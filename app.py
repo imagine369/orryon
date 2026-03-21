@@ -50,7 +50,14 @@ except Exception as _crewai_err:
     logger_pre.warning("crewai not available (%s). AI chat disabled.", _crewai_err)
 
 from config import USER_ID
-from db import fetch_rows
+from db import (
+    authenticate_user,
+    create_user,
+    fetch_rows,
+    load_chat_history,
+    save_chat_message,
+)
+from memory import extract_memory_facts, retrieve_relevant_memories, store_memory
 from tools import (
     add_bill_reminder,
     analyze_spending_trends,
@@ -214,7 +221,10 @@ def _init_state() -> None:
         "chat_history": [],
         "data_loaded": False,
         "last_sync": None,
-        "screen": "home",   # home | signin | signup
+        "screen": "home",       # home | signin | signup
+        "user_id": None,        # set after successful login
+        "display_name": "",     # shown in sidebar + welcome
+        "auth_error": "",       # sign-in / sign-up error message
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -225,27 +235,81 @@ _init_state()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AGENT RUNNER
+# AGENT RUNNER + RESPONSE PARSER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_agent_query(user_query: str) -> str:
+import re as _re
+
+
+def _parse_agent_response(raw: str) -> dict:
     """
-    Route a user query through the multi-agent system and return the result.
-    Falls back to a helpful message if crewai / Ollama are not available.
+    Extract the structured JSON terminus block from an agent response.
+    Returns a dict with keys: text, status, summary, confidence, evidence,
+    next_steps_or_question. Falls back gracefully if JSON is absent.
+    """
+    # Try to find the trailing JSON block
+    json_match = _re.search(
+        r'\{\s*"status"\s*:.*?"next_steps_or_question"\s*:.*?\}',
+        raw,
+        _re.DOTALL,
+    )
+    if json_match:
+        json_str = json_match.group(0)
+        # Text is everything before the JSON block
+        text_part = raw[: json_match.start()].strip()
+        try:
+            meta = json.loads(json_str)
+            return {
+                "text": text_part,
+                "status": meta.get("status", "complete"),
+                "summary": meta.get("summary", ""),
+                "confidence": int(meta.get("confidence", 0)),
+                "evidence": meta.get("evidence", ""),
+                "next_steps_or_question": meta.get("next_steps_or_question", ""),
+            }
+        except json.JSONDecodeError:
+            pass
+    # No valid JSON found — return raw text with neutral meta
+    return {
+        "text": raw.strip(),
+        "status": "complete",
+        "summary": "",
+        "confidence": 0,
+        "evidence": "",
+        "next_steps_or_question": "",
+    }
+
+
+def run_agent_query(user_query: str, user_id: str | None = None) -> dict:
+    """
+    Route a user query through the multi-agent system and return a parsed dict:
+      text                  — main response body (may include Thought/Plan/Action)
+      status                — "complete" | "needs_input" | "partial" | "stuck"
+      summary               — one-line summary of what was accomplished
+      confidence            — int 0–100
+      evidence              — proof string
+      next_steps_or_question — follow-up question if status != "complete"
+
+    Falls back to a helpful message dict if crewai / LLM is not available.
+    Long-term memory is retrieved before the query and stored after.
     """
     if not CREWAI_AVAILABLE:
-        return (
+        return _parse_agent_response(
             "⚠️ **AI chat requires Python 3.10+** and a running LLM.\n\n"
             "**To enable it:**\n"
             "1. Install Python 3.10+ (via [python.org](https://python.org/downloads) or `brew install python@3.11`)\n"
             "2. Create a virtualenv: `python3.11 -m venv .venv && source .venv/bin/activate`\n"
             "3. Install deps: `pip install -r requirements.txt`\n"
-            "4. Install Ollama: [ollama.com](https://ollama.com) → `ollama pull llama3.1`\n"
-            "5. Re-launch: `streamlit run app.py`\n\n"
+            "4. Re-launch: `streamlit run app.py`\n\n"
             "The **Dashboard, Budget, Forecast, Schedule, Notes, and Reports** tabs all work right now — explore them!"
         )
+
+    # ── Retrieve long-term memories for this user ──────────────────────────
+    effective_uid = user_id or st.session_state.get("user_id") or USER_ID
+    memory_context = retrieve_relevant_memories(effective_uid, user_query)
+
     try:
-        tasks = route_query_to_tasks(user_query)
+        tasks = route_query_to_tasks(user_query, memory_context=memory_context)
         needed_agents = list({t.agent for t in tasks if t.agent is not orchestrator})
         if not needed_agents:
             needed_agents = [data_aggregator]
@@ -258,13 +322,35 @@ def run_agent_query(user_query: str) -> str:
             memory=True,
         )
         result = crew.kickoff()
-        return str(result)
+        parsed = _parse_agent_response(str(result))
+
+        # ── Store new memory facts extracted from this exchange ────────────
+        facts = extract_memory_facts(user_query, parsed["text"])
+        for fact in facts:
+            store_memory(
+                effective_uid,
+                fact,
+                {
+                    "type": "fact",
+                    "query": user_query[:120],
+                    "confidence": str(parsed.get("confidence", 0)),
+                },
+            )
+        # Always store the summary as a compact memory if it's meaningful
+        summary = parsed.get("summary", "").strip()
+        if summary and len(summary) > 15:
+            store_memory(
+                effective_uid,
+                summary,
+                {"type": "summary", "query": user_query[:120]},
+            )
+
+        return parsed
     except Exception as exc:
         logger.error("Agent query error: %s", exc)
-        return (
+        return _parse_agent_response(
             f"**Error:** {exc}\n\n"
-            "Tip: Make sure Ollama is running (`ollama serve`) and the model is pulled "
-            "(`ollama pull llama3.1`). Or set `LLM_PROVIDER=grok` + `XAI_API_KEY` in your `.env`."
+            "Tip: Set `LLM_PROVIDER=grok` + `XAI_API_KEY` in your `.env` file."
         )
 
 
@@ -290,23 +376,23 @@ def _guess_agent_label(query: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _nw() -> dict:
-    return json.loads(calculate_net_worth(""))
+    return json.loads(calculate_net_worth.invoke(""))
 
 
 def _spending(days: int = 30) -> dict:
-    return json.loads(get_spending_by_category(json.dumps({"days": days})))
+    return json.loads(get_spending_by_category.invoke(json.dumps({"days": days})))
 
 
 def _portfolio() -> dict:
-    return json.loads(get_portfolio_performance(json.dumps({"fetch_live_prices": False})))
+    return json.loads(get_portfolio_performance.invoke(json.dumps({"fetch_live_prices": False})))
 
 
 def _upcoming_events(days: int = 30) -> list:
-    return json.loads(list_upcoming_events(json.dumps({"days": days}))).get("events", [])
+    return json.loads(list_upcoming_events.invoke(json.dumps({"days": days}))).get("events", [])
 
 
 def _recommendations() -> list:
-    return json.loads(get_financial_recommendations("")).get("recommendations", [])
+    return json.loads(get_financial_recommendations.invoke("")).get("recommendations", [])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -332,7 +418,7 @@ with st.sidebar:
     with col_load:
         if st.button("📥 Load Sample", use_container_width=True):
             with st.spinner("Loading…"):
-                res = json.loads(load_sample_data(""))
+                res = json.loads(load_sample_data.invoke(""))
                 if res.get("status") == "success":
                     st.session_state.data_loaded = True
                     st.session_state.last_sync = datetime.now().isoformat()
@@ -349,15 +435,13 @@ with st.sidebar:
 
     st.divider()
     with st.expander("⚙️ Settings"):
-        llm_display = st.radio(
-            "LLM Backend", ["Grok (xAI) — grok-latest", "Ollama (local, private)"],
-            horizontal=False, label_visibility="collapsed",
-        )
-        if "Grok" in llm_display:
-            st.info("Set `LLM_PROVIDER=grok` and `XAI_API_KEY` in `.env`. Get a key at console.x.ai")
-        else:
-            st.info("Set `LLM_PROVIDER=ollama` in `.env`. Ensure `ollama serve` is running.")
-        st.caption(f"User ID: `{USER_ID}`")
+        st.info("LLM: **Grok (xAI) — grok-latest**\nSet `XAI_API_KEY` in `.env`. Get a key at [console.x.ai](https://console.x.ai)")
+        _sid_dn = st.session_state.get("display_name", "")
+        _sid_uid = st.session_state.get("user_id") or USER_ID or ""
+        if _sid_dn:
+            st.caption(f"Signed in as **{_sid_dn}**")
+        if _sid_uid:
+            st.caption(f"User ID: `{_sid_uid[:8]}…`")
 
     st.divider()
     st.caption("🔒 All data stored locally in `finance.db`.")
@@ -480,14 +564,14 @@ if not st.session_state.data_loaded:
         # social buttons
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
         if st.button("🔵  Sign in with Google", use_container_width=True, key="si_google"):
-            load_sample_data(""); st.session_state.data_loaded = True
+            load_sample_data.invoke(""); st.session_state.data_loaded = True
             st.session_state.last_sync = datetime.now().isoformat()
             st.session_state.screen = "home"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
         if st.button("🍎  Sign in with Apple", use_container_width=True, key="si_apple"):
-            load_sample_data(""); st.session_state.data_loaded = True
+            load_sample_data.invoke(""); st.session_state.data_loaded = True
             st.session_state.last_sync = datetime.now().isoformat()
             st.session_state.screen = "home"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -495,19 +579,36 @@ if not st.session_state.data_loaded:
         st.markdown('<div class="or-divider">or</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="auth-input">', unsafe_allow_html=True)
-        email = st.text_input("", placeholder="Phone, email, or username",
-                              label_visibility="collapsed", key="si_email")
+        si_username = st.text_input("Username or email", placeholder="Username or email",
+                                    label_visibility="collapsed", key="si_username")
+        si_password = st.text_input("Password", placeholder="Password", type="password",
+                                    label_visibility="collapsed", key="si_password")
         st.markdown('</div>', unsafe_allow_html=True)
+
+        if st.session_state.auth_error:
+            st.error(st.session_state.auth_error)
 
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("Next", use_container_width=True, key="si_next"):
-            load_sample_data(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="auth-btn auth-btn-outline" style="margin-top:0.5rem">', unsafe_allow_html=True)
-        st.button("Forgot password?", use_container_width=True, key="si_forgot")
+        if st.button("Sign in", use_container_width=True, key="si_next"):
+            if not si_username or not si_password:
+                st.session_state.auth_error = "Please enter your username and password."
+                st.rerun()
+            else:
+                _user = authenticate_user(si_username, si_password)
+                if _user:
+                    st.session_state.auth_error = ""
+                    st.session_state.user_id = _user["id"]
+                    st.session_state.display_name = _user["display_name"]
+                    st.session_state.chat_history = load_chat_history(_user["id"])
+                    if not st.session_state.data_loaded:
+                        load_sample_data.invoke("")
+                        st.session_state.data_loaded = True
+                    st.session_state.last_sync = datetime.now().isoformat()
+                    st.session_state.screen = "home"
+                    st.rerun()
+                else:
+                    st.session_state.auth_error = "Invalid username or password."
+                    st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown(
@@ -515,6 +616,7 @@ if not st.session_state.data_loaded:
             '<span id="goto-signup">Sign up</span></div>', unsafe_allow_html=True)
         if st.button("→ Sign up instead", key="si_goto_signup",
                      help="Go to sign up"):
+            st.session_state.auth_error = ""
             st.session_state.screen = "signup"; st.rerun()
         st.stop()
 
@@ -538,14 +640,14 @@ if not st.session_state.data_loaded:
 
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
         if st.button("🔵  Sign up with Google", use_container_width=True, key="su_google"):
-            load_sample_data(""); st.session_state.data_loaded = True
+            load_sample_data.invoke(""); st.session_state.data_loaded = True
             st.session_state.last_sync = datetime.now().isoformat()
             st.session_state.screen = "home"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
         if st.button("🍎  Sign up with Apple", use_container_width=True, key="su_apple"):
-            load_sample_data(""); st.session_state.data_loaded = True
+            load_sample_data.invoke(""); st.session_state.data_loaded = True
             st.session_state.last_sync = datetime.now().isoformat()
             st.session_state.screen = "home"; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -553,21 +655,59 @@ if not st.session_state.data_loaded:
         st.markdown('<div class="or-divider">or</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="auth-input">', unsafe_allow_html=True)
-        su_name  = st.text_input("", placeholder="Name", label_visibility="collapsed", key="su_name")
-        su_email = st.text_input("", placeholder="Phone or email", label_visibility="collapsed", key="su_email")
+        su_name     = st.text_input("Your name", placeholder="Your name",
+                                    label_visibility="collapsed", key="su_name")
+        su_username = st.text_input("Choose a username", placeholder="Choose a username",
+                                    label_visibility="collapsed", key="su_username")
+        su_email    = st.text_input("Email (optional)", placeholder="Email (optional)",
+                                    label_visibility="collapsed", key="su_email")
+        su_password = st.text_input("Password", placeholder="Password (min 6 chars)", type="password",
+                                    label_visibility="collapsed", key="su_password")
+        su_confirm  = st.text_input("Confirm password", placeholder="Confirm password", type="password",
+                                    label_visibility="collapsed", key="su_confirm")
         st.markdown('</div>', unsafe_allow_html=True)
+
+        if st.session_state.auth_error:
+            st.error(st.session_state.auth_error)
 
         st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
         if st.button("Create account", use_container_width=True, key="su_create"):
-            load_sample_data(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
+            if not su_username or not su_password:
+                st.session_state.auth_error = "Username and password are required."
+                st.rerun()
+            elif len(su_password) < 6:
+                st.session_state.auth_error = "Password must be at least 6 characters."
+                st.rerun()
+            elif su_password != su_confirm:
+                st.session_state.auth_error = "Passwords do not match."
+                st.rerun()
+            else:
+                _new_user = create_user(
+                    username=su_username,
+                    password=su_password,
+                    display_name=su_name or su_username,
+                    email=su_email,
+                )
+                if _new_user:
+                    st.session_state.auth_error = ""
+                    st.session_state.user_id = _new_user["id"]
+                    st.session_state.display_name = _new_user["display_name"]
+                    st.session_state.chat_history = []
+                    load_sample_data.invoke("")
+                    st.session_state.data_loaded = True
+                    st.session_state.last_sync = datetime.now().isoformat()
+                    st.session_state.screen = "home"
+                    st.rerun()
+                else:
+                    st.session_state.auth_error = "Username already taken. Please choose another."
+                    st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown(
             '<div class="auth-footer">Already have an account? '
             '<span>Sign in</span></div>', unsafe_allow_html=True)
         if st.button("→ Sign in instead", key="su_goto_signin"):
+            st.session_state.auth_error = ""
             st.session_state.screen = "signin"; st.rerun()
         st.stop()
 
@@ -754,7 +894,7 @@ with _app_l:
         st.caption("Local-first · Private · Multi-agent")
         st.divider()
         if st.session_state.data_loaded:
-            _nw_q = json.loads(calculate_net_worth(""))
+            _nw_q = json.loads(calculate_net_worth.invoke(""))
             if "net_worth" in _nw_q:
                 st.metric("Net Worth", f"${_nw_q['net_worth']:,.0f}")
                 _c1, _c2 = st.columns(2)
@@ -765,17 +905,22 @@ with _app_l:
             st.session_state.last_sync = datetime.now().isoformat()
             st.success("Synced!")
         st.divider()
+        # ── Logged-in user info ───────────────────────────────────────────
+        _dn = st.session_state.get("display_name", "")
+        if _dn:
+            st.caption(f"Signed in as **{_dn}**")
+            st.divider()
         st.subheader("⚙️ Settings")
-        _llm = st.radio("LLM Backend", ["Grok (xAI)", "Ollama (local)"],
-                        label_visibility="collapsed")
-        if "Grok" in _llm:
-            st.caption("Set `LLM_PROVIDER=grok` + `XAI_API_KEY` in `.env`")
-        else:
-            st.caption("Set `LLM_PROVIDER=ollama` in `.env`")
+        st.caption("LLM: **Grok (xAI)**")
+        st.caption("Set `XAI_API_KEY` in `.env`")
         st.divider()
         st.caption("🔒 Data in `finance.db` · Notes in `notes/`")
         if st.button("← Sign out", use_container_width=True):
             st.session_state.data_loaded = False
+            st.session_state.user_id = None
+            st.session_state.display_name = ""
+            st.session_state.chat_history = []
+            st.session_state.auth_error = ""
             st.rerun()
 with _app_c:
     st.markdown('<h1 class="main-header">💰 guddd</h1>', unsafe_allow_html=True)
@@ -857,10 +1002,58 @@ with tab_chat:
                 )
             else:
                 badge = f'<span class="badge">🤖 {msg.get("agent", "AI")}</span>'
+                status = msg.get("status", "")
+                confidence = msg.get("confidence", 0)
+                summary = msg.get("summary", "")
+                evidence = msg.get("evidence", "")
+                next_q = msg.get("next_steps_or_question", "")
+
+                # Status badge colours
+                _status_colours = {
+                    "complete": "#22c55e",
+                    "partial": "#f59e0b",
+                    "needs_input": "#3b82f6",
+                    "stuck": "#ef4444",
+                }
+                _status_icons = {
+                    "complete": "✅",
+                    "partial": "⏳",
+                    "needs_input": "❓",
+                    "stuck": "🚫",
+                }
+                status_colour = _status_colours.get(status, "#888")
+                status_icon = _status_icons.get(status, "🤖")
+
                 st.markdown(
                     f'<div class="chat-ai">{badge}<br>{msg["content"]}</div>',
                     unsafe_allow_html=True,
                 )
+
+                # Render structured metadata below the message bubble
+                if status or confidence:
+                    meta_cols = st.columns([2, 2, 3])
+                    if status:
+                        meta_cols[0].markdown(
+                            f'<span style="color:{status_colour};font-size:0.8rem;'
+                            f'font-weight:600">{status_icon} {status.upper()}</span>',
+                            unsafe_allow_html=True,
+                        )
+                    if confidence:
+                        bar_pct = max(0, min(100, confidence))
+                        meta_cols[1].markdown(
+                            f'<span style="font-size:0.8rem;color:#aaa">Confidence: '
+                            f'<strong style="color:#fff">{bar_pct}%</strong></span>',
+                            unsafe_allow_html=True,
+                        )
+                        meta_cols[2].progress(bar_pct / 100)
+
+                if summary:
+                    st.caption(f"**Summary:** {summary}")
+                if evidence:
+                    with st.expander("Evidence", expanded=False):
+                        st.markdown(evidence)
+                if next_q:
+                    st.info(f"**Follow-up:** {next_q}")
 
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_area(
@@ -884,17 +1077,29 @@ with tab_chat:
     to_process = triggered or (user_input.strip() if submitted and user_input.strip() else None)
 
     if to_process:
-        st.session_state.chat_history.append({"role": "user", "content": to_process})
+        _active_uid = st.session_state.get("user_id") or USER_ID
+        _user_msg = {"role": "user", "content": to_process}
+        st.session_state.chat_history.append(_user_msg)
+        save_chat_message(_active_uid, _user_msg)
+
         with st.spinner("Consulting your financial agents…"):
             if not st.session_state.data_loaded:
-                load_sample_data("")
+                load_sample_data.invoke("")
                 st.session_state.data_loaded = True
-            response = run_agent_query(to_process)
-        st.session_state.chat_history.append({
+            parsed = run_agent_query(to_process, user_id=_active_uid)
+
+        _ai_msg = {
             "role": "assistant",
-            "content": response,
+            "content": parsed["text"],
             "agent": _guess_agent_label(to_process),
-        })
+            "status": parsed.get("status", "complete"),
+            "summary": parsed.get("summary", ""),
+            "confidence": parsed.get("confidence", 0),
+            "evidence": parsed.get("evidence", ""),
+            "next_steps_or_question": parsed.get("next_steps_or_question", ""),
+        }
+        st.session_state.chat_history.append(_ai_msg)
+        save_chat_message(_active_uid, _ai_msg)
         st.rerun()
 
 
@@ -1062,7 +1267,7 @@ with tab_budget:
             # Spending trend (month-over-month)
             st.divider()
             st.subheader("Month-over-Month Trends")
-            trend_data = json.loads(analyze_spending_trends(json.dumps({"user_id": USER_ID})))
+            trend_data = json.loads(analyze_spending_trends.invoke(json.dumps({"user_id": USER_ID})))
             insights = trend_data.get("insights", [])
             if insights:
                 for ins in insights[:5]:
@@ -1078,7 +1283,7 @@ with tab_budget:
         st.subheader("Subscription Audit")
         if st.button("🔍 Detect Subscriptions", type="primary"):
             with st.spinner("Analysing transactions…"):
-                sub_res = json.loads(detect_subscriptions(""))
+                sub_res = json.loads(detect_subscriptions.invoke(""))
                 subs = sub_res.get("subscriptions", [])
                 monthly_total = sub_res.get("monthly_total", 0)
                 if subs:
@@ -1129,7 +1334,7 @@ with tab_forecast:
         cf_savings_rate = st.slider("Extra savings rate (%)", 0, 50, 10, key="cf_sr") / 100
 
         if st.button("📈 Generate Forecast", type="primary", key="btn_cf"):
-            cf_res = json.loads(forecast_cash_flow(json.dumps({
+            cf_res = json.loads(forecast_cash_flow.invoke(json.dumps({
                 "months": cf_months, "monthly_income": cf_income,
                 "monthly_expenses": cf_expenses, "current_balance": cf_balance,
                 "savings_rate": cf_savings_rate,
@@ -1176,7 +1381,7 @@ with tab_forecast:
 
         if st.button("🎲 Run Monte Carlo", type="primary", key="btn_mc"):
             with st.spinner(f"Running {mc_sims:,} scenarios…"):
-                mc_res = json.loads(run_monte_carlo_retirement(json.dumps({
+                mc_res = json.loads(run_monte_carlo_retirement.invoke(json.dumps({
                     "current_age": mc_cur_age, "retirement_age": mc_ret_age,
                     "current_savings": mc_savings, "monthly_contribution": mc_contrib,
                     "annual_return_mean": mc_return, "annual_return_std": 0.15,
@@ -1247,7 +1452,7 @@ with tab_forecast:
             sc_dur = st.slider("Duration (months)", 1, 24, 6, key="sc_d")
 
         if st.button("⚡ Simulate", type="primary", key="btn_sc"):
-            sc_res = json.loads(simulate_scenario(json.dumps({
+            sc_res = json.loads(simulate_scenario.invoke(json.dumps({
                 "scenario": sc_scenario, "duration_months": sc_dur,
                 "current_monthly_income": sc_inc,
                 "current_monthly_expenses": sc_exp,
@@ -1320,7 +1525,7 @@ with tab_schedule:
             b_day = st.number_input("Due Day of Month", 1, 28, 1, key="b_day")
             b_rec = st.checkbox("Recurring Monthly", value=True)
             if st.form_submit_button("Add Reminder 🔔", type="primary"):
-                res = json.loads(add_bill_reminder(json.dumps({
+                res = json.loads(add_bill_reminder.invoke(json.dumps({
                     "bill_name": b_name, "amount": b_amt,
                     "due_day": b_day, "is_recurring": b_rec,
                 })))
@@ -1338,7 +1543,7 @@ with tab_schedule:
             ev_type = st.selectbox("Type", ["reminder", "review", "goal_deadline", "bill_due"], key="ev_type")
             ev_desc = st.text_area("Notes", height=70, key="ev_desc")
             if st.form_submit_button("Create Event 📅", type="primary"):
-                res = json.loads(create_calendar_event(json.dumps({
+                res = json.loads(create_calendar_event.invoke(json.dumps({
                     "title": ev_title,
                     "date": ev_date.strftime("%Y-%m-%d"),
                     "event_type": ev_type,
@@ -1363,7 +1568,7 @@ with tab_notes:
     with n_left:
         search_q = st.text_input("🔍 Search notes", placeholder="savings, goal, investment…")
         if search_q:
-            res = json.loads(search_notes(search_q))
+            res = json.loads(search_notes.invoke(search_q))
             notes_show = res.get("notes", [])
             st.caption(f"Found {res.get('count', 0)} note(s)")
         else:
@@ -1396,7 +1601,7 @@ with tab_notes:
                 (g["id"] for g in goals_list if g["name"] == linked_goal_name), ""
             )
             if st.form_submit_button("Save Note 💾", type="primary"):
-                res = json.loads(save_note(json.dumps({
+                res = json.loads(save_note.invoke(json.dumps({
                     "title": n_title, "content": n_content,
                     "tags": n_tags, "linked_goal": linked_goal_id,
                 })))
@@ -1409,7 +1614,7 @@ with tab_notes:
         st.divider()
         if st.button("📋 Summarise Recent Notes (AI)", use_container_width=True):
             with st.spinner("Summarising…"):
-                sum_res = json.loads(summarize_notes(json.dumps({"days": 30})))
+                sum_res = json.loads(summarize_notes.invoke(json.dumps({"days": 30})))
                 summaries = sum_res.get("summaries", [])
                 if summaries:
                     st.write(f"**{sum_res.get('total_notes', 0)} notes — last 30 days:**")
@@ -1440,7 +1645,7 @@ with tab_reports:
             end_d = d2.date_input("End", value=datetime.now(), key="rend")
 
             if st.button("📊 Generate CSV", type="primary", key="btn_csv"):
-                res = json.loads(generate_csv_report(json.dumps({
+                res = json.loads(generate_csv_report.invoke(json.dumps({
                     "report_type": rtype,
                     "start_date": start_d.strftime("%Y-%m-%d"),
                     "end_date": end_d.strftime("%Y-%m-%d"),
@@ -1471,7 +1676,7 @@ with tab_reports:
             if st.button("Calculate Payoff Plan 💳", type="primary", key="btn_debt"):
                 try:
                     debts = json.loads(debts_json)
-                    res = json.loads(get_debt_payoff_plan(json.dumps({
+                    res = json.loads(get_debt_payoff_plan.invoke(json.dumps({
                         "debts": debts, "extra_monthly_payment": extra_pmt,
                     })))
                     st.metric("Total Debt", f"${res.get('total_debt', 0):,.2f}")

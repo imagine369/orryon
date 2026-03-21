@@ -5,6 +5,8 @@ All financial state is persisted locally in a single SQLite file (finance.db).
 No cloud sync by default — privacy first.
 
 Tables:
+  users          - registered user accounts (multi-user auth)
+  chat_messages  - persistent chat history per user
   accounts       - bank, investment, credit, loan, and manual asset accounts
   transactions   - income and expense line items
   holdings       - investment portfolio positions
@@ -16,12 +18,17 @@ Tables:
 
 Usage:
   from db import insert_row, fetch_rows, update_row, get_connection
+  from db import create_user, authenticate_user, save_chat_message, load_chat_history
 """
 
 from __future__ import annotations
 
+import hashlib
+import os
 import sqlite3
 import logging
+import uuid
+from datetime import datetime
 from config import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -46,6 +53,30 @@ def init_db() -> None:
     cur = conn.cursor()
 
     cur.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id            TEXT PRIMARY KEY,
+            username      TEXT UNIQUE NOT NULL,
+            email         TEXT,
+            display_name  TEXT,
+            password_hash TEXT NOT NULL,
+            salt          TEXT NOT NULL,
+            created_at    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            role        TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            agent       TEXT,
+            status      TEXT,
+            summary     TEXT,
+            confidence  INTEGER,
+            evidence    TEXT,
+            next_steps  TEXT,
+            created_at  TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS accounts (
             id            TEXT PRIMARY KEY,
             user_id       TEXT NOT NULL,
@@ -224,6 +255,122 @@ def delete_row(table: str, where: dict) -> bool:
     except Exception as exc:
         logger.error("delete_row(%s) error: %s", table, exc)
         return False
+
+
+# ── Password helpers ──────────────────────────────────────────────────────────
+
+def _hash_password(password: str, salt: str) -> str:
+    """PBKDF2-SHA256 hash with per-user salt. Built-in — no extra dependency."""
+    dk = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations=260_000,
+    )
+    return dk.hex()
+
+
+# ── User auth ─────────────────────────────────────────────────────────────────
+
+def create_user(
+    username: str,
+    password: str,
+    display_name: str = "",
+    email: str = "",
+) -> dict | None:
+    """
+    Create a new user. Returns the user dict on success, None if username exists.
+    """
+    salt = os.urandom(32).hex()
+    user = {
+        "id": str(uuid.uuid4()),
+        "username": username.strip().lower(),
+        "email": email.strip().lower(),
+        "display_name": display_name.strip() or username.strip(),
+        "password_hash": _hash_password(password, salt),
+        "salt": salt,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    if insert_row("users", user):
+        logger.info("Created user: %s (%s)", user["username"], user["id"])
+        return user
+    return None
+
+
+def authenticate_user(username: str, password: str) -> dict | None:
+    """
+    Validate credentials. Returns the user dict on success, None on failure.
+    Accepts username or email.
+    """
+    username = username.strip().lower()
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1",
+            (username, username),
+        ).fetchone()
+        conn.close()
+    except Exception as exc:
+        logger.error("authenticate_user error: %s", exc)
+        return None
+
+    if not row:
+        return None
+    user = dict(row)
+    expected = _hash_password(password, user["salt"])
+    if not hashlib.compare_digest(expected, user["password_hash"]):
+        return None
+    return user
+
+
+# ── Chat persistence ──────────────────────────────────────────────────────────
+
+def save_chat_message(user_id: str, msg: dict) -> bool:
+    """Persist a single chat message (user or assistant) for *user_id*."""
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "role": msg.get("role", "user"),
+        "content": msg.get("content", ""),
+        "agent": msg.get("agent", ""),
+        "status": msg.get("status", ""),
+        "summary": msg.get("summary", ""),
+        "confidence": msg.get("confidence", 0),
+        "evidence": msg.get("evidence", ""),
+        "next_steps": msg.get("next_steps_or_question", ""),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    return insert_row("chat_messages", row)
+
+
+def load_chat_history(user_id: str, limit: int = 100) -> list[dict]:
+    """
+    Load the most recent *limit* messages for *user_id*, oldest-first so they
+    render in correct chronological order.
+    """
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            """
+            SELECT * FROM (
+                SELECT * FROM chat_messages
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ) ORDER BY created_at ASC
+            """,
+            (user_id, limit),
+        ).fetchall()
+        conn.close()
+        msgs = []
+        for r in rows:
+            d = dict(r)
+            d["next_steps_or_question"] = d.pop("next_steps", "")
+            msgs.append(d)
+        return msgs
+    except Exception as exc:
+        logger.error("load_chat_history error: %s", exc)
+        return []
 
 
 # Auto-initialise on import

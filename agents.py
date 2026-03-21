@@ -4,22 +4,68 @@ agents.py — All CrewAI agents for guddd Personal Finance Dashboard.
 
 from __future__ import annotations
 
-Architecture (hierarchical CrewAI)
-────────────────────────────────────
-  Orchestrator  (manager)
-    ├─ DataAggregator   — fetches raw financial data (Plaid, yfinance, DB)
-    ├─ NetWorth         — net worth, portfolio performance, asset allocation
-    ├─ BudgetExpense    — spending categorisation, subscriptions, budgets
-    ├─ Forecasting      — cash flow, Monte Carlo retirement, scenario analysis
-    ├─ Insights         — anomaly detection, recommendations, trend analysis
-    ├─ Scheduling       — calendar events, bill reminders, Google Calendar sync
-    └─ Notes            — financial journal: save, search, summarise notes
+# Architecture (hierarchical CrewAI)
+# ────────────────────────────────────
+#   Orchestrator  (manager)
+#     ├─ DataAggregator   — fetches raw financial data (Plaid, yfinance, DB)
+#     ├─ NetWorth         — net worth, portfolio performance, asset allocation
+#     ├─ BudgetExpense    — spending categorisation, subscriptions, budgets
+#     ├─ Forecasting      — cash flow, Monte Carlo retirement, scenario analysis
+#     ├─ Insights         — anomaly detection, recommendations, trend analysis
+#     ├─ Scheduling       — calendar events, bill reminders, Google Calendar sync
+#     └─ Notes            — financial journal: save, search, summarise notes
+#
+# Adding a new agent (e.g., TaxPlanner):
+#   1. Define its tools in tools.py.
+#   2. Create an Agent instance below with role / goal / backstory / tools.
+#   3. Append it to ALL_AGENTS and AGENT_MAP.
+#   4. Add routing keywords to tasks.py → route_query_to_tasks().
 
-Adding a new agent (e.g., TaxPlanner):
-  1. Define its tools in tools.py.
-  2. Create an Agent instance below with role / goal / backstory / tools.
-  3. Append it to ALL_AGENTS and AGENT_MAP.
-  4. Add routing keywords to tasks.py → route_query_to_tasks().
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PERSISTENT RECURSIVE AGENT DIRECTIVE
+# Injected into every agent's backstory so the LLM adopts this reasoning style.
+# ─────────────────────────────────────────────────────────────────────────────
+
+AGENT_DIRECTIVE = """
+
+═══════════════════════════════════════════════
+CORE BEHAVIOR DIRECTIVE — apply to every response
+═══════════════════════════════════════════════
+You are a persistent, recursive task agent powered by Grok via the xAI API.
+Your directive: fully resolve the user's intent — continue reasoning, planning,
+using tools, verifying results, self-correcting, and iterating until the goal is
+verifiably complete.
+
+REASONING FORMAT — use this exact structure in every response:
+  Thought: [current state analysis · progress so far · what's achieved/verified ·
+            what's missing/broken/inconsistent · risks or edge cases]
+  Plan:    [numbered 1–4 next concrete, prioritised steps]
+  Action:  [tool calls, analysis, computation, or final answer if goal is achieved]
+
+COMPLETION RULES:
+• Only conclude when the task is 100% achieved with concrete evidence.
+• Actively verify outputs where possible (check data, confirm tool results).
+• Target confidence ≥ 90 based on evidence, not assumption.
+• If blocked or clarification needed → ask ONE precise, focused question and pause.
+• Never guess or proceed blindly when state is ambiguous.
+
+PROACTIVE BEHAVIOUR:
+• Automatically chain steps — do not wait for permission to proceed.
+• Self-correct hallucinations or tool errors; re-read data if context feels stale.
+• Prefer structured planning before mass edits or large computations.
+
+OUTPUT DISCIPLINE:
+• No vague "looks good" or premature congratulations — prove everything with evidence.
+• End your FINAL response with this exact JSON block (no extra text after it):
+{
+  "status": "complete" | "needs_input" | "partial" | "stuck",
+  "summary": "<brief human-readable result of what was accomplished>",
+  "confidence": <integer 0–100>,
+  "evidence": "<specific proof: e.g. tool returned X, calculation verified, data confirmed>",
+  "next_steps_or_question": "<empty string if complete, or one clear question>"
+}
+═══════════════════════════════════════════════
 """
 
 from crewai import Agent
@@ -97,6 +143,7 @@ orchestrator = Agent(
         "agents and synthesise their outputs into clear, jargon-free answers. "
         "You prioritise the user's financial wellbeing above all else, "
         "never judge spending decisions, and always suggest one concrete next step."
+        + AGENT_DIRECTIVE
     ),
     tools=[
         fetch_bank_accounts,
@@ -133,6 +180,7 @@ data_aggregator = Agent(
         "to SQLite, and never log raw account numbers or personal identifiers. "
         "When live APIs are unavailable you serve stale-but-valid cached data rather than "
         "failing the user."
+        + AGENT_DIRECTIVE
     ),
     tools=[
         fetch_bank_accounts,
@@ -170,6 +218,7 @@ net_worth_agent = Agent(
         "You present net worth not just as a number but as a story — where the wealth came "
         "from, how it is allocated, and what the trajectory looks like. "
         "You always note that investment values are estimates based on last available prices."
+        + AGENT_DIRECTIVE
     ),
     tools=[
         calculate_net_worth,
@@ -207,6 +256,7 @@ budget_agent = Agent(
         "always empowering. You translate raw transaction lists into clear stories: "
         "'You spent 28% of your income on dining — your all-time high. Here's why that matters "
         "and what a 5% reduction would mean for your retirement date.'"
+        + AGENT_DIRECTIVE
     ),
     tools=[
         fetch_transactions,
@@ -244,6 +294,7 @@ forecasting_agent = Agent(
         "percentile? Can the user survive a 2008-style crash five years before retirement? "
         "You translate Monte Carlo math into clear language and always caveat projections: "
         "'Past market returns do not guarantee future performance.'"
+        + AGENT_DIRECTIVE
     ),
     tools=[
         forecast_cash_flow,
@@ -281,6 +332,7 @@ insights_agent = Agent(
         "a flag, but a $14 coffee on Saturday morning does not. "
         "You present insights with just enough context — one sentence of what, one of why "
         "it matters, one concrete suggestion."
+        + AGENT_DIRECTIVE
     ),
     tools=[
         detect_anomalies,
@@ -320,6 +372,7 @@ scheduling_agent = Agent(
         "reminders before every bill due date, quarterly rebalancing reviews, and annual "
         "tax-prep blocks. You know every major IRS deadline, when credit card statements "
         "close, and why reviewing subscriptions once a quarter pays for itself 10×."
+        + AGENT_DIRECTIVE
     ),
     tools=[
         create_calendar_event,
@@ -357,6 +410,7 @@ notes_agent = Agent(
         "user always owns their data. You surface relevant past notes to provide context in "
         "planning conversations: 'You wrote in January that you wanted to cut dining by 20% "
         "— here is how March compared.'"
+        + AGENT_DIRECTIVE
     ),
     tools=[
         save_note,

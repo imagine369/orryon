@@ -4,8 +4,11 @@ crewai-tools>=0.15.0
 langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-community>=0.3.0
-langchain-xai>=0.2.0        # Grok (xAI) — official LangChain integration, no OpenAI dependency
-langchain-ollama>=0.2.0     # local/private fallback
+langchain-xai>=0.2.0        # Grok (xAI) — sole LLM, no OpenAI dependency
+
+# ── Long-term Agent Memory ─────────────────────────────────────────────────────
+chromadb>=0.5.0             # local vector store for per-user persistent memory
+sentence-transformers>=3.0.0  # all-MiniLM-L6-v2 embeddings (local, 22 MB, no API key)
 
 # ── Finance & Banking ──────────────────────────────────────────────────────────
 plaid-python>=20.0.0
