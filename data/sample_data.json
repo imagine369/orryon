@@ -1,0 +1,237 @@
+{
+  "_comment": "Sample financial data for Sabba AI. Load via 'Load Sample' button or load_sample_data tool.",
+  "accounts": [
+    {
+      "id": "acc_checking_001",
+      "name": "Chase Checking",
+      "type": "checking",
+      "institution": "Chase",
+      "balance": 4250.67,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_savings_001",
+      "name": "Ally HYSA (4.75% APY)",
+      "type": "savings",
+      "institution": "Ally Bank",
+      "balance": 18500.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_invest_001",
+      "name": "Fidelity Brokerage",
+      "type": "investment",
+      "institution": "Fidelity",
+      "balance": 87430.25,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_401k_001",
+      "name": "401(k) — Fidelity",
+      "type": "investment",
+      "institution": "Fidelity",
+      "balance": 245000.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_roth_001",
+      "name": "Roth IRA — Fidelity",
+      "type": "investment",
+      "institution": "Fidelity",
+      "balance": 42000.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_cc_001",
+      "name": "Chase Sapphire Reserve",
+      "type": "credit",
+      "institution": "Chase",
+      "balance": -2340.50,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_cc_002",
+      "name": "Amex Blue Cash",
+      "type": "credit",
+      "institution": "American Express",
+      "balance": -820.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_mortgage_001",
+      "name": "Home Mortgage",
+      "type": "loan",
+      "institution": "Wells Fargo",
+      "balance": -285000.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_student_001",
+      "name": "Student Loan",
+      "type": "loan",
+      "institution": "Navient",
+      "balance": -15000.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_home_001",
+      "name": "Home Value (Zillow Estimate)",
+      "type": "asset",
+      "institution": "Zillow Est.",
+      "balance": 450000.00,
+      "currency": "USD"
+    },
+    {
+      "id": "acc_car_001",
+      "name": "Car Value (KBB)",
+      "type": "asset",
+      "institution": "Manual",
+      "balance": 22000.00,
+      "currency": "USD"
+    }
+  ],
+  "transactions": [
+    { "id": "txn_001", "account_id": "acc_checking_001", "date": "2026-03-01", "amount": -7500.00, "description": "Employer Direct Deposit", "category": "Income", "merchant": "Employer Direct Deposit", "is_recurring": 1 },
+    { "id": "txn_002", "account_id": "acc_checking_001", "date": "2026-03-02", "amount": 1800.00, "description": "Rent Payment", "category": "Housing", "merchant": "Landlord Management", "is_recurring": 1 },
+    { "id": "txn_003", "account_id": "acc_checking_001", "date": "2026-03-03", "amount": 127.43, "description": "Whole Foods Market", "category": "Groceries", "merchant": "Whole Foods", "is_recurring": 0 },
+    { "id": "txn_004", "account_id": "acc_checking_001", "date": "2026-03-04", "amount": 54.20, "description": "Chipotle Mexican Grill", "category": "Food & Dining", "merchant": "Chipotle", "is_recurring": 0 },
+    { "id": "txn_005", "account_id": "acc_checking_001", "date": "2026-03-04", "amount": 15.99, "description": "Netflix Premium", "category": "Subscriptions", "merchant": "Netflix", "is_recurring": 1 },
+    { "id": "txn_006", "account_id": "acc_checking_001", "date": "2026-03-05", "amount": 9.99, "description": "Spotify Premium", "category": "Subscriptions", "merchant": "Spotify", "is_recurring": 1 },
+    { "id": "txn_007", "account_id": "acc_checking_001", "date": "2026-03-06", "amount": 54.99, "description": "Adobe Creative Cloud", "category": "Subscriptions", "merchant": "Adobe", "is_recurring": 1 },
+    { "id": "txn_008", "account_id": "acc_checking_001", "date": "2026-03-07", "amount": 48.20, "description": "Shell Gas Station", "category": "Gas", "merchant": "Shell", "is_recurring": 0 },
+    { "id": "txn_009", "account_id": "acc_checking_001", "date": "2026-03-08", "amount": 142.80, "description": "Electricity Bill", "category": "Utilities", "merchant": "Electricity Co.", "is_recurring": 1 },
+    { "id": "txn_010", "account_id": "acc_checking_001", "date": "2026-03-09", "amount": 89.99, "description": "Comcast Internet", "category": "Utilities", "merchant": "Comcast", "is_recurring": 1 },
+    { "id": "txn_011", "account_id": "acc_checking_001", "date": "2026-03-10", "amount": 35.50, "description": "Starbucks Coffee", "category": "Food & Dining", "merchant": "Starbucks", "is_recurring": 0 },
+    { "id": "txn_012", "account_id": "acc_checking_001", "date": "2026-03-11", "amount": 230.00, "description": "Amazon Purchase", "category": "Shopping", "merchant": "Amazon", "is_recurring": 0 },
+    { "id": "txn_013", "account_id": "acc_checking_001", "date": "2026-03-12", "amount": 67.40, "description": "Trader Joe's", "category": "Groceries", "merchant": "Trader Joe's", "is_recurring": 0 },
+    { "id": "txn_014", "account_id": "acc_checking_001", "date": "2026-03-13", "amount": 85.00, "description": "Planet Fitness", "category": "Healthcare", "merchant": "Planet Fitness", "is_recurring": 1 },
+    { "id": "txn_015", "account_id": "acc_checking_001", "date": "2026-03-14", "amount": 42.30, "description": "Uber Ride", "category": "Transportation", "merchant": "Uber", "is_recurring": 0 },
+    { "id": "txn_016", "account_id": "acc_checking_001", "date": "2026-03-15", "amount": -500.00, "description": "Freelance Payment", "category": "Income", "merchant": "Client Payment", "is_recurring": 0 },
+    { "id": "txn_017", "account_id": "acc_checking_001", "date": "2026-03-16", "amount": 120.00, "description": "CVS Pharmacy", "category": "Healthcare", "merchant": "CVS", "is_recurring": 0 },
+    { "id": "txn_018", "account_id": "acc_checking_001", "date": "2026-03-17", "amount": 280.50, "description": "Best Buy Electronics", "category": "Shopping", "merchant": "Best Buy", "is_recurring": 0 },
+    { "id": "txn_019", "account_id": "acc_checking_001", "date": "2026-03-18", "amount": 75.00, "description": "Restaurant Dinner", "category": "Food & Dining", "merchant": "Local Bistro", "is_recurring": 0 },
+    { "id": "txn_020", "account_id": "acc_checking_001", "date": "2026-03-19", "amount": 10.00, "description": "GitHub Pro", "category": "Subscriptions", "merchant": "GitHub", "is_recurring": 1 },
+    { "id": "txn_021", "account_id": "acc_checking_001", "date": "2026-02-01", "amount": -7500.00, "description": "Employer Direct Deposit", "category": "Income", "merchant": "Employer Direct Deposit", "is_recurring": 1 },
+    { "id": "txn_022", "account_id": "acc_checking_001", "date": "2026-02-02", "amount": 1800.00, "description": "Rent Payment", "category": "Housing", "merchant": "Landlord Management", "is_recurring": 1 },
+    { "id": "txn_023", "account_id": "acc_checking_001", "date": "2026-02-04", "amount": 15.99, "description": "Netflix Premium", "category": "Subscriptions", "merchant": "Netflix", "is_recurring": 1 },
+    { "id": "txn_024", "account_id": "acc_checking_001", "date": "2026-02-04", "amount": 9.99, "description": "Spotify Premium", "category": "Subscriptions", "merchant": "Spotify", "is_recurring": 1 },
+    { "id": "txn_025", "account_id": "acc_checking_001", "date": "2026-02-05", "amount": 54.99, "description": "Adobe Creative Cloud", "category": "Subscriptions", "merchant": "Adobe", "is_recurring": 1 },
+    { "id": "txn_026", "account_id": "acc_checking_001", "date": "2026-02-07", "amount": 98.50, "description": "Whole Foods Market", "category": "Groceries", "merchant": "Whole Foods", "is_recurring": 0 },
+    { "id": "txn_027", "account_id": "acc_checking_001", "date": "2026-02-10", "amount": 320.00, "description": "Large Amazon Order", "category": "Shopping", "merchant": "Amazon", "is_recurring": 0 },
+    { "id": "txn_028", "account_id": "acc_checking_001", "date": "2026-02-15", "amount": 95.00, "description": "Delta Airlines", "category": "Travel", "merchant": "Delta Airlines", "is_recurring": 0 },
+    { "id": "txn_029", "account_id": "acc_checking_001", "date": "2026-01-01", "amount": -7500.00, "description": "Employer Direct Deposit", "category": "Income", "merchant": "Employer Direct Deposit", "is_recurring": 1 },
+    { "id": "txn_030", "account_id": "acc_checking_001", "date": "2026-01-04", "amount": 15.99, "description": "Netflix Premium", "category": "Subscriptions", "merchant": "Netflix", "is_recurring": 1 }
+  ],
+  "holdings": [
+    {
+      "id": "hold_001",
+      "account_id": "acc_invest_001",
+      "symbol": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "quantity": 120.0,
+      "cost_basis": 42000.00,
+      "asset_type": "etf"
+    },
+    {
+      "id": "hold_002",
+      "account_id": "acc_invest_001",
+      "symbol": "VXUS",
+      "name": "Vanguard Total International Stock ETF",
+      "quantity": 80.0,
+      "cost_basis": 18400.00,
+      "asset_type": "etf"
+    },
+    {
+      "id": "hold_003",
+      "account_id": "acc_invest_001",
+      "symbol": "BND",
+      "name": "Vanguard Total Bond Market ETF",
+      "quantity": 50.0,
+      "cost_basis": 3800.00,
+      "asset_type": "etf"
+    },
+    {
+      "id": "hold_004",
+      "account_id": "acc_invest_001",
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "quantity": 50.0,
+      "cost_basis": 8500.00,
+      "asset_type": "stock"
+    },
+    {
+      "id": "hold_005",
+      "account_id": "acc_invest_001",
+      "symbol": "MSFT",
+      "name": "Microsoft Corp.",
+      "quantity": 25.0,
+      "cost_basis": 9100.00,
+      "asset_type": "stock"
+    },
+    {
+      "id": "hold_006",
+      "account_id": "acc_invest_001",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "quantity": 0.5,
+      "cost_basis": 20000.00,
+      "asset_type": "crypto"
+    },
+    {
+      "id": "hold_007",
+      "account_id": "acc_invest_001",
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "quantity": 2.0,
+      "cost_basis": 7200.00,
+      "asset_type": "crypto"
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal_001",
+      "name": "Emergency Fund (6 months)",
+      "target_amount": 25200.0,
+      "current_amount": 18500.0,
+      "target_date": "2026-12-31",
+      "category": "emergency",
+      "notes": "Based on $4,200/month expenses × 6 months"
+    },
+    {
+      "id": "goal_002",
+      "name": "Europe Vacation 2027",
+      "target_amount": 8000.0,
+      "current_amount": 2300.0,
+      "target_date": "2027-06-01",
+      "category": "vacation",
+      "notes": "2 weeks in Italy and France"
+    },
+    {
+      "id": "goal_003",
+      "name": "Early Retirement (FIRE)",
+      "target_amount": 2000000.0,
+      "current_amount": 374430.0,
+      "target_date": "2045-01-01",
+      "category": "retirement",
+      "notes": "4% SWR on $2M = $80k/year"
+    },
+    {
+      "id": "goal_004",
+      "name": "House Down Payment",
+      "target_amount": 80000.0,
+      "current_amount": 18500.0,
+      "target_date": "2028-06-01",
+      "category": "house",
+      "notes": "20% down on a $400k property"
+    },
+    {
+      "id": "goal_005",
+      "name": "New Car Fund",
+      "target_amount": 35000.0,
+      "current_amount": 5000.0,
+      "target_date": "2027-12-01",
+      "category": "other",
+      "notes": "Replace aging vehicle"
+    }
+  ]
+}

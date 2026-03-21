@@ -1,0 +1,30 @@
+# Environment & secrets — never commit these
+.env
+*.env
+
+# SQLite database files — local data, not for version control
+finance.db
+finance.db-shm
+finance.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Local notes and generated files
+notes/
+calendar.ics
+report_*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Google Calendar token (contains OAuth credentials)
+token.json
+
+# macOS
+.DS_Store
