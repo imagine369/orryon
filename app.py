@@ -90,6 +90,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── PWA: manifest + service worker ───────────────────────────────────────────
+st.markdown("""
+<link rel="manifest" href="/app/static/manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="guddd">
+<link rel="apple-touch-icon" href="/app/static/icon-192.png">
+<meta name="theme-color" content="#000000">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker
+        .register('/app/static/sw.js', { scope: '/app/static/' })
+        .then(function (reg) { console.log('[guddd] SW registered', reg.scope); })
+        .catch(function (err) { console.warn('[guddd] SW failed', err); });
+    });
+  }
+</script>
+""", unsafe_allow_html=True)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GLOBAL CSS
 # ─────────────────────────────────────────────────────────────────────────────
