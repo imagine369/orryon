@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -34,14 +35,14 @@ CREWAI_AVAILABLE = False
 try:
     from crewai import Crew, Process
     from agents import (
+        alex,
         budget_agent,
         data_aggregator,
+        edward,
         forecasting_agent,
         insights_agent,
         net_worth_agent,
         notes_agent,
-        orchestrator,
-        scheduling_agent,
     )
     from tasks import route_query_to_tasks
     CREWAI_AVAILABLE = True
@@ -49,30 +50,40 @@ except Exception as _crewai_err:
     logger_pre = logging.getLogger(__name__)
     logger_pre.warning("crewai not available (%s). AI chat disabled.", _crewai_err)
 
-from config import USER_ID
+from config import APP_URL, USER_ID
 from db import (
-    authenticate_user,
-    create_user,
+    create_verification_code,
     fetch_rows,
+    get_link_page_by_token,
+    get_or_create_link_page,
+    get_or_create_user_by_email,
     load_chat_history,
     save_chat_message,
+    update_row,
+    verify_code,
 )
+from email_sender import send_verification_code
 from memory import extract_memory_facts, retrieve_relevant_memories, store_memory
 from tools import (
     add_bill_reminder,
     analyze_spending_trends,
     calculate_net_worth,
     create_calendar_event,
+    delete_link,
     detect_subscriptions,
     forecast_cash_flow,
     generate_csv_report,
     get_debt_payoff_plan,
     get_financial_recommendations,
+    get_inspo_items,
+    get_links,
     get_portfolio_performance,
     get_spending_by_category,
     list_upcoming_events,
     load_sample_data,
     run_monte_carlo_retirement,
+    save_inspo_item,
+    save_link,
     save_note,
     search_notes,
     simulate_scenario,
@@ -221,10 +232,15 @@ def _init_state() -> None:
         "chat_history": [],
         "data_loaded": False,
         "last_sync": None,
-        "screen": "home",       # home | signin | signup
-        "user_id": None,        # set after successful login
-        "display_name": "",     # shown in sidebar + welcome
-        "auth_error": "",       # sign-in / sign-up error message
+        "screen": "home",           # home | signin
+        "user_id": None,            # set after successful OTP verification
+        "display_name": "",         # shown in sidebar + welcome
+        "auth_error": "",           # error message on auth screens
+        "auth_step": "email",       # "email" | "code"  — OTP flow step
+        "auth_pending_email": "",   # email waiting for code verification
+        "auth_code_sent": False,    # True once code has been dispatched
+        "auth_dev_code": "",        # non-empty when SMTP is off (dev mode)
+        "inspo_upload_count": 0,    # triggers inspo gallery refresh
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -232,6 +248,105 @@ def _init_state() -> None:
 
 
 _init_state()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC LINKS PAGE  (intercepted via ?links=<token> — no auth required)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_share_token = st.query_params.get("links", "")
+if _share_token:
+    _page = get_link_page_by_token(_share_token)
+    if _page is None:
+        st.error("This link page is private or doesn't exist.")
+        st.stop()
+
+    _pub_links = fetch_rows("links", {"user_id": _page["user_id"]}, limit=100)
+    _pub_name  = _page.get("page_title") or _page.get("display_name") or "My Links"
+    _pub_bio   = _page.get("bio", "")
+    _theme     = _page.get("theme", "dark")
+
+    _bg    = "#000000" if _theme == "dark" else "#f9fafb"
+    _card  = "#111827" if _theme == "dark" else "#ffffff"
+    _text  = "#f9fafb" if _theme == "dark" else "#111827"
+    _sub   = "#9ca3af" if _theme == "dark" else "#6b7280"
+    _border= "#1f2937" if _theme == "dark" else "#e5e7eb"
+    _btn_bg= "linear-gradient(135deg,#00c9ff,#92fe9d)" if _theme == "gradient" else (
+             "#1f2937" if _theme == "dark" else "#f3f4f6"
+    )
+    _btn_text = "#000" if _theme == "gradient" else _text
+
+    st.markdown(f"""
+<style>
+  [data-testid="stAppViewContainer"],[data-testid="stMain"],.stApp,
+  section[data-testid="stMain"]>div{{background:{_bg}!important}}
+  #MainMenu,footer,[data-testid="stHeader"],[data-testid="stToolbar"],
+  [data-testid="stDecoration"],[data-testid="stSidebar"]{{display:none!important}}
+  .block-container{{
+    max-width:480px!important;margin:0 auto!important;
+    padding:2rem 1rem 4rem!important;
+  }}
+  .pub-avatar{{
+    width:88px;height:88px;border-radius:50%;object-fit:cover;
+    border:2px solid {_border};margin:0 auto 0.6rem;display:block;
+  }}
+  .pub-name{{
+    text-align:center;font-size:1.4rem;font-weight:800;
+    color:{_text};margin:0 0 0.2rem;letter-spacing:-0.3px;
+  }}
+  .pub-bio{{
+    text-align:center;font-size:0.9rem;color:{_sub};
+    margin:0 0 1.6rem;
+  }}
+  .pub-btn{{
+    display:block;width:100%;padding:0.9rem 1.2rem;
+    margin-bottom:0.7rem;border-radius:50px;text-align:center;
+    text-decoration:none;font-weight:600;font-size:0.97rem;
+    background:{_btn_bg};color:{_btn_text}!important;
+    border:1px solid {_border};
+    box-shadow:0 2px 12px rgba(0,0,0,0.18);
+    transition:transform 0.15s,box-shadow 0.15s;
+  }}
+  .pub-btn:hover{{transform:translateY(-2px);box-shadow:0 4px 18px rgba(0,0,0,0.28);}}
+  .pub-footer{{
+    text-align:center;font-size:0.72rem;color:{_sub};
+    margin-top:2.5rem;
+  }}
+  .pub-footer a{{color:{_sub};text-decoration:none;}}
+</style>
+""", unsafe_allow_html=True)
+
+    # Avatar — reuse tribble for now
+    import base64 as _b64p
+    with open("assets/tribble.png", "rb") as _pf:
+        _pavatar = _b64p.b64encode(_pf.read()).decode()
+    st.markdown(
+        f'<img src="data:image/png;base64,{_pavatar}" class="pub-avatar"/>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(f'<div class="pub-name">{_pub_name}</div>', unsafe_allow_html=True)
+    if _pub_bio:
+        st.markdown(f'<div class="pub-bio">{_pub_bio}</div>', unsafe_allow_html=True)
+
+    if _pub_links:
+        for _lk in _pub_links:
+            st.markdown(
+                f'<a href="{_lk["url"]}" target="_blank" class="pub-btn">'
+                f'{_lk["title"]}</a>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.markdown(
+            f'<p style="text-align:center;color:{_sub}">No links added yet.</p>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<div class="pub-footer">Made with <a href="https://guddd.app">guddd</a></div>',
+        unsafe_allow_html=True,
+    )
+    st.stop()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -295,12 +410,13 @@ def run_agent_query(user_query: str, user_id: str | None = None) -> dict:
     """
     if not CREWAI_AVAILABLE:
         return _parse_agent_response(
-            "⚠️ **AI chat requires Python 3.10+** and a running LLM.\n\n"
-            "**To enable it:**\n"
+            "⚠️ **Edward & Alex require Python 3.10+** and a running LLM.\n\n"
+            "**To enable them:**\n"
             "1. Install Python 3.10+ (via [python.org](https://python.org/downloads) or `brew install python@3.11`)\n"
             "2. Create a virtualenv: `python3.11 -m venv .venv && source .venv/bin/activate`\n"
             "3. Install deps: `pip install -r requirements.txt`\n"
-            "4. Re-launch: `streamlit run app.py`\n\n"
+            "4. Set `XAI_API_KEY` in your `.env` file\n"
+            "5. Re-launch: `streamlit run app.py`\n\n"
             "The **Dashboard, Budget, Forecast, Schedule, Notes, and Reports** tabs all work right now — explore them!"
         )
 
@@ -310,7 +426,7 @@ def run_agent_query(user_query: str, user_id: str | None = None) -> dict:
 
     try:
         tasks = route_query_to_tasks(user_query, memory_context=memory_context)
-        needed_agents = list({t.agent for t in tasks if t.agent is not orchestrator})
+        needed_agents = list({t.agent for t in tasks if t.agent is not edward})
         if not needed_agents:
             needed_agents = [data_aggregator]
 
@@ -356,19 +472,34 @@ def run_agent_query(user_query: str, user_id: str | None = None) -> dict:
 
 def _guess_agent_label(query: str) -> str:
     q = query.lower()
-    if any(k in q for k in ["schedule", "calendar", "remind", "event", "bill"]):
-        return "Scheduling Agent"
-    if any(k in q for k in ["note", "journal", "memo"]):
-        return "Notes Agent"
-    if any(k in q for k in ["retire", "monte carlo", "projection"]):
-        return "Forecasting Agent"
-    if any(k in q for k in ["net worth", "portfolio", "stock", "crypto"]):
-        return "Net Worth Agent"
-    if any(k in q for k in ["spend", "budget", "subscription"]):
-        return "Budget Agent"
-    if any(k in q for k in ["insight", "anomal", "recommend"]):
-        return "Insights Agent"
-    return "Orchestrator"
+    # Alex's financial domains
+    if any(k in q for k in [
+        "spend", "budget", "subscription", "expense", "tax",
+        "net worth", "portfolio", "stock", "crypto", "invest",
+        "retire", "monte carlo", "projection", "debt", "payoff",
+        "insight", "anomal", "recommend", "forecast", "savings",
+    ]):
+        return "Alex (Finance)"
+    # Edward's domains
+    if any(k in q for k in ["travel", "flight", "hotel", "trip", "itinerary"]):
+        return "Edward (Travel)"
+    if any(k in q for k in ["draft", "email", "message", "compose", "write"]):
+        return "Edward (Communications)"
+    if any(k in q for k in ["research", "compare", "find best", "options for"]):
+        return "Edward (Research)"
+    if any(k in q for k in ["briefing", "brief me", "catch me up", "what's on my plate"]):
+        return "Edward (Briefing)"
+    if any(k in q for k in ["schedule", "calendar", "remind", "event", "bill", "appointment"]):
+        return "Edward (Scheduling)"
+    if any(k in q for k in ["note", "journal", "memo", "log", "save this", "my notes"]):
+        return "Edward (Notes)"
+    if any(k in q for k in ["task", "action item", "todo", "follow up", "remind me to"]):
+        return "Edward (Tasks)"
+    if any(k in q for k in ["link", "url", "website", "linktree", "my links"]):
+        return "Edward (Links)"
+    if any(k in q for k in ["inspo", "inspiration", "mood board", "my inspo"]):
+        return "Edward (Inspo)"
+    return "Edward"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -401,7 +532,7 @@ def _recommendations() -> list:
 
 with st.sidebar:
     st.markdown('<div class="main-header">💰 guddd</div>', unsafe_allow_html=True)
-    st.caption("Local-first · Privacy-first · Multi-agent")
+    st.caption("Edward · Alex · Local-first · Private")
     st.divider()
 
     if st.session_state.data_loaded:
@@ -460,9 +591,12 @@ if not st.session_state.data_loaded:
     _tribble_mime = "jpeg" if _traw[:3] == b"\xff\xd8\xff" else "png"
 
     # Route query-param nav clicks (from fixed HTML buttons)
+    # Both "signin" and "signup" now go to the unified OTP auth screen.
     _action = st.query_params.get("action", "")
     if _action in ("signin", "signup"):
-        st.session_state.screen = _action
+        st.session_state.screen = "signin"
+        st.session_state.auth_step = "email"
+        st.session_state.auth_error = ""
         st.query_params.clear()
         st.rerun()
 
@@ -543,14 +677,18 @@ if not st.session_state.data_loaded:
 """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════════════════════════
-    # SCREEN: SIGN IN
+    # SCREEN: SIGN IN — two-step email + OTP (Cursor-style, no passwords)
     # ═══════════════════════════════════════════════════════════════════════
     if st.session_state.screen == "signin":
-        # top bar: close + logo
         _tc, _tlogo, _ = st.columns([1, 1, 1])
         with _tc:
             if st.button("✕", key="si_close"):
-                st.session_state.screen = "home"; st.rerun()
+                st.session_state.screen = "home"
+                st.session_state.auth_step = "email"
+                st.session_state.auth_pending_email = ""
+                st.session_state.auth_error = ""
+                st.session_state.auth_dev_code = ""
+                st.rerun()
         with _tlogo:
             st.markdown(
                 f'<div style="text-align:center">'
@@ -559,44 +697,105 @@ if not st.session_state.data_loaded:
                 unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("## Sign in to guddd")
 
-        # social buttons
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("🔵  Sign in with Google", use_container_width=True, key="si_google"):
-            load_sample_data.invoke(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        # ── STEP 1: Email entry ──────────────────────────────────────────
+        if st.session_state.auth_step == "email":
+            st.markdown("## Sign in to guddd")
+            st.markdown(
+                '<p style="color:#888;font-size:0.9rem;margin:0 0 1.2rem;">'
+                "Enter your email — we'll send a verification code."
+                "</p>",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("🍎  Sign in with Apple", use_container_width=True, key="si_apple"):
-            load_sample_data.invoke(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="auth-input">', unsafe_allow_html=True)
+            otp_email = st.text_input(
+                "Email address", placeholder="you@example.com",
+                label_visibility="collapsed", key="otp_email_input",
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="or-divider">or</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<p style="font-size:0.75rem;color:#555;margin:0.4rem 0 1rem;">'
+                "Works with Gmail · Outlook · iCloud · Yahoo · any email"
+                "</p>",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown('<div class="auth-input">', unsafe_allow_html=True)
-        si_username = st.text_input("Username or email", placeholder="Username or email",
-                                    label_visibility="collapsed", key="si_username")
-        si_password = st.text_input("Password", placeholder="Password", type="password",
-                                    label_visibility="collapsed", key="si_password")
-        st.markdown('</div>', unsafe_allow_html=True)
+            if st.session_state.auth_error:
+                st.error(st.session_state.auth_error)
 
-        if st.session_state.auth_error:
-            st.error(st.session_state.auth_error)
-
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("Sign in", use_container_width=True, key="si_next"):
-            if not si_username or not si_password:
-                st.session_state.auth_error = "Please enter your username and password."
-                st.rerun()
-            else:
-                _user = authenticate_user(si_username, si_password)
-                if _user:
+            st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
+            if st.button("Send code →", use_container_width=True, key="otp_send"):
+                _email_val = otp_email.strip().lower()
+                if not _email_val or "@" not in _email_val:
+                    st.session_state.auth_error = "Please enter a valid email address."
+                    st.rerun()
+                else:
+                    _code = create_verification_code(_email_val)
+                    _sent = send_verification_code(_email_val, _code)
+                    st.session_state.auth_pending_email = _email_val
+                    st.session_state.auth_step = "code"
                     st.session_state.auth_error = ""
+                    st.session_state.auth_code_sent = _sent
+                    # Dev mode: show code on screen when SMTP is not configured
+                    st.session_state.auth_dev_code = "" if _sent else _code
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── STEP 2: Code entry ───────────────────────────────────────────
+        else:
+            _pending = st.session_state.auth_pending_email
+            st.markdown("## Check your email")
+            if st.session_state.auth_code_sent:
+                st.markdown(
+                    f'<p style="color:#888;font-size:0.9rem;margin:0 0 1.2rem;">'
+                    f"Code sent to <strong style='color:#fff'>{_pending}</strong>.<br>"
+                    f"Check your inbox and enter the 6-digit code below."
+                    f"</p>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                # SMTP not configured — show code on screen (dev mode)
+                st.markdown(
+                    f'<p style="color:#888;font-size:0.9rem;margin:0 0 0.6rem;">'
+                    f"SMTP not configured — your code is shown below (dev mode)."
+                    f"</p>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;'
+                    f'padding:16px;text-align:center;margin-bottom:1rem;">'
+                    f'<span style="font-size:2rem;font-weight:700;letter-spacing:8px;color:#fff;">'
+                    f'{st.session_state.auth_dev_code}</span>'
+                    f'<p style="color:#555;font-size:0.75rem;margin:8px 0 0;">Dev mode — set SMTP in .env to send real emails</p>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown('<div class="auth-input">', unsafe_allow_html=True)
+            otp_code = st.text_input(
+                "Verification code", placeholder="6-digit code",
+                label_visibility="collapsed", key="otp_code_input",
+                max_chars=6,
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if st.session_state.auth_error:
+                st.error(st.session_state.auth_error)
+
+            st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
+            if st.button("Verify →", use_container_width=True, key="otp_verify"):
+                _code_val = otp_code.strip()
+                if not _code_val or len(_code_val) != 6:
+                    st.session_state.auth_error = "Please enter the 6-digit code."
+                    st.rerun()
+                elif verify_code(_pending, _code_val):
+                    _user = get_or_create_user_by_email(_pending)
+                    st.session_state.auth_error = ""
+                    st.session_state.auth_step = "email"
+                    st.session_state.auth_pending_email = ""
+                    st.session_state.auth_dev_code = ""
                     st.session_state.user_id = _user["id"]
                     st.session_state.display_name = _user["display_name"]
                     st.session_state.chat_history = load_chat_history(_user["id"])
@@ -607,108 +806,20 @@ if not st.session_state.data_loaded:
                     st.session_state.screen = "home"
                     st.rerun()
                 else:
-                    st.session_state.auth_error = "Invalid username or password."
+                    st.session_state.auth_error = "Invalid or expired code. Please try again."
                     st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown(
-            '<div class="auth-footer">Don\'t have an account? '
-            '<span id="goto-signup">Sign up</span></div>', unsafe_allow_html=True)
-        if st.button("→ Sign up instead", key="si_goto_signup",
-                     help="Go to sign up"):
-            st.session_state.auth_error = ""
-            st.session_state.screen = "signup"; st.rerun()
-        st.stop()
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # SCREEN: SIGN UP
-    # ═══════════════════════════════════════════════════════════════════════
-    if st.session_state.screen == "signup":
-        _tc2, _tlogo2, _ = st.columns([1, 1, 1])
-        with _tc2:
-            if st.button("✕", key="su_close"):
-                st.session_state.screen = "home"; st.rerun()
-        with _tlogo2:
-            st.markdown(
-                f'<div style="text-align:center">'
-                f'<img src="data:image/{_tribble_mime};base64,{_tribble_b64}" '
-                f'style="width:32px;height:32px;border-radius:50%;object-fit:cover"/></div>',
-                unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("## Create your account")
-
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("🔵  Sign up with Google", use_container_width=True, key="su_google"):
-            load_sample_data.invoke(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("🍎  Sign up with Apple", use_container_width=True, key="su_apple"):
-            load_sample_data.invoke(""); st.session_state.data_loaded = True
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.session_state.screen = "home"; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="or-divider">or</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="auth-input">', unsafe_allow_html=True)
-        su_name     = st.text_input("Your name", placeholder="Your name",
-                                    label_visibility="collapsed", key="su_name")
-        su_username = st.text_input("Choose a username", placeholder="Choose a username",
-                                    label_visibility="collapsed", key="su_username")
-        su_email    = st.text_input("Email (optional)", placeholder="Email (optional)",
-                                    label_visibility="collapsed", key="su_email")
-        su_password = st.text_input("Password", placeholder="Password (min 6 chars)", type="password",
-                                    label_visibility="collapsed", key="su_password")
-        su_confirm  = st.text_input("Confirm password", placeholder="Confirm password", type="password",
-                                    label_visibility="collapsed", key="su_confirm")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        if st.session_state.auth_error:
-            st.error(st.session_state.auth_error)
-
-        st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-        if st.button("Create account", use_container_width=True, key="su_create"):
-            if not su_username or not su_password:
-                st.session_state.auth_error = "Username and password are required."
+            st.markdown('<div class="auth-btn auth-btn-outline" style="margin-top:0.5rem">',
+                        unsafe_allow_html=True)
+            if st.button("← Resend / use different email",
+                         use_container_width=True, key="otp_back"):
+                st.session_state.auth_step = "email"
+                st.session_state.auth_error = ""
+                st.session_state.auth_dev_code = ""
                 st.rerun()
-            elif len(su_password) < 6:
-                st.session_state.auth_error = "Password must be at least 6 characters."
-                st.rerun()
-            elif su_password != su_confirm:
-                st.session_state.auth_error = "Passwords do not match."
-                st.rerun()
-            else:
-                _new_user = create_user(
-                    username=su_username,
-                    password=su_password,
-                    display_name=su_name or su_username,
-                    email=su_email,
-                )
-                if _new_user:
-                    st.session_state.auth_error = ""
-                    st.session_state.user_id = _new_user["id"]
-                    st.session_state.display_name = _new_user["display_name"]
-                    st.session_state.chat_history = []
-                    load_sample_data.invoke("")
-                    st.session_state.data_loaded = True
-                    st.session_state.last_sync = datetime.now().isoformat()
-                    st.session_state.screen = "home"
-                    st.rerun()
-                else:
-                    st.session_state.auth_error = "Username already taken. Please choose another."
-                    st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown(
-            '<div class="auth-footer">Already have an account? '
-            '<span>Sign in</span></div>', unsafe_allow_html=True)
-        if st.button("→ Sign in instead", key="su_goto_signin"):
-            st.session_state.auth_error = ""
-            st.session_state.screen = "signin"; st.rerun()
         st.stop()
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -891,7 +1002,7 @@ _app_l, _app_c, _app_r = st.columns([1, 4, 1])
 with _app_l:
     with st.popover("☰"):
         st.markdown("**💰 guddd**")
-        st.caption("Local-first · Private · Multi-agent")
+        st.caption("Edward · Alex · Local-first · Private")
         st.divider()
         if st.session_state.data_loaded:
             _nw_q = json.loads(calculate_net_worth.invoke(""))
@@ -921,6 +1032,10 @@ with _app_l:
             st.session_state.display_name = ""
             st.session_state.chat_history = []
             st.session_state.auth_error = ""
+            st.session_state.auth_step = "email"
+            st.session_state.auth_pending_email = ""
+            st.session_state.auth_code_sent = False
+            st.session_state.auth_dev_code = ""
             st.rerun()
 with _app_c:
     st.markdown('<h1 class="main-header">💰 guddd</h1>', unsafe_allow_html=True)
@@ -944,7 +1059,7 @@ st.markdown("""
   }
 </style>
 """, unsafe_allow_html=True)
-_app_query = st.chat_input("Ask Guddd…")
+_app_query = st.chat_input("Ask Edward or Alex…")
 if _app_query:
     st.session_state.chat_history.append({"role": "user", "content": _app_query})
     st.rerun()
@@ -953,10 +1068,12 @@ st.markdown('<div class="app-dictate-pill">🎙 New &nbsp;·&nbsp; Hold to dicta
 
 (
     tab_chat, tab_dash, tab_budget,
-    tab_forecast, tab_schedule, tab_notes, tab_reports,
+    tab_forecast, tab_schedule, tab_notes,
+    tab_links, tab_inspo, tab_reports,
 ) = st.tabs([
     "💬 Chat", "📊 Dashboard", "💳 Budget",
-    "📈 Forecast", "📅 Schedule", "📝 Notes", "📋 Reports",
+    "📈 Forecast", "📅 Schedule", "📝 Notes",
+    "🔗 Links", "✨ Inspo", "📋 Reports",
 ])
 
 
@@ -965,20 +1082,27 @@ st.markdown('<div class="app-dictate-pill">🎙 New &nbsp;·&nbsp; Hold to dicta
 # ═════════════════════════════════════════════════════════════════════════════
 
 with tab_chat:
-    st.subheader("Ask Your Finance AI")
+    st.subheader("Ask Edward or Alex")
 
     QUICK = [
-        "What's my net worth?",
-        "Show spending this month",
-        "Run retirement projection",
-        "Any unusual transactions?",
-        "Schedule rent payment of $1800 due on the 1st",
-        "Save a note: I want to cut dining out by 20%",
+        "Edward, brief me on today",
+        "Alex, what's my net worth?",
+        "Alex, show spending this month",
+        "Edward, plan a trip to NYC next week",
+        "Alex, run my retirement projection",
+        "Edward, add task: review insurance renewal",
+        "Edward, draft a follow-up email to my landlord",
+        "Alex, any unusual transactions?",
+        "Edward, research best budgeting apps 2026",
+        "Alex, detect my subscriptions",
+        "Edward, schedule rent of $1800 due the 1st",
+        "Alex, how can I improve my savings rate?",
     ]
     qcols = st.columns(3)
     triggered = None
     for idx, q in enumerate(QUICK):
-        if qcols[idx % 3].button(q, use_container_width=True, key=f"q{idx}"):
+        label = q
+        if qcols[idx % 3].button(label, use_container_width=True, key=f"q{idx}"):
             triggered = q
 
     st.divider()
@@ -988,9 +1112,10 @@ with tab_chat:
         if not st.session_state.chat_history:
             st.markdown(
                 "<div style='text-align:center;color:#666;padding:2rem'>"
-                "<h3>👋 Welcome to guddd</h3>"
-                "<p>Ask anything about your finances. Agents collaborate to answer.</p>"
-                "<p><em>Try: &quot;What&#39;s my emergency fund status?&quot; or &quot;Schedule my car payment&quot;</em></p>"
+                "<h3>👋 Hi, I'm Edward — your Chief of Staff</h3>"
+                "<p>I handle your schedule, travel, research, communications, and more.<br>"
+                "For anything financial, I'll bring in <strong>Alex</strong>.</p>"
+                "<p><em>Try: &quot;Edward, brief me on today&quot; or &quot;Alex, what's my net worth?&quot;</em></p>"
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -1059,9 +1184,10 @@ with tab_chat:
         user_input = st.text_area(
             "Your question",
             placeholder=(
-                "e.g. 'What's my net worth?'  |  "
-                "'Schedule Netflix renewal reminder'  |  "
-                "'Save a note: increased 401k to 15%'"
+                "e.g. 'Edward, brief me on today'  |  "
+                "'Alex, what's my net worth?'  |  "
+                "'Edward, plan a trip to Miami next month'  |  "
+                "'Alex, run my retirement projection'"
             ),
             height=80,
             label_visibility="collapsed",
@@ -1082,7 +1208,7 @@ with tab_chat:
         st.session_state.chat_history.append(_user_msg)
         save_chat_message(_active_uid, _user_msg)
 
-        with st.spinner("Consulting your financial agents…"):
+        with st.spinner("Edward & Alex on it…"):
             if not st.session_state.data_loaded:
                 load_sample_data.invoke("")
                 st.session_state.data_loaded = True
@@ -1561,7 +1687,8 @@ with tab_schedule:
 # ═════════════════════════════════════════════════════════════════════════════
 
 with tab_notes:
-    st.subheader("Financial Notes & Journal")
+    st.subheader("📝 Notes & Journal")
+    st.caption("Your personal notes — type them or say *\"Edward, put this in notes\"*.")
 
     n_left, n_right = st.columns([2, 1])
 
@@ -1622,6 +1749,347 @@ with tab_notes:
                         st.markdown(f"- **{s['title']}** ({s['date']}): {s['preview']}")
                 else:
                     st.info("No notes in the last 30 days.")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB: LINKS
+# ═════════════════════════════════════════════════════════════════════════════
+
+with tab_links:
+    st.subheader("🔗 My Links")
+    st.caption("Save, copy, and share your links — ask Edward to add or pull them up anytime.")
+
+    _active_uid_lk = st.session_state.get("user_id") or USER_ID
+    _lp = get_or_create_link_page(_active_uid_lk)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SHARE MY PAGE SECTION
+    # ─────────────────────────────────────────────────────────────────────────
+    _share_url = f"{APP_URL}?links={_lp['share_token']}"
+
+    with st.expander("🌐 Share My Links Page", expanded=True):
+        _is_public = bool(_lp.get("is_public", 0))
+
+        # Enable / disable toggle
+        _toggle = st.toggle("Make my links page public", value=_is_public, key="lp_public_toggle")
+        if _toggle != _is_public:
+            update_row(
+                "link_pages",
+                {"is_public": int(_toggle), "updated_at": datetime.now().isoformat()},
+                {"user_id": _active_uid_lk},
+            )
+            _lp["is_public"] = int(_toggle)
+            _is_public = _toggle
+            st.rerun()
+
+        if _is_public:
+            # Page customisation
+            _pg_title_cur = _lp.get("page_title") or ""
+            _pg_bio_cur   = _lp.get("bio") or ""
+            _pg_theme_cur = _lp.get("theme") or "dark"
+
+            _pc1, _pc2 = st.columns(2)
+            _pg_title = _pc1.text_input("Page title", value=_pg_title_cur,
+                                        placeholder="Jane's Links", key="lp_title")
+            _pg_theme = _pc2.selectbox("Theme", ["dark", "light", "gradient"],
+                                       index=["dark","light","gradient"].index(_pg_theme_cur),
+                                       key="lp_theme")
+            _pg_bio = st.text_input("Bio / tagline", value=_pg_bio_cur,
+                                    placeholder="Designer · Developer · Creator", key="lp_bio")
+
+            if st.button("Save page settings", key="btn_lp_save"):
+                update_row(
+                    "link_pages",
+                    {"page_title": _pg_title, "bio": _pg_bio,
+                     "theme": _pg_theme, "updated_at": datetime.now().isoformat()},
+                    {"user_id": _active_uid_lk},
+                )
+                st.success("Saved!")
+                st.rerun()
+
+            st.divider()
+
+            # Shareable URL + copy
+            st.markdown("**Your shareable link:**")
+            st.code(_share_url, language=None)
+
+            # Social share buttons
+            _enc_url   = _share_url.replace("&", "%26").replace("?", "%3F").replace(":", "%3A").replace("/", "%2F")
+            _enc_title = (_pg_title or "My Links").replace(" ", "%20")
+
+            st.markdown(
+                f"""
+<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem">
+  <a href="https://twitter.com/intent/tweet?text={_enc_title}&url={_enc_url}"
+     target="_blank"
+     style="background:#000;color:#fff;border:1px solid #333;
+            border-radius:50px;padding:0.45rem 1rem;font-size:0.85rem;
+            font-weight:600;text-decoration:none;display:inline-flex;
+            align-items:center;gap:0.4rem">
+    𝕏 &nbsp;Share on X
+  </a>
+  <a href="https://wa.me/?text={_enc_title}%20{_enc_url}"
+     target="_blank"
+     style="background:#25D366;color:#fff;border-radius:50px;
+            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
+            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
+    WhatsApp
+  </a>
+  <a href="https://www.linkedin.com/sharing/share-offsite/?url={_enc_url}"
+     target="_blank"
+     style="background:#0077B5;color:#fff;border-radius:50px;
+            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
+            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
+    LinkedIn
+  </a>
+  <a href="https://www.facebook.com/sharer/sharer.php?u={_enc_url}"
+     target="_blank"
+     style="background:#1877F2;color:#fff;border-radius:50px;
+            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
+            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
+    Facebook
+  </a>
+  <a href="mailto:?subject={_enc_title}&body={_enc_url}"
+     style="background:#1f2937;color:#fff;border:1px solid #374151;
+            border-radius:50px;padding:0.45rem 1rem;font-size:0.85rem;
+            font-weight:600;text-decoration:none;display:inline-flex;
+            align-items:center;gap:0.4rem">
+    ✉️ &nbsp;Email
+  </a>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                f"<p style='font-size:0.75rem;color:#6b7280;margin-top:0.6rem'>"
+                f"👁 Preview your public page: <a href='{_share_url}' target='_blank' "
+                f"style='color:#60a5fa'>{_share_url}</a></p>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("Enable the toggle above to generate your shareable links page.")
+
+    st.divider()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # ADD LINK FORM
+    # ─────────────────────────────────────────────────────────────────────────
+    with st.expander("➕ Add a new link", expanded=False):
+        with st.form("link_add_form", clear_on_submit=True):
+            lk_url   = st.text_input("URL *", placeholder="https://yoursite.com")
+            lk_title = st.text_input("Title", placeholder="My Portfolio")
+            lk_desc  = st.text_input("Description (optional)", placeholder="What is this link?")
+            lk_tags  = st.text_input("Tags (comma-separated)", placeholder="work, social, portfolio")
+            if st.form_submit_button("Save Link 🔗", type="primary"):
+                if lk_url.strip():
+                    res = json.loads(save_link.invoke(json.dumps({
+                        "url": lk_url.strip(),
+                        "title": lk_title.strip() or lk_url.strip(),
+                        "description": lk_desc.strip(),
+                        "tags": lk_tags.strip(),
+                    })))
+                    if res.get("status") == "saved":
+                        st.success(f"Saved: **{res['title']}**")
+                        st.rerun()
+                    else:
+                        st.error(res.get("error", "Failed to save"))
+                else:
+                    st.warning("Please enter a URL.")
+
+    st.divider()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINK LIST
+    # ─────────────────────────────────────────────────────────────────────────
+    lk_search = st.text_input("🔍 Search links", placeholder="portfolio, social, work…", key="lk_search")
+
+    _lk_res = json.loads(get_links.invoke(json.dumps({"search": lk_search, "limit": 100})))
+    _links  = _lk_res.get("links", [])
+
+    if not _links:
+        st.markdown(
+            "<div style='text-align:center;color:#555;padding:3rem'>"
+            "<h4>No links yet</h4>"
+            "<p>Add your first link above or say:<br>"
+            "<em>\"Edward, save this link: https://yoursite.com\"</em></p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(f"{len(_links)} link{'s' if len(_links) != 1 else ''}")
+        for lk in _links:
+            _tags = [t.strip() for t in (lk.get("tags") or "").split(",") if t.strip()]
+            _tag_html = " ".join(
+                f'<span style="background:#1e3a5f;color:#7dd3fc;'
+                f'border-radius:12px;padding:2px 8px;font-size:0.72rem">{t}</span>'
+                for t in _tags
+            )
+            st.markdown(
+                f"""<div style="background:#111827;border:1px solid #1f2937;
+                border-radius:12px;padding:1rem;margin-bottom:0.6rem">
+                  <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
+                    <img src="{lk.get('favicon_url','')}" width="16" height="16"
+                         style="border-radius:3px" onerror="this.style.display='none'"/>
+                    <strong style="font-size:1rem;color:#f9fafb">{lk['title']}</strong>
+                  </div>
+                  <div style="color:#6b7280;font-size:0.82rem;word-break:break-all;margin-bottom:0.4rem">
+                    <a href="{lk['url']}" target="_blank"
+                       style="color:#60a5fa;text-decoration:none">{lk['url']}</a>
+                  </div>
+                  {"<div style='color:#9ca3af;font-size:0.8rem;margin-bottom:0.4rem'>"
+                   + lk['description'] + "</div>" if lk.get("description") else ""}
+                  <div style="margin-top:0.3rem">{_tag_html}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            _col1, _col2 = st.columns([4, 1])
+            _col1.code(lk["url"], language=None)
+            if _col2.button("🗑", key=f"del_lk_{lk['id']}", use_container_width=True,
+                            help="Delete this link"):
+                json.loads(delete_link.invoke(json.dumps({"link_id": lk["id"]})))
+                st.rerun()
+
+    st.divider()
+    st.caption("💬 Say: *\"Edward, pull up my links\"* or *\"Edward, save this link: https://…\"*")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB: INSPO
+# ═════════════════════════════════════════════════════════════════════════════
+
+with tab_inspo:
+    st.subheader("✨ Inspo Board")
+    st.caption("Your personal mood board — upload images for inspiration. Ask Edward to pull it up anytime.")
+
+    INSPO_DIR = "inspo"
+
+    # ── Upload section ────────────────────────────────────────────────────────
+    with st.expander("📷 Add to your board", expanded=True):
+
+        # Metadata fields (shared by both upload methods)
+        _m1, _m2, _m3 = st.columns(3)
+        ins_title = _m1.text_input("Title", placeholder="Dream kitchen", key="ins_title")
+        ins_desc  = _m2.text_input("Description", placeholder="Modern minimalist…", key="ins_desc")
+        ins_tags  = _m3.text_input("Tags", placeholder="home, design, travel", key="ins_tags")
+
+        st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
+
+        # Two source tabs: Camera vs File upload
+        _src_camera, _src_file = st.tabs(["📸 Camera", "🖼 File / Gallery"])
+
+        _inspo_image_data = None   # bytes
+        _inspo_image_name = None   # filename hint
+
+        with _src_camera:
+            st.caption("On **mobile**: opens your camera. On **desktop**: uses your webcam.")
+            _cam_shot = st.camera_input(
+                "Take a photo",
+                key=f"inspo_cam_{st.session_state.inspo_upload_count}",
+                label_visibility="collapsed",
+            )
+            if _cam_shot:
+                _inspo_image_data = _cam_shot.getvalue()
+                _inspo_image_name = "camera_capture.jpg"
+
+        with _src_file:
+            st.caption("Choose from your **photo library**, **desktop**, or any folder.")
+            _file_up = st.file_uploader(
+                "Select image",
+                type=["jpg", "jpeg", "png", "webp", "gif", "heic"],
+                key=f"inspo_upload_{st.session_state.inspo_upload_count}",
+                label_visibility="collapsed",
+            )
+            if _file_up:
+                _inspo_image_data = _file_up.getvalue()
+                _inspo_image_name = _file_up.name
+
+        # Preview before saving
+        if _inspo_image_data:
+            st.image(_inspo_image_data, caption="Preview", use_container_width=True)
+
+        _save_disabled = _inspo_image_data is None
+        if st.button(
+            "Save to Inspo Board ✨",
+            type="primary",
+            key="btn_inspo_save",
+            disabled=_save_disabled,
+            use_container_width=True,
+        ):
+            _ext   = (_inspo_image_name or "image.jpg").rsplit(".", 1)[-1].lower()
+            if _ext == "heic":
+                _ext = "jpg"
+            _fname = f"ins_{uuid.uuid4().hex[:10]}.{_ext}"
+            _fpath = f"{INSPO_DIR}/{_fname}"
+            with open(_fpath, "wb") as _fh:
+                _fh.write(_inspo_image_data)
+            res = json.loads(save_inspo_item.invoke(json.dumps({
+                "file_path": _fpath,
+                "title": ins_title.strip() or "Inspiration",
+                "description": ins_desc.strip(),
+                "tags": ins_tags.strip(),
+            })))
+            if res.get("status") == "saved":
+                st.success(f"Added to your Inspo Board: **{res['title']}**")
+                st.session_state.inspo_upload_count += 1
+                st.rerun()
+            else:
+                st.error(res.get("error", "Upload failed"))
+
+    st.divider()
+
+    # ── Filter ────────────────────────────────────────────────────────────────
+    ins_search = st.text_input("🔍 Search inspo", placeholder="design, travel, food…", key="ins_search")
+
+    # ── Load items ────────────────────────────────────────────────────────────
+    _ins_res   = json.loads(get_inspo_items.invoke(json.dumps({"search": ins_search, "limit": 100})))
+    _ins_items = _ins_res.get("items", [])
+
+    if not _ins_items:
+        st.markdown(
+            "<div style='text-align:center;color:#555;padding:3rem'>"
+            "<h4>Your Inspo Board is empty</h4>"
+            "<p>Upload your first image above — screenshots, photos, anything that inspires you.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(f"{len(_ins_items)} image{'s' if len(_ins_items) != 1 else ''} on your board")
+
+        # Masonry-style 3-column grid
+        _cols = st.columns(3)
+        for _i, _item in enumerate(_ins_items):
+            _fp = _item.get("file_path", "")
+            with _cols[_i % 3]:
+                if _fp and os.path.exists(_fp):
+                    st.image(_fp, use_container_width=True)
+                else:
+                    st.markdown(
+                        "<div style='background:#1f2937;border-radius:8px;height:120px;"
+                        "display:flex;align-items:center;justify-content:center;"
+                        "color:#6b7280;font-size:0.8rem'>Image not found</div>",
+                        unsafe_allow_html=True,
+                    )
+                # Title + tags below image
+                _itags = [t.strip() for t in (_item.get("tags") or "").split(",") if t.strip()]
+                st.markdown(
+                    f"<div style='font-size:0.82rem;font-weight:600;color:#f9fafb;"
+                    f"margin:0.2rem 0 0.1rem'>{_item.get('title','')}</div>"
+                    + (f"<div style='font-size:0.75rem;color:#9ca3af'>{_item['description']}</div>"
+                       if _item.get("description") else "")
+                    + "<div style='margin-top:0.2rem'>"
+                    + " ".join(
+                        f'<span style="background:#1e3a5f;color:#7dd3fc;'
+                        f'border-radius:10px;padding:1px 6px;font-size:0.68rem">{t}</span>'
+                        for t in _itags
+                    )
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(((_item.get("created_at") or "")[:10]))
+
+    st.divider()
+    st.caption("💬 Say: *\"Edward, pull up my inspo\"* or *\"Edward, show inspo tagged 'travel'\"*")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1701,12 +2169,12 @@ with tab_reports:
         st.divider()
         st.subheader("AI-Generated Financial Summary")
         if st.button(
-            "🤖 Generate Full Financial Report (AI)",
+            "🤖 Alex: Generate Full Financial Report",
             type="secondary", use_container_width=True, key="btn_ai_report",
         ):
-            with st.spinner("Generating comprehensive report… (30–90 s depending on LLM speed)"):
+            with st.spinner("Alex is generating your report… (30–90 s depending on LLM speed)"):
                 ai_report = run_agent_query(
-                    "Generate a comprehensive financial health report covering: "
+                    "Alex, generate a comprehensive financial health report covering: "
                     "1) Net worth summary with breakdown, "
                     "2) Monthly spending analysis with top categories, "
                     "3) Investment portfolio performance, "

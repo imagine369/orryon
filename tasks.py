@@ -7,24 +7,22 @@ Each Task has:
   • description    — detailed instructions (includes user query when dynamic)
   • expected_output — what a good answer looks like (guides the LLM)
   • agent           — which specialist handles it
-  • context         — list of upstream Tasks whose output feeds this one (for compound tasks)
+  • context         — list of upstream Tasks whose output feeds this one
 
-Task types
-──────────
-  Static     — always-on tasks (data sync, net worth snapshot)
-  Dynamic    — created per user query with specific parameters
-  Compound   — two+ tasks with context dependencies (e.g., net worth → retirement)
+Routing overview
+────────────────
+  Edward (Chief of Staff) handles:
+    calendar, schedule, reminders, travel, research, drafting,
+    action items, briefings, notes, personal tasks, general queries
 
-Usage
-──────
-  from tasks import route_query_to_tasks
+  Alex (Finance) handles:
+    budget, spending, net worth, investments, tax, forecasting,
+    retirement, debt, subscriptions, financial recommendations
 
-  tasks = route_query_to_tasks("Run my retirement projection")
-  # → [Task(agent=forecasting_agent)]
-
-  tasks = route_query_to_tasks("What's my net worth and when can I retire?")
-  # → [nw_task, retirement_task]  (retirement has context=[nw_task])
+  Compound tasks chain multiple agents when a query spans domains.
 """
+
+from __future__ import annotations
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SHARED RESPONSE REQUIREMENTS
@@ -60,21 +58,290 @@ def _memory_prefix(memory_context: str) -> str:
         "preferences, and decisions where relevant.\n\n"
     )
 
+
 from crewai import Task
 from agents import (
+    alex,
     budget_agent,
     data_aggregator,
+    edward,
     forecasting_agent,
     insights_agent,
     net_worth_agent,
     notes_agent,
-    orchestrator,
-    scheduling_agent,
 )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STATIC TASKS
+# EDWARD TASKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def create_schedule_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward handles all calendar and scheduling requests."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Handle this scheduling request: '{user_query}'\n\n"
+            "Determine what type of action is needed:\n"
+            "• CREATE EVENT: parse title, date, type, amount from the query, "
+            "  then call create_calendar_event.\n"
+            "• ADD BILL REMINDER: parse bill name, amount, and due day, "
+            "  then call add_bill_reminder.\n"
+            "• LIST: call list_upcoming_events with appropriate date range.\n"
+            "After creating, confirm what was saved and suggest related follow-ups."
+        ),
+        expected_output=(
+            "Confirmation of the action taken:\n"
+            "• Event/reminder title, date, amount (if applicable)\n"
+            "• Next occurrence (if recurring)\n"
+            "• List of upcoming events if requested\n"
+            "• One proactive follow-up suggestion from Edward."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_travel_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward plans travel — itineraries, logistics, calendar placeholders."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Handle this travel request: '{user_query}'\n\n"
+            "Use plan_travel to:\n"
+            "1. Extract destination, dates, purpose, and preferences from the query.\n"
+            "2. Create an itinerary note with a pre-departure checklist.\n"
+            "3. Create calendar events for departure and return.\n"
+            "4. List visa requirements, packing tips, and any concierge-style reminders.\n"
+            "5. If budget is mentioned, flag to Alex for financial tracking.\n"
+            "Be thorough — a great Chief of Staff anticipates every detail."
+        ),
+        expected_output=(
+            "Travel plan confirmation:\n"
+            "• Destination, dates, purpose\n"
+            "• Itinerary note ID and summary\n"
+            "• Calendar events created\n"
+            "• Pre-departure checklist\n"
+            "• Any visa / entry notes\n"
+            "• Edward's proactive next step (e.g., 'Want me to set a reminder to book flights?')."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_communication_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward drafts emails, messages, or any written communication."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Handle this communication request: '{user_query}'\n\n"
+            "Use draft_message to:\n"
+            "1. Identify the purpose, recipient, tone, and key points from the query.\n"
+            "2. Draft a complete, polished message the user can send or adapt.\n"
+            "3. Save it as a note for reference.\n"
+            "4. Suggest any follow-up actions (e.g., calendar reminder to send).\n"
+            "Match the user's implied tone — professional for business, "
+            "casual for personal contexts."
+        ),
+        expected_output=(
+            "Drafted communication:\n"
+            "• Subject line\n"
+            "• Full draft message\n"
+            "• Tone and recipient context\n"
+            "• Note ID where it's saved\n"
+            "• Suggested follow-up (send deadline, reminder?)."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_research_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward researches a topic and returns structured findings."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Research request: '{user_query}'\n\n"
+            "Use research_topic to:\n"
+            "1. Extract the topic, context, and desired output format.\n"
+            "2. Structure findings: options/approaches, key differentiators, "
+            "   pros/cons, and a clear recommendation.\n"
+            "3. Save the research as a note.\n"
+            "4. If the topic involves financial decisions, flag relevant data to Alex.\n"
+            "Be concise but thorough — give the user everything they need to decide."
+        ),
+        expected_output=(
+            "Research summary:\n"
+            "• Topic and context\n"
+            "• Key findings (bullet points)\n"
+            "• Options/comparison (if applicable)\n"
+            "• Clear recommendation with reasoning\n"
+            "• Research note ID\n"
+            "• Any financial implications to discuss with Alex."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_action_items_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward manages the user's action items and to-dos."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Action item request: '{user_query}'\n\n"
+            "Use manage_action_items to:\n"
+            "• ADD: extract title, due date, priority, and category from the query.\n"
+            "• LIST: retrieve open items, ordered by priority and due date.\n"
+            "• COMPLETE: mark the referenced item as done.\n"
+            "After acting, confirm and suggest any related scheduling or follow-ups."
+        ),
+        expected_output=(
+            "Action item update:\n"
+            "• What was added/updated/completed\n"
+            "• Current open action items (top 5 by priority)\n"
+            "• Edward's proactive next step."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_briefing_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward compiles a briefing across schedule, tasks, and notes."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Briefing request: '{user_query}'\n\n"
+            "Use prepare_briefing to compile a comprehensive briefing covering:\n"
+            "1. Upcoming calendar events and bill due dates.\n"
+            "2. Open action items by priority.\n"
+            "3. Recent notes and journal entries.\n"
+            "4. Call get_financial_recommendations for a headline financial insight "
+            "   to include from Alex's domain.\n"
+            "Present it as a structured daily/weekly brief — concise and scannable."
+        ),
+        expected_output=(
+            "Structured briefing:\n"
+            "• Date and period covered\n"
+            "• Upcoming schedule (next 7 days)\n"
+            "• Top action items\n"
+            "• Recent notes highlights\n"
+            "• One financial headline from Alex\n"
+            "• Edward's priority recommendation for the day."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_notes_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward (or notes_agent) handles save/search/summarise notes."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Notes request: '{user_query}'\n\n"
+            "Determine the intent:\n"
+            "• SAVE: extract title, content, and tags from the query, call save_note.\n"
+            "• SEARCH: extract keywords/tags, call search_notes.\n"
+            "• SUMMARISE: call summarize_notes for recent entries.\n"
+            "Link the note to a relevant goal or account if mentioned."
+        ),
+        expected_output=(
+            "For SAVE: confirmation with note ID, title, and tags.\n"
+            "For SEARCH: list of matching notes with date and preview.\n"
+            "For SUMMARISE: bullet-point summary with key themes."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_links_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward manages the user's Links page — save, list, or delete links."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Links request: '{user_query}'\n\n"
+            "Determine the intent:\n"
+            "• SAVE: extract the URL and optional title/description/tags, "
+            "  then call save_link. If no title given, infer one from the URL domain.\n"
+            "• LIST / PULL UP: call get_links and return a formatted list with titles and URLs.\n"
+            "• DELETE: extract the link title or id, call delete_link.\n"
+            "• SEARCH: call get_links with a search or tags filter.\n"
+            "Confirm what was saved or return the requested links clearly."
+        ),
+        expected_output=(
+            "For SAVE: confirmation with link title, URL, and link_id.\n"
+            "For LIST: formatted list of links with title, URL, description, and tags.\n"
+            "For DELETE: confirmation of removal.\n"
+            "For SEARCH: matching links with context."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_inspo_task(user_query: str, memory_context: str = "") -> Task:
+    """Edward manages the user's Inspo board — list or describe saved images."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Inspo board request: '{user_query}'\n\n"
+            "Determine the intent:\n"
+            "• LIST / PULL UP: call get_inspo_items and return a summary of saved "
+            "  inspiration images — titles, descriptions, tags, and dates.\n"
+            "• SEARCH: call get_inspo_items with a tags or search filter.\n"
+            "• NOTE: actual image uploads happen via the Inspo tab UI — "
+            "  if user asks to upload, direct them there and confirm the tab is available.\n"
+            "Present inspo items in an engaging, visual-friendly format."
+        ),
+        expected_output=(
+            "For LIST: summary of inspo board — count, titles, tags, and dates.\n"
+            "For SEARCH: matching items with descriptions.\n"
+            "Always end with an invitation to add more via the Inspo tab."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+def create_general_edward_task(user_query: str, memory_context: str = "") -> Task:
+    """Fallback: Edward handles any unclassified request."""
+    return Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"User request: '{user_query}'\n\n"
+            "As Chief of Staff, handle this request directly or delegate to the "
+            "appropriate specialist. Use your available tools to provide a complete, "
+            "actionable response. If the request is financial in nature, "
+            "surface relevant data and note that Alex can go deeper. "
+            "Always end with one concrete next step."
+        ),
+        expected_output=(
+            "A well-structured response:\n"
+            "1. Direct answer or action taken\n"
+            "2. Relevant context\n"
+            "3. One actionable next step from Edward."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ALEX TASKS (Finance)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def create_data_sync_task(memory_context: str = "") -> Task:
@@ -100,7 +367,7 @@ def create_data_sync_task(memory_context: str = "") -> Task:
 
 
 def create_net_worth_task(memory_context: str = "") -> Task:
-    """Calculate and narrate the user's current net worth."""
+    """Alex calculates and narrates the user's current net worth."""
     return Task(
         description=(
             _memory_prefix(memory_context)
@@ -122,12 +389,12 @@ def create_net_worth_task(memory_context: str = "") -> Task:
             "• One key insight or recommendation."
             + _JSON_SUFFIX
         ),
-        agent=net_worth_agent,
+        agent=alex,
     )
 
 
 def create_budget_analysis_task(days: int = 30, memory_context: str = "") -> Task:
-    """Spending analysis and budget health check."""
+    """Alex analyses spending and budget health."""
     return Task(
         description=(
             _memory_prefix(memory_context)
@@ -149,14 +416,14 @@ def create_budget_analysis_task(days: int = 30, memory_context: str = "") -> Tas
             "• 2–3 specific, actionable tips."
             + _JSON_SUFFIX
         ),
-        agent=budget_agent,
+        agent=alex,
     )
 
 
 def create_retirement_projection_task(
     params: dict | None = None, memory_context: str = ""
 ) -> Task:
-    """Monte Carlo retirement simulation."""
+    """Alex runs a Monte Carlo retirement simulation."""
     param_str = str(params) if params else (
         "defaults: age 30, retire at 65, $332k saved, $2k/month contribution, "
         "7% expected annual return, $2M target"
@@ -182,12 +449,12 @@ def create_retirement_projection_task(
             "• Key risk: ..."
             + _JSON_SUFFIX
         ),
-        agent=forecasting_agent,
+        agent=alex,
     )
 
 
 def create_insights_task(memory_context: str = "") -> Task:
-    """Proactive financial insights and anomaly detection."""
+    """Alex surfaces proactive financial insights and anomalies."""
     return Task(
         description=(
             _memory_prefix(memory_context)
@@ -209,12 +476,12 @@ def create_insights_task(memory_context: str = "") -> Task:
             "• Top 3 recommendations with expected financial impact."
             + _JSON_SUFFIX
         ),
-        agent=insights_agent,
+        agent=alex,
     )
 
 
 def create_cash_flow_forecast_task(months: int = 6, memory_context: str = "") -> Task:
-    """Month-by-month cash flow projection."""
+    """Alex projects month-by-month cash flow."""
     return Task(
         description=(
             _memory_prefix(memory_context)
@@ -234,83 +501,7 @@ def create_cash_flow_forecast_task(months: int = 6, memory_context: str = "") ->
             "• Annual surplus at current rate: $X."
             + _JSON_SUFFIX
         ),
-        agent=forecasting_agent,
-    )
-
-
-def create_schedule_task(user_query: str, memory_context: str = "") -> Task:
-    """Handle all scheduling and calendar requests."""
-    return Task(
-        description=(
-            _memory_prefix(memory_context)
-            + _REASONING_PREFIX
-            + f"Handle this scheduling request: '{user_query}'\n\n"
-            "Determine what type of scheduling action is needed:\n"
-            "• CREATE: parse the bill/event name, amount, and date from the query, "
-            "  then call create_calendar_event or add_bill_reminder.\n"
-            "• LIST: call list_upcoming_events with appropriate date range.\n"
-            "• DETECT: call detect_subscriptions to auto-populate bill reminders.\n"
-            "After creating, confirm what was saved and when the next occurrence is."
-        ),
-        expected_output=(
-            "Confirmation of the action taken:\n"
-            "• Event/reminder title, date, amount (if applicable)\n"
-            "• Whether it synced to Google Calendar (or .ics fallback)\n"
-            "• List of upcoming events if requested\n"
-            "• Next step suggestion (e.g., 'Want me to set up all your other bills?')."
-            + _JSON_SUFFIX
-        ),
-        agent=scheduling_agent,
-    )
-
-
-def create_notes_task(user_query: str, memory_context: str = "") -> Task:
-    """Handle all notes, journal, and memo requests."""
-    return Task(
-        description=(
-            _memory_prefix(memory_context)
-            + _REASONING_PREFIX
-            + f"Handle this notes request: '{user_query}'\n\n"
-            "Determine the intent:\n"
-            "• SAVE: extract title, content, and tags from the query, call save_note. "
-            "  Infer tags from the content (e.g., mention of 'savings' → tag: savings).\n"
-            "• SEARCH: extract keywords/tags, call search_notes.\n"
-            "• SUMMARISE: call summarize_notes for recent entries.\n"
-            "Link the note to a relevant goal or account if the query mentions one."
-        ),
-        expected_output=(
-            "For SAVE: confirmation with note ID, title, tags, and filename.\n"
-            "For SEARCH: list of matching notes with date and preview.\n"
-            "For SUMMARISE: bullet-point summary of recent financial journal entries "
-            "with key themes."
-            + _JSON_SUFFIX
-        ),
-        agent=notes_agent,
-    )
-
-
-def create_general_query_task(user_query: str, memory_context: str = "") -> Task:
-    """Fallback: orchestrator handles an unclassified query."""
-    return Task(
-        description=(
-            _memory_prefix(memory_context)
-            + _REASONING_PREFIX
-            + f"User query: '{user_query}'\n\n"
-            "This query did not match a specific routing rule. "
-            "Use your tools to fetch the most relevant financial data and provide a "
-            "comprehensive, helpful answer. Be specific with numbers and actionable "
-            "with recommendations. If you need data that isn't loaded yet, call "
-            "load_sample_data first. Include one clear next step."
-        ),
-        expected_output=(
-            "A well-structured response:\n"
-            "1. Direct answer to the question with specific figures\n"
-            "2. Relevant context (why this matters)\n"
-            "3. One actionable next step\n"
-            "4. Privacy note if sensitive data was used."
-            + _JSON_SUFFIX
-        ),
-        agent=orchestrator,
+        agent=alex,
     )
 
 
@@ -321,10 +512,7 @@ def create_general_query_task(user_query: str, memory_context: str = "") -> Task
 def create_net_worth_plus_retirement_tasks(
     user_query: str, memory_context: str = ""
 ) -> list[Task]:
-    """
-    Two-task compound: net worth feeds into retirement projection.
-    The forecasting agent receives the actual portfolio value as context.
-    """
+    """Alex: net worth feeds into retirement projection."""
     nw_task = create_net_worth_task(memory_context=memory_context)
 
     retirement_task = Task(
@@ -334,9 +522,7 @@ def create_net_worth_plus_retirement_tasks(
             + f"Original user question: '{user_query}'\n\n"
             "Using the net worth data provided in context:\n"
             "1. Extract the total investment portfolio value.\n"
-            "2. Run run_monte_carlo_retirement using the ACTUAL current savings figure "
-            "   (not a default). Assume retirement age 65, $2k/month contribution, "
-            "   7% mean annual return unless the user specified otherwise.\n"
+            "2. Run run_monte_carlo_retirement using the ACTUAL current savings figure.\n"
             "3. Present probability of success and key outcomes.\n"
             "4. Give one concrete recommendation to improve the success probability."
         ),
@@ -349,7 +535,7 @@ def create_net_worth_plus_retirement_tasks(
             "• One recommendation to improve odds."
             + _JSON_SUFFIX
         ),
-        agent=forecasting_agent,
+        agent=alex,
         context=[nw_task],
     )
 
@@ -359,9 +545,7 @@ def create_net_worth_plus_retirement_tasks(
 def create_budget_plus_insights_tasks(
     user_query: str, memory_context: str = ""
 ) -> list[Task]:
-    """
-    Two-task compound: budget analysis feeds into personalised insights.
-    """
+    """Alex: budget analysis feeds into personalised insights."""
     budget_task = create_budget_analysis_task(days=30, memory_context=memory_context)
 
     insights_task = Task(
@@ -383,11 +567,66 @@ def create_budget_plus_insights_tasks(
             "• Priority order: high / medium / low impact."
             + _JSON_SUFFIX
         ),
-        agent=insights_agent,
+        agent=alex,
         context=[budget_task],
     )
 
     return [budget_task, insights_task]
+
+
+def create_edward_finance_briefing_tasks(
+    user_query: str, memory_context: str = ""
+) -> list[Task]:
+    """
+    Edward requests a financial snapshot from Alex to include in a briefing.
+    Alex runs net worth + insights, then Edward compiles the full brief.
+    """
+    finance_task = Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + "Produce a compact financial snapshot for Edward's briefing:\n"
+            "1. Call calculate_net_worth — headline number and MoM change.\n"
+            "2. Call get_financial_recommendations — top 2 priority recommendations.\n"
+            "3. Check for any anomalies via detect_anomalies.\n"
+            "Return a concise summary Edward can include in the daily brief."
+        ),
+        expected_output=(
+            "Financial snapshot (for Edward's briefing):\n"
+            "• Net worth: $X\n"
+            "• Top 2 recommendations\n"
+            "• Any anomalies to flag\n"
+            "• One-line financial health status."
+            + _JSON_SUFFIX
+        ),
+        agent=alex,
+    )
+
+    briefing_task = Task(
+        description=(
+            _memory_prefix(memory_context)
+            + _REASONING_PREFIX
+            + f"Original request: '{user_query}'\n\n"
+            "Using Alex's financial snapshot from context, compile a full briefing:\n"
+            "1. Call prepare_briefing to pull schedule and action items.\n"
+            "2. Integrate the financial headline from Alex's output.\n"
+            "3. Present a clean, structured brief the user can scan in 60 seconds.\n"
+            "4. End with Edward's one priority recommendation for today."
+        ),
+        expected_output=(
+            "Complete briefing:\n"
+            "• Date and greeting\n"
+            "• Schedule highlights\n"
+            "• Open action items\n"
+            "• Financial headline (from Alex)\n"
+            "• Edward's priority for today."
+            + _JSON_SUFFIX
+        ),
+        agent=edward,
+        context=[finance_task],
+    )
+
+    return [finance_task, briefing_task]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -400,31 +639,86 @@ def route_query_to_tasks(
     """
     Analyse the free-text user query and return the appropriate Task list.
 
-    Args:
-        user_query:      The user's raw input string.
-        memory_context:  Recalled long-term memories for this user (injected
-                         into each task description for personalisation).
-
-    Returns a list because compound tasks have context dependencies.
-    The Crew will execute tasks in order, passing outputs as context.
+    Edward handles: scheduling, travel, research, communication, action items,
+                    briefings, notes, general personal assistant requests.
+    Alex handles:   anything financial — budget, net worth, investments,
+                    forecasting, tax, debt, subscriptions.
     """
     q = user_query.lower()
 
-    # ── Scheduling ────────────────────────────────────────────────────────────
+    # ── Travel & Logistics ────────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "travel", "trip", "flight", "hotel", "itinerary", "visa",
+        "book", "airport", "pack", "destination", "depart", "return flight",
+    ]):
+        return [create_travel_task(user_query, memory_context=memory_context)]
+
+    # ── Communication / Drafting ──────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "draft", "write an email", "write a message", "compose",
+        "follow up", "follow-up", "thank you email", "reply to",
+        "message to", "email to", "communicate",
+    ]):
+        return [create_communication_task(user_query, memory_context=memory_context)]
+
+    # ── Research ──────────────────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "research", "find best", "compare", "look up", "options for",
+        "what are the best", "which is better", "recommend a", "vendor",
+        "summarize", "summarise findings",
+    ]):
+        return [create_research_task(user_query, memory_context=memory_context)]
+
+    # ── Briefing / Catch me up ────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "briefing", "brief me", "catch me up", "what's on my plate",
+        "daily summary", "weekly summary", "what do i have today",
+        "morning brief", "what's happening",
+    ]):
+        # Compound: Alex provides financial snapshot, Edward compiles the full brief
+        return create_edward_finance_briefing_tasks(user_query, memory_context=memory_context)
+
+    # ── Action Items / To-dos ─────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "action item", "todo", "to do", "to-do", "task", "follow up on",
+        "remind me to", "don't forget", "add to my list",
+    ]):
+        return [create_action_items_task(user_query, memory_context=memory_context)]
+
+    # ── Scheduling & Calendar ─────────────────────────────────────────────────
     if any(kw in q for kw in [
         "schedule", "calendar", "remind", "reminder", "event",
         "bill due", "due date", "appointment", "deadline",
+        "add to calendar", "set a reminder",
     ]):
         return [create_schedule_task(user_query, memory_context=memory_context)]
 
-    # ── Notes ─────────────────────────────────────────────────────────────────
+    # ── Notes / Journal ───────────────────────────────────────────────────────
     if any(kw in q for kw in [
         "note", "journal", "memo", "log", "write down", "jot",
         "save this", "remember this", "record",
+        "put this in notes", "add to notes", "pull up notes", "show notes",
+        "open notes", "my notes",
     ]):
         return [create_notes_task(user_query, memory_context=memory_context)]
 
-    # ── Retirement + net worth (compound) ─────────────────────────────────────
+    # ── Links page ────────────────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "link", "links", "url", "website", "save this link", "add link",
+        "put in links", "pull up links", "show links", "my links",
+        "linktree", "share link", "copy link",
+    ]):
+        return [create_links_task(user_query, memory_context=memory_context)]
+
+    # ── Inspo board ───────────────────────────────────────────────────────────
+    if any(kw in q for kw in [
+        "inspo", "inspiration", "mood board", "moodboard",
+        "pull up inspo", "show inspo", "my inspo", "inspo board",
+        "inspiration board", "save to inspo", "add to inspo",
+    ]):
+        return [create_inspo_task(user_query, memory_context=memory_context)]
+
+    # ── Retirement + net worth (compound, Alex) ───────────────────────────────
     is_retirement = any(kw in q for kw in [
         "retire", "retirement", "financial independence", "fi/re", "fire",
         "nest egg", "when can i retire",
@@ -439,14 +733,14 @@ def route_query_to_tasks(
     if is_retirement:
         return [create_retirement_projection_task(memory_context=memory_context)]
 
-    # ── Net worth / portfolio ──────────────────────────────────────────────────
+    # ── Net worth / portfolio (Alex) ──────────────────────────────────────────
     if any(kw in q for kw in [
         "net worth", "worth", "portfolio", "holdings", "assets",
         "liabilities", "allocation", "stock", "crypto", "investments",
     ]):
         return [create_net_worth_task(memory_context=memory_context)]
 
-    # ── Budget + insights (compound) ──────────────────────────────────────────
+    # ── Budget + insights (compound, Alex) ────────────────────────────────────
     is_budget = any(kw in q for kw in [
         "spend", "budget", "expense", "subscription", "category",
         "where is my money", "bills", "groceries", "dining",
@@ -461,18 +755,19 @@ def route_query_to_tasks(
     if is_budget:
         return [create_budget_analysis_task(memory_context=memory_context)]
 
-    # ── Forecasting / scenarios ────────────────────────────────────────────────
+    # ── Forecasting / scenarios (Alex) ────────────────────────────────────────
     if any(kw in q for kw in [
         "forecast", "project", "future", "scenario", "what if",
         "cash flow", "savings goal", "if i lose my job",
-        "if i get a raise", "job loss", "emergency",
+        "if i get a raise", "job loss", "emergency fund",
     ]):
         return [create_cash_flow_forecast_task(memory_context=memory_context)]
 
-    # ── Insights only ────────────────────────────────────────────────────────
+    # ── Financial insights only (Alex) ────────────────────────────────────────
     if any(kw in q for kw in [
         "insight", "anomal", "unusual", "trend", "improve",
-        "recommend", "advice", "tips", "alert",
+        "recommend", "advice", "tips", "alert", "tax",
+        "debt", "payoff", "interest",
     ]):
         return [create_insights_task(memory_context=memory_context)]
 
@@ -482,5 +777,5 @@ def route_query_to_tasks(
     ]):
         return [create_data_sync_task(memory_context=memory_context)]
 
-    # ── Default ───────────────────────────────────────────────────────────────
-    return [create_general_query_task(user_query, memory_context=memory_context)]
+    # ── Default: Edward handles ───────────────────────────────────────────────
+    return [create_general_edward_task(user_query, memory_context=memory_context)]

@@ -4,13 +4,15 @@ config.py — Central configuration for guddd Personal Finance Dashboard.
 All secrets are read from environment variables (loaded from .env).
 NEVER hardcode API keys here. Use .env.example as a template.
 
-LLM Priority:
-  1. Grok (default) — xAI's cloud LLM via langchain-xai. No OpenAI dependency.
-                       Set LLM_PROVIDER=grok and XAI_API_KEY in .env.
-                       GROK_MODEL=grok-latest auto-tracks the newest Grok release.
-  2. Ollama (fallback) — 100% local/private. Set LLM_PROVIDER=ollama.
+LLM:
+  Grok (xAI) via langchain-xai. Set LLM_PROVIDER=grok and XAI_API_KEY in .env.
+  GROK_MODEL=grok-latest auto-tracks the newest Grok release.
+  OpenAI is intentionally not supported.
 
-OpenAI is intentionally not supported.
+Email OTP auth:
+  Set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM in .env.
+  Works with Gmail, Outlook, iCloud, Yahoo, or any SMTP provider.
+  If SMTP is not configured, the OTP code is displayed on-screen (dev mode).
 """
 
 import os
@@ -111,6 +113,30 @@ ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 
 # ── User ──────────────────────────────────────────────────────────────────────
 USER_ID: str = os.getenv("USER_ID", "default_user")
+
+# ── Public URL (used for share links) ─────────────────────────────────────────
+# Change this to your deployed URL in production, e.g. https://guddd.app
+APP_URL: str = os.getenv("APP_URL", "http://localhost:8501")
+
+# ── Email / SMTP (for OTP verification codes) ─────────────────────────────────
+# Works with any SMTP provider. Leave blank to use on-screen dev mode.
+#
+# Gmail setup:
+#   1. Enable 2FA on your Google account
+#   2. Go to myaccount.google.com → Security → App Passwords
+#   3. Generate an App Password and paste it as SMTP_PASS
+#
+# Provider reference:
+#   Gmail   : smtp.gmail.com         port 587
+#   Outlook : smtp-mail.outlook.com  port 587
+#   iCloud  : smtp.mail.me.com       port 587
+#   Yahoo   : smtp.mail.yahoo.com    port 587
+SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER: str = os.getenv("SMTP_USER", "")
+SMTP_PASS: str = os.getenv("SMTP_PASS", "")
+SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
+SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
 # ── Ensure directories exist ──────────────────────────────────────────────────
 os.makedirs(NOTES_DIR, exist_ok=True)

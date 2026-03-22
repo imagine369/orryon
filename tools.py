@@ -1684,3 +1684,568 @@ def get_debt_payoff_plan(input: str = "") -> str:
         })
     except Exception as exc:
         return _err(str(exc))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EDWARD — CHIEF OF STAFF TOOLS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tool("manage_action_items")
+def manage_action_items(input: str = "") -> str:
+    """
+    Add, update, list, or complete action items tracked by Edward.
+
+    Input JSON:
+      {"action": "add", "title": "...", "description": "...",
+       "priority": "high|medium|low", "due_date": "YYYY-MM-DD",
+       "category": "work|personal|finance|travel|health|other"}
+
+      {"action": "list", "status": "open|done|all", "category": "..."}
+
+      {"action": "complete", "item_id": "..."}
+
+      {"action": "delete", "item_id": "..."}
+
+    Returns: confirmation or list of action items.
+    """
+    try:
+        p = _parse(input)
+        action = p.get("action", "list")
+
+        if action == "add":
+            item_id = f"ai_{uuid.uuid4().hex[:10]}"
+            now = datetime.now().isoformat()
+            insert_row("action_items", {
+                "id": item_id,
+                "user_id": USER_ID,
+                "title": p.get("title", "Untitled task"),
+                "description": p.get("description", ""),
+                "priority": p.get("priority", "medium"),
+                "status": "open",
+                "due_date": p.get("due_date", ""),
+                "category": p.get("category", "other"),
+                "created_by": "edward",
+                "created_at": now,
+                "updated_at": now,
+            })
+            return _ok({"status": "created", "item_id": item_id,
+                        "title": p.get("title", "Untitled task")})
+
+        elif action == "complete":
+            item_id = p.get("item_id", "")
+            if not item_id:
+                return _err("item_id is required to complete a task")
+            update_row("action_items",
+                       {"status": "done", "updated_at": datetime.now().isoformat()},
+                       {"id": item_id})
+            return _ok({"status": "completed", "item_id": item_id})
+
+        elif action == "delete":
+            item_id = p.get("item_id", "")
+            if not item_id:
+                return _err("item_id is required to delete a task")
+            from db import delete_row as _del
+            _del("action_items", {"id": item_id})
+            return _ok({"status": "deleted", "item_id": item_id})
+
+        else:  # list
+            conn = get_connection()
+            status_filter = p.get("status", "open")
+            cat_filter = p.get("category", "")
+            query = "SELECT * FROM action_items WHERE user_id = ?"
+            params: list = [USER_ID]
+            if status_filter != "all":
+                query += " AND status = ?"
+                params.append(status_filter)
+            if cat_filter:
+                query += " AND category = ?"
+                params.append(cat_filter)
+            query += " ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, due_date ASC LIMIT 50"
+            rows = conn.execute(query, params).fetchall()
+            conn.close()
+            items = [dict(r) for r in rows]
+            return _ok({"items": items, "count": len(items),
+                        "filter_status": status_filter})
+
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("draft_message")
+def draft_message(input: str = "") -> str:
+    """
+    Draft an email, message, or communication on behalf of the user.
+
+    Input JSON:
+      {"purpose": "follow up on meeting | thank you | request | update",
+       "recipient": "name or role of recipient",
+       "tone": "professional|casual|formal",
+       "key_points": ["point 1", "point 2"],
+       "context": "optional background info",
+       "save_as_note": true|false}
+
+    Returns: {"draft": "...", "subject": "...", "note_id": "..."}
+    """
+    try:
+        p = _parse(input)
+        purpose = p.get("purpose", "general communication")
+        recipient = p.get("recipient", "recipient")
+        tone = p.get("tone", "professional")
+        key_points = p.get("key_points", [])
+        context = p.get("context", "")
+        save_note_flag = p.get("save_as_note", True)
+
+        subject = f"Re: {purpose.title()}"
+        points_text = "\n".join(f"- {pt}" for pt in key_points) if key_points else ""
+        draft_template = (
+            f"[{tone.upper()} DRAFT — to: {recipient}]\n"
+            f"Subject: {subject}\n\n"
+            f"Purpose: {purpose}\n"
+            + (f"Context: {context}\n" if context else "")
+            + (f"Key points to cover:\n{points_text}\n" if points_text else "")
+            + "\n[Edward will expand this into a full message based on the above structure.]"
+        )
+
+        note_id = ""
+        if save_note_flag:
+            note_id = f"draft_{uuid.uuid4().hex[:8]}"
+            now = datetime.now().isoformat()
+            insert_row("notes", {
+                "id": note_id,
+                "user_id": USER_ID,
+                "title": f"Draft: {subject}",
+                "content": draft_template,
+                "tags": f"draft,communication,{tone}",
+                "created_at": now,
+                "updated_at": now,
+            })
+
+        return _ok({
+            "draft": draft_template,
+            "subject": subject,
+            "recipient": recipient,
+            "tone": tone,
+            "note_id": note_id,
+        })
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("plan_travel")
+def plan_travel(input: str = "") -> str:
+    """
+    Create a travel plan with calendar events and a structured itinerary note.
+
+    Input JSON:
+      {"destination": "Paris, France",
+       "departure_date": "YYYY-MM-DD",
+       "return_date": "YYYY-MM-DD",
+       "purpose": "business|leisure|mixed",
+       "preferences": "window seat, vegetarian meals, 4-star hotel",
+       "budget_usd": 3000}
+
+    Returns: {"itinerary_note_id": ..., "events_created": [...], "checklist": [...]}
+    """
+    try:
+        p = _parse(input)
+        destination = p.get("destination", "TBD")
+        dep_date = p.get("departure_date", (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d"))
+        ret_date = p.get("return_date", (datetime.now() + timedelta(days=21)).strftime("%Y-%m-%d"))
+        purpose = p.get("purpose", "leisure")
+        preferences = p.get("preferences", "")
+        budget = p.get("budget_usd", 0)
+
+        checklist = [
+            "Book flights (check seat preferences)",
+            "Book accommodation",
+            "Arrange airport transfers",
+            "Check visa / entry requirements",
+            "Travel insurance",
+            "Foreign currency / notify bank",
+            "Pack essentials checklist",
+        ]
+        if purpose == "business":
+            checklist += ["Confirm meeting schedule", "Prepare presentation materials",
+                          "Business cards", "Expense tracking setup"]
+
+        itinerary = (
+            f"# Travel Plan: {destination}\n\n"
+            f"**Dates:** {dep_date} → {ret_date}\n"
+            f"**Purpose:** {purpose.title()}\n"
+            + (f"**Preferences:** {preferences}\n" if preferences else "")
+            + (f"**Budget:** ${budget:,.0f} USD\n" if budget else "")
+            + f"\n## Pre-Departure Checklist\n"
+            + "\n".join(f"- [ ] {item}" for item in checklist)
+            + "\n\n## Itinerary\n"
+            + f"**Day 1 ({dep_date}):** Departure — confirm flight, pack, airport transfer\n"
+            + f"**Days 2–{max(2, (datetime.strptime(ret_date, '%Y-%m-%d') - datetime.strptime(dep_date, '%Y-%m-%d')).days)} :** [Edward will add detailed itinerary on request]\n"
+            + f"**Return ({ret_date}):** Return journey — check-out, airport transfer\n"
+        )
+
+        now = datetime.now().isoformat()
+        note_id = f"travel_{uuid.uuid4().hex[:8]}"
+        insert_row("notes", {
+            "id": note_id,
+            "user_id": USER_ID,
+            "title": f"Travel Plan: {destination} ({dep_date})",
+            "content": itinerary,
+            "tags": f"travel,{purpose},{destination.split(',')[0].lower().replace(' ','-')}",
+            "created_at": now,
+            "updated_at": now,
+        })
+
+        events_created = []
+        for ev_title, ev_date, ev_type in [
+            (f"✈️ Depart to {destination}", dep_date, "reminder"),
+            (f"🏨 Return from {destination}", ret_date, "reminder"),
+        ]:
+            ev_id = f"ev_{uuid.uuid4().hex[:8]}"
+            insert_row("events", {
+                "id": ev_id,
+                "user_id": USER_ID,
+                "title": ev_title,
+                "description": f"Travel: {destination} — {purpose}",
+                "event_date": ev_date,
+                "event_type": ev_type,
+                "amount": 0,
+                "is_recurring": 0,
+                "created_at": now,
+            })
+            events_created.append({"id": ev_id, "title": ev_title, "date": ev_date})
+
+        return _ok({
+            "itinerary_note_id": note_id,
+            "destination": destination,
+            "dates": f"{dep_date} to {ret_date}",
+            "events_created": events_created,
+            "checklist": checklist,
+        })
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("research_topic")
+def research_topic(input: str = "") -> str:
+    """
+    Structure and log a research request; returns a research scaffold for Edward to complete.
+
+    Input JSON:
+      {"topic": "best tax software 2026",
+       "context": "small business owner, quarterly filings",
+       "depth": "brief|detailed",
+       "output_format": "summary|comparison|pros_cons|recommendation"}
+
+    Returns: {"topic": ..., "research_id": ..., "scaffold": ..., "saved_note_id": ...}
+    """
+    try:
+        p = _parse(input)
+        topic = p.get("topic", input if isinstance(input, str) and not input.startswith("{") else "general research")
+        context = p.get("context", "")
+        depth = p.get("depth", "brief")
+        output_format = p.get("output_format", "recommendation")
+
+        scaffold = (
+            f"# Research: {topic}\n\n"
+            f"**Depth:** {depth}  |  **Format:** {output_format}\n"
+            + (f"**Context:** {context}\n" if context else "")
+            + "\n## Key Questions\n"
+            "1. What are the main options / approaches?\n"
+            "2. What are the key differentiators?\n"
+            "3. What fits the user's specific context best?\n"
+            "4. What are the risks or downsides?\n\n"
+            "## Findings\n[Edward populates this based on available knowledge and context]\n\n"
+            "## Recommendation\n[Clear, actionable recommendation with reasoning]"
+        )
+
+        now = datetime.now().isoformat()
+        note_id = f"research_{uuid.uuid4().hex[:8]}"
+        insert_row("notes", {
+            "id": note_id,
+            "user_id": USER_ID,
+            "title": f"Research: {topic[:80]}",
+            "content": scaffold,
+            "tags": f"research,edward,{output_format}",
+            "created_at": now,
+            "updated_at": now,
+        })
+
+        return _ok({
+            "topic": topic,
+            "context": context,
+            "depth": depth,
+            "output_format": output_format,
+            "research_id": note_id,
+            "scaffold": scaffold,
+        })
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("prepare_briefing")
+def prepare_briefing(input: str = "") -> str:
+    """
+    Compile a daily/weekly briefing by pulling key data from all domains.
+
+    Input JSON:
+      {"period": "today|week|month",
+       "topics": ["finance", "schedule", "action_items", "notes"]}
+
+    Returns: {"briefing": "...", "note_id": "...", "sections": {...}}
+    """
+    try:
+        p = _parse(input)
+        period = p.get("period", "today")
+        topics = p.get("topics", ["finance", "schedule", "action_items"])
+
+        sections: dict = {}
+        now_dt = datetime.now()
+
+        if "schedule" in topics:
+            days_map = {"today": 1, "week": 7, "month": 30}
+            days = days_map.get(period, 7)
+            cutoff = (now_dt + timedelta(days=days)).strftime("%Y-%m-%d")
+            conn = get_connection()
+            ev_rows = conn.execute(
+                "SELECT title, event_date, amount FROM events "
+                "WHERE user_id = ? AND event_date <= ? AND event_date >= ? ORDER BY event_date ASC LIMIT 10",
+                (USER_ID, cutoff, now_dt.strftime("%Y-%m-%d"))
+            ).fetchall()
+            conn.close()
+            sections["schedule"] = [dict(r) for r in ev_rows]
+
+        if "action_items" in topics:
+            conn = get_connection()
+            ai_rows = conn.execute(
+                "SELECT title, priority, due_date, category FROM action_items "
+                "WHERE user_id = ? AND status = 'open' "
+                "ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END LIMIT 10",
+                (USER_ID,)
+            ).fetchall()
+            conn.close()
+            sections["action_items"] = [dict(r) for r in ai_rows]
+
+        if "notes" in topics:
+            conn = get_connection()
+            cutoff_note = (now_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+            note_rows = conn.execute(
+                "SELECT title, created_at FROM notes "
+                "WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 5",
+                (USER_ID, cutoff_note)
+            ).fetchall()
+            conn.close()
+            sections["recent_notes"] = [dict(r) for r in note_rows]
+
+        # Build briefing text
+        date_str = now_dt.strftime("%A, %B %d %Y")
+        briefing_lines = [f"# Edward's Briefing — {date_str}\n"]
+
+        if sections.get("schedule"):
+            briefing_lines.append("## Upcoming Schedule")
+            for ev in sections["schedule"]:
+                amt = f" — ${ev['amount']:,.0f}" if ev.get("amount") else ""
+                briefing_lines.append(f"- **{ev['event_date']}** {ev['title']}{amt}")
+            briefing_lines.append("")
+
+        if sections.get("action_items"):
+            briefing_lines.append("## Open Action Items")
+            for ai in sections["action_items"]:
+                due = f" (due {ai['due_date']})" if ai.get("due_date") else ""
+                briefing_lines.append(f"- [{ai['priority'].upper()}] {ai['title']}{due}")
+            briefing_lines.append("")
+
+        if sections.get("recent_notes"):
+            briefing_lines.append("## Recent Notes")
+            for note in sections["recent_notes"]:
+                briefing_lines.append(f"- {note['title']} ({(note.get('created_at') or '')[:10]})")
+            briefing_lines.append("")
+
+        briefing_text = "\n".join(briefing_lines)
+
+        note_id = f"briefing_{uuid.uuid4().hex[:8]}"
+        now_iso = now_dt.isoformat()
+        insert_row("notes", {
+            "id": note_id,
+            "user_id": USER_ID,
+            "title": f"Briefing — {date_str}",
+            "content": briefing_text,
+            "tags": "briefing,edward,daily",
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        })
+
+        return _ok({
+            "briefing": briefing_text,
+            "note_id": note_id,
+            "period": period,
+            "sections": sections,
+        })
+    except Exception as exc:
+        return _err(str(exc))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EDWARD — NOTES / LINKS / INSPO TOOLS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tool("save_link")
+def save_link(input: str = "") -> str:
+    """
+    Save a URL to the user's personal Links page.
+
+    Input JSON:
+      {"url": "https://...", "title": "My Portfolio",
+       "description": "optional note about the link",
+       "tags": "work,portfolio,social"}
+
+    Returns: {"status": "saved", "link_id": "...", "title": "...", "url": "..."}
+    """
+    try:
+        p = _parse(input)
+        url = p.get("url", "")
+        if not url:
+            return _err("url is required")
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
+        title = p.get("title", "") or url
+        now = datetime.now().isoformat()
+        link_id = f"lnk_{uuid.uuid4().hex[:10]}"
+        insert_row("links", {
+            "id": link_id,
+            "user_id": USER_ID,
+            "title": title,
+            "url": url,
+            "description": p.get("description", ""),
+            "tags": p.get("tags", ""),
+            "favicon_url": f"https://www.google.com/s2/favicons?domain={url}&sz=32",
+            "created_at": now,
+            "updated_at": now,
+        })
+        return _ok({"status": "saved", "link_id": link_id, "title": title, "url": url})
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("get_links")
+def get_links(input: str = "") -> str:
+    """
+    Retrieve the user's saved links.
+
+    Input JSON (all optional):
+      {"tags": "work", "search": "portfolio", "limit": 50}
+
+    Returns: {"links": [...], "count": N}
+    """
+    try:
+        p = _parse(input)
+        tags_filter = p.get("tags", "").strip()
+        search = p.get("search", "").strip().lower()
+        limit = int(p.get("limit", 50))
+
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM links WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (USER_ID, limit),
+        ).fetchall()
+        conn.close()
+
+        links = [dict(r) for r in rows]
+        if tags_filter:
+            links = [lk for lk in links if tags_filter.lower() in (lk.get("tags") or "").lower()]
+        if search:
+            links = [lk for lk in links if
+                     search in lk.get("title", "").lower()
+                     or search in lk.get("url", "").lower()
+                     or search in (lk.get("description") or "").lower()]
+        return _ok({"links": links, "count": len(links)})
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("delete_link")
+def delete_link(input: str = "") -> str:
+    """
+    Delete a saved link by its ID.
+
+    Input JSON: {"link_id": "lnk_..."}
+    Returns: {"status": "deleted", "link_id": "..."}
+    """
+    try:
+        p = _parse(input)
+        link_id = p.get("link_id", "")
+        if not link_id:
+            return _err("link_id is required")
+        from db import delete_row as _del
+        _del("links", {"id": link_id, "user_id": USER_ID})
+        return _ok({"status": "deleted", "link_id": link_id})
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("save_inspo_item")
+def save_inspo_item(input: str = "") -> str:
+    """
+    Save an inspiration item (image already uploaded to inspo/ directory).
+
+    Input JSON:
+      {"file_path": "inspo/image.jpg", "title": "Dream kitchen",
+       "description": "Modern minimalist design", "tags": "home,design,kitchen"}
+
+    Returns: {"status": "saved", "inspo_id": "...", "file_path": "..."}
+    """
+    try:
+        p = _parse(input)
+        file_path = p.get("file_path", "")
+        if not file_path:
+            return _err("file_path is required")
+
+        inspo_id = f"ins_{uuid.uuid4().hex[:10]}"
+        now = datetime.now().isoformat()
+        insert_row("inspo_images", {
+            "id": inspo_id,
+            "user_id": USER_ID,
+            "title": p.get("title", "Inspiration"),
+            "file_path": file_path,
+            "description": p.get("description", ""),
+            "tags": p.get("tags", ""),
+            "created_at": now,
+        })
+        return _ok({"status": "saved", "inspo_id": inspo_id, "file_path": file_path,
+                    "title": p.get("title", "Inspiration")})
+    except Exception as exc:
+        return _err(str(exc))
+
+
+@tool("get_inspo_items")
+def get_inspo_items(input: str = "") -> str:
+    """
+    Retrieve the user's inspo images.
+
+    Input JSON (all optional):
+      {"tags": "design", "search": "kitchen", "limit": 50}
+
+    Returns: {"items": [...], "count": N}
+    """
+    try:
+        p = _parse(input)
+        tags_filter = p.get("tags", "").strip()
+        search = p.get("search", "").strip().lower()
+        limit = int(p.get("limit", 50))
+
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM inspo_images WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (USER_ID, limit),
+        ).fetchall()
+        conn.close()
+
+        items = [dict(r) for r in rows]
+        if tags_filter:
+            items = [it for it in items if tags_filter.lower() in (it.get("tags") or "").lower()]
+        if search:
+            items = [it for it in items if
+                     search in (it.get("title") or "").lower()
+                     or search in (it.get("description") or "").lower()]
+        return _ok({"items": items, "count": len(items)})
+    except Exception as exc:
+        return _err(str(exc))
