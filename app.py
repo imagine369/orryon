@@ -1,12 +1,12 @@
 """
-app.py — orryon v1  |  Your personal Finance + Daily Life OS.
+app.py — orryon v1  |  Your intelligent personal concierge.
 
 Run:
     streamlit run app.py
 
 Architecture:
   Landing page  : Grok-style hero, OTP sign-in/sign-up
-  Post-login    : 5 tabs (Dashboard · Budget · Forecast · Schedule · Notes)
+  Post-login    : 6 tabs (Dashboard · Budget · Forecast · Schedule · Goals · Notes)
                   + persistent "Ask orryon" floating chat input
   AI brain      : core/grok_agent.py → direct xAI Grok API with tool calling
   Data          : SQLite via db.py — fully local, zero cloud
@@ -94,6 +94,7 @@ def _init_state() -> None:
         "orryon_actions": [],
         "show_chat_history": False,
         "active_tab": 0,
+        "lp_sending": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -328,7 +329,7 @@ if not st.session_state.data_loaded:
 
         st.stop()
 
-    # ── SCREEN: HOME (landing page) ──────────────────────────────────────────
+    # ── LANDING CSS ───────────────────────────────────────────────────────────
     st.markdown(f"""
 <style>
   [data-testid="stAppViewContainer"],[data-testid="stMain"],
@@ -337,65 +338,362 @@ if not st.session_state.data_loaded:
   [data-testid="stHeader"]{{display:none!important}}
   [data-testid="stSidebar"]{{display:none!important}}
   .block-container{{
-    min-height:100vh!important; display:flex!important; flex-direction:column!important;
-    padding:0.75rem 1rem 1rem!important; max-width:480px!important;
+    padding:0 1.1rem 6rem!important;
+    max-width:480px!important;
     background:transparent!important;
   }}
-  .hero-center{{
-    position:fixed; top:calc(50% - 120px); left:50%;
-    transform:translate(-50%,-50%);
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    text-align:center; gap:0.6rem; z-index:1;
-  }}
-  .hero-avatar{{width:110px;height:110px;border-radius:50%;object-fit:cover}}
-  .hero-name{{
-    font-size:2rem;font-weight:800;letter-spacing:2px;
-    color:#fff;text-transform:uppercase;margin-top:-8px;
-  }}
-  .hero-tagline{{
-    font-size:0.88rem;color:rgba(255,255,255,0.45);
-    max-width:280px;line-height:1.5;margin-top:2px;
-  }}
-  [data-testid="stBottom"]{{background:transparent!important;padding-bottom:0.5rem!important}}
-  [data-testid="stChatInputContainer"]{{
+  /* ── Pill: the horizontal block that contains the input + send button ── */
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"]){{
     background:#1c1c1e!important;
     border:1px solid rgba(255,255,255,0.10)!important;
-    border-radius:28px!important; padding:0.15rem 0.5rem!important;
+    border-radius:28px!important;
+    padding:0 0.4rem 0 1rem!important;
+    align-items:center!important;
+    gap:0!important;
+    max-width:420px;
+    margin:0 auto;
   }}
-  [data-testid="stChatInputContainer"] textarea{{color:#fff!important;background:transparent!important;font-size:1rem!important}}
-  [data-testid="stChatInputContainer"] textarea::placeholder{{color:rgba(255,255,255,0.38)!important}}
-  [data-testid="stChatInputSubmitButton"]>button{{
-    background:#fff!important;border-radius:50%!important;color:#000!important;
-    width:2.2rem!important;height:2.2rem!important;padding:0!important;
+  /* strip input chrome */
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stTextInput"]{{flex:1!important;min-width:0!important;}}
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stTextInput"] label{{display:none!important}}
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stTextInput"] div[data-baseweb]{{
+      background:transparent!important;border:none!important;box-shadow:none!important;
+    }}
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stTextInput"] input{{
+      background:transparent!important;border:none!important;box-shadow:none!important;
+      color:#fff!important;font-size:1rem!important;
+      padding:0.58rem 0.2rem!important;caret-color:#fff;
+    }}
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stTextInput"] input::placeholder{{
+      color:rgba(255,255,255,0.38)!important;
+    }}
+  /* send button column — no padding */
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stColumn"]:last-child{{
+      padding:0!important;flex:0 0 auto!important;width:auto!important;
+    }}
+  /* the ● button — 50% of original (1.1rem × 1.1rem) */
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stButton"] button{{
+      background:#fff!important;border:none!important;color:#000!important;
+      border-radius:50%!important;
+      width:1.55rem!important;height:1.55rem!important;
+      min-height:unset!important;padding:0!important;
+      font-size:0.7rem!important;line-height:1!important;
+      transition:background 0.15s,transform 0.15s!important;
+    }}
+  [data-testid="stHorizontalBlock"]:has([data-testid="stTextInput"])
+    [data-testid="stButton"] button:hover{{
+      background:#d4d4d4!important;transform:scale(1.08)!important;
+    }}
+  /* Stop / Review bar above pill */
+  .lp-action-bar{{
+    display:flex;align-items:center;gap:0.55rem;
+    max-width:420px;margin:0 auto 0.45rem;
+    justify-content:flex-end;
   }}
-  [data-testid="stBottom"],[data-testid="stBottom"]>div,
-  [data-testid="stChatInput"],.stChatFloatingInputContainer{{
-    background:transparent!important;padding-bottom:3.8rem!important;
+  .lp-action-bar .stop-btn>button{{
+    background:transparent!important;border:none!important;
+    color:rgba(255,255,255,0.55)!important;
+    font-size:0.82rem!important;font-weight:500!important;
+    padding:0.2rem 0.5rem!important;min-height:unset!important;
+    border-radius:6px!important;
   }}
+  .lp-action-bar .stop-btn>button:hover{{color:#fff!important;background:rgba(255,255,255,0.06)!important;}}
+  .lp-action-bar .review-btn>button{{
+    background:rgba(255,255,255,0.08)!important;
+    border:1px solid rgba(255,255,255,0.15)!important;
+    color:#fff!important;font-size:0.82rem!important;font-weight:600!important;
+    padding:0.2rem 0.75rem!important;min-height:unset!important;
+    border-radius:6px!important;
+  }}
+  .lp-action-bar .review-btn>button:hover{{background:rgba(255,255,255,0.14)!important;}}
+  /* ── Upload animation ── */
+  @keyframes arrowUp{{
+    0%  {{transform:translateY(0);opacity:1;}}
+    60% {{transform:translateY(-10px);opacity:0;}}
+    100%{{transform:translateY(-10px);opacity:0;}}
+  }}
+  @keyframes btnShrink{{
+    0%  {{transform:scale(1);opacity:1;}}
+    60% {{transform:scale(0.7);opacity:0.5;}}
+    100%{{transform:scale(0.5);opacity:0;}}
+  }}
+  @keyframes pillFade{{
+    0%  {{opacity:1;}}
+    100%{{opacity:0.35;}}
+  }}
+  .lp-sending-pill{{
+    background:#1c1c1e;border:1px solid rgba(255,255,255,0.10);
+    border-radius:28px;padding:0 0.4rem 0 1rem;
+    max-width:420px;margin:0 auto;
+    display:flex;align-items:center;gap:0;
+    animation:pillFade 0.45s ease forwards;
+  }}
+  .lp-sending-pill .sending-text{{
+    flex:1;color:rgba(255,255,255,0.38);font-size:1rem;padding:0.58rem 0.2rem;
+  }}
+  .lp-sending-pill .sending-btn{{
+    width:1.55rem;height:1.55rem;background:#fff;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;flex-shrink:0;
+    animation:btnShrink 0.45s ease forwards;
+  }}
+  .lp-sending-pill .sending-btn span{{
+    font-size:0.7rem;color:#000;
+    animation:arrowUp 0.45s ease forwards;
+  }}
+  /* Section divider */
+  .lp-divider{{
+    border:none;border-top:1px solid rgba(255,255,255,0.07);
+    margin:3.5rem 0 3rem;
+  }}
+  /* How It Works steps */
+  .hiw-step{{
+    display:flex;align-items:flex-start;gap:1rem;
+    padding:1.1rem 0;border-bottom:1px solid rgba(255,255,255,0.07);
+  }}
+  .hiw-num{{
+    min-width:34px;height:34px;border-radius:50%;
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:0.9rem;color:#fff;flex-shrink:0;margin-top:1px;
+  }}
+  .hiw-title{{margin:0 0 3px;font-size:0.95rem;font-weight:700;color:#fff;}}
+  .hiw-desc{{margin:0;font-size:0.83rem;color:rgba(255,255,255,0.42);line-height:1.55;}}
+  /* Example cards */
+  .ex-card{{
+    background:#0f0f0f;border:1px solid rgba(255,255,255,0.09);
+    border-radius:12px;padding:0.88rem 1.1rem;
+    font-size:0.93rem;color:#e2e8f0;
+    margin-bottom:0.6rem;line-height:1.4;
+  }}
+  .ex-card::before{{content:'"';color:rgba(255,255,255,0.22);margin-right:1px;}}
+  .ex-card::after{{content:'"';color:rgba(255,255,255,0.22);margin-left:1px;}}
+  /* CTA button */
+  .lp-cta>button{{
+    width:100%!important;border-radius:50px!important;
+    padding:0.78rem 0!important;font-size:1rem!important;
+    font-weight:700!important;box-shadow:none!important;
+    background:#fff!important;border:none!important;color:#000!important;
+  }}
+  .lp-cta>button:hover{{background:#e8e8e8!important}}
+  /* Feature list */
+  .feat-row{{
+    display:flex;align-items:center;gap:0.8rem;padding:0.6rem 0;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    font-size:0.88rem;color:rgba(255,255,255,0.62);
+  }}
+  .feat-icon{{font-size:1rem;min-width:26px;text-align:center;}}
   .bottom-note{{
-    position:fixed;bottom:0.6rem;left:0;right:0;text-align:center;
-    font-size:0.70rem;color:rgba(255,255,255,0.22);z-index:1000;margin:0;
+    text-align:center;font-size:0.70rem;
+    color:rgba(255,255,255,0.16);margin-top:2rem;
   }}
 </style>
 """, unsafe_allow_html=True)
 
+    # ─── HERO ────────────────────────────────────────────────────────────────
+    st.markdown("<div style='height:4.5rem'></div>", unsafe_allow_html=True)
+
     if _b64:
         st.markdown(
-            f"""<div class="hero-center">
-              <img src="data:image/{_mime};base64,{_b64}" class="hero-avatar" />
-              <div class="hero-name">orryon</div>
-              <div class="hero-tagline">Your personal Finance + Daily Life OS.<br>Just tell orryon what to do.</div>
-            </div>""",
+            f'<div style="display:flex;justify-content:center;margin-bottom:1.3rem;">'
+            f'<img src="data:image/{_mime};base64,{_b64}" '
+            f'style="width:96px;height:96px;border-radius:50%;object-fit:cover;"/></div>',
             unsafe_allow_html=True,
         )
 
-    # Landing page chat input — routes to sign-in
-    _landing_query = st.chat_input("What can orryon help you with?")
-    if _landing_query:
+    st.markdown(
+        '<h1 style="text-align:center;font-size:2.2rem;font-weight:800;letter-spacing:2px;'
+        'color:#fff;text-transform:uppercase;margin:0 0 0.45rem;">orryon</h1>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p style="text-align:center;font-size:1.05rem;font-weight:600;'
+        'color:rgba(255,255,255,0.75);margin:0 0 0.55rem;line-height:1.45;">'
+        'Your intelligent personal concierge</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p style="text-align:center;font-size:0.88rem;color:rgba(255,255,255,0.36);'
+        'max-width:300px;margin:0 auto 1.8rem;line-height:1.65;">'
+        'Just talk to him naturally — whether you\'re adding an expense, planning your week, tracking goals, or organizing your daily life. Orryon understands you and takes care of the rest.</p>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Sending animation (plays for one frame before redirect) ─────────────
+    if st.session_state.get("lp_sending"):
+        st.markdown(
+            '<div class="lp-sending-pill">'
+            '<span class="sending-text">Sending…</span>'
+            '<div class="sending-btn"><span>↑</span></div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        import time as _t; _t.sleep(0.45)
+        st.session_state.lp_sending = False
+        st.session_state.screen    = "signin"
+        st.session_state.auth_step = "email"
+        st.rerun()
+
+    # ── Stop / Review bar (shown when input has content) ─────────────────────
+    _lp_current = st.session_state.get("lp_q", "")
+    if _lp_current.strip():
+        st.markdown('<div class="lp-action-bar">', unsafe_allow_html=True)
+        _acol1, _acol2, _aspace = st.columns([1, 1.2, 3])
+        with _acol1:
+            st.markdown('<div class="stop-btn">', unsafe_allow_html=True)
+            if st.button("Stop", key="lp_stop"):
+                st.session_state.lp_q = ""
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        with _acol2:
+            st.markdown('<div class="review-btn">', unsafe_allow_html=True)
+            with st.popover("Review →"):
+                st.markdown(
+                    f'<div style="background:#1c1c1e;border:1px solid rgba(255,255,255,0.1);'
+                    f'border-radius:12px;padding:1rem 1.1rem;font-size:0.95rem;color:#e2e8f0;'
+                    f'line-height:1.55;margin-bottom:0.8rem;">{_lp_current}</div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button("Send →", key="lp_review_confirm", use_container_width=True):
+                    st.session_state.lp_sending = True
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Pill: text input + ● send button ─────────────────────────────────────
+    _pill_l, _pill_r = st.columns([20, 1])
+    with _pill_l:
+        st.text_input(
+            "q", placeholder="What can orryon help you with?",
+            label_visibility="collapsed", key="lp_q",
+        )
+    with _pill_r:
+        if st.button("↑", key="lp_send_btn"):
+            if st.session_state.get("lp_q", "").strip():
+                st.session_state.lp_sending = True
+            else:
+                st.session_state.screen    = "signin"
+                st.session_state.auth_step = "email"
+            st.rerun()
+
+    # ─── SECTION: HOW IT WORKS ───────────────────────────────────────────────
+    st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        'color:rgba(255,255,255,0.28);text-align:center;margin:0 0 1.3rem;">How it works</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<h2 style="font-size:1.5rem;font-weight:800;color:#fff;margin:0 0 0.4rem;">'
+        'Your all-in-one intelligent personal concierge</h2>',
+        unsafe_allow_html=True,
+    )
+
+    _steps = [
+        ("1", "Just tell Orryon what you need",
+         "Speak naturally — “Add coffee and breakfast $9.50”, “Help me save $4000 for a vacation by December”, or “Doctor appointment next Tuesday at 10am”."),
+        ("2", "Orryon understands and acts",
+         "He takes care of the details — adding expenses, updating your schedule, tracking goals, and keeping your daily life organized."),
+        ("3", "Everything updates automatically",
+         "Your Dashboard, Budget, Forecast, Schedule, and Goals stay perfectly in sync in real time."),
+        ("4", "Ask anything, get real answers",
+         '“How much did I spend on dining this week?” “How close am I to my vacation goal?” Orryon gives you clear, helpful answers from your actual data.'),
+    ]
+    for num, title, desc in _steps:
+        st.markdown(
+            f'<div class="hiw-step">'
+            f'<div class="hiw-num">{num}</div>'
+            f'<div><p class="hiw-title">{title}</p><p class="hiw-desc">{desc}</p></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ─── SECTION: REAL EXAMPLES ──────────────────────────────────────────────
+    st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;'
+        'color:rgba(255,255,255,0.28);text-align:center;margin:0 0 1.3rem;">Real examples</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<h2 style="font-size:1.5rem;font-weight:800;color:#fff;margin:0 0 0.4rem;">'
+        "Here's what you can ask Orryon</h2>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p style="font-size:0.87rem;color:rgba(255,255,255,0.38);margin:0 0 1.4rem;line-height:1.55;">'
+        "No commands to learn. Just type like you're texting a friend.</p>",
+        unsafe_allow_html=True,
+    )
+
+    for ex in [
+        "Add coffee and breakfast $9.50",
+        "Help me save $4000 for a vacation by December",
+        "Add milk, eggs, bread, and chicken to my grocery list",
+        "Doctor appointment on July 15 at 10am",
+        "Give me a spending recap for this week",
+    ]:
+        st.markdown(f'<div class="ex-card">{ex}</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        '<p style="font-size:0.82rem;color:rgba(255,255,255,0.32);margin:1.1rem 0 0;'
+        'line-height:1.6;text-align:center;">'
+        'Orryon understands natural language and automatically updates your budget, '
+        'schedule, goals, and dashboard.</p>',
+        unsafe_allow_html=True,
+    )
+
+    # ─── SECTION: GET STARTED CTA ────────────────────────────────────────────
+    st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
+
+    if _b64:
+        st.markdown(
+            f'<div style="display:flex;justify-content:center;margin-bottom:1.1rem;">'
+            f'<img src="data:image/{_mime};base64,{_b64}" '
+            f'style="width:54px;height:54px;border-radius:50%;object-fit:cover;opacity:0.85"/></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<h2 style="font-size:1.5rem;font-weight:800;color:#fff;margin:0 0 0.35rem;text-align:center;">'
+        "You're ready to start</h2>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p style="font-size:0.87rem;color:rgba(255,255,255,0.38);margin:0 0 1.8rem;'
+        'line-height:1.6;text-align:center;">'
+        'Free forever. All your data stays private on your device.</p>',
+        unsafe_allow_html=True,
+    )
+
+    for icon, label in [
+        ("💳", "Budget & expense tracking"),
+        ("🎯", "Savings goals with progress"),
+        ("📅", "Schedule, tasks & grocery list"),
+        ("📊", "Smart spending recaps"),
+        ("✦",  "Orryon — your intelligent personal concierge, always ready to help."),
+    ]:
+        st.markdown(
+            f'<div class="feat-row">'
+            f'<span class="feat-icon">{icon}</span>'
+            f'<span>{label}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height:1.8rem'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="lp-cta">', unsafe_allow_html=True)
+    if st.button("Create free account →", use_container_width=True, key="lp_final_cta"):
         st.session_state.screen = "signin"
         st.session_state.auth_step = "email"
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(
         '<p class="bottom-note">By using orryon, all data stays on your device.</p>',
@@ -410,6 +708,34 @@ if not st.session_state.data_loaded:
 
 _active_uid = st.session_state.get("user_id") or USER_ID
 _display_name = st.session_state.get("display_name", "")
+
+# ── Shared read-only view (finance_readonly token in URL) ─────────────────────
+_qp = st.query_params
+_share_token = _qp.get("share_token", "")
+if _share_token and not st.session_state.get("user_id"):
+    # Validate token and show read-only dashboard
+    from db import get_connection as _gc
+    _tc = _gc()
+    _tok_row = _tc.execute(
+        "SELECT user_id FROM share_tokens WHERE token=? AND is_active=1 AND view_type='finance_readonly'",
+        (_share_token,),
+    ).fetchone()
+    _tc.close()
+    if _tok_row:
+        _active_uid = _tok_row["user_id"]
+        st.markdown(
+            '<div style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);'
+            'border-radius:10px;padding:10px 14px;font-size:0.82rem;color:#a5b4fc;margin-bottom:8px;">'
+            '👁️ <strong>Read-only view</strong> — This is a shared Finance Dashboard. Data is live but not editable.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        from ui.dashboard import render_dashboard as _rdb
+        _rdb(_active_uid)
+        st.stop()
+    else:
+        st.error("Invalid or expired share link.")
+        st.stop()
 
 # ── Global app CSS ────────────────────────────────────────────────────────────
 st.markdown("""
@@ -562,6 +888,34 @@ with col_menu:
         st.caption("🔒 All data in `finance.db`")
         st.caption(f"Model: `{os.getenv('GROK_MODEL', 'grok-3-mini')}`")
         st.divider()
+        st.markdown("**👁️ Shared View**")
+        st.caption("Share a read-only link to your Dashboard with a partner or family member.")
+        if st.button("🔗 Generate share link", use_container_width=True, key="gen_share"):
+            import secrets as _sec
+            from db import get_connection as _gc2, insert_row as _ins2
+            _token = _sec.token_urlsafe(16)
+            _gc3 = _gc2()
+            _existing = _gc3.execute(
+                "SELECT token FROM share_tokens WHERE user_id=? AND is_active=1 AND view_type='finance_readonly'",
+                (_active_uid,),
+            ).fetchone()
+            _gc3.close()
+            if _existing:
+                _token = _existing["token"]
+            else:
+                _ins2("share_tokens", {
+                    "id": str(__import__("uuid").uuid4()),
+                    "user_id": _active_uid,
+                    "token": _token,
+                    "view_type": "finance_readonly",
+                    "is_active": 1,
+                    "created_at": datetime.now().isoformat(),
+                })
+            from config import APP_URL
+            _share_url = f"{APP_URL}?share_token={_token}"
+            st.code(_share_url, language=None)
+            st.caption("Anyone with this link can view your Dashboard (read-only).")
+        st.divider()
         if st.button("← Sign out", use_container_width=True):
             for key in ["data_loaded", "user_id", "display_name", "chat_history",
                         "orryon_last_message", "orryon_actions"]:
@@ -611,12 +965,99 @@ if st.session_state.show_chat_history and st.session_state.chat_history:
                 )
 
 
-# ── 5 TABS ────────────────────────────────────────────────────────────────────
-tab_dash, tab_budget, tab_forecast, tab_schedule, tab_notes = st.tabs([
+# ── QUICK-ADD STRIP ──────────────────────────────────────────────────────────
+# 4 small popover buttons for fast expense / task / grocery / note entry
+_qa1, _qa2, _qa3, _qa4 = st.columns(4)
+
+with _qa1:
+    with st.popover("💸 Expense", use_container_width=True):
+        st.markdown("**Quick Add Expense**")
+        _qa_merchant = st.text_input("Merchant", placeholder="Starbucks", key="qa_merchant")
+        _qa_amount = st.number_input("Amount ($)", min_value=0.01, step=1.0, key="qa_amount")
+        _qa_cat = st.selectbox("Category", [
+            "Food & Dining", "Groceries", "Transport", "Subscriptions",
+            "Health & Fitness", "Shopping", "Rent & Housing", "Utilities",
+            "Entertainment", "Travel", "Other"
+        ], key="qa_cat")
+        if st.button("Add", type="primary", use_container_width=True, key="qa_exp_submit"):
+            if _qa_merchant and _qa_amount > 0:
+                import json as _qjson
+                from db import insert_row as _qi, get_connection as _qc
+                from core.tools import _uid as _quid, _now_iso as _qnow
+                from datetime import datetime as _qdt
+                _qi("transactions", {
+                    "id": _quid(), "user_id": _active_uid,
+                    "date": _qdt.now().strftime("%Y-%m-%d"),
+                    "amount": float(_qa_amount), "merchant": _qa_merchant,
+                    "description": _qa_merchant, "category": _qa_cat,
+                    "is_recurring": 0, "metadata": _qjson.dumps({}),
+                })
+                st.success(f"✅ ${_qa_amount:.2f} at {_qa_merchant}")
+                st.rerun()
+
+with _qa2:
+    with st.popover("✅ Task", use_container_width=True):
+        st.markdown("**Quick Add Task**")
+        _qa_task = st.text_input("Task title", placeholder="Call dentist", key="qa_task")
+        _qa_due = st.date_input("Due (optional)", value=None, key="qa_task_due")
+        _qa_pri = st.selectbox("Priority", ["medium", "high", "low"], key="qa_task_pri")
+        if st.button("Add", type="primary", use_container_width=True, key="qa_task_submit"):
+            if _qa_task:
+                from db import insert_row as _qi2
+                from core.tools import _uid as _quid2, _now_iso as _qnow2
+                _qi2("action_items", {
+                    "id": _quid2(), "user_id": _active_uid,
+                    "title": _qa_task, "description": "",
+                    "priority": _qa_pri, "status": "open",
+                    "due_date": _qa_due.strftime("%Y-%m-%d") if _qa_due else "",
+                    "category": "personal", "created_by": "user",
+                    "created_at": _qnow2(), "updated_at": _qnow2(),
+                })
+                st.success(f"✅ Task added!")
+                st.rerun()
+
+with _qa3:
+    with st.popover("🛒 Grocery", use_container_width=True):
+        st.markdown("**Quick Add to Grocery List**")
+        _qa_item = st.text_input("Item name", placeholder="Milk, eggs…", key="qa_groc")
+        _qa_qty = st.text_input("Quantity", value="1", key="qa_groc_qty")
+        if st.button("Add", type="primary", use_container_width=True, key="qa_groc_submit"):
+            if _qa_item:
+                from db import insert_row as _qi3
+                from core.tools import _uid as _quid3, _now_iso as _qnow3
+                _qi3("grocery_items", {
+                    "id": _quid3(), "user_id": _active_uid,
+                    "name": _qa_item, "quantity": _qa_qty,
+                    "estimated_price": 0, "is_checked": 0, "added_at": _qnow3(),
+                })
+                st.success(f"🛒 {_qa_item} added!")
+                st.rerun()
+
+with _qa4:
+    with st.popover("📝 Note", use_container_width=True):
+        st.markdown("**Quick Add Note**")
+        _qa_ntitle = st.text_input("Title", placeholder="Reminder, idea…", key="qa_note_title")
+        _qa_ncontent = st.text_area("Content", height=80, key="qa_note_content")
+        if st.button("Save", type="primary", use_container_width=True, key="qa_note_submit"):
+            if _qa_ntitle:
+                from db import insert_row as _qi4
+                from core.tools import _uid as _quid4, _now_iso as _qnow4
+                _qi4("notes", {
+                    "id": _quid4(), "user_id": _active_uid,
+                    "title": _qa_ntitle, "content": _qa_ncontent,
+                    "tags": "", "created_at": _qnow4(), "updated_at": _qnow4(),
+                })
+                st.success("📝 Note saved!")
+                st.rerun()
+
+
+# ── 6 TABS ────────────────────────────────────────────────────────────────────
+tab_dash, tab_budget, tab_forecast, tab_schedule, tab_goals, tab_notes = st.tabs([
     "📊 Dashboard",
     "💳 Budget",
     "📈 Forecast",
     "📅 Schedule",
+    "🎯 Goals",
     "📝 Notes",
 ])
 
@@ -635,6 +1076,10 @@ with tab_forecast:
 with tab_schedule:
     from ui.schedule import render_schedule
     render_schedule(_active_uid)
+
+with tab_goals:
+    from ui.goals import render_goals
+    render_goals(_active_uid)
 
 with tab_notes:
     from ui.notes import render_notes
