@@ -129,16 +129,17 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS goals (
-            id             TEXT PRIMARY KEY,
-            user_id        TEXT NOT NULL,
-            name           TEXT NOT NULL,
-            target_amount  REAL NOT NULL,
-            current_amount REAL DEFAULT 0,
-            target_date    TEXT,
-            category       TEXT,         -- emergency | vacation | house | retirement | education | other
-            notes          TEXT,
-            created_at     TEXT,
-            is_completed   INTEGER DEFAULT 0
+            id                     TEXT PRIMARY KEY,
+            user_id                TEXT NOT NULL,
+            name                   TEXT NOT NULL,
+            target_amount          REAL NOT NULL,
+            current_amount         REAL DEFAULT 0,
+            target_date            TEXT,
+            category               TEXT,
+            linked_budget_category TEXT DEFAULT '',
+            notes                  TEXT,
+            created_at             TEXT,
+            is_completed           INTEGER DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS notes (
@@ -257,16 +258,61 @@ def init_db() -> None:
             is_checked       INTEGER DEFAULT 0,
             added_at         TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS custom_categories (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            color       TEXT DEFAULT '#6366f1',
+            icon        TEXT DEFAULT '🏷️',
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT NOT NULL,
+            UNIQUE(user_id, name)
+        );
+
+        CREATE TABLE IF NOT EXISTS share_tokens (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            token       TEXT UNIQUE NOT NULL,
+            view_type   TEXT DEFAULT 'finance_readonly',
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT NOT NULL
+        );
     """)
 
     conn.commit()
 
-    # ── Migration: drop legacy password columns from users if they exist ──
-    # (upgrading from username/password auth to email OTP auth)
+    # ── Migrations ────────────────────────────────────────────────────────────
     _migrate_users_table(conn)
+    _migrate_goals_table(conn)
+    _migrate_subscriptions_table(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
+
+
+def _migrate_subscriptions_table(conn: sqlite3.Connection) -> None:
+    """Add previous_amount + last_changed columns to subscriptions (v1 migration)."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
+        if "previous_amount" not in cols:
+            conn.execute("ALTER TABLE subscriptions ADD COLUMN previous_amount REAL DEFAULT 0")
+        if "last_changed" not in cols:
+            conn.execute("ALTER TABLE subscriptions ADD COLUMN last_changed TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass
+
+
+def _migrate_goals_table(conn: sqlite3.Connection) -> None:
+    """Add linked_budget_category column to goals table if it doesn't exist (v1 migration)."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(goals)").fetchall()]
+        if "linked_budget_category" not in cols:
+            conn.execute("ALTER TABLE goals ADD COLUMN linked_budget_category TEXT DEFAULT ''")
+            conn.commit()
+    except Exception:
+        pass
 
 
 def _migrate_users_table(conn: sqlite3.Connection) -> None:

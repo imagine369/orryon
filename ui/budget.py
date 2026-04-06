@@ -10,6 +10,8 @@ Shows:
 
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -169,12 +171,28 @@ def render_budget(user_id: str) -> None:
 
     if txns:
         df = pd.DataFrame([dict(r) for r in txns[:30]])
-        df = df[["date", "merchant", "category", "amount"]].rename(columns={
+        df_display = df[["date", "merchant", "category", "amount"]].rename(columns={
             "date": "Date", "merchant": "Merchant",
             "category": "Category", "amount": "Amount ($)",
-        })
-        df["Amount ($)"] = df["Amount ($)"].apply(lambda x: f"${x:,.2f}")
-        st.dataframe(df, use_container_width=True, hide_index=True, height=280)
+        }).copy()
+        df_display["Amount ($)"] = df_display["Amount ($)"].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(df_display, use_container_width=True, hide_index=True, height=280)
+
+        # CSV export
+        col_exp, _ = st.columns([1, 3])
+        with col_exp:
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(["Date", "Merchant", "Category", "Amount"])
+            for r in txns:
+                writer.writerow([r["date"], r["merchant"] or "", r["category"] or "", f"{float(r['amount']):.2f}"])
+            st.download_button(
+                "⬇️ Export CSV",
+                data=csv_buf.getvalue(),
+                file_name=f"orryon_budget_{month_str}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
     else:
         st.caption("No transactions this month.")
 
@@ -186,15 +204,22 @@ def render_budget(user_id: str) -> None:
             m_merchant = st.text_input("Merchant", placeholder="e.g. Whole Foods", key="qe_merchant")
             m_amount = st.number_input("Amount ($)", min_value=0.0, step=0.01, key="qe_amount")
         with c2:
-            CATS = ["Food & Dining", "Groceries", "Transport", "Subscriptions",
-                    "Health & Fitness", "Shopping", "Rent & Housing",
-                    "Utilities", "Entertainment", "Travel", "Other"]
+            _base_cats = ["Food & Dining", "Groceries", "Transport", "Subscriptions",
+                          "Health & Fitness", "Shopping", "Rent & Housing",
+                          "Utilities", "Entertainment", "Travel", "Other"]
+            _conn_c = get_connection()
+            _custom = [r["name"] for r in _conn_c.execute(
+                "SELECT name FROM custom_categories WHERE user_id=? AND is_active=1 ORDER BY name", (user_id,)
+            ).fetchall()]
+            _conn_c.close()
+            CATS = _base_cats + _custom
             m_cat = st.selectbox("Category", CATS, key="qe_cat")
             m_date = st.date_input("Date", value=datetime.now().date(), key="qe_date")
         m_notes = st.text_input("Notes (optional)", key="qe_notes")
 
         if st.button("Add Expense", type="primary", use_container_width=True, key="qe_submit"):
             if m_merchant and m_amount > 0:
+                import json as _json
                 insert_row("transactions", {
                     "id": _uid(),
                     "user_id": user_id,
@@ -203,14 +228,82 @@ def render_budget(user_id: str) -> None:
                     "merchant": m_merchant,
                     "description": m_merchant,
                     "category": m_cat,
-                    "notes": m_notes,
                     "is_recurring": 0,
-                    "metadata": "{}",
+                    "metadata": _json.dumps({"notes": m_notes}),
                 })
                 st.success(f"Added ${m_amount:.2f} at {m_merchant} to {m_cat}")
                 st.rerun()
             else:
                 st.warning("Please enter a merchant name and amount.")
+
+    # ── Spending Recap ────────────────────────────────────────────────────────
+    st.markdown('<div class="section-head">Spending Recap</div>', unsafe_allow_html=True)
+    with st.expander("📊 Generate a spending recap", expanded=False):
+        recap_period = st.selectbox(
+            "Period",
+            ["this_month", "last_month", "this_week", "last_week"],
+            format_func=lambda x: x.replace("_", " ").title(),
+            key="recap_period",
+        )
+        st.caption("Click below — orryon will analyze your spending and give you a full summary.")
+        if st.button("📊 Get Recap from orryon", type="primary", use_container_width=True, key="recap_btn"):
+            label = recap_period.replace("_", " ")
+            st.session_state["pending_chat_input"] = f"Give me a spending recap for {label}"
+            st.info(f"📊 Recap requested for {label}. Use the chat bar below to send it to orryon!")
+
+    # ── Custom Categories ─────────────────────────────────────────────────────
+    st.markdown('<div class="section-head">Custom Categories</div>', unsafe_allow_html=True)
+    with st.expander("🏷️ Manage custom categories", expanded=False):
+        conn = get_connection()
+        custom_cats = conn.execute(
+            "SELECT * FROM custom_categories WHERE user_id=? AND is_active=1 ORDER BY name",
+            (user_id,),
+        ).fetchall()
+        conn.close()
+
+        if custom_cats:
+            for cat in custom_cats:
+                c_icon = cat["icon"] or "🏷️"
+                c_name = cat["name"]
+                c_col = cat["color"] or "#6366f1"
+                col_name, col_del = st.columns([5, 1])
+                with col_name:
+                    st.markdown(
+                        f'<span style="background:{c_col}22;border:1px solid {c_col}44;'
+                        f'border-radius:20px;padding:2px 10px;font-size:0.82rem;">'
+                        f'{c_icon} {c_name}</span>',
+                        unsafe_allow_html=True,
+                    )
+                with col_del:
+                    if st.button("✕", key=f"del_cat_{cat['id']}", help=f"Remove {c_name}"):
+                        from db import update_row as _upd
+                        _upd("custom_categories", {"is_active": 0}, {"id": cat["id"]})
+                        st.rerun()
+        else:
+            st.caption("No custom categories yet.")
+
+        st.divider()
+        col_n, col_i = st.columns([3, 1])
+        with col_n:
+            new_cat_name = st.text_input("Category name", placeholder="Date Night, Pet Care…", key="new_cat_name")
+        with col_i:
+            new_cat_icon = st.text_input("Icon", value="🏷️", key="new_cat_icon", max_chars=2)
+        if st.button("Create Category", type="primary", use_container_width=True, key="create_cat_btn"):
+            if new_cat_name.strip():
+                from db import insert_row as _ins
+                try:
+                    _ins("custom_categories", {
+                        "id": _uid(), "user_id": user_id,
+                        "name": new_cat_name.strip(), "color": "#6366f1",
+                        "icon": new_cat_icon or "🏷️", "is_active": 1,
+                        "created_at": _now_iso(),
+                    })
+                    st.success(f"Category '{new_cat_name.strip()}' created!")
+                    st.rerun()
+                except Exception:
+                    st.warning(f"Category '{new_cat_name.strip()}' already exists.")
+            else:
+                st.warning("Please enter a category name.")
 
     st.markdown(
         '<p style="font-size:0.68rem;color:#475569;text-align:center;margin-top:1rem">'

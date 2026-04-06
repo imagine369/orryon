@@ -73,6 +73,48 @@ _DASH_CSS = """
   padding: 0.5rem; margin-top: 1rem;
   border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;
 }
+
+/* Money Left After Goals */
+.mlag-card {
+  background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.08));
+  border: 1px solid rgba(34,197,94,0.25); border-radius: 14px;
+  padding: 1rem 1.2rem; margin-bottom: 1rem;
+}
+.mlag-label { font-size: 0.72rem; color: #86efac; text-transform: uppercase; letter-spacing: 0.8px; }
+.mlag-value { font-size: 2rem; font-weight: 800; color: #22c55e; margin: 0.15rem 0; }
+.mlag-sub   { font-size: 0.78rem; color: #64748b; }
+.mlag-row   { display: flex; justify-content: space-between; font-size: 0.8rem;
+              color: #94a3b8; margin-top: 0.5rem; padding-top: 0.5rem;
+              border-top: 1px solid rgba(255,255,255,0.06); }
+
+/* Upcoming bills alert strip */
+.bill-alert {
+  background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 10px; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem;
+}
+.bill-alert.overdue { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+
+/* Goals preview */
+.goal-strip {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 0.5rem;
+}
+.goal-item {
+  background: #0f172a; border: 1px solid #1e293b;
+  border-radius: 12px; padding: 12px 14px;
+}
+.goal-hdr {
+  display: flex; justify-content: space-between;
+  font-size: 0.86rem; margin-bottom: 6px; align-items: center;
+}
+.goal-name { color: #f1f5f9; font-weight: 600; }
+.goal-pct  { color: #22c55e; font-weight: 800; font-size: 0.95rem; }
+.goal-bar-bg { background: #1e293b; border-radius: 99px; height: 8px; overflow: hidden; }
+.goal-bar    { height: 8px; border-radius: 99px; transition: width .4s ease; }
+.goal-meta { font-size: 0.74rem; color: #64748b; margin-top: 5px;
+             display: flex; justify-content: space-between; }
 </style>
 """
 
@@ -102,6 +144,9 @@ def render_dashboard(user_id: str) -> None:
     # ── Safe to Spend ─────────────────────────────────────────────────────────
     _render_safe_to_spend(user_id)
 
+    # ── Money Left After Goals ────────────────────────────────────────────────
+    _render_money_left_after_goals(user_id)
+
     # ── Two-column lower section ──────────────────────────────────────────────
     col_left, col_right = st.columns([1, 1])
 
@@ -111,7 +156,11 @@ def render_dashboard(user_id: str) -> None:
 
     with col_right:
         st.markdown("#### 📅 Coming Up")
-        _render_upcoming(user_id)
+        _render_upcoming_with_bills(user_id)
+
+    # ── Goals preview ─────────────────────────────────────────────────────────
+    st.markdown("#### 🎯 Goals Progress")
+    _render_goals_preview(user_id)
 
     # ── Grocery preview ───────────────────────────────────────────────────────
     st.markdown("#### 🛒 Grocery List")
@@ -268,42 +317,140 @@ def _render_budget_highlights(user_id: str) -> None:
         )
 
 
-def _render_upcoming(user_id: str) -> None:
+
+
+def _render_money_left_after_goals(user_id: str) -> None:
+    """Card showing free spending money after bills + goal contributions."""
     now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
-    limit_date = (now + timedelta(days=14)).strftime("%Y-%m-%d")
+    month = now.strftime("%Y-%m")
 
     conn = get_connection()
-    events = conn.execute(
-        "SELECT title, event_date, event_type FROM events "
-        "WHERE user_id=? AND event_date>=? ORDER BY event_date ASC LIMIT 5",
-        (user_id, today),
-    ).fetchall()
-    tasks = conn.execute(
-        "SELECT title, due_date, priority FROM action_items "
-        "WHERE user_id=? AND status='open' AND (due_date>=? OR due_date IS NULL OR due_date='') "
-        "ORDER BY due_date ASC LIMIT 3",
-        (user_id, today),
+    # Monthly income (negative transactions)
+    income_row = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount<0",
+        (user_id, f"{month}%"),
+    ).fetchone()
+    # This month expenses
+    exp_row = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
+        (user_id, f"{month}%"),
+    ).fetchone()
+    # Recurring bills total
+    bills_row = conn.execute(
+        "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
+        (user_id,),
+    ).fetchone()
+    # Active goals
+    goals = conn.execute(
+        "SELECT name, target_amount, current_amount, target_date FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
     ).fetchall()
     conn.close()
 
+    monthly_income = abs(float(income_row["total"] or 0))
+    total_spent = float(exp_row["total"] or 0)
+    monthly_bills = float(bills_row["total"] or 0)
+
+    # Fallback estimate if no income tracked
+    if monthly_income < 1:
+        monthly_income = total_spent * 1.3
+
+    # Monthly goal contributions needed
+    today = now.date()
+    goal_monthly = 0.0
+    for g in goals:
+        remaining = float(g["target_amount"]) - float(g["current_amount"])
+        if remaining <= 0:
+            continue
+        if g["target_date"]:
+            try:
+                td = datetime.strptime(g["target_date"], "%Y-%m-%d").date()
+                months_left = max(1, (td - today).days / 30.44)
+                goal_monthly += remaining / months_left
+            except Exception:
+                goal_monthly += remaining / 12
+        else:
+            goal_monthly += remaining / 12
+
+    free_budget = monthly_income - monthly_bills - goal_monthly
+    used = total_spent - monthly_bills  # non-bill spending
+    free_remaining = max(0, free_budget - used)
+    used_pct = min(100, round((used / free_budget * 100) if free_budget > 0 else 0, 0))
+
+    color = "#22c55e" if free_remaining > 200 else "#f59e0b" if free_remaining > 0 else "#ef4444"
+    bar_color = color
+
+    st.markdown(
+        f"""<div class="mlag-card">
+          <div class="mlag-label">💚 Free to Spend (After Goals & Bills)</div>
+          <div class="mlag-value" style="color:{color}">${free_remaining:,.0f}</div>
+          <div style="background:#1e293b;border-radius:99px;height:6px;margin:6px 0;">
+            <div style="width:{used_pct}%;height:6px;border-radius:99px;background:{bar_color};"></div>
+          </div>
+          <div class="mlag-row">
+            <span>📥 Income ~${monthly_income:,.0f}</span>
+            <span>📋 Bills ${monthly_bills:,.0f}</span>
+            <span>🎯 Goals ${goal_monthly:,.0f}/mo</span>
+            <span>💸 Spent ${used:,.0f}</span>
+          </div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_upcoming_with_bills(user_id: str) -> None:
+    """Upcoming schedule items + highlighted bill alerts."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    week_out = (now + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    conn = get_connection()
+    events = conn.execute(
+        "SELECT * FROM events WHERE user_id=? AND event_date>=? ORDER BY event_date ASC LIMIT 5",
+        (user_id, today),
+    ).fetchall()
+    tasks = conn.execute(
+        "SELECT * FROM action_items WHERE user_id=? AND status='open' ORDER BY due_date ASC LIMIT 3",
+        (user_id,),
+    ).fetchall()
+    bills_due_soon = conn.execute(
+        "SELECT * FROM subscriptions WHERE user_id=? AND is_active=1 AND next_due>=? AND next_due<=? ORDER BY next_due ASC",
+        (user_id, today, week_out),
+    ).fetchall()
+    conn.close()
+
+    # Bills due within 7 days — show as alerts first
+    if bills_due_soon:
+        for b in bills_due_soon:
+            try:
+                delta = (datetime.strptime(b["next_due"], "%Y-%m-%d") - now.replace(hour=0, minute=0, second=0, microsecond=0)).days
+            except Exception:
+                delta = 0
+            overdue_cls = "overdue" if delta < 0 else ""
+            due_txt = "Overdue!" if delta < 0 else "Today" if delta == 0 else f"in {delta}d"
+            st.markdown(
+                f'<div class="bill-alert {overdue_cls}">'
+                f'<span>⚡ <b>{b["name"]}</b> due {due_txt}</span>'
+                f'<span style="color:#f59e0b;font-weight:700">${float(b["amount"]):,.2f}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    type_icons = {"event": "📅", "task": "✅", "bill": "⚡"}
+    type_colors = {"event": "#00c9ff", "task": "#92fe9d", "bill": "#f59e0b"}
+
     items = []
     for e in events:
-        items.append({"title": e["title"], "date": (e["event_date"] or "")[:10], "type": "event"})
+        items.append({"type": "event", "title": e["title"], "date": (e["event_date"] or "")[:10], "time": (e["event_date"] or "")[11:16]})
     for t in tasks:
-        items.append({"title": t["title"], "date": t["due_date"] or "", "type": "task"})
+        items.append({"type": "task", "title": t["title"], "date": t["due_date"] or "", "priority": t["priority"]})
+    items.sort(key=lambda x: x.get("date") or "9999")
 
-    items.sort(key=lambda x: x["date"] or "9999")
-    items = items[:5]
-
-    if not items:
-        st.caption("Nothing coming up. Ask orryon to add events!")
+    if not items and not bills_due_soon:
+        st.caption("All clear! Nothing coming up.")
         return
 
-    type_colors = {"event": "#00c9ff", "task": "#92fe9d", "bill": "#fbbf24"}
-    type_icons = {"event": "📅", "task": "✅", "bill": "💸"}
-
-    for item in items:
+    for item in items[:5]:
         icon = type_icons.get(item["type"], "•")
         color = type_colors.get(item["type"], "#94a3b8")
         date_str = ""
@@ -314,15 +461,82 @@ def _render_upcoming(user_id: str) -> None:
                 date_str = "Today" if delta == 0 else f"In {delta}d" if delta > 0 else f"{abs(delta)}d ago"
             except Exception:
                 date_str = item["date"]
-
         st.markdown(
             f"""<div class="sched-item">
               <span>{icon}</span>
-              <span style="flex:1">{item['title']}</span>
+              <span style="flex:1;color:{color}">{item['title']}</span>
               <span class="sched-date">{date_str}</span>
             </div>""",
             unsafe_allow_html=True,
         )
+
+
+def _render_goals_preview(user_id: str) -> None:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM goals WHERE user_id=? AND is_completed=0 ORDER BY created_at DESC LIMIT 4",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        st.caption("No active goals yet. Head to the Goals tab or ask orryon: *'save $5000 for vacation by December'*")
+        return
+
+    _cat_emoji = {
+        "emergency": "🛡️", "vacation": "✈️", "house": "🏠",
+        "retirement": "🌅", "education": "🎓", "investment": "📈",
+        "debt_payoff": "💳", "vehicle": "🚗", "gadget": "💻",
+        "wedding": "💍", "other": "🎯",
+    }
+
+    goal_items_html = '<div class="goal-strip">'
+    for g in rows:
+        target = float(g["target_amount"])
+        current = float(g["current_amount"])
+        pct = min(100.0, round((current / target) * 100, 1)) if target > 0 else 0
+        remaining = max(0, target - current)
+        emoji = _cat_emoji.get(g["category"] or "other", "🎯")
+
+        # Progress bar colour: green spectrum by progress
+        if pct >= 75:
+            bar_color = "#22c55e"
+        elif pct >= 50:
+            bar_color = "#4ade80"
+        elif pct >= 25:
+            bar_color = "#86efac"
+        else:
+            bar_color = "#bbf7d0"
+
+        bar_width = max(2, pct)
+
+        # Days left
+        days_str = ""
+        if g["target_date"]:
+            try:
+                delta = datetime.strptime(g["target_date"], "%Y-%m-%d") - datetime.now()
+                days_left = max(0, delta.days)
+                days_str = f"· {days_left}d left"
+            except Exception:
+                pass
+
+        goal_items_html += f"""
+        <div class="goal-item">
+          <div class="goal-hdr">
+            <span class="goal-name">{emoji} {g['name']}</span>
+            <span class="goal-pct">{pct:.0f}%</span>
+          </div>
+          <div class="goal-bar-bg">
+            <div class="goal-bar" style="width:{bar_width}%;background:{bar_color};"></div>
+          </div>
+          <div class="goal-meta">
+            <span>${current:,.0f} saved of ${target:,.0f}</span>
+            <span>${remaining:,.0f} to go {days_str}</span>
+          </div>
+        </div>
+        """
+    goal_items_html += "</div>"
+    st.markdown(goal_items_html, unsafe_allow_html=True)
 
 
 def _render_grocery_preview(user_id: str) -> None:

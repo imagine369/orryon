@@ -15,7 +15,6 @@ import uuid
 from datetime import datetime, timedelta
 
 from db import delete_row, fetch_rows, get_connection, insert_row, update_row
-from config import USER_ID
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +267,128 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "month": {"type": "string", "description": "Month as YYYY-MM. Defaults to current month."},
                     "category": {"type": "string", "description": "Optional: specific category only"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_goal",
+            "description": (
+                "Create a new savings or financial goal. Use when the user wants to save for something "
+                "specific (emergency fund, vacation, paying off debt, buying a car, etc.)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Clear goal name, e.g. 'Emergency Fund', 'Japan Vacation', 'Pay Off Credit Card'"},
+                    "target_amount": {"type": "number", "description": "Total target amount in dollars"},
+                    "current_amount": {"type": "number", "description": "How much has already been saved toward this goal (default 0)"},
+                    "target_date": {"type": "string", "description": "Target completion date as YYYY-MM-DD (optional)"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["emergency", "vacation", "house", "retirement", "education", "investment", "debt_payoff", "vehicle", "gadget", "wedding", "other"],
+                        "description": "Goal category type",
+                    },
+                    "linked_budget_category": {"type": "string", "description": "Optional budget category to link spending awareness (e.g. 'Dining', 'Savings')"},
+                    "notes": {"type": "string", "description": "Optional motivation note or description"},
+                },
+                "required": ["name", "target_amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_goal_progress",
+            "description": (
+                "Add funds to a savings goal or set the current saved amount. "
+                "Use when user says they saved money toward a goal, got a bonus, or transferred money to a goal account."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_name": {"type": "string", "description": "Name of the goal to update (partial match ok)"},
+                    "amount": {"type": "number", "description": "Amount to add (if action='add') or set (if action='set')"},
+                    "action": {
+                        "type": "string",
+                        "enum": ["add", "set"],
+                        "description": "'add' adds to current saved amount; 'set' replaces current saved amount entirely",
+                    },
+                },
+                "required": ["goal_name", "amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_goals",
+            "description": "Get all active savings goals with progress details, or look up a specific goal by name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_name": {"type": "string", "description": "Optional: name of a specific goal to look up"},
+                    "include_completed": {"type": "boolean", "description": "Include already-completed goals (default false)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spending_recap",
+            "description": (
+                "Generate a natural-language spending recap for a time period. "
+                "Use when the user asks for a summary, recap, or review of their spending. "
+                "Returns total spent, top categories, comparison to prior period, goal impact, and a positive insight."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["this_week", "last_week", "this_month", "last_month"],
+                        "description": "Time period for the recap",
+                    },
+                },
+                "required": ["period"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_custom_category",
+            "description": (
+                "Create a new custom budget category. Use when the user says 'create a category', "
+                "'add a category called X', or mentions a spending area that doesn't fit existing categories."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Category name (e.g. 'Date Night', 'Pet Care', 'Side Hustle')"},
+                    "icon": {"type": "string", "description": "Single emoji icon for the category (e.g. '🌹', '🐶', '💼')"},
+                    "color": {"type": "string", "description": "Hex color for the category badge (e.g. '#f43f5e'). Optional."},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_money_left_after_goals",
+            "description": (
+                "Calculate and return how much money the user has left to spend freely this month "
+                "after accounting for estimated income, recurring bills, and monthly goal contributions. "
+                "Use when the user asks 'how much can I spend freely?', 'money left after goals', or similar."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "month": {"type": "string", "description": "Month as YYYY-MM. Defaults to current month."},
                 },
             },
         },
@@ -690,6 +811,344 @@ def _get_category_budget(user_id: str, category: str, month: str) -> float:
     return float(row["planned"]) if row else 0.0
 
 
+# ── Goal tools ────────────────────────────────────────────────────────────────
+
+def _add_goal(args: dict, user_id: str) -> dict:
+    row = {
+        "id": _uid(),
+        "user_id": user_id,
+        "name": args["name"],
+        "target_amount": float(args["target_amount"]),
+        "current_amount": float(args.get("current_amount", 0)),
+        "target_date": args.get("target_date", ""),
+        "category": args.get("category", "other"),
+        "linked_budget_category": args.get("linked_budget_category", ""),
+        "notes": args.get("notes", ""),
+        "created_at": _now_iso(),
+        "is_completed": 0,
+    }
+    insert_row("goals", row)
+    pct = round((row["current_amount"] / row["target_amount"]) * 100, 1) if row["target_amount"] else 0
+    remaining = round(row["target_amount"] - row["current_amount"], 2)
+    # Days to target
+    days_left = None
+    if row["target_date"]:
+        try:
+            td = datetime.strptime(row["target_date"], "%Y-%m-%d") - datetime.now()
+            days_left = max(0, td.days)
+        except Exception:
+            pass
+    return {
+        "status": "ok",
+        "id": row["id"],
+        "name": row["name"],
+        "target_amount": row["target_amount"],
+        "current_amount": row["current_amount"],
+        "pct_complete": pct,
+        "remaining": remaining,
+        "target_date": row["target_date"],
+        "days_left": days_left,
+    }
+
+
+def _update_goal_progress(args: dict, user_id: str) -> dict:
+    goal_name = args["goal_name"].lower()
+    amount = float(args["amount"])
+    action = args.get("action", "add")
+
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    matched = next((r for r in rows if goal_name in r["name"].lower()), None)
+    if not matched:
+        return {"status": "not_found", "searched": args["goal_name"]}
+
+    if action == "set":
+        new_amount = amount
+    else:
+        new_amount = float(matched["current_amount"]) + amount
+
+    new_amount = max(0, new_amount)
+    target = float(matched["target_amount"])
+    is_completed = 1 if new_amount >= target else 0
+    new_amount = min(new_amount, target)
+
+    update_row(
+        "goals",
+        {"current_amount": new_amount, "is_completed": is_completed},
+        {"id": matched["id"]},
+    )
+
+    pct = round((new_amount / target) * 100, 1) if target else 0
+    remaining = round(target - new_amount, 2)
+    return {
+        "status": "ok",
+        "name": matched["name"],
+        "current_amount": round(new_amount, 2),
+        "target_amount": target,
+        "pct_complete": pct,
+        "remaining": remaining,
+        "is_completed": bool(is_completed),
+        "added": round(amount, 2) if action == "add" else None,
+    }
+
+
+def _get_goals(args: dict, user_id: str) -> dict:
+    goal_name = (args.get("goal_name") or "").lower()
+    include_completed = args.get("include_completed", False)
+
+    conn = get_connection()
+    if include_completed:
+        rows = conn.execute(
+            "SELECT * FROM goals WHERE user_id=? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM goals WHERE user_id=? AND is_completed=0 ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+    conn.close()
+
+    if goal_name:
+        rows = [r for r in rows if goal_name in r["name"].lower()]
+
+    goals = []
+    for r in rows:
+        target = float(r["target_amount"])
+        current = float(r["current_amount"])
+        pct = round((current / target) * 100, 1) if target else 0
+        days_left = None
+        if r["target_date"]:
+            try:
+                td = datetime.strptime(r["target_date"], "%Y-%m-%d") - datetime.now()
+                days_left = max(0, td.days)
+            except Exception:
+                pass
+        goals.append({
+            "name": r["name"],
+            "target_amount": target,
+            "current_amount": round(current, 2),
+            "remaining": round(target - current, 2),
+            "pct_complete": pct,
+            "target_date": r["target_date"] or "",
+            "category": r["category"],
+            "days_left": days_left,
+            "is_completed": bool(r["is_completed"]),
+            "notes": r["notes"] or "",
+        })
+
+    return {"goals": goals, "count": len(goals)}
+
+
+# ── Spending Recap ────────────────────────────────────────────────────────────
+
+def _get_spending_recap(args: dict, user_id: str) -> dict:
+    period = args.get("period", "this_month")
+    now = datetime.now()
+
+    if period == "this_week":
+        start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+        end = now.strftime("%Y-%m-%d")
+        prev_start = (now - timedelta(days=now.weekday() + 7)).strftime("%Y-%m-%d")
+        prev_end = (now - timedelta(days=now.weekday() + 1)).strftime("%Y-%m-%d")
+        label = "This Week"
+    elif period == "last_week":
+        monday = now - timedelta(days=now.weekday() + 7)
+        start = monday.strftime("%Y-%m-%d")
+        end = (monday + timedelta(days=6)).strftime("%Y-%m-%d")
+        prev_start = (monday - timedelta(days=7)).strftime("%Y-%m-%d")
+        prev_end = (monday - timedelta(days=1)).strftime("%Y-%m-%d")
+        label = "Last Week"
+    elif period == "last_month":
+        first_this = now.replace(day=1)
+        last_mo_end = first_this - timedelta(days=1)
+        start = last_mo_end.replace(day=1).strftime("%Y-%m-%d")
+        end = last_mo_end.strftime("%Y-%m-%d")
+        prev_first = last_mo_end.replace(day=1) - timedelta(days=1)
+        prev_start = prev_first.replace(day=1).strftime("%Y-%m-%d")
+        prev_end = prev_first.strftime("%Y-%m-%d")
+        label = "Last Month"
+    else:  # this_month
+        start = now.strftime("%Y-%m-01")
+        end = now.strftime("%Y-%m-%d")
+        prev_mo = (now.replace(day=1) - timedelta(days=1))
+        prev_start = prev_mo.replace(day=1).strftime("%Y-%m-%d")
+        prev_end = prev_mo.strftime("%Y-%m-%d")
+        label = "This Month"
+
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT category, SUM(amount) as total, COUNT(*) as cnt "
+        "FROM transactions WHERE user_id=? AND date>=? AND date<=? AND amount>0 GROUP BY category",
+        (user_id, start, end),
+    ).fetchall()
+    prev_rows = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions "
+        "WHERE user_id=? AND date>=? AND date<=? AND amount>0",
+        (user_id, prev_start, prev_end),
+    ).fetchone()
+    budgets = conn.execute(
+        "SELECT category, planned FROM budget_categories WHERE user_id=? AND month=?",
+        (user_id, start[:7]),
+    ).fetchall()
+    conn.close()
+
+    total = sum(float(r["total"]) for r in rows)
+    prev_total = float(prev_rows["total"] or 0) if prev_rows else 0
+    by_cat = sorted([{"category": r["category"], "total": round(float(r["total"]), 2), "count": r["cnt"]} for r in rows], key=lambda x: -x["total"])
+    top_cats = by_cat[:3]
+
+    budget_map = {b["category"]: float(b["planned"]) for b in budgets}
+    over_budget = [{"category": c["category"], "spent": c["total"], "budget": budget_map[c["category"]], "over_by": round(c["total"] - budget_map[c["category"]], 2)} for c in by_cat if c["category"] in budget_map and c["total"] > budget_map[c["category"]]]
+
+    diff = round(total - prev_total, 2)
+    diff_pct = round((diff / prev_total * 100) if prev_total > 0 else 0, 1)
+
+    # Positive insight: find the category that improved most vs prior period
+    insight = ""
+    if total < prev_total and prev_total > 0:
+        insight = f"Great job — you spent ${abs(diff):,.0f} less than the previous period ({abs(diff_pct):.0f}% reduction)! 🎉"
+    elif top_cats:
+        best_cat = min(by_cat, key=lambda x: x["total"]) if len(by_cat) > 1 else None
+        if best_cat:
+            insight = f"Your lowest spending category was {best_cat['category']} at ${best_cat['total']:,.0f} — nice restraint there!"
+        else:
+            insight = "Keep tracking your spending to build better habits over time!"
+
+    return {
+        "period": label,
+        "start": start,
+        "end": end,
+        "total_spent": round(total, 2),
+        "transaction_count": sum(r["cnt"] for r in rows),
+        "top_categories": top_cats,
+        "all_categories": by_cat,
+        "prev_total": round(prev_total, 2),
+        "change_vs_prev": diff,
+        "change_pct": diff_pct,
+        "over_budget_categories": over_budget,
+        "positive_insight": insight,
+    }
+
+
+# ── Custom Categories ─────────────────────────────────────────────────────────
+
+def _add_custom_category(args: dict, user_id: str) -> dict:
+    name = args["name"].strip()
+    icon = args.get("icon", "🏷️")
+    color = args.get("color", "#6366f1")
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT id FROM custom_categories WHERE user_id=? AND name=?",
+        (user_id, name),
+    ).fetchone()
+    conn.close()
+    if existing:
+        return {"status": "already_exists", "name": name, "message": f"Category '{name}' already exists."}
+    insert_row("custom_categories", {
+        "id": _uid(),
+        "user_id": user_id,
+        "name": name,
+        "color": color,
+        "icon": icon,
+        "is_active": 1,
+        "created_at": _now_iso(),
+    })
+    return {"status": "ok", "name": name, "icon": icon, "color": color}
+
+
+def _get_custom_categories(user_id: str) -> list[dict]:
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM custom_categories WHERE user_id=? AND is_active=1 ORDER BY name",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ── Money Left After Goals ────────────────────────────────────────────────────
+
+def _get_money_left_after_goals(args: dict, user_id: str) -> dict:
+    month = args.get("month") or _current_month()
+    now = datetime.now()
+
+    # Estimate monthly income from negative transactions (income = negative amount)
+    conn = get_connection()
+    income_rows = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount<0",
+        (user_id, f"{month}%"),
+    ).fetchone()
+    # Total expenses this month
+    expense_rows = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
+        (user_id, f"{month}%"),
+    ).fetchone()
+    # Recurring monthly bills
+    bills = conn.execute(
+        "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
+        (user_id,),
+    ).fetchone()
+    # Active goals - estimate monthly contribution needed
+    goals = conn.execute(
+        "SELECT * FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    monthly_income = abs(float(income_rows["total"] or 0))
+    total_expenses = float(expense_rows["total"] or 0)
+    monthly_bills = float(bills["total"] or 0)
+
+    # If no income tracked, estimate from prior month average spending
+    if monthly_income == 0:
+        monthly_income = total_expenses * 1.2  # rough estimate: spend is ~83% of income
+
+    # Calculate monthly goal contributions needed
+    goal_monthly_needed = 0.0
+    goal_details = []
+    today = now.date()
+    for g in goals:
+        target = float(g["target_amount"])
+        current = float(g["current_amount"])
+        remaining = target - current
+        if remaining <= 0:
+            continue
+        monthly_contrib = 0.0
+        if g["target_date"]:
+            try:
+                target_dt = datetime.strptime(g["target_date"], "%Y-%m-%d").date()
+                months_left = max(1, (target_dt - today).days / 30.44)
+                monthly_contrib = round(remaining / months_left, 2)
+            except Exception:
+                monthly_contrib = round(remaining / 12, 2)
+        else:
+            monthly_contrib = round(remaining / 12, 2)
+        goal_monthly_needed += monthly_contrib
+        goal_details.append({"name": g["name"], "monthly_needed": monthly_contrib})
+
+    free_spending = round(monthly_income - monthly_bills - goal_monthly_needed, 2)
+    already_spent_this_month = total_expenses
+    free_remaining = round(free_spending - already_spent_this_month + monthly_bills, 2)
+
+    return {
+        "month": month,
+        "estimated_monthly_income": round(monthly_income, 2),
+        "monthly_bills_total": round(monthly_bills, 2),
+        "monthly_goal_contributions": round(goal_monthly_needed, 2),
+        "free_spending_budget": free_spending,
+        "spent_so_far": round(total_expenses, 2),
+        "free_remaining": free_remaining,
+        "goal_breakdown": goal_details,
+        "income_note": "Income estimated from transactions" if float(income_rows["total"] or 0) < 0 else "Estimated from spending patterns",
+    }
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
@@ -706,6 +1165,12 @@ _TOOL_MAP = {
     "get_net_worth": _get_net_worth,
     "get_upcoming_schedule": _get_upcoming_schedule,
     "get_budget_status": _get_budget_status,
+    "add_goal": _add_goal,
+    "update_goal_progress": _update_goal_progress,
+    "get_goals": _get_goals,
+    "get_spending_recap": _get_spending_recap,
+    "add_custom_category": _add_custom_category,
+    "get_money_left_after_goals": _get_money_left_after_goals,
 }
 
 # Which tools cause which tabs to refresh
@@ -719,10 +1184,16 @@ _TAB_REFRESH_MAP = {
     "add_task": ["schedule"],
     "complete_task": ["schedule"],
     "add_note": ["notes"],
+    "add_goal": ["dashboard", "goals"],
+    "update_goal_progress": ["dashboard", "goals"],
     "get_spending_summary": [],
     "get_net_worth": [],
     "get_upcoming_schedule": [],
     "get_budget_status": [],
+    "get_goals": [],
+    "get_spending_recap": [],
+    "add_custom_category": ["budget"],
+    "get_money_left_after_goals": [],
 }
 
 
@@ -915,5 +1386,62 @@ def seed_sample_data(user_id: str) -> None:
         "tags": "ideas, work",
         "created_at": _now_iso(), "updated_at": _now_iso(),
     })
+
+    # ── Goals ─────────────────────────────────────────────────────────────────
+    _six_months = (now + timedelta(days=180)).strftime("%Y-%m-%d")
+    _one_year = (now + timedelta(days=365)).strftime("%Y-%m-%d")
+    _two_years = (now + timedelta(days=730)).strftime("%Y-%m-%d")
+    _sample_goals = [
+        {
+            "name": "Emergency Fund",
+            "target_amount": 10000.00,
+            "current_amount": 4200.00,
+            "target_date": _one_year,
+            "category": "emergency",
+            "linked_budget_category": "Savings",
+            "notes": "3–6 months of expenses. Keeping this in HYSA.",
+        },
+        {
+            "name": "Japan Vacation",
+            "target_amount": 5000.00,
+            "current_amount": 1250.00,
+            "target_date": _six_months,
+            "category": "vacation",
+            "linked_budget_category": "",
+            "notes": "Tokyo + Kyoto + Osaka, 14 days. Need flights, hotels, spending money.",
+        },
+        {
+            "name": "Pay Off Student Loan",
+            "target_amount": 12000.00,
+            "current_amount": 2400.00,
+            "target_date": _two_years,
+            "category": "debt_payoff",
+            "linked_budget_category": "",
+            "notes": "Navient loan at 5.8%. Extra $200/mo accelerated payments.",
+        },
+        {
+            "name": "New MacBook",
+            "target_amount": 2500.00,
+            "current_amount": 800.00,
+            "target_date": _six_months,
+            "category": "gadget",
+            "linked_budget_category": "Shopping",
+            "notes": "M4 MacBook Pro when it drops. Saving $300/month.",
+        },
+    ]
+    for g in _sample_goals:
+        insert_row("goals", {
+            "id": _uid(),
+            "user_id": user_id,
+            "name": g["name"],
+            "target_amount": g["target_amount"],
+            "current_amount": g["current_amount"],
+            "target_date": g["target_date"],
+            "category": g["category"],
+            "linked_budget_category": g["linked_budget_category"],
+            "notes": g["notes"],
+            "created_at": _now_iso(),
+            "is_completed": 0,
+        })
 
     logger.info("Sample data seeded for user %s", user_id)

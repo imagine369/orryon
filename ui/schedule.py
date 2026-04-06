@@ -283,56 +283,92 @@ def _render_tasks(user_id: str, now: datetime, today: str) -> None:
 
 def _render_bills(user_id: str, now: datetime) -> None:
     conn = get_connection()
-    bills = conn.execute(
+    active_bills = conn.execute(
         "SELECT * FROM subscriptions WHERE user_id=? AND is_active=1 ORDER BY next_due ASC",
+        (user_id,),
+    ).fetchall()
+    cancelled_bills = conn.execute(
+        "SELECT * FROM subscriptions WHERE user_id=? AND is_active=0 ORDER BY detected_at DESC LIMIT 5",
         (user_id,),
     ).fetchall()
     conn.close()
 
-    total_monthly = sum(
-        float(b["amount"]) for b in bills if b["frequency"] == "monthly"
-    )
+    total_monthly = sum(float(b["amount"]) for b in active_bills if b["frequency"] == "monthly")
+    total_yearly_est = total_monthly * 12
 
-    if bills:
-        st.markdown(
-            f'<div style="text-align:right;font-size:0.82rem;color:#64748b;margin-bottom:0.5rem">'
-            f'Monthly total: <strong style="color:#fff">${total_monthly:,.0f}</strong></div>',
-            unsafe_allow_html=True,
-        )
+    # Summary strip
+    if active_bills:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Active Bills", len(active_bills))
+        c2.metric("Monthly Total", f"${total_monthly:,.0f}")
+        c3.metric("Annual Est.", f"${total_yearly_est:,.0f}")
+        st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
 
     freq_icons = {"monthly": "🔄", "weekly": "📆", "yearly": "📅", "bi-weekly": "🔁"}
 
-    if not bills:
+    if not active_bills:
         st.info("No recurring bills.\n\nTry: *'electricity bill $120 on the 15th every month'*")
     else:
-        for b in bills:
+        for b in active_bills:
+            amount = float(b["amount"])
+            prev_amount = float(b["previous_amount"] or 0) if "previous_amount" in b.keys() else 0.0
+            amount_changed = prev_amount > 0 and abs(amount - prev_amount) > 0.01
+
             due_str = ""
+            due_color = "#64748b"
             if b["next_due"]:
                 try:
                     d = datetime.strptime(b["next_due"], "%Y-%m-%d")
                     delta = (d.replace(hour=0) - now.replace(hour=0, minute=0, second=0, microsecond=0)).days
                     due_str = "Due today!" if delta == 0 else f"Due in {delta}d" if delta > 0 else f"{abs(delta)}d overdue"
-                    due_color = "#ef4444" if delta <= 3 else "#f59e0b" if delta <= 7 else "#64748b"
+                    due_color = "#ef4444" if delta <= 0 else "#f59e0b" if delta <= 7 else "#64748b"
                 except Exception:
                     due_str = b["next_due"]
-                    due_color = "#64748b"
-            else:
-                due_color = "#64748b"
 
-            icon = freq_icons.get(b["frequency"], "💳")
-            st.markdown(
-                f"""<div class="bill-row">
-                  <div class="bill-left">
-                    <span>{icon} <strong>{b['name']}</strong></span><br>
-                    <span style="font-size:0.74rem;color:#64748b">{b['category'] or ''} · {b['frequency']}</span>
-                  </div>
-                  <div class="bill-right">
-                    <strong>${b['amount']:,.2f}</strong><br>
-                    <span style="color:{due_color};font-size:0.74rem">{due_str}</span>
-                  </div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
+            icon = freq_icons.get(b["frequency"] or "monthly", "💳")
+            change_badge = ""
+            if amount_changed:
+                direction = "↑" if amount > prev_amount else "↓"
+                diff_amt = abs(amount - prev_amount)
+                change_badge = f'<span style="background:#f59e0b22;border:1px solid #f59e0b55;border-radius:20px;padding:1px 7px;font-size:0.7rem;color:#f59e0b;margin-left:6px;">{direction} ${diff_amt:.2f} change</span>'
+
+            col_info, col_action = st.columns([5, 1])
+            with col_info:
+                st.markdown(
+                    f"""<div class="bill-row">
+                      <div class="bill-left">
+                        <span>{icon} <strong>{b['name']}</strong>{change_badge}</span><br>
+                        <span style="font-size:0.74rem;color:#64748b">{b['category'] or ''} · {b['frequency'] or 'monthly'}</span>
+                      </div>
+                      <div class="bill-right">
+                        <strong>${amount:,.2f}</strong><br>
+                        <span style="color:{due_color};font-size:0.74rem">{due_str}</span>
+                      </div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+            with col_action:
+                with st.popover("⋮"):
+                    new_amt = st.number_input("Update amount ($)", value=amount, min_value=0.0, step=0.01, key=f"upd_bill_{b['id']}")
+                    if st.button("Update", key=f"upd_bill_save_{b['id']}"):
+                        update_row("subscriptions", {"previous_amount": amount, "amount": new_amt, "last_changed": _now_iso()}, {"id": b["id"]})
+                        st.success("Updated!")
+                        st.rerun()
+                    if st.button("Cancel subscription", key=f"cancel_bill_{b['id']}", type="secondary"):
+                        update_row("subscriptions", {"is_active": 0}, {"id": b["id"]})
+                        st.success(f"Cancelled {b['name']}")
+                        st.rerun()
+
+    if cancelled_bills:
+        with st.expander(f"🚫 {len(cancelled_bills)} cancelled subscription{'s' if len(cancelled_bills)>1 else ''}"):
+            for b in cancelled_bills:
+                col_r, col_btn = st.columns([4, 1])
+                with col_r:
+                    st.markdown(f'<span style="color:#475569;font-size:0.84rem">✕ {b["name"]} — ${float(b["amount"]):,.2f}/mo</span>', unsafe_allow_html=True)
+                with col_btn:
+                    if st.button("Restore", key=f"restore_bill_{b['id']}"):
+                        update_row("subscriptions", {"is_active": 1}, {"id": b["id"]})
+                        st.rerun()
 
     # Quick add bill
     with st.expander("➕ Add recurring bill", expanded=False):
