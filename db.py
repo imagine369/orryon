@@ -1,5 +1,5 @@
 """
-db.py — SQLite database setup and helpers for guddd.
+db.py — SQLite database setup and helpers for orryon.
 
 All financial state is persisted locally in a single SQLite file (finance.db).
 No cloud sync by default — privacy first.

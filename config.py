@@ -1,5 +1,5 @@
 """
-config.py — Central configuration for guddd Personal Finance Dashboard.
+config.py — Central configuration for orryon.
 
 All secrets are read from environment variables (loaded from .env).
 NEVER hardcode API keys here. Use .env.example as a template.
@@ -119,7 +119,7 @@ ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 USER_ID: str = os.getenv("USER_ID", "default_user")
 
 # ── Public URL (used for share links) ─────────────────────────────────────────
-# Change this to your deployed URL in production, e.g. https://guddd.app
+# Change this to your deployed URL in production, e.g. https://orryon.app
 APP_URL: str = os.getenv("APP_URL", "http://localhost:8501")
 
 # ── Email / SMTP (for OTP verification codes) ─────────────────────────────────

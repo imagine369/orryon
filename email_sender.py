@@ -35,15 +35,15 @@ logger = logging.getLogger(__name__)
 
 def _build_email(to_email: str, code: str) -> MIMEMultipart:
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{code} is your guddd verification code"
+    msg["Subject"] = f"{code} is your orryon verification code"
     msg["From"] = SMTP_FROM or SMTP_USER
     msg["To"] = to_email
 
     plain = (
-        f"Your guddd verification code is: {code}\n\n"
+        f"Your orryon verification code is: {code}\n\n"
         "This code expires in 10 minutes and can only be used once.\n\n"
         "If you didn't request this, you can ignore this email.\n\n"
-        "— guddd"
+        "— orryon"
     )
 
     html = f"""
@@ -59,7 +59,7 @@ def _build_email(to_email: str, code: str) -> MIMEMultipart:
           <tr>
             <td align="center" style="padding-bottom:24px;">
               <span style="font-size:28px;font-weight:700;
-                           letter-spacing:-0.5px;">💰 guddd</span>
+                           letter-spacing:-0.5px;">💰 orryon</span>
             </td>
           </tr>
           <tr>

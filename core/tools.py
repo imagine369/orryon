@@ -299,6 +299,7 @@ def _uid() -> str:
 
 def _add_expense(args: dict, user_id: str) -> dict:
     date = args.get("date") or _today()
+    import json as _json
     row = {
         "id": _uid(),
         "user_id": user_id,
@@ -307,9 +308,8 @@ def _add_expense(args: dict, user_id: str) -> dict:
         "merchant": args.get("merchant", "Unknown"),
         "description": args.get("merchant", ""),
         "category": args.get("category", "Other"),
-        "notes": args.get("notes", ""),
         "is_recurring": 0,
-        "metadata": "{}",
+        "metadata": _json.dumps({"notes": args.get("notes", "")}),
     }
     insert_row("transactions", row)
     # Return budget context
