@@ -237,6 +237,26 @@ def init_db() -> None:
             created_at   TEXT NOT NULL,
             updated_at   TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS budget_categories (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            category    TEXT NOT NULL,
+            planned     REAL DEFAULT 0,
+            month       TEXT NOT NULL,           -- YYYY-MM
+            created_at  TEXT,
+            UNIQUE(user_id, category, month)
+        );
+
+        CREATE TABLE IF NOT EXISTS grocery_items (
+            id               TEXT PRIMARY KEY,
+            user_id          TEXT NOT NULL,
+            name             TEXT NOT NULL,
+            quantity         TEXT DEFAULT '1',
+            estimated_price  REAL DEFAULT 0,
+            is_checked       INTEGER DEFAULT 0,
+            added_at         TEXT NOT NULL
+        );
     """)
 
     conn.commit()

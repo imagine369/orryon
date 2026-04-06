@@ -1,94 +1,37 @@
 """
-app.py — Streamlit frontend for guddd Personal Finance Dashboard.
+app.py — orryon v1  |  Your personal Finance + Daily Life OS.
 
-Run with:
+Run:
     streamlit run app.py
 
-Layout
-──────
-  Sidebar     : quick stats, data controls, settings
-  Tab: Chat   : multi-agent chat interface with quick-query buttons
-  Tab: Dashboard : net worth donut, spending bar, goal progress, upcoming events
-  Tab: Budget : treemap, subscription detection, transaction table
-  Tab: Forecast : cash flow, Monte Carlo, scenario simulator
-  Tab: Schedule : upcoming events, add bill reminders, quick event creator
-  Tab: Notes  : journal, search, new note form, AI summary
-  Tab: Reports : CSV export, debt payoff calculator, AI full report
+Architecture:
+  Landing page  : Grok-style hero, OTP sign-in/sign-up
+  Post-login    : 5 tabs (Dashboard · Budget · Forecast · Schedule · Notes)
+                  + persistent "Ask orryon" floating chat input
+  AI brain      : core/grok_agent.py → direct xAI Grok API with tool calling
+  Data          : SQLite via db.py — fully local, zero cloud
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
-# crewai requires Python 3.10+ — wrap gracefully so the dashboard still loads on 3.9
-CREWAI_AVAILABLE = False
-try:
-    from crewai import Crew, Process
-    from agents import (
-        alex,
-        budget_agent,
-        data_aggregator,
-        edward,
-        forecasting_agent,
-        insights_agent,
-        net_worth_agent,
-        notes_agent,
-    )
-    from tasks import route_query_to_tasks
-    CREWAI_AVAILABLE = True
-except Exception as _crewai_err:
-    logger_pre = logging.getLogger(__name__)
-    logger_pre.warning("crewai not available (%s). AI chat disabled.", _crewai_err)
-
-from config import APP_URL, USER_ID
+from config import APP_URL, USER_ID, XAI_API_KEY
 from db import (
     create_verification_code,
     fetch_rows,
-    get_link_page_by_token,
-    get_or_create_link_page,
     get_or_create_user_by_email,
     load_chat_history,
     save_chat_message,
-    update_row,
     verify_code,
 )
 from email_sender import send_verification_code
-from memory import extract_memory_facts, retrieve_relevant_memories, store_memory
-from tools import (
-    add_bill_reminder,
-    analyze_spending_trends,
-    calculate_net_worth,
-    create_calendar_event,
-    delete_link,
-    detect_subscriptions,
-    forecast_cash_flow,
-    generate_csv_report,
-    get_debt_payoff_plan,
-    get_financial_recommendations,
-    get_inspo_items,
-    get_links,
-    get_portfolio_performance,
-    get_spending_by_category,
-    list_upcoming_events,
-    load_sample_data,
-    run_monte_carlo_retirement,
-    save_inspo_item,
-    save_link,
-    save_note,
-    search_notes,
-    simulate_scenario,
-    summarize_notes,
-)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,19 +45,19 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="guddd",
+    page_title="orryon",
     page_icon="💰",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# ── PWA: manifest + service worker ───────────────────────────────────────────
+# PWA manifest + service worker
 st.markdown("""
 <link rel="manifest" href="/app/static/manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="guddd">
+<meta name="apple-mobile-web-app-title" content="orryon">
 <link rel="apple-touch-icon" href="/app/static/icon-192.png">
 <meta name="theme-color" content="#000000">
 <script>
@@ -122,105 +65,12 @@ st.markdown("""
     window.addEventListener('load', function () {
       navigator.serviceWorker
         .register('/app/static/sw.js', { scope: '/app/static/' })
-        .then(function (reg) { console.log('[guddd] SW registered', reg.scope); })
-        .catch(function (err) { console.warn('[guddd] SW failed', err); });
+        .then(function (reg) { console.log('[orryon] SW registered', reg.scope); })
+        .catch(function (err) { console.warn('[orryon] SW failed', err); });
     });
   }
 </script>
 """, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GLOBAL CSS
-# ─────────────────────────────────────────────────────────────────────────────
-
-st.markdown(
-    """
-<style>
-  /* ── Mobile viewport ── */
-  meta[name="viewport"] { content: "width=device-width, initial-scale=1"; }
-
-  /* ── Hide all Streamlit chrome ── */
-  #MainMenu, footer { visibility: hidden; }
-  [data-testid="stHeader"],
-  [data-testid="stToolbar"],
-  [data-testid="stDecoration"] { display: none !important; }
-  [data-testid="stSidebar"] { display: none !important; }
-  .block-container {
-    padding-top: 1rem !important;
-    padding-bottom: 2rem !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    max-width: 480px !important;
-  }
-
-  /* ── Hero ── */
-  .hero-wrap {
-    display: flex; flex-direction: column; align-items: center;
-    text-align: center; padding: 0.5rem 0 1.5rem;
-  }
-  .hero-title {
-    font-size: 2.6rem; font-weight: 800; letter-spacing: -1px;
-    background: linear-gradient(135deg, #00c9ff 0%, #92fe9d 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin: 0.5rem 0 0.2rem;
-  }
-  .hero-sub {
-    font-size: 1rem; color: #8892a4; margin: 0 0 1.4rem;
-  }
-  .hero-cta {
-    display: inline-block;
-    background: linear-gradient(135deg, #00c9ff, #92fe9d);
-    color: #000 !important; font-weight: 700; font-size: 1rem;
-    padding: 0.75rem 2.2rem; border-radius: 50px;
-    text-decoration: none; margin-top: 0.5rem;
-    box-shadow: 0 4px 20px rgba(0,201,255,0.35);
-  }
-
-  /* ── Main header ── */
-  .main-header {
-    font-size: 1.5rem; font-weight: 700;
-    background: linear-gradient(135deg, #00c9ff, #92fe9d);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 0.25rem;
-  }
-
-  /* ── Chat bubbles ── */
-  .chat-user {
-    background: #1e3a5f; border-radius: 18px 18px 4px 18px;
-    padding: 0.75rem 1rem; margin: 0.4rem 0;
-    border-left: 3px solid #00c9ff; font-size: 0.92rem;
-  }
-  .chat-ai {
-    background: #1a2e1a; border-radius: 18px 18px 18px 4px;
-    padding: 0.75rem 1rem; margin: 0.4rem 0;
-    border-left: 3px solid #92fe9d; font-size: 0.92rem;
-  }
-  .badge {
-    font-size: 0.68rem; padding: 2px 7px; border-radius: 20px;
-    background: #2d3748; color: #a0aec0; margin-right: 4px;
-  }
-
-  /* ── Cards ── */
-  .insight-card {
-    background: #1a1a2e; border-radius: 10px; padding: 0.75rem;
-    margin: 0.35rem 0; border-left: 3px solid #ffd700;
-  }
-  .goal-bar-wrap {
-    background: #2d2d44; border-radius: 4px; height: 8px; margin: 6px 0;
-  }
-
-  /* ── Responsive tabs ── */
-  .stTabs [data-baseweb="tab-list"] { gap: 2px; flex-wrap: wrap; }
-  .stTabs [data-baseweb="tab"] { padding: 6px 10px; font-size: 0.78rem; }
-
-  /* ── Buttons full-width on small screens ── */
-  @media (max-width: 500px) {
-    .stButton > button { width: 100% !important; }
-  }
-</style>
-""",
-    unsafe_allow_html=True,
-)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,15 +82,18 @@ def _init_state() -> None:
         "chat_history": [],
         "data_loaded": False,
         "last_sync": None,
-        "screen": "home",           # home | signin
-        "user_id": None,            # set after successful OTP verification
-        "display_name": "",         # shown in sidebar + welcome
-        "auth_error": "",           # error message on auth screens
-        "auth_step": "email",       # "email" | "code"  — OTP flow step
-        "auth_pending_email": "",   # email waiting for code verification
-        "auth_code_sent": False,    # True once code has been dispatched
-        "auth_dev_code": "",        # non-empty when SMTP is off (dev mode)
-        "inspo_upload_count": 0,    # triggers inspo gallery refresh
+        "screen": "home",
+        "user_id": None,
+        "display_name": "",
+        "auth_error": "",
+        "auth_step": "email",
+        "auth_pending_email": "",
+        "auth_code_sent": False,
+        "auth_dev_code": "",
+        "orryon_last_message": "",
+        "orryon_actions": [],
+        "show_chat_history": False,
+        "active_tab": 0,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -251,347 +104,22 @@ _init_state()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC LINKS PAGE  (intercepted via ?links=<token> — no auth required)
-# ─────────────────────────────────────────────────────────────────────────────
-
-_share_token = st.query_params.get("links", "")
-if _share_token:
-    _page = get_link_page_by_token(_share_token)
-    if _page is None:
-        st.error("This link page is private or doesn't exist.")
-        st.stop()
-
-    _pub_links = fetch_rows("links", {"user_id": _page["user_id"]}, limit=100)
-    _pub_name  = _page.get("page_title") or _page.get("display_name") or "My Links"
-    _pub_bio   = _page.get("bio", "")
-    _theme     = _page.get("theme", "dark")
-
-    _bg    = "#000000" if _theme == "dark" else "#f9fafb"
-    _card  = "#111827" if _theme == "dark" else "#ffffff"
-    _text  = "#f9fafb" if _theme == "dark" else "#111827"
-    _sub   = "#9ca3af" if _theme == "dark" else "#6b7280"
-    _border= "#1f2937" if _theme == "dark" else "#e5e7eb"
-    _btn_bg= "linear-gradient(135deg,#00c9ff,#92fe9d)" if _theme == "gradient" else (
-             "#1f2937" if _theme == "dark" else "#f3f4f6"
-    )
-    _btn_text = "#000" if _theme == "gradient" else _text
-
-    st.markdown(f"""
-<style>
-  [data-testid="stAppViewContainer"],[data-testid="stMain"],.stApp,
-  section[data-testid="stMain"]>div{{background:{_bg}!important}}
-  #MainMenu,footer,[data-testid="stHeader"],[data-testid="stToolbar"],
-  [data-testid="stDecoration"],[data-testid="stSidebar"]{{display:none!important}}
-  .block-container{{
-    max-width:480px!important;margin:0 auto!important;
-    padding:2rem 1rem 4rem!important;
-  }}
-  .pub-avatar{{
-    width:88px;height:88px;border-radius:50%;object-fit:cover;
-    border:2px solid {_border};margin:0 auto 0.6rem;display:block;
-  }}
-  .pub-name{{
-    text-align:center;font-size:1.4rem;font-weight:800;
-    color:{_text};margin:0 0 0.2rem;letter-spacing:-0.3px;
-  }}
-  .pub-bio{{
-    text-align:center;font-size:0.9rem;color:{_sub};
-    margin:0 0 1.6rem;
-  }}
-  .pub-btn{{
-    display:block;width:100%;padding:0.9rem 1.2rem;
-    margin-bottom:0.7rem;border-radius:50px;text-align:center;
-    text-decoration:none;font-weight:600;font-size:0.97rem;
-    background:{_btn_bg};color:{_btn_text}!important;
-    border:1px solid {_border};
-    box-shadow:0 2px 12px rgba(0,0,0,0.18);
-    transition:transform 0.15s,box-shadow 0.15s;
-  }}
-  .pub-btn:hover{{transform:translateY(-2px);box-shadow:0 4px 18px rgba(0,0,0,0.28);}}
-  .pub-footer{{
-    text-align:center;font-size:0.72rem;color:{_sub};
-    margin-top:2.5rem;
-  }}
-  .pub-footer a{{color:{_sub};text-decoration:none;}}
-</style>
-""", unsafe_allow_html=True)
-
-    # Avatar — reuse tribble for now
-    import base64 as _b64p
-    with open("assets/tribble.png", "rb") as _pf:
-        _pavatar = _b64p.b64encode(_pf.read()).decode()
-    st.markdown(
-        f'<img src="data:image/png;base64,{_pavatar}" class="pub-avatar"/>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(f'<div class="pub-name">{_pub_name}</div>', unsafe_allow_html=True)
-    if _pub_bio:
-        st.markdown(f'<div class="pub-bio">{_pub_bio}</div>', unsafe_allow_html=True)
-
-    if _pub_links:
-        for _lk in _pub_links:
-            st.markdown(
-                f'<a href="{_lk["url"]}" target="_blank" class="pub-btn">'
-                f'{_lk["title"]}</a>',
-                unsafe_allow_html=True,
-            )
-    else:
-        st.markdown(
-            f'<p style="text-align:center;color:{_sub}">No links added yet.</p>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown(
-        '<div class="pub-footer">Made with <a href="https://guddd.app">guddd</a></div>',
-        unsafe_allow_html=True,
-    )
-    st.stop()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# AGENT RUNNER + RESPONSE PARSER
-# ─────────────────────────────────────────────────────────────────────────────
-
-import re as _re
-
-
-def _parse_agent_response(raw: str) -> dict:
-    """
-    Extract the structured JSON terminus block from an agent response.
-    Returns a dict with keys: text, status, summary, confidence, evidence,
-    next_steps_or_question. Falls back gracefully if JSON is absent.
-    """
-    # Try to find the trailing JSON block
-    json_match = _re.search(
-        r'\{\s*"status"\s*:.*?"next_steps_or_question"\s*:.*?\}',
-        raw,
-        _re.DOTALL,
-    )
-    if json_match:
-        json_str = json_match.group(0)
-        # Text is everything before the JSON block
-        text_part = raw[: json_match.start()].strip()
-        try:
-            meta = json.loads(json_str)
-            return {
-                "text": text_part,
-                "status": meta.get("status", "complete"),
-                "summary": meta.get("summary", ""),
-                "confidence": int(meta.get("confidence", 0)),
-                "evidence": meta.get("evidence", ""),
-                "next_steps_or_question": meta.get("next_steps_or_question", ""),
-            }
-        except json.JSONDecodeError:
-            pass
-    # No valid JSON found — return raw text with neutral meta
-    return {
-        "text": raw.strip(),
-        "status": "complete",
-        "summary": "",
-        "confidence": 0,
-        "evidence": "",
-        "next_steps_or_question": "",
-    }
-
-
-def run_agent_query(user_query: str, user_id: str | None = None) -> dict:
-    """
-    Route a user query through the multi-agent system and return a parsed dict:
-      text                  — main response body (may include Thought/Plan/Action)
-      status                — "complete" | "needs_input" | "partial" | "stuck"
-      summary               — one-line summary of what was accomplished
-      confidence            — int 0–100
-      evidence              — proof string
-      next_steps_or_question — follow-up question if status != "complete"
-
-    Falls back to a helpful message dict if crewai / LLM is not available.
-    Long-term memory is retrieved before the query and stored after.
-    """
-    if not CREWAI_AVAILABLE:
-        return _parse_agent_response(
-            "⚠️ **Edward & Alex require Python 3.10+** and a running LLM.\n\n"
-            "**To enable them:**\n"
-            "1. Install Python 3.10+ (via [python.org](https://python.org/downloads) or `brew install python@3.11`)\n"
-            "2. Create a virtualenv: `python3.11 -m venv .venv && source .venv/bin/activate`\n"
-            "3. Install deps: `pip install -r requirements.txt`\n"
-            "4. Set `XAI_API_KEY` in your `.env` file\n"
-            "5. Re-launch: `streamlit run app.py`\n\n"
-            "The **Dashboard, Budget, Forecast, Schedule, Notes, and Reports** tabs all work right now — explore them!"
-        )
-
-    # ── Retrieve long-term memories for this user ──────────────────────────
-    effective_uid = user_id or st.session_state.get("user_id") or USER_ID
-    memory_context = retrieve_relevant_memories(effective_uid, user_query)
-
-    try:
-        tasks = route_query_to_tasks(user_query, memory_context=memory_context)
-        needed_agents = list({t.agent for t in tasks if t.agent is not edward})
-        if not needed_agents:
-            needed_agents = [data_aggregator]
-
-        crew = Crew(
-            agents=needed_agents,
-            tasks=tasks,
-            process=Process.sequential,
-            verbose=True,
-            memory=True,
-        )
-        result = crew.kickoff()
-        parsed = _parse_agent_response(str(result))
-
-        # ── Store new memory facts extracted from this exchange ────────────
-        facts = extract_memory_facts(user_query, parsed["text"])
-        for fact in facts:
-            store_memory(
-                effective_uid,
-                fact,
-                {
-                    "type": "fact",
-                    "query": user_query[:120],
-                    "confidence": str(parsed.get("confidence", 0)),
-                },
-            )
-        # Always store the summary as a compact memory if it's meaningful
-        summary = parsed.get("summary", "").strip()
-        if summary and len(summary) > 15:
-            store_memory(
-                effective_uid,
-                summary,
-                {"type": "summary", "query": user_query[:120]},
-            )
-
-        return parsed
-    except Exception as exc:
-        logger.error("Agent query error: %s", exc)
-        return _parse_agent_response(
-            f"**Error:** {exc}\n\n"
-            "Tip: Set `LLM_PROVIDER=grok` + `XAI_API_KEY` in your `.env` file."
-        )
-
-
-def _guess_agent_label(query: str) -> str:
-    q = query.lower()
-    # Alex's financial domains
-    if any(k in q for k in [
-        "spend", "budget", "subscription", "expense", "tax",
-        "net worth", "portfolio", "stock", "crypto", "invest",
-        "retire", "monte carlo", "projection", "debt", "payoff",
-        "insight", "anomal", "recommend", "forecast", "savings",
-    ]):
-        return "Alex (Finance)"
-    # Edward's domains
-    if any(k in q for k in ["travel", "flight", "hotel", "trip", "itinerary"]):
-        return "Edward (Travel)"
-    if any(k in q for k in ["draft", "email", "message", "compose", "write"]):
-        return "Edward (Communications)"
-    if any(k in q for k in ["research", "compare", "find best", "options for"]):
-        return "Edward (Research)"
-    if any(k in q for k in ["briefing", "brief me", "catch me up", "what's on my plate"]):
-        return "Edward (Briefing)"
-    if any(k in q for k in ["schedule", "calendar", "remind", "event", "bill", "appointment"]):
-        return "Edward (Scheduling)"
-    if any(k in q for k in ["note", "journal", "memo", "log", "save this", "my notes"]):
-        return "Edward (Notes)"
-    if any(k in q for k in ["task", "action item", "todo", "follow up", "remind me to"]):
-        return "Edward (Tasks)"
-    if any(k in q for k in ["link", "url", "website", "linktree", "my links"]):
-        return "Edward (Links)"
-    if any(k in q for k in ["inspo", "inspiration", "mood board", "my inspo"]):
-        return "Edward (Inspo)"
-    return "Edward"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DASHBOARD DATA HELPERS (direct tool calls — fast, no LLM overhead)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _nw() -> dict:
-    return json.loads(calculate_net_worth.invoke(""))
-
-
-def _spending(days: int = 30) -> dict:
-    return json.loads(get_spending_by_category.invoke(json.dumps({"days": days})))
-
-
-def _portfolio() -> dict:
-    return json.loads(get_portfolio_performance.invoke(json.dumps({"fetch_live_prices": False})))
-
-
-def _upcoming_events(days: int = 30) -> list:
-    return json.loads(list_upcoming_events.invoke(json.dumps({"days": days}))).get("events", [])
-
-
-def _recommendations() -> list:
-    return json.loads(get_financial_recommendations.invoke("")).get("recommendations", [])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
-
-with st.sidebar:
-    st.markdown('<div class="main-header">💰 guddd</div>', unsafe_allow_html=True)
-    st.caption("Edward · Alex · Local-first · Private")
-    st.divider()
-
-    if st.session_state.data_loaded:
-        nw_data = _nw()
-        if "net_worth" in nw_data:
-            st.metric("Net Worth", f"${nw_data['net_worth']:,.0f}")
-            c1, c2 = st.columns(2)
-            c1.metric("Assets", f"${nw_data.get('total_assets', 0):,.0f}")
-            c2.metric("Liabilities", f"${nw_data.get('total_liabilities', 0):,.0f}")
-        st.divider()
-
-    st.subheader("Data Controls")
-    col_load, col_sync = st.columns(2)
-    with col_load:
-        if st.button("📥 Load Sample", use_container_width=True):
-            with st.spinner("Loading…"):
-                res = json.loads(load_sample_data.invoke(""))
-                if res.get("status") == "success":
-                    st.session_state.data_loaded = True
-                    st.session_state.last_sync = datetime.now().isoformat()
-                    st.success("Done!")
-                    st.rerun()
-    with col_sync:
-        if st.button("🔄 Sync", use_container_width=True,
-                     disabled=not st.session_state.data_loaded):
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.success("Synced!")
-
-    if st.session_state.last_sync:
-        st.caption(f"Last sync: {st.session_state.last_sync[:16]}")
-
-    st.divider()
-    with st.expander("⚙️ Settings"):
-        st.info("LLM: **Grok (xAI) — grok-latest**\nSet `XAI_API_KEY` in `.env`. Get a key at [console.x.ai](https://console.x.ai)")
-        _sid_dn = st.session_state.get("display_name", "")
-        _sid_uid = st.session_state.get("user_id") or USER_ID or ""
-        if _sid_dn:
-            st.caption(f"Signed in as **{_sid_dn}**")
-        if _sid_uid:
-            st.caption(f"User ID: `{_sid_uid[:8]}…`")
-
-    st.divider()
-    st.caption("🔒 All data stored locally in `finance.db`.")
-    st.caption("📁 Notes saved to `notes/` as markdown.")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN LAYOUT
+# PRE-LOGIN  (landing + auth)
 # ─────────────────────────────────────────────────────────────────────────────
 
 if not st.session_state.data_loaded:
-    import base64 as _b64
-    with open("assets/tribble.png", "rb") as _f:
-        _traw = _f.read()
-    _tribble_b64 = _b64.b64encode(_traw).decode()
-    _tribble_mime = "jpeg" if _traw[:3] == b"\xff\xd8\xff" else "png"
 
-    # Route query-param nav clicks (from fixed HTML buttons)
-    # Both "signin" and "signup" now go to the unified OTP auth screen.
+    # Load avatar once
+    _avatar_path = "assets/tribble.png"
+    if os.path.exists(_avatar_path):
+        with open(_avatar_path, "rb") as _f:
+            _raw = _f.read()
+        _b64 = base64.b64encode(_raw).decode()
+        _mime = "jpeg" if _raw[:3] == b"\xff\xd8\xff" else "png"
+    else:
+        _b64, _mime = "", "png"
+
+    # Handle ?action= query param from top-nav links
     _action = st.query_params.get("action", "")
     if _action in ("signin", "signup"):
         st.session_state.screen = "signin"
@@ -600,7 +128,7 @@ if not st.session_state.data_loaded:
         st.query_params.clear()
         st.rerun()
 
-    # ── Shared auth CSS ───────────────────────────────────────────────────
+    # ── Shared pre-login CSS ─────────────────────────────────────────────────
     st.markdown("""
 <style>
   [data-testid="stAppViewContainer"],[data-testid="stMain"],
@@ -615,7 +143,6 @@ if not st.session_state.data_loaded:
     padding:0.75rem 1rem 1rem!important; max-width:480px!important;
     background:transparent!important;
   }
-  /* auth page shared pill button */
   .auth-btn>button{
     width:100%!important; border-radius:50px!important;
     padding:0.72rem 0!important; font-size:0.97rem!important;
@@ -631,20 +158,6 @@ if not st.session_state.data_loaded:
     border-radius:6px!important; font-size:0.97rem!important;
   }
   .auth-input input:focus{border-color:rgba(255,255,255,.55)!important}
-  .or-divider{
-    display:flex; align-items:center; gap:0.7rem;
-    color:rgba(255,255,255,.35); font-size:0.85rem; margin:0.2rem 0;
-  }
-  .or-divider::before,.or-divider::after{
-    content:''; flex:1; height:1px; background:rgba(255,255,255,.12);
-  }
-  .auth-footer{
-    text-align:center; color:rgba(255,255,255,.38);
-    font-size:0.82rem; margin-top:1.8rem;
-  }
-  .auth-footer span{color:#1d9bf0; cursor:pointer}
-
-  /* ── Fixed top-right nav buttons ── */
   .fixed-topnav {
     position: fixed; top: 0.75rem; right: 0.9rem;
     display: flex; gap: 0.45rem; z-index: 9999;
@@ -668,7 +181,7 @@ if not st.session_state.data_loaded:
 </style>
 """, unsafe_allow_html=True)
 
-    # ── Fixed Sign in / Sign up in top-right corner ───────────────────────
+    # Fixed Sign in / Sign up buttons
     st.markdown("""
 <div class="fixed-topnav">
   <a href="?action=signin" class="btn-si">Sign in</a>
@@ -676,9 +189,7 @@ if not st.session_state.data_loaded:
 </div>
 """, unsafe_allow_html=True)
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # SCREEN: SIGN IN — two-step email + OTP (Cursor-style, no passwords)
-    # ═══════════════════════════════════════════════════════════════════════
+    # ── SCREEN: SIGN IN / SIGN UP ────────────────────────────────────────────
     if st.session_state.screen == "signin":
         _tc, _tlogo, _ = st.columns([1, 1, 1])
         with _tc:
@@ -690,41 +201,39 @@ if not st.session_state.data_loaded:
                 st.session_state.auth_dev_code = ""
                 st.rerun()
         with _tlogo:
-            st.markdown(
-                f'<div style="text-align:center">'
-                f'<img src="data:image/{_tribble_mime};base64,{_tribble_b64}" '
-                f'style="width:32px;height:32px;border-radius:50%;object-fit:cover"/></div>',
-                unsafe_allow_html=True)
+            if _b64:
+                st.markdown(
+                    f'<div style="text-align:center">'
+                    f'<img src="data:image/{_mime};base64,{_b64}" '
+                    f'style="width:32px;height:32px;border-radius:50%;object-fit:cover"/></div>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # ── STEP 1: Email entry ──────────────────────────────────────────
+        # Step 1: email
         if st.session_state.auth_step == "email":
-            st.markdown("## Sign in to guddd")
+            st.markdown("## Sign in to orryon")
             st.markdown(
                 '<p style="color:#888;font-size:0.9rem;margin:0 0 1.2rem;">'
                 "Enter your email — we'll send a verification code."
                 "</p>",
                 unsafe_allow_html=True,
             )
-
             st.markdown('<div class="auth-input">', unsafe_allow_html=True)
             otp_email = st.text_input(
                 "Email address", placeholder="you@example.com",
                 label_visibility="collapsed", key="otp_email_input",
             )
             st.markdown('</div>', unsafe_allow_html=True)
-
             st.markdown(
                 '<p style="font-size:0.75rem;color:#555;margin:0.4rem 0 1rem;">'
                 "Works with Gmail · Outlook · iCloud · Yahoo · any email"
                 "</p>",
                 unsafe_allow_html=True,
             )
-
             if st.session_state.auth_error:
                 st.error(st.session_state.auth_error)
-
             st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
             if st.button("Send code →", use_container_width=True, key="otp_send"):
                 _email_val = otp_email.strip().lower()
@@ -738,12 +247,11 @@ if not st.session_state.data_loaded:
                     st.session_state.auth_step = "code"
                     st.session_state.auth_error = ""
                     st.session_state.auth_code_sent = _sent
-                    # Dev mode: show code on screen when SMTP is not configured
                     st.session_state.auth_dev_code = "" if _sent else _code
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── STEP 2: Code entry ───────────────────────────────────────────
+        # Step 2: OTP code
         else:
             _pending = st.session_state.auth_pending_email
             st.markdown("## Check your email")
@@ -756,11 +264,10 @@ if not st.session_state.data_loaded:
                     unsafe_allow_html=True,
                 )
             else:
-                # SMTP not configured — show code on screen (dev mode)
                 st.markdown(
-                    f'<p style="color:#888;font-size:0.9rem;margin:0 0 0.6rem;">'
-                    f"SMTP not configured — your code is shown below (dev mode)."
-                    f"</p>",
+                    '<p style="color:#888;font-size:0.9rem;margin:0 0 0.6rem;">'
+                    "SMTP not configured — your code is shown below (dev mode)."
+                    "</p>",
                     unsafe_allow_html=True,
                 )
                 st.markdown(
@@ -768,7 +275,8 @@ if not st.session_state.data_loaded:
                     f'padding:16px;text-align:center;margin-bottom:1rem;">'
                     f'<span style="font-size:2rem;font-weight:700;letter-spacing:8px;color:#fff;">'
                     f'{st.session_state.auth_dev_code}</span>'
-                    f'<p style="color:#555;font-size:0.75rem;margin:8px 0 0;">Dev mode — set SMTP in .env to send real emails</p>'
+                    f'<p style="color:#555;font-size:0.75rem;margin:8px 0 0;">'
+                    f'Dev mode — set SMTP in .env to send real emails</p>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -780,10 +288,8 @@ if not st.session_state.data_loaded:
                 max_chars=6,
             )
             st.markdown('</div>', unsafe_allow_html=True)
-
             if st.session_state.auth_error:
                 st.error(st.session_state.auth_error)
-
             st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
             if st.button("Verify →", use_container_width=True, key="otp_verify"):
                 _code_val = otp_code.strip()
@@ -799,9 +305,12 @@ if not st.session_state.data_loaded:
                     st.session_state.user_id = _user["id"]
                     st.session_state.display_name = _user["display_name"]
                     st.session_state.chat_history = load_chat_history(_user["id"])
-                    if not st.session_state.data_loaded:
-                        load_sample_data.invoke("")
-                        st.session_state.data_loaded = True
+                    # Seed sample data on first login
+                    existing_txns = fetch_rows("transactions", {"user_id": _user["id"]})
+                    if not existing_txns:
+                        from core.tools import seed_sample_data
+                        seed_sample_data(_user["id"])
+                    st.session_state.data_loaded = True
                     st.session_state.last_sync = datetime.now().isoformat()
                     st.session_state.screen = "home"
                     st.rerun()
@@ -809,11 +318,8 @@ if not st.session_state.data_loaded:
                     st.session_state.auth_error = "Invalid or expired code. Please try again."
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-
-            st.markdown('<div class="auth-btn auth-btn-outline" style="margin-top:0.5rem">',
-                        unsafe_allow_html=True)
-            if st.button("← Resend / use different email",
-                         use_container_width=True, key="otp_back"):
+            st.markdown('<div class="auth-btn auth-btn-outline" style="margin-top:0.5rem">', unsafe_allow_html=True)
+            if st.button("← Resend / use different email", use_container_width=True, key="otp_back"):
                 st.session_state.auth_step = "email"
                 st.session_state.auth_error = ""
                 st.session_state.auth_dev_code = ""
@@ -822,1364 +328,355 @@ if not st.session_state.data_loaded:
 
         st.stop()
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # SCREEN: HOME (Grok-style)
-    # ═══════════════════════════════════════════════════════════════════════
-    # ── Grok-style homepage ────────────────────────────────────────────────
-
-    st.markdown(
-        f"""
+    # ── SCREEN: HOME (landing page) ──────────────────────────────────────────
+    st.markdown(f"""
 <style>
-  /* ── Black background ── */
-  [data-testid="stAppViewContainer"],
-  [data-testid="stMain"],
-  [data-testid="stHeader"],
-  .stApp,
-  section[data-testid="stMain"] > div {{
-    background: #000 !important;
+  [data-testid="stAppViewContainer"],[data-testid="stMain"],
+  [data-testid="stHeader"],.stApp,section[data-testid="stMain"]>div{{background:#000!important}}
+  #MainMenu,footer{{visibility:hidden}}
+  [data-testid="stHeader"]{{display:none!important}}
+  [data-testid="stSidebar"]{{display:none!important}}
+  .block-container{{
+    min-height:100vh!important; display:flex!important; flex-direction:column!important;
+    padding:0.75rem 1rem 1rem!important; max-width:480px!important;
+    background:transparent!important;
   }}
-  #MainMenu, footer {{ visibility: hidden; }}
-  [data-testid="stHeader"] {{ background: transparent !important; }}
-  [data-testid="stSidebar"] {{ display: none !important; }}
-
-  /* ── Full-height flex column ── */
-  .block-container {{
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 0.75rem 1rem 1rem !important;
-    max-width: 480px !important;
-    background: transparent !important;
+  .hero-center{{
+    position:fixed; top:calc(50% - 120px); left:50%;
+    transform:translate(-50%,-50%);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    text-align:center; gap:0.6rem; z-index:1;
   }}
-
-  /* ── Top nav row ── */
-  .nav-row {{
-    display: flex; align-items: center;
-    justify-content: space-between; width: 100%;
+  .hero-avatar{{width:110px;height:110px;border-radius:50%;object-fit:cover}}
+  .hero-name{{
+    font-size:2rem;font-weight:800;letter-spacing:2px;
+    color:#fff;text-transform:uppercase;margin-top:-8px;
   }}
-  .nav-icon {{
-    width: 36px; height: 36px; border-radius: 10px;
-    object-fit: cover; opacity: 0.85;
+  .hero-tagline{{
+    font-size:0.88rem;color:rgba(255,255,255,0.45);
+    max-width:280px;line-height:1.5;margin-top:2px;
   }}
-  .nav-btns {{ display: flex; gap: 0.45rem; align-items: center; }}
-
-  /* Sign in – outlined */
-  div[data-testid="column"]:nth-of-type(2) .stButton > button {{
-    background: transparent !important;
-    border: 1.5px solid rgba(255,255,255,0.45) !important;
-    color: #fff !important;
-    border-radius: 50px !important;
-    padding: 0.5rem 1.3rem !important;
-    font-size: 0.95rem !important; font-weight: 500 !important;
-    width: auto !important; min-width: 0 !important;
-    box-shadow: none !important; letter-spacing: 0.1px !important;
+  [data-testid="stBottom"]{{background:transparent!important;padding-bottom:0.5rem!important}}
+  [data-testid="stChatInputContainer"]{{
+    background:#1c1c1e!important;
+    border:1px solid rgba(255,255,255,0.10)!important;
+    border-radius:28px!important; padding:0.15rem 0.5rem!important;
   }}
-  div[data-testid="column"]:nth-of-type(2) .stButton > button:hover {{
-    border-color: rgba(255,255,255,0.75) !important;
+  [data-testid="stChatInputContainer"] textarea{{color:#fff!important;background:transparent!important;font-size:1rem!important}}
+  [data-testid="stChatInputContainer"] textarea::placeholder{{color:rgba(255,255,255,0.38)!important}}
+  [data-testid="stChatInputSubmitButton"]>button{{
+    background:#fff!important;border-radius:50%!important;color:#000!important;
+    width:2.2rem!important;height:2.2rem!important;padding:0!important;
   }}
-
-  /* Sign up – white filled */
-  div[data-testid="column"]:nth-of-type(3) .stButton > button {{
-    background: #fff !important;
-    border: none !important;
-    color: #000 !important;
-    border-radius: 50px !important;
-    padding: 0.5rem 1.3rem !important;
-    font-size: 0.95rem !important; font-weight: 600 !important;
-    width: auto !important; min-width: 0 !important;
-    box-shadow: none !important; letter-spacing: 0.1px !important;
+  [data-testid="stBottom"],[data-testid="stBottom"]>div,
+  [data-testid="stChatInput"],.stChatFloatingInputContainer{{
+    background:transparent!important;padding-bottom:3.8rem!important;
   }}
-  div[data-testid="column"]:nth-of-type(3) .stButton > button:hover {{
-    background: #e5e5e5 !important;
-  }}
-
-  /* ── Center hero ── */
-  .hero-center {{
-    position: fixed;
-    top: calc(50% - 110px); left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center; gap: 1rem;
-    z-index: 1;
-  }}
-  .hero-avatar {{
-    width: 110px; height: 110px;
-    border-radius: 50%; object-fit: cover;
-  }}
-  .hero-name {{
-    font-size: 2rem; font-weight: 800;
-    letter-spacing: 2px; color: #fff;
-    text-transform: uppercase;
-    margin-top: -10px;
-  }}
-
-  /* ── Chat input – Grok style ── */
-  [data-testid="stBottom"] {{
-    background: transparent !important;
-    padding-bottom: 0.5rem !important;
-  }}
-  [data-testid="stChatInputContainer"] {{
-    background: #1c1c1e !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    border-radius: 28px !important;
-    padding: 0.15rem 0.5rem !important;
-  }}
-  [data-testid="stChatInputContainer"] textarea {{
-    color: #fff !important;
-    background: transparent !important;
-    font-size: 1rem !important;
-  }}
-  [data-testid="stChatInputContainer"] textarea::placeholder {{
-    color: rgba(255,255,255,0.38) !important;
-  }}
-  /* submit button → waveform circle */
-  [data-testid="stChatInputSubmitButton"] > button {{
-    background: #fff !important;
-    border-radius: 50% !important;
-    color: #000 !important;
-    width: 2.2rem !important; height: 2.2rem !important;
-    padding: 0 !important;
-  }}
-
-  /* ── Lift chat input, strip gray background ── */
-  [data-testid="stBottom"],
-  [data-testid="stBottom"] > div,
-  [data-testid="stChatInput"],
-  .stChatFloatingInputContainer {{
-    background: transparent !important;
-    padding-bottom: 3.8rem !important;
-  }}
-
-  /* ── Dictate pill: fixed just below chat input ── */
-  .dictate-pill {{
-    position: fixed; bottom: 2.4rem;
-    left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 0.45rem;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 50px;
-    padding: 0.38rem 1.1rem;
-    color: rgba(255,255,255,0.65);
-    font-size: 0.82rem;
-    white-space: nowrap;
-    z-index: 1000; cursor: default;
-  }}
-
-  /* ── Bottom note: fixed at very bottom ── */
-  .bottom-note {{
-    position: fixed; bottom: 0.6rem;
-    left: 0; right: 0; text-align: center;
-    font-size: 0.70rem;
-    color: rgba(255,255,255,0.22);
-    z-index: 1000; margin: 0;
+  .bottom-note{{
+    position:fixed;bottom:0.6rem;left:0;right:0;text-align:center;
+    font-size:0.70rem;color:rgba(255,255,255,0.22);z-index:1000;margin:0;
   }}
 </style>
-""",
-        unsafe_allow_html=True,
-    )
+""", unsafe_allow_html=True)
 
+    if _b64:
+        st.markdown(
+            f"""<div class="hero-center">
+              <img src="data:image/{_mime};base64,{_b64}" class="hero-avatar" />
+              <div class="hero-name">orryon</div>
+              <div class="hero-tagline">Your personal Finance + Daily Life OS.<br>Just tell orryon what to do.</div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    # ── Center: tribble avatar + app name ─────────────────────────────────
+    # Landing page chat input — routes to sign-in
+    _landing_query = st.chat_input("What can orryon help you with?")
+    if _landing_query:
+        st.session_state.screen = "signin"
+        st.session_state.auth_step = "email"
+        st.rerun()
+
     st.markdown(
-        f"""
-        <div class="hero-center">
-          <img src="data:image/{_tribble_mime};base64,{_tribble_b64}" class="hero-avatar" />
-          <div class="hero-name">guddd</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<p class="bottom-note">By using guddd, all data stays on your device</p>',
+        '<p class="bottom-note">By using orryon, all data stays on your device.</p>',
         unsafe_allow_html=True,
     )
     st.stop()
 
-# ── Post-login top bar: hamburger left, title center ─────────────────────
-_app_l, _app_c, _app_r = st.columns([1, 4, 1])
-with _app_l:
-    with st.popover("☰"):
-        st.markdown("**💰 guddd**")
-        st.caption("Edward · Alex · Local-first · Private")
-        st.divider()
-        if st.session_state.data_loaded:
-            _nw_q = json.loads(calculate_net_worth.invoke(""))
-            if "net_worth" in _nw_q:
-                st.metric("Net Worth", f"${_nw_q['net_worth']:,.0f}")
-                _c1, _c2 = st.columns(2)
-                _c1.metric("Assets", f"${_nw_q.get('total_assets',0):,.0f}")
-                _c2.metric("Liabilities", f"${_nw_q.get('total_liabilities',0):,.0f}")
-            st.divider()
-        if st.button("🔄 Sync", use_container_width=True):
-            st.session_state.last_sync = datetime.now().isoformat()
-            st.success("Synced!")
-        st.divider()
-        # ── Logged-in user info ───────────────────────────────────────────
-        _dn = st.session_state.get("display_name", "")
-        if _dn:
-            st.caption(f"Signed in as **{_dn}**")
-            st.divider()
-        st.subheader("⚙️ Settings")
-        st.caption("LLM: **Grok (xAI)**")
-        st.caption("Set `XAI_API_KEY` in `.env`")
-        st.divider()
-        st.caption("🔒 Data in `finance.db` · Notes in `notes/`")
-        if st.button("← Sign out", use_container_width=True):
-            st.session_state.data_loaded = False
-            st.session_state.user_id = None
-            st.session_state.display_name = ""
-            st.session_state.chat_history = []
-            st.session_state.auth_error = ""
-            st.session_state.auth_step = "email"
-            st.session_state.auth_pending_email = ""
-            st.session_state.auth_code_sent = False
-            st.session_state.auth_dev_code = ""
-            st.rerun()
-with _app_c:
-    st.markdown('<h1 class="main-header">💰 guddd</h1>', unsafe_allow_html=True)
 
-# ── Post-login: Ask Guddd input + dictate pill ────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# POST-LOGIN APP
+# ─────────────────────────────────────────────────────────────────────────────
+
+_active_uid = st.session_state.get("user_id") or USER_ID
+_display_name = st.session_state.get("display_name", "")
+
+# ── Global app CSS ────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  [data-testid="stBottom"],[data-testid="stBottom"]>div,
-  [data-testid="stChatInput"],.stChatFloatingInputContainer{
-    background:transparent!important;
+  /* ── Base ── */
+  [data-testid="stAppViewContainer"],[data-testid="stMain"],.stApp,
+  section[data-testid="stMain"]>div{background:#0a0a10!important}
+  #MainMenu,footer{visibility:hidden}
+  [data-testid="stHeader"]{display:none!important}
+  [data-testid="stSidebar"]{display:none!important}
+  [data-testid="stToolbar"]{display:none!important}
+  [data-testid="stDecoration"]{display:none!important}
+  .block-container{
+    padding-top:0.5rem!important; padding-bottom:6rem!important;
+    padding-left:1rem!important; padding-right:1rem!important;
+    max-width:700px!important;
   }
-  .app-dictate-pill{
-    position:fixed; bottom:2.4rem;
-    left:50%; transform:translateX(-50%);
-    display:flex; align-items:center; gap:0.45rem;
-    background:rgba(255,255,255,0.08);
-    border:1px solid rgba(255,255,255,0.14);
-    border-radius:50px; padding:0.38rem 1.1rem;
-    color:rgba(255,255,255,0.65); font-size:0.82rem;
-    white-space:nowrap; z-index:1000; cursor:default;
+
+  /* ── Tabs ── */
+  .stTabs [data-baseweb="tab-list"]{
+    background:#111118!important; border-radius:12px; padding:3px; gap:2px;
+    border:1px solid rgba(255,255,255,0.07);
   }
+  .stTabs [data-baseweb="tab"]{
+    border-radius:9px!important; padding:6px 14px!important;
+    font-size:0.83rem!important; font-weight:500!important;
+    color:rgba(255,255,255,0.5)!important; background:transparent!important;
+  }
+  .stTabs [aria-selected="true"]{
+    background:rgba(255,255,255,0.08)!important;
+    color:#fff!important;
+  }
+  .stTabs [data-baseweb="tab-highlight"]{display:none!important}
+  .stTabs [data-baseweb="tab-border"]{display:none!important}
+
+  /* ── Metrics ── */
+  [data-testid="stMetricValue"]{font-size:1.4rem!important;font-weight:700!important}
+
+  /* ── Buttons ── */
+  .stButton>button{
+    border-radius:10px!important;
+    border:1px solid rgba(255,255,255,0.12)!important;
+    background:rgba(255,255,255,0.05)!important;
+    color:#fff!important; font-weight:500!important;
+  }
+  .stButton>button[kind="primary"]{
+    background:linear-gradient(135deg,#00c9ff,#92fe9d)!important;
+    border:none!important; color:#000!important; font-weight:700!important;
+  }
+
+  /* ── Floating orryon chat input ── */
+  [data-testid="stBottom"]{
+    background:rgba(10,10,16,0.92)!important;
+    backdrop-filter:blur(12px)!important;
+    border-top:1px solid rgba(255,255,255,0.07)!important;
+    padding:0.5rem 1rem 0.6rem!important;
+  }
+  [data-testid="stChatInputContainer"]{
+    background:#1c1c1e!important;
+    border:1px solid rgba(255,255,255,0.12)!important;
+    border-radius:28px!important; padding:0.1rem 0.5rem!important;
+  }
+  [data-testid="stChatInputContainer"] textarea{
+    color:#fff!important; background:transparent!important;
+    font-size:0.95rem!important;
+  }
+  [data-testid="stChatInputContainer"] textarea::placeholder{
+    color:rgba(255,255,255,0.35)!important;
+  }
+  [data-testid="stChatInputSubmitButton"]>button{
+    background:linear-gradient(135deg,#00c9ff,#92fe9d)!important;
+    border-radius:50%!important;color:#000!important;
+    width:2.1rem!important;height:2.1rem!important;padding:0!important;
+  }
+
+  /* ── orryon response banner ── */
+  .orryon-response{
+    background:linear-gradient(135deg,rgba(0,201,255,0.08),rgba(146,254,157,0.06));
+    border:1px solid rgba(0,201,255,0.2); border-radius:14px;
+    padding:0.9rem 1.1rem; margin:0 0 0.75rem;
+    font-size:0.88rem; line-height:1.55; color:#e2e8f0;
+  }
+  .orryon-badge{
+    display:inline-flex; align-items:center; gap:0.3rem;
+    background:rgba(0,201,255,0.12); border-radius:20px;
+    padding:2px 10px; font-size:0.72rem; color:#00c9ff;
+    font-weight:600; margin-bottom:0.45rem;
+  }
+
+  /* ── Chat history ── */
+  .chat-bubble-user{
+    background:#1e3a5f; border-radius:16px 16px 4px 16px;
+    padding:0.65rem 0.9rem; margin:0.3rem 0;
+    border-left:3px solid #00c9ff; font-size:0.87rem;
+  }
+  .chat-bubble-ai{
+    background:#131a1a; border-radius:16px 16px 16px 4px;
+    padding:0.65rem 0.9rem; margin:0.3rem 0;
+    border-left:3px solid #92fe9d; font-size:0.87rem;
+  }
+
+  /* ── Inputs ── */
+  .stTextInput input,.stTextArea textarea,.stNumberInput input,.stSelectbox select{
+    background:#131320!important; border:1px solid rgba(255,255,255,0.12)!important;
+    border-radius:8px!important; color:#fff!important;
+  }
+  .stDateInput input{background:#131320!important;color:#fff!important}
+
+  /* ── Expander ── */
+  .streamlit-expanderHeader{font-size:0.86rem!important}
+
+  /* ── Dataframe ── */
+  .stDataFrame{font-size:0.82rem!important}
 </style>
 """, unsafe_allow_html=True)
-_app_query = st.chat_input("Ask Edward or Alex…")
-if _app_query:
-    st.session_state.chat_history.append({"role": "user", "content": _app_query})
-    st.rerun()
-st.markdown('<div class="app-dictate-pill">🎙 New &nbsp;·&nbsp; Hold to dictate</div>',
-            unsafe_allow_html=True)
-
-(
-    tab_chat, tab_dash, tab_budget,
-    tab_forecast, tab_schedule, tab_notes,
-    tab_links, tab_inspo, tab_reports,
-) = st.tabs([
-    "💬 Chat", "📊 Dashboard", "💳 Budget",
-    "📈 Forecast", "📅 Schedule", "📝 Notes",
-    "🔗 Links", "✨ Inspo", "📋 Reports",
-])
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: CHAT
-# ═════════════════════════════════════════════════════════════════════════════
+# ── Top bar ───────────────────────────────────────────────────────────────────
+_avatar_path = "assets/tribble.png"
+if os.path.exists(_avatar_path):
+    with open(_avatar_path, "rb") as _f:
+        _raw = _f.read()
+    _b64 = base64.b64encode(_raw).decode()
+    _mime = "jpeg" if _raw[:3] == b"\xff\xd8\xff" else "png"
+    _avatar_html = f'<img src="data:image/{_mime};base64,{_b64}" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/>'
+else:
+    _avatar_html = "💰"
 
-with tab_chat:
-    st.subheader("Ask Edward or Alex")
-
-    QUICK = [
-        "Edward, brief me on today",
-        "Alex, what's my net worth?",
-        "Alex, show spending this month",
-        "Edward, plan a trip to NYC next week",
-        "Alex, run my retirement projection",
-        "Edward, add task: review insurance renewal",
-        "Edward, draft a follow-up email to my landlord",
-        "Alex, any unusual transactions?",
-        "Edward, research best budgeting apps 2026",
-        "Alex, detect my subscriptions",
-        "Edward, schedule rent of $1800 due the 1st",
-        "Alex, how can I improve my savings rate?",
-    ]
-    qcols = st.columns(3)
-    triggered = None
-    for idx, q in enumerate(QUICK):
-        label = q
-        if qcols[idx % 3].button(label, use_container_width=True, key=f"q{idx}"):
-            triggered = q
-
-    st.divider()
-
-    chat_box = st.container(height=430)
-    with chat_box:
-        if not st.session_state.chat_history:
-            st.markdown(
-                "<div style='text-align:center;color:#666;padding:2rem'>"
-                "<h3>👋 Hi, I'm Edward — your Chief of Staff</h3>"
-                "<p>I handle your schedule, travel, research, communications, and more.<br>"
-                "For anything financial, I'll bring in <strong>Alex</strong>.</p>"
-                "<p><em>Try: &quot;Edward, brief me on today&quot; or &quot;Alex, what's my net worth?&quot;</em></p>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-        for msg in st.session_state.chat_history:
-            if msg["role"] == "user":
-                st.markdown(
-                    f'<div class="chat-user">👤 <strong>You:</strong> {msg["content"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                badge = f'<span class="badge">🤖 {msg.get("agent", "AI")}</span>'
-                status = msg.get("status", "")
-                confidence = msg.get("confidence", 0)
-                summary = msg.get("summary", "")
-                evidence = msg.get("evidence", "")
-                next_q = msg.get("next_steps_or_question", "")
-
-                # Status badge colours
-                _status_colours = {
-                    "complete": "#22c55e",
-                    "partial": "#f59e0b",
-                    "needs_input": "#3b82f6",
-                    "stuck": "#ef4444",
-                }
-                _status_icons = {
-                    "complete": "✅",
-                    "partial": "⏳",
-                    "needs_input": "❓",
-                    "stuck": "🚫",
-                }
-                status_colour = _status_colours.get(status, "#888")
-                status_icon = _status_icons.get(status, "🤖")
-
-                st.markdown(
-                    f'<div class="chat-ai">{badge}<br>{msg["content"]}</div>',
-                    unsafe_allow_html=True,
-                )
-
-                # Render structured metadata below the message bubble
-                if status or confidence:
-                    meta_cols = st.columns([2, 2, 3])
-                    if status:
-                        meta_cols[0].markdown(
-                            f'<span style="color:{status_colour};font-size:0.8rem;'
-                            f'font-weight:600">{status_icon} {status.upper()}</span>',
-                            unsafe_allow_html=True,
-                        )
-                    if confidence:
-                        bar_pct = max(0, min(100, confidence))
-                        meta_cols[1].markdown(
-                            f'<span style="font-size:0.8rem;color:#aaa">Confidence: '
-                            f'<strong style="color:#fff">{bar_pct}%</strong></span>',
-                            unsafe_allow_html=True,
-                        )
-                        meta_cols[2].progress(bar_pct / 100)
-
-                if summary:
-                    st.caption(f"**Summary:** {summary}")
-                if evidence:
-                    with st.expander("Evidence", expanded=False):
-                        st.markdown(evidence)
-                if next_q:
-                    st.info(f"**Follow-up:** {next_q}")
-
-    with st.form("chat_form", clear_on_submit=True):
-        user_input = st.text_area(
-            "Your question",
-            placeholder=(
-                "e.g. 'Edward, brief me on today'  |  "
-                "'Alex, what's my net worth?'  |  "
-                "'Edward, plan a trip to Miami next month'  |  "
-                "'Alex, run my retirement projection'"
-            ),
-            height=80,
-            label_visibility="collapsed",
-        )
-        s_col, c_col = st.columns([5, 1])
-        submitted = s_col.form_submit_button("Send 🚀", use_container_width=True, type="primary")
-        cleared = c_col.form_submit_button("Clear", use_container_width=True)
-
-    if cleared:
-        st.session_state.chat_history = []
-        st.rerun()
-
-    to_process = triggered or (user_input.strip() if submitted and user_input.strip() else None)
-
-    if to_process:
-        _active_uid = st.session_state.get("user_id") or USER_ID
-        _user_msg = {"role": "user", "content": to_process}
-        st.session_state.chat_history.append(_user_msg)
-        save_chat_message(_active_uid, _user_msg)
-
-        with st.spinner("Edward & Alex on it…"):
-            if not st.session_state.data_loaded:
-                load_sample_data.invoke("")
-                st.session_state.data_loaded = True
-            parsed = run_agent_query(to_process, user_id=_active_uid)
-
-        _ai_msg = {
-            "role": "assistant",
-            "content": parsed["text"],
-            "agent": _guess_agent_label(to_process),
-            "status": parsed.get("status", "complete"),
-            "summary": parsed.get("summary", ""),
-            "confidence": parsed.get("confidence", 0),
-            "evidence": parsed.get("evidence", ""),
-            "next_steps_or_question": parsed.get("next_steps_or_question", ""),
-        }
-        st.session_state.chat_history.append(_ai_msg)
-        save_chat_message(_active_uid, _ai_msg)
-        st.rerun()
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: DASHBOARD
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_dash:
-    st.subheader("Financial Dashboard")
-
-    if not st.session_state.data_loaded:
-        st.warning("Load data from the sidebar to populate the dashboard.")
-    else:
-        nw = _nw()
-        spend = _spending(30)
-
-        # ── Top metric row ──────────────────────────────────────────────────
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Net Worth", f"${nw.get('net_worth', 0):,.0f}")
-        m2.metric("Assets", f"${nw.get('total_assets', 0):,.0f}")
-        m3.metric("Liabilities", f"${nw.get('total_liabilities', 0):,.0f}")
-        m4.metric("30-Day Spending", f"${spend.get('total', 0):,.0f}")
-        goals_db = fetch_rows("goals", {"user_id": USER_ID})
-        m5.metric("Active Goals", str(len([g for g in goals_db if not g.get("is_completed")])))
-
+col_logo, col_title, col_menu = st.columns([1, 5, 1])
+with col_logo:
+    st.markdown(_avatar_html, unsafe_allow_html=True)
+with col_title:
+    st.markdown(
+        '<h2 style="margin:0;font-size:1.25rem;font-weight:800;'
+        'background:linear-gradient(135deg,#00c9ff,#92fe9d);'
+        '-webkit-background-clip:text;-webkit-text-fill-color:transparent;">orryon</h2>',
+        unsafe_allow_html=True,
+    )
+with col_menu:
+    with st.popover("☰"):
+        st.markdown(f"👤 **{_display_name or 'You'}**")
+        st.caption("orryon · Local-first · Private")
         st.divider()
-        left, right = st.columns([3, 2])
-
-        with left:
-            # Net worth donut
-            st.subheader("Net Worth Breakdown")
-            bd = nw.get("breakdown", {})
-            labels = ["Liquid Cash", "Investments", "Real Estate"]
-            vals = [bd.get("liquid", 0), bd.get("investments", 0), bd.get("real_estate", 0)]
-            lv = [(l, v) for l, v in zip(labels, vals) if v > 0]
-            if lv:
-                fig_d = go.Figure(go.Pie(
-                    labels=[x[0] for x in lv],
-                    values=[x[1] for x in lv],
-                    hole=0.55,
-                    marker_colors=["#00c9ff", "#92fe9d", "#ffd700"],
-                    textinfo="label+percent",
-                    hovertemplate="<b>%{label}</b><br>$%{value:,.0f}<extra></extra>",
-                ))
-                fig_d.update_layout(
-                    height=300, showlegend=True,
-                    paper_bgcolor="rgba(0,0,0,0)", font_color="white",
-                    annotations=[dict(
-                        text=f"${nw.get('net_worth', 0):,.0f}",
-                        x=0.5, y=0.5, font_size=13, showarrow=False,
-                        font=dict(color="white", weight=700),
-                    )],
-                )
-                st.plotly_chart(fig_d, use_container_width=True)
-
-            # Spending bar
-            st.subheader("Spending This Month")
-            spending_items = spend.get("spending", [])
-            if spending_items:
-                df_sp = pd.DataFrame(spending_items).head(8)
-                fig_b = go.Figure(go.Bar(
-                    x=df_sp["category"], y=df_sp["total"],
-                    marker_color=px.colors.qualitative.Set3[:len(df_sp)],
-                    hovertemplate="<b>%{x}</b><br>$%{y:,.0f}<extra></extra>",
-                ))
-                fig_b.update_layout(
-                    height=260, showlegend=False,
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="white",
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.07)"),
-                    yaxis=dict(gridcolor="rgba(255,255,255,0.07)"),
-                )
-                st.plotly_chart(fig_b, use_container_width=True)
-            else:
-                st.info("No spending data found for this period.")
-
-        with right:
-            # Savings goals
-            st.subheader("Savings Goals")
-            if goals_db:
-                for g in goals_db[:5]:
-                    pct = min(
-                        (g["current_amount"] / g["target_amount"] * 100)
-                        if g["target_amount"] else 0,
-                        100,
-                    )
-                    color = "#92fe9d" if pct >= 75 else "#ffd700" if pct >= 40 else "#ff6b6b"
-                    st.markdown(
-                        f"<div style='margin-bottom:0.8rem'>"
-                        f"<div style='display:flex;justify-content:space-between'>"
-                        f"<b>{g['name']}</b>"
-                        f"<span style='color:{color}'>{pct:.0f}%</span></div>"
-                        f"<div class='goal-bar-wrap'>"
-                        f"<div style='background:{color};width:{pct}%;height:100%;border-radius:4px'></div>"
-                        f"</div>"
-                        f"<small>${g['current_amount']:,.0f} / ${g['target_amount']:,.0f}</small>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.info("No goals yet. Ask the AI to create savings goals.")
-
-            # AI recommendations
-            st.subheader("AI Insights")
-            recs = _recommendations()
-            for rec in recs[:4]:
-                emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
-                    rec.get("priority", "low"), "🔵"
-                )
-                st.markdown(
-                    f'<div class="insight-card">{emoji} <b>{rec.get("type","Insight").replace("_"," ").title()}</b>'
-                    f'<br><small>{rec.get("message","")}</small></div>',
-                    unsafe_allow_html=True,
-                )
-
-            # Upcoming events
-            st.subheader("Upcoming Bills")
-            events = _upcoming_events(30)
-            if events:
-                for e in events[:5]:
-                    amt = f" — ${e['amount']:,.0f}" if e.get("amount") else ""
-                    st.markdown(f"📅 **{e['event_date']}** {e['title']}{amt}")
-            else:
-                st.caption("No events. Add bill reminders in the Schedule tab.")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: BUDGET
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_budget:
-    st.subheader("Budget & Spending Analysis")
-
-    if not st.session_state.data_loaded:
-        st.warning("Load data from the sidebar first.")
-    else:
-        period = st.select_slider("Analysis period", [7, 14, 30, 60, 90], value=30)
-        spend = _spending(period)
-        items = spend.get("spending", [])
-        total = spend.get("total", 0)
-
-        if items:
-            b1, b2 = st.columns(2)
-            with b1:
-                st.metric(f"Total Spending ({period}d)", f"${total:,.0f}")
-                df_sp = pd.DataFrame(items)
-                fig_tree = px.treemap(
-                    df_sp, path=["category"], values="total",
-                    color="total", color_continuous_scale="RdYlGn_r",
-                    title="Spending Treemap",
-                )
-                fig_tree.update_layout(
-                    height=340, paper_bgcolor="rgba(0,0,0,0)", font_color="white",
-                )
-                st.plotly_chart(fig_tree, use_container_width=True)
-
-            with b2:
-                st.dataframe(
-                    df_sp[["category", "total", "percentage"]].rename(
-                        columns={"category": "Category", "total": "Amount ($)", "percentage": "%"}
-                    ).style.format({"Amount ($)": "${:,.2f}", "%": "{:.1f}%"}),
-                    use_container_width=True, height=280,
-                )
-
-            # Spending trend (month-over-month)
-            st.divider()
-            st.subheader("Month-over-Month Trends")
-            trend_data = json.loads(analyze_spending_trends.invoke(json.dumps({"user_id": USER_ID})))
-            insights = trend_data.get("insights", [])
-            if insights:
-                for ins in insights[:5]:
-                    arrow = "📈" if ins["change_pct"] > 0 else "📉"
-                    st.markdown(f"{arrow} {ins['insight']}")
-            else:
-                st.info("Not enough historical data for trend analysis yet.")
+        if not XAI_API_KEY:
+            st.warning("⚠️ XAI_API_KEY not set — orryon AI disabled")
+            st.caption("Add your key at [console.x.ai](https://console.x.ai)")
         else:
-            st.info("No spending data for this period. Load more sample data or connect Plaid.")
-
-        # Subscription detection
+            st.success("✅ Grok AI connected")
         st.divider()
-        st.subheader("Subscription Audit")
-        if st.button("🔍 Detect Subscriptions", type="primary"):
-            with st.spinner("Analysing transactions…"):
-                sub_res = json.loads(detect_subscriptions.invoke(""))
-                subs = sub_res.get("subscriptions", [])
-                monthly_total = sub_res.get("monthly_total", 0)
-                if subs:
-                    st.metric(
-                        "Monthly Subscription Spend",
-                        f"${monthly_total:,.2f}",
-                        delta=f"${monthly_total * 12:,.0f}/year",
-                    )
-                    st.dataframe(
-                        pd.DataFrame(subs)[["name", "amount", "frequency", "occurrences"]]
-                        .style.format({"amount": "${:.2f}"}),
-                        use_container_width=True,
-                    )
-                else:
-                    st.info("No recurring subscriptions detected in current data.")
-
-        # Transaction table
+        st.caption("🔒 All data in `finance.db`")
+        st.caption(f"Model: `{os.getenv('GROK_MODEL', 'grok-3-mini')}`")
         st.divider()
-        st.subheader("Recent Transactions")
-        txns = fetch_rows("transactions", {"user_id": USER_ID}, limit=60)
-        if txns:
-            df_t = pd.DataFrame(txns)[["date", "description", "category", "amount", "merchant"]]
-            df_t["amount"] = df_t["amount"].map("${:,.2f}".format)
-            st.dataframe(df_t, use_container_width=True, height=280)
-        else:
-            st.info("No transactions in the database.")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: FORECAST
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_forecast:
-    st.subheader("Financial Forecasting & Planning")
-
-    f1, f2, f3 = st.tabs(["💵 Cash Flow", "🎲 Retirement (Monte Carlo)", "⚡ Scenario Simulator"])
-
-    # ── Cash Flow ────────────────────────────────────────────────────────────
-    with f1:
-        st.subheader("Cash Flow Forecast")
-        c1, c2 = st.columns(2)
-        with c1:
-            cf_income = st.number_input("Monthly Income ($)", value=7500, step=100, key="cf_inc")
-            cf_expenses = st.number_input("Monthly Expenses ($)", value=4200, step=100, key="cf_exp")
-        with c2:
-            cf_months = st.slider("Months to forecast", 3, 24, 6, key="cf_mo")
-            cf_balance = st.number_input("Current Balance ($)", value=4250, step=100, key="cf_bal")
-        cf_savings_rate = st.slider("Extra savings rate (%)", 0, 50, 10, key="cf_sr") / 100
-
-        if st.button("📈 Generate Forecast", type="primary", key="btn_cf"):
-            cf_res = json.loads(forecast_cash_flow.invoke(json.dumps({
-                "months": cf_months, "monthly_income": cf_income,
-                "monthly_expenses": cf_expenses, "current_balance": cf_balance,
-                "savings_rate": cf_savings_rate,
-            })))
-            proj = cf_res.get("projections", [])
-            if proj:
-                df_cf = pd.DataFrame(proj)
-                fig_cf = go.Figure()
-                fig_cf.add_trace(go.Scatter(
-                    x=df_cf["month"], y=df_cf["projected_balance"],
-                    mode="lines+markers", name="Balance",
-                    line=dict(color="#92fe9d", width=2),
-                    fill="tozeroy", fillcolor="rgba(146,254,157,0.08)",
-                ))
-                fig_cf.add_trace(go.Bar(
-                    x=df_cf["month"], y=df_cf["net"],
-                    name="Monthly Net", marker_color="#00c9ff", opacity=0.55,
-                ))
-                fig_cf.update_layout(
-                    title="Projected Cash Flow", height=380,
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="white",
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.07)"),
-                    yaxis=dict(gridcolor="rgba(255,255,255,0.07)"),
-                )
-                st.plotly_chart(fig_cf, use_container_width=True)
-                r1, r2 = st.columns(2)
-                r1.metric("Monthly Surplus", f"${cf_res.get('monthly_surplus', 0):,.0f}")
-                r2.metric("Annual Projection", f"${cf_res.get('annual_projection', 0):,.0f}")
-
-    # ── Monte Carlo ──────────────────────────────────────────────────────────
-    with f2:
-        st.subheader("Retirement Monte Carlo Simulation")
-        mc1, mc2 = st.columns(2)
-        with mc1:
-            mc_cur_age = st.number_input("Current Age", 18, 70, 30, key="mc_age")
-            mc_ret_age = st.number_input("Retirement Age", 40, 80, 65, key="mc_ret")
-            mc_savings = st.number_input("Current Savings ($)", value=332_430, step=1000, key="mc_sav")
-        with mc2:
-            mc_contrib = st.number_input("Monthly Contribution ($)", value=2000, step=100, key="mc_c")
-            mc_return = st.slider("Expected Annual Return (%)", 3.0, 12.0, 7.0, 0.5, key="mc_r") / 100
-            mc_target = st.number_input("Target Nest Egg ($)", value=2_000_000, step=50_000, key="mc_t")
-        mc_sims = st.select_slider("Simulations", [100, 500, 1000, 2000], value=1000, key="mc_s")
-
-        if st.button("🎲 Run Monte Carlo", type="primary", key="btn_mc"):
-            with st.spinner(f"Running {mc_sims:,} scenarios…"):
-                mc_res = json.loads(run_monte_carlo_retirement.invoke(json.dumps({
-                    "current_age": mc_cur_age, "retirement_age": mc_ret_age,
-                    "current_savings": mc_savings, "monthly_contribution": mc_contrib,
-                    "annual_return_mean": mc_return, "annual_return_std": 0.15,
-                    "target_nest_egg": mc_target, "simulations": mc_sims,
-                })))
-
-            if "error" in mc_res:
-                st.error(mc_res["error"])
-            else:
-                prob = mc_res["probability_of_success"]
-                r1, r2, r3, r4 = st.columns(4)
-                r1.metric("Success Prob.", f"{prob:.1f}%",
-                          delta="✓ Strong" if prob >= 80 else "Needs attention")
-                r2.metric("Median Outcome", f"${mc_res['median_outcome']:,.0f}")
-                r3.metric("Best Case (P90)", f"${mc_res['p90_outcome']:,.0f}")
-                r4.metric("Worst Case (P10)", f"${mc_res['p10_outcome']:,.0f}")
-
-                # Distribution visualisation
-                rng = np.random.default_rng(42)
-                sim_vals = rng.lognormal(
-                    np.log(max(mc_res["median_outcome"], 1)), 0.55, mc_sims
-                )
-                fig_mc = go.Figure(go.Histogram(
-                    x=sim_vals / 1_000_000, nbinsx=50,
-                    name="Outcomes", marker_color="#00c9ff", opacity=0.7,
-                ))
-                fig_mc.add_vline(
-                    x=mc_target / 1_000_000, line_dash="dash", line_color="#ff6b6b",
-                    annotation_text=f"Target ${mc_target/1e6:.1f}M",
-                    annotation_font_color="white",
-                )
-                fig_mc.update_layout(
-                    title="Retirement Portfolio Distribution at Retirement",
-                    xaxis_title="Portfolio Value at Retirement ($M)",
-                    yaxis_title="Scenarios",
-                    height=340, paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)", font_color="white",
-                )
-                st.plotly_chart(fig_mc, use_container_width=True)
-
-                if prob < 75:
-                    adj = mc_contrib * (0.9 / max(prob / 100, 0.01))
-                    st.warning(
-                        f"To reach 90% success, consider increasing monthly "
-                        f"contributions to ~${adj:,.0f}."
-                    )
-
-    # ── Scenario Simulator ───────────────────────────────────────────────────
-    with f3:
-        st.subheader("Financial Scenario Simulator")
-        SCENARIO_LABELS = {
-            "job_loss":      "🚨 Job Loss",
-            "pay_cut_20pct": "📉 20% Pay Cut",
-            "raise_15pct":   "📈 15% Raise",
-            "large_expense": "💸 Large Unexpected Expense ($2k/mo)",
-            "recession":     "🌩️ Economic Recession (−30% income)",
-        }
-        sc_scenario = st.selectbox(
-            "Scenario", list(SCENARIO_LABELS.keys()),
-            format_func=lambda k: SCENARIO_LABELS[k], key="sc_sel",
-        )
-        s1, s2 = st.columns(2)
-        with s1:
-            sc_inc = st.number_input("Monthly Income", value=7500, step=100, key="sc_i")
-            sc_exp = st.number_input("Monthly Expenses", value=4200, step=100, key="sc_e")
-        with s2:
-            sc_sav = st.number_input("Current Savings ($)", value=22750, step=500, key="sc_s")
-            sc_dur = st.slider("Duration (months)", 1, 24, 6, key="sc_d")
-
-        if st.button("⚡ Simulate", type="primary", key="btn_sc"):
-            sc_res = json.loads(simulate_scenario.invoke(json.dumps({
-                "scenario": sc_scenario, "duration_months": sc_dur,
-                "current_monthly_income": sc_inc,
-                "current_monthly_expenses": sc_exp,
-                "current_savings": sc_sav,
-            })))
-            st.markdown(f"**{sc_res.get('description', sc_scenario)}**")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Start Balance", f"${sc_res.get('starting_savings', 0):,.0f}")
-            delta_bal = sc_res.get("ending_savings", 0) - sc_res.get("starting_savings", 0)
-            c2.metric("End Balance", f"${sc_res.get('ending_savings', 0):,.0f}",
-                      delta=f"${delta_bal:,.0f}")
-            runway = sc_res.get("runway_months")
-            c3.metric("Runway", f"{runway:.1f} mo" if runway else "N/A")
-
-            timeline = sc_res.get("timeline", [])
-            if timeline:
-                df_sc = pd.DataFrame(timeline)
-                pos = sc_scenario == "raise_15pct"
-                color = "#92fe9d" if pos else "#ff6b6b"
-                fill_color = "rgba(146,254,157,0.08)" if pos else "rgba(255,107,107,0.08)"
-                fig_sc = go.Figure(go.Scatter(
-                    x=df_sc["month"], y=df_sc["balance"],
-                    mode="lines+markers", line=dict(color=color, width=2),
-                    fill="tozeroy", fillcolor=fill_color,
-                ))
-                fig_sc.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.4)
-                fig_sc.update_layout(
-                    title=f"Balance Over {sc_dur} Months", height=290,
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="white",
-                )
-                st.plotly_chart(fig_sc, use_container_width=True)
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: SCHEDULE
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_schedule:
-    st.subheader("Financial Calendar & Bill Reminders")
-
-    sc_left, sc_right = st.columns([2, 1])
-
-    with sc_left:
-        st.subheader("Upcoming Events")
-        days_ahead = st.slider("Show events in next N days", 7, 90, 30, key="sched_days")
-        events = _upcoming_events(days_ahead)
-        if events:
-            for ev in events:
-                type_emoji = {"bill_due": "💳", "review": "📊",
-                              "reminder": "🔔", "goal_deadline": "🎯"}.get(
-                    ev.get("event_type", ""), "📅"
-                )
-                amt = f" — **${ev.get('amount', 0):,.0f}**" if ev.get("amount") else ""
-                rec = " 🔄" if ev.get("is_recurring") else ""
-                with st.expander(f"{type_emoji} {ev['event_date']} — {ev['title']}{amt}{rec}"):
-                    st.write(ev.get("description") or "No description.")
-                    if ev.get("is_synced_to_google"):
-                        st.success("✓ Synced to Google Calendar")
-        else:
-            st.info("No upcoming events. Add bill reminders on the right.")
-        st.divider()
-        st.caption("Or ask the Chat: *'Schedule my rent of $1800 due on the 1st every month'*")
-
-    with sc_right:
-        st.subheader("Add Bill Reminder")
-        with st.form("bill_form"):
-            b_name = st.text_input("Bill Name", placeholder="Rent, Netflix…")
-            b_amt = st.number_input("Amount ($)", min_value=0.0, step=1.0, key="b_amt")
-            b_day = st.number_input("Due Day of Month", 1, 28, 1, key="b_day")
-            b_rec = st.checkbox("Recurring Monthly", value=True)
-            if st.form_submit_button("Add Reminder 🔔", type="primary"):
-                res = json.loads(add_bill_reminder.invoke(json.dumps({
-                    "bill_name": b_name, "amount": b_amt,
-                    "due_day": b_day, "is_recurring": b_rec,
-                })))
-                if res.get("status") == "created":
-                    st.success(f"Reminder added for **{b_name}**!")
-                    st.rerun()
-                else:
-                    st.error(res.get("error", "Unknown error"))
-
-        st.divider()
-        st.subheader("Quick Event")
-        with st.form("event_form"):
-            ev_title = st.text_input("Title", key="ev_t")
-            ev_date = st.date_input("Date", key="ev_d")
-            ev_type = st.selectbox("Type", ["reminder", "review", "goal_deadline", "bill_due"], key="ev_type")
-            ev_desc = st.text_area("Notes", height=70, key="ev_desc")
-            if st.form_submit_button("Create Event 📅", type="primary"):
-                res = json.loads(create_calendar_event.invoke(json.dumps({
-                    "title": ev_title,
-                    "date": ev_date.strftime("%Y-%m-%d"),
-                    "event_type": ev_type,
-                    "description": ev_desc,
-                })))
-                if res.get("status") == "created":
-                    st.success("Event created!")
-                    st.rerun()
-                else:
-                    st.error(res.get("error", "Unknown error"))
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: NOTES
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_notes:
-    st.subheader("📝 Notes & Journal")
-    st.caption("Your personal notes — type them or say *\"Edward, put this in notes\"*.")
-
-    n_left, n_right = st.columns([2, 1])
-
-    with n_left:
-        search_q = st.text_input("🔍 Search notes", placeholder="savings, goal, investment…")
-        if search_q:
-            res = json.loads(search_notes.invoke(search_q))
-            notes_show = res.get("notes", [])
-            st.caption(f"Found {res.get('count', 0)} note(s)")
-        else:
-            notes_show = fetch_rows("notes", {"user_id": USER_ID}, limit=20)
-
-        if notes_show:
-            for note in notes_show:
-                with st.expander(f"📝 {note['title']} — {(note.get('created_at') or '')[:10]}"):
-                    st.markdown(note.get("content") or "")
-                    tags = note.get("tags", "")
-                    if tags:
-                        for tag in tags.split(","):
-                            st.markdown(f"`{tag.strip()}`")
-                    if note.get("linked_goal"):
-                        st.caption(f"Linked goal: `{note['linked_goal']}`")
-        else:
-            st.info("No notes yet. Start journaling below or ask the Chat.")
-
-    with n_right:
-        st.subheader("New Note")
-        with st.form("note_form"):
-            n_title = st.text_input("Title", placeholder="Budget review — March 2026")
-            n_content = st.text_area("Content", height=140,
-                                     placeholder="Write thoughts, decisions, or reflections…")
-            n_tags = st.text_input("Tags (comma-separated)", placeholder="savings, goal, review")
-            goals_list = fetch_rows("goals", {"user_id": USER_ID})
-            goal_opts = ["None"] + [g["name"] for g in goals_list]
-            linked_goal_name = st.selectbox("Link to Goal", goal_opts)
-            linked_goal_id = next(
-                (g["id"] for g in goals_list if g["name"] == linked_goal_name), ""
-            )
-            if st.form_submit_button("Save Note 💾", type="primary"):
-                res = json.loads(save_note.invoke(json.dumps({
-                    "title": n_title, "content": n_content,
-                    "tags": n_tags, "linked_goal": linked_goal_id,
-                })))
-                if res.get("status") == "saved":
-                    st.success(f"Saved! ID: `{res.get('note_id', '')}`")
-                    st.rerun()
-                else:
-                    st.error(res.get("error", "Unknown error"))
-
-        st.divider()
-        if st.button("📋 Summarise Recent Notes (AI)", use_container_width=True):
-            with st.spinner("Summarising…"):
-                sum_res = json.loads(summarize_notes.invoke(json.dumps({"days": 30})))
-                summaries = sum_res.get("summaries", [])
-                if summaries:
-                    st.write(f"**{sum_res.get('total_notes', 0)} notes — last 30 days:**")
-                    for s in summaries:
-                        st.markdown(f"- **{s['title']}** ({s['date']}): {s['preview']}")
-                else:
-                    st.info("No notes in the last 30 days.")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: LINKS
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_links:
-    st.subheader("🔗 My Links")
-    st.caption("Save, copy, and share your links — ask Edward to add or pull them up anytime.")
-
-    _active_uid_lk = st.session_state.get("user_id") or USER_ID
-    _lp = get_or_create_link_page(_active_uid_lk)
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # SHARE MY PAGE SECTION
-    # ─────────────────────────────────────────────────────────────────────────
-    _share_url = f"{APP_URL}?links={_lp['share_token']}"
-
-    with st.expander("🌐 Share My Links Page", expanded=True):
-        _is_public = bool(_lp.get("is_public", 0))
-
-        # Enable / disable toggle
-        _toggle = st.toggle("Make my links page public", value=_is_public, key="lp_public_toggle")
-        if _toggle != _is_public:
-            update_row(
-                "link_pages",
-                {"is_public": int(_toggle), "updated_at": datetime.now().isoformat()},
-                {"user_id": _active_uid_lk},
-            )
-            _lp["is_public"] = int(_toggle)
-            _is_public = _toggle
+        if st.button("← Sign out", use_container_width=True):
+            for key in ["data_loaded", "user_id", "display_name", "chat_history",
+                        "orryon_last_message", "orryon_actions"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state.screen = "home"
             st.rerun()
 
-        if _is_public:
-            # Page customisation
-            _pg_title_cur = _lp.get("page_title") or ""
-            _pg_bio_cur   = _lp.get("bio") or ""
-            _pg_theme_cur = _lp.get("theme") or "dark"
 
-            _pc1, _pc2 = st.columns(2)
-            _pg_title = _pc1.text_input("Page title", value=_pg_title_cur,
-                                        placeholder="Jane's Links", key="lp_title")
-            _pg_theme = _pc2.selectbox("Theme", ["dark", "light", "gradient"],
-                                       index=["dark","light","gradient"].index(_pg_theme_cur),
-                                       key="lp_theme")
-            _pg_bio = st.text_input("Bio / tagline", value=_pg_bio_cur,
-                                    placeholder="Designer · Developer · Creator", key="lp_bio")
-
-            if st.button("Save page settings", key="btn_lp_save"):
-                update_row(
-                    "link_pages",
-                    {"page_title": _pg_title, "bio": _pg_bio,
-                     "theme": _pg_theme, "updated_at": datetime.now().isoformat()},
-                    {"user_id": _active_uid_lk},
-                )
-                st.success("Saved!")
-                st.rerun()
-
-            st.divider()
-
-            # Shareable URL + copy
-            st.markdown("**Your shareable link:**")
-            st.code(_share_url, language=None)
-
-            # Social share buttons
-            _enc_url   = _share_url.replace("&", "%26").replace("?", "%3F").replace(":", "%3A").replace("/", "%2F")
-            _enc_title = (_pg_title or "My Links").replace(" ", "%20")
-
-            st.markdown(
-                f"""
-<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem">
-  <a href="https://twitter.com/intent/tweet?text={_enc_title}&url={_enc_url}"
-     target="_blank"
-     style="background:#000;color:#fff;border:1px solid #333;
-            border-radius:50px;padding:0.45rem 1rem;font-size:0.85rem;
-            font-weight:600;text-decoration:none;display:inline-flex;
-            align-items:center;gap:0.4rem">
-    𝕏 &nbsp;Share on X
-  </a>
-  <a href="https://wa.me/?text={_enc_title}%20{_enc_url}"
-     target="_blank"
-     style="background:#25D366;color:#fff;border-radius:50px;
-            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
-            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
-    WhatsApp
-  </a>
-  <a href="https://www.linkedin.com/sharing/share-offsite/?url={_enc_url}"
-     target="_blank"
-     style="background:#0077B5;color:#fff;border-radius:50px;
-            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
-            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
-    LinkedIn
-  </a>
-  <a href="https://www.facebook.com/sharer/sharer.php?u={_enc_url}"
-     target="_blank"
-     style="background:#1877F2;color:#fff;border-radius:50px;
-            padding:0.45rem 1rem;font-size:0.85rem;font-weight:600;
-            text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem">
-    Facebook
-  </a>
-  <a href="mailto:?subject={_enc_title}&body={_enc_url}"
-     style="background:#1f2937;color:#fff;border:1px solid #374151;
-            border-radius:50px;padding:0.45rem 1rem;font-size:0.85rem;
-            font-weight:600;text-decoration:none;display:inline-flex;
-            align-items:center;gap:0.4rem">
-    ✉️ &nbsp;Email
-  </a>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
-
-            st.markdown(
-                f"<p style='font-size:0.75rem;color:#6b7280;margin-top:0.6rem'>"
-                f"👁 Preview your public page: <a href='{_share_url}' target='_blank' "
-                f"style='color:#60a5fa'>{_share_url}</a></p>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption("Enable the toggle above to generate your shareable links page.")
-
-    st.divider()
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # ADD LINK FORM
-    # ─────────────────────────────────────────────────────────────────────────
-    with st.expander("➕ Add a new link", expanded=False):
-        with st.form("link_add_form", clear_on_submit=True):
-            lk_url   = st.text_input("URL *", placeholder="https://yoursite.com")
-            lk_title = st.text_input("Title", placeholder="My Portfolio")
-            lk_desc  = st.text_input("Description (optional)", placeholder="What is this link?")
-            lk_tags  = st.text_input("Tags (comma-separated)", placeholder="work, social, portfolio")
-            if st.form_submit_button("Save Link 🔗", type="primary"):
-                if lk_url.strip():
-                    res = json.loads(save_link.invoke(json.dumps({
-                        "url": lk_url.strip(),
-                        "title": lk_title.strip() or lk_url.strip(),
-                        "description": lk_desc.strip(),
-                        "tags": lk_tags.strip(),
-                    })))
-                    if res.get("status") == "saved":
-                        st.success(f"Saved: **{res['title']}**")
-                        st.rerun()
-                    else:
-                        st.error(res.get("error", "Failed to save"))
-                else:
-                    st.warning("Please enter a URL.")
-
-    st.divider()
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # LINK LIST
-    # ─────────────────────────────────────────────────────────────────────────
-    lk_search = st.text_input("🔍 Search links", placeholder="portfolio, social, work…", key="lk_search")
-
-    _lk_res = json.loads(get_links.invoke(json.dumps({"search": lk_search, "limit": 100})))
-    _links  = _lk_res.get("links", [])
-
-    if not _links:
-        st.markdown(
-            "<div style='text-align:center;color:#555;padding:3rem'>"
-            "<h4>No links yet</h4>"
-            "<p>Add your first link above or say:<br>"
-            "<em>\"Edward, save this link: https://yoursite.com\"</em></p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption(f"{len(_links)} link{'s' if len(_links) != 1 else ''}")
-        for lk in _links:
-            _tags = [t.strip() for t in (lk.get("tags") or "").split(",") if t.strip()]
-            _tag_html = " ".join(
-                f'<span style="background:#1e3a5f;color:#7dd3fc;'
-                f'border-radius:12px;padding:2px 8px;font-size:0.72rem">{t}</span>'
-                for t in _tags
-            )
-            st.markdown(
-                f"""<div style="background:#111827;border:1px solid #1f2937;
-                border-radius:12px;padding:1rem;margin-bottom:0.6rem">
-                  <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
-                    <img src="{lk.get('favicon_url','')}" width="16" height="16"
-                         style="border-radius:3px" onerror="this.style.display='none'"/>
-                    <strong style="font-size:1rem;color:#f9fafb">{lk['title']}</strong>
-                  </div>
-                  <div style="color:#6b7280;font-size:0.82rem;word-break:break-all;margin-bottom:0.4rem">
-                    <a href="{lk['url']}" target="_blank"
-                       style="color:#60a5fa;text-decoration:none">{lk['url']}</a>
-                  </div>
-                  {"<div style='color:#9ca3af;font-size:0.8rem;margin-bottom:0.4rem'>"
-                   + lk['description'] + "</div>" if lk.get("description") else ""}
-                  <div style="margin-top:0.3rem">{_tag_html}</div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
-            _col1, _col2 = st.columns([4, 1])
-            _col1.code(lk["url"], language=None)
-            if _col2.button("🗑", key=f"del_lk_{lk['id']}", use_container_width=True,
-                            help="Delete this link"):
-                json.loads(delete_link.invoke(json.dumps({"link_id": lk["id"]})))
-                st.rerun()
-
-    st.divider()
-    st.caption("💬 Say: *\"Edward, pull up my links\"* or *\"Edward, save this link: https://…\"*")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: INSPO
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_inspo:
-    st.subheader("✨ Inspo Board")
-    st.caption("Your personal mood board — upload images for inspiration. Ask Edward to pull it up anytime.")
-
-    INSPO_DIR = "inspo"
-
-    # ── Upload section ────────────────────────────────────────────────────────
-    with st.expander("📷 Add to your board", expanded=True):
-
-        # Metadata fields (shared by both upload methods)
-        _m1, _m2, _m3 = st.columns(3)
-        ins_title = _m1.text_input("Title", placeholder="Dream kitchen", key="ins_title")
-        ins_desc  = _m2.text_input("Description", placeholder="Modern minimalist…", key="ins_desc")
-        ins_tags  = _m3.text_input("Tags", placeholder="home, design, travel", key="ins_tags")
-
-        st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
-
-        # Two source tabs: Camera vs File upload
-        _src_camera, _src_file = st.tabs(["📸 Camera", "🖼 File / Gallery"])
-
-        _inspo_image_data = None   # bytes
-        _inspo_image_name = None   # filename hint
-
-        with _src_camera:
-            st.caption("On **mobile**: opens your camera. On **desktop**: uses your webcam.")
-            _cam_shot = st.camera_input(
-                "Take a photo",
-                key=f"inspo_cam_{st.session_state.inspo_upload_count}",
-                label_visibility="collapsed",
-            )
-            if _cam_shot:
-                _inspo_image_data = _cam_shot.getvalue()
-                _inspo_image_name = "camera_capture.jpg"
-
-        with _src_file:
-            st.caption("Choose from your **photo library**, **desktop**, or any folder.")
-            _file_up = st.file_uploader(
-                "Select image",
-                type=["jpg", "jpeg", "png", "webp", "gif", "heic"],
-                key=f"inspo_upload_{st.session_state.inspo_upload_count}",
-                label_visibility="collapsed",
-            )
-            if _file_up:
-                _inspo_image_data = _file_up.getvalue()
-                _inspo_image_name = _file_up.name
-
-        # Preview before saving
-        if _inspo_image_data:
-            st.image(_inspo_image_data, caption="Preview", use_container_width=True)
-
-        _save_disabled = _inspo_image_data is None
+# ── orryon last response banner ───────────────────────────────────────────────
+if st.session_state.get("orryon_last_message"):
+    st.markdown(
+        f'<div class="orryon-response">'
+        f'<div class="orryon-badge">✦ orryon</div><br>'
+        f'{st.session_state.orryon_last_message}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    col_dismiss, col_history = st.columns([3, 1])
+    with col_dismiss:
+        if st.button("✕ Dismiss", key="dismiss_resp", use_container_width=False):
+            st.session_state.orryon_last_message = ""
+            st.rerun()
+    with col_history:
         if st.button(
-            "Save to Inspo Board ✨",
-            type="primary",
-            key="btn_inspo_save",
-            disabled=_save_disabled,
+            "🕐 History" if not st.session_state.show_chat_history else "Hide",
+            key="toggle_hist",
             use_container_width=True,
         ):
-            _ext   = (_inspo_image_name or "image.jpg").rsplit(".", 1)[-1].lower()
-            if _ext == "heic":
-                _ext = "jpg"
-            _fname = f"ins_{uuid.uuid4().hex[:10]}.{_ext}"
-            _fpath = f"{INSPO_DIR}/{_fname}"
-            with open(_fpath, "wb") as _fh:
-                _fh.write(_inspo_image_data)
-            res = json.loads(save_inspo_item.invoke(json.dumps({
-                "file_path": _fpath,
-                "title": ins_title.strip() or "Inspiration",
-                "description": ins_desc.strip(),
-                "tags": ins_tags.strip(),
-            })))
-            if res.get("status") == "saved":
-                st.success(f"Added to your Inspo Board: **{res['title']}**")
-                st.session_state.inspo_upload_count += 1
-                st.rerun()
-            else:
-                st.error(res.get("error", "Upload failed"))
+            st.session_state.show_chat_history = not st.session_state.show_chat_history
+            st.rerun()
 
-    st.divider()
-
-    # ── Filter ────────────────────────────────────────────────────────────────
-    ins_search = st.text_input("🔍 Search inspo", placeholder="design, travel, food…", key="ins_search")
-
-    # ── Load items ────────────────────────────────────────────────────────────
-    _ins_res   = json.loads(get_inspo_items.invoke(json.dumps({"search": ins_search, "limit": 100})))
-    _ins_items = _ins_res.get("items", [])
-
-    if not _ins_items:
-        st.markdown(
-            "<div style='text-align:center;color:#555;padding:3rem'>"
-            "<h4>Your Inspo Board is empty</h4>"
-            "<p>Upload your first image above — screenshots, photos, anything that inspires you.</p>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption(f"{len(_ins_items)} image{'s' if len(_ins_items) != 1 else ''} on your board")
-
-        # Masonry-style 3-column grid
-        _cols = st.columns(3)
-        for _i, _item in enumerate(_ins_items):
-            _fp = _item.get("file_path", "")
-            with _cols[_i % 3]:
-                if _fp and os.path.exists(_fp):
-                    st.image(_fp, use_container_width=True)
-                else:
-                    st.markdown(
-                        "<div style='background:#1f2937;border-radius:8px;height:120px;"
-                        "display:flex;align-items:center;justify-content:center;"
-                        "color:#6b7280;font-size:0.8rem'>Image not found</div>",
-                        unsafe_allow_html=True,
-                    )
-                # Title + tags below image
-                _itags = [t.strip() for t in (_item.get("tags") or "").split(",") if t.strip()]
+# Chat history
+if st.session_state.show_chat_history and st.session_state.chat_history:
+    with st.expander("Conversation history", expanded=True):
+        recent = st.session_state.chat_history[-20:]
+        for msg in recent:
+            if msg["role"] == "user":
                 st.markdown(
-                    f"<div style='font-size:0.82rem;font-weight:600;color:#f9fafb;"
-                    f"margin:0.2rem 0 0.1rem'>{_item.get('title','')}</div>"
-                    + (f"<div style='font-size:0.75rem;color:#9ca3af'>{_item['description']}</div>"
-                       if _item.get("description") else "")
-                    + "<div style='margin-top:0.2rem'>"
-                    + " ".join(
-                        f'<span style="background:#1e3a5f;color:#7dd3fc;'
-                        f'border-radius:10px;padding:1px 6px;font-size:0.68rem">{t}</span>'
-                        for t in _itags
-                    )
-                    + "</div>",
+                    f'<div class="chat-bubble-user">👤 {msg["content"]}</div>',
                     unsafe_allow_html=True,
                 )
-                st.caption(((_item.get("created_at") or "")[:10]))
-
-    st.divider()
-    st.caption("💬 Say: *\"Edward, pull up my inspo\"* or *\"Edward, show inspo tagged 'travel'\"*")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# TAB: REPORTS
-# ═════════════════════════════════════════════════════════════════════════════
-
-with tab_reports:
-    st.subheader("Reports & Exports")
-
-    if not st.session_state.data_loaded:
-        st.warning("Load data from the sidebar first.")
-    else:
-        r_left, r_right = st.columns(2)
-
-        with r_left:
-            st.subheader("CSV Export")
-            rtype = st.selectbox("Report Type", ["transactions", "spending", "net_worth"],
-                                 key="rtype")
-            d1, d2 = st.columns(2)
-            start_d = d1.date_input("Start", value=datetime.now() - timedelta(days=90), key="rstart")
-            end_d = d2.date_input("End", value=datetime.now(), key="rend")
-
-            if st.button("📊 Generate CSV", type="primary", key="btn_csv"):
-                res = json.loads(generate_csv_report.invoke(json.dumps({
-                    "report_type": rtype,
-                    "start_date": start_d.strftime("%Y-%m-%d"),
-                    "end_date": end_d.strftime("%Y-%m-%d"),
-                })))
-                if res.get("status") == "generated":
-                    fpath = res.get("file", "")
-                    st.success(f"Generated: `{fpath}` ({res.get('rows', 0)} rows)")
-                    if os.path.exists(fpath):
-                        with open(fpath, "rb") as fh:
-                            st.download_button(
-                                "⬇️ Download CSV", data=fh.read(),
-                                file_name=os.path.basename(fpath),
-                                mime="text/csv", type="primary",
-                            )
-                else:
-                    st.error(res.get("error", "Generation failed"))
-
-        with r_right:
-            st.subheader("Debt Payoff Calculator")
-            st.caption("Avalanche vs Snowball — which saves more?")
-
-            debts_json = st.text_area("Debts (JSON list)", height=120, value=json.dumps([
-                {"name": "Credit Card", "balance": 2340.50, "interest_rate": 0.22, "min_payment": 70},
-                {"name": "Student Loan", "balance": 15000, "interest_rate": 0.065, "min_payment": 180},
-            ], indent=2), key="debts_json")
-            extra_pmt = st.number_input("Extra Monthly Payment ($)", value=200, step=50, key="extra_pmt")
-
-            if st.button("Calculate Payoff Plan 💳", type="primary", key="btn_debt"):
-                try:
-                    debts = json.loads(debts_json)
-                    res = json.loads(get_debt_payoff_plan.invoke(json.dumps({
-                        "debts": debts, "extra_monthly_payment": extra_pmt,
-                    })))
-                    st.metric("Total Debt", f"${res.get('total_debt', 0):,.2f}")
-                    av = res.get("avalanche_method", {})
-                    sw = res.get("snowball_method", {})
-                    dc1, dc2 = st.columns(2)
-                    with dc1:
-                        st.markdown("**🏔 Avalanche** (highest APR first)")
-                        st.write(f"Months: **{av.get('months_to_payoff', 0)}**")
-                        st.write(f"Interest: **${av.get('total_interest_paid', 0):,.0f}**")
-                    with dc2:
-                        st.markdown("**❄️ Snowball** (smallest balance first)")
-                        st.write(f"Months: **{sw.get('months_to_payoff', 0)}**")
-                        st.write(f"Interest: **${sw.get('total_interest_paid', 0):,.0f}**")
-                    savings = res.get("interest_savings_with_avalanche", 0)
-                    if savings > 0:
-                        st.success(f"Avalanche saves you **${savings:,.0f}** in interest over Snowball.")
-                except json.JSONDecodeError:
-                    st.error("Invalid JSON in debts field.")
-
-        # AI full report
-        st.divider()
-        st.subheader("AI-Generated Financial Summary")
-        if st.button(
-            "🤖 Alex: Generate Full Financial Report",
-            type="secondary", use_container_width=True, key="btn_ai_report",
-        ):
-            with st.spinner("Alex is generating your report… (30–90 s depending on LLM speed)"):
-                ai_report = run_agent_query(
-                    "Alex, generate a comprehensive financial health report covering: "
-                    "1) Net worth summary with breakdown, "
-                    "2) Monthly spending analysis with top categories, "
-                    "3) Investment portfolio performance, "
-                    "4) Goal progress for all active goals, "
-                    "5) Top 3 priority recommendations with estimated financial impact. "
-                    "Format clearly with section headers."
+            else:
+                st.markdown(
+                    f'<div class="chat-bubble-ai">✦ orryon: {msg.get("content","")}</div>',
+                    unsafe_allow_html=True,
                 )
-            st.markdown(ai_report)
+
+
+# ── 5 TABS ────────────────────────────────────────────────────────────────────
+tab_dash, tab_budget, tab_forecast, tab_schedule, tab_notes = st.tabs([
+    "📊 Dashboard",
+    "💳 Budget",
+    "📈 Forecast",
+    "📅 Schedule",
+    "📝 Notes",
+])
+
+with tab_dash:
+    from ui.dashboard import render_dashboard
+    render_dashboard(_active_uid)
+
+with tab_budget:
+    from ui.budget import render_budget
+    render_budget(_active_uid)
+
+with tab_forecast:
+    from ui.forecast import render_forecast
+    render_forecast(_active_uid)
+
+with tab_schedule:
+    from ui.schedule import render_schedule
+    render_schedule(_active_uid)
+
+with tab_notes:
+    from ui.notes import render_notes
+    render_notes(_active_uid)
+
+
+# ── FLOATING "ASK ORRYON" INPUT ───────────────────────────────────────────────
+# st.chat_input renders as a sticky bottom bar — it's always visible across all tabs.
+_user_input = st.chat_input("Ask orryon anything…")
+
+if _user_input:
+    # Save user message
+    _user_msg = {"role": "user", "content": _user_input}
+    st.session_state.chat_history.append(_user_msg)
+    save_chat_message(_active_uid, _user_msg)
+
+    # Run orryon
+    with st.spinner("orryon is thinking…"):
+        try:
+            from core.grok_agent import run_orryon
+            result = run_orryon(
+                user_message=_user_input,
+                user_id=_active_uid,
+                chat_history=st.session_state.chat_history[:-1],  # exclude the just-added msg
+                user_name=_display_name or "there",
+            )
+        except Exception as exc:
+            logger.error("run_orryon failed: %s", exc)
+            result = {
+                "message": f"Something went wrong: {exc}",
+                "actions_taken": [],
+                "tabs_to_refresh": [],
+                "error": str(exc),
+            }
+
+    # Save orryon response
+    _ai_msg = {"role": "assistant", "content": result["message"]}
+    st.session_state.chat_history.append(_ai_msg)
+    save_chat_message(_active_uid, _ai_msg)
+
+    # Surface response + trigger re-render
+    st.session_state.orryon_last_message = result["message"]
+    st.session_state.orryon_actions = result.get("actions_taken", [])
+    st.session_state.show_chat_history = False  # auto-hide history on new message
+    st.rerun()

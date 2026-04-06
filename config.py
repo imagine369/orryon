@@ -27,12 +27,16 @@ logger = logging.getLogger(__name__)
 # Default provider is "grok". Set LLM_PROVIDER=ollama in .env for local mode.
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "grok")
 
-# Grok (xAI) — grok-latest always tracks the newest released Grok model.
-# Change to e.g. "grok-3" if you want a pinned, stable version.
+# ── Grok (xAI) — direct API, OpenAI-compatible ──────────────────────────────
+# Get your key at https://console.x.ai
+# Recommended models (set GROK_MODEL in .env):
+#   grok-3-mini        — fast + cheap, great for most tasks
+#   grok-3             — smarter, slower, better for complex queries
+#   grok-3-mini-fast   — fastest, cheapest (for high-volume use)
 XAI_API_KEY: str = os.getenv("XAI_API_KEY", "")
-GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-latest")
+GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-3-mini")
 
-# Ollama (local fallback)
+# Ollama (local fallback — not used in v1 rebuild but kept for compatibility)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1")
 

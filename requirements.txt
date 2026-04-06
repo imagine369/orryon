@@ -1,14 +1,8 @@
-# ── Core AI Framework ──────────────────────────────────────────────────────────
-crewai>=0.80.0
-crewai-tools>=0.15.0
-langchain>=0.3.0
-langchain-core>=0.3.0
-langchain-community>=0.3.0
-langchain-xai>=0.2.0        # Grok (xAI) — sole LLM, no OpenAI dependency
-
-# ── Long-term Agent Memory ─────────────────────────────────────────────────────
-chromadb>=0.5.0             # local vector store for per-user persistent memory
-sentence-transformers>=3.0.0  # all-MiniLM-L6-v2 embeddings (local, 22 MB, no API key)
+# ── Core AI (direct xAI Grok API — no LangChain/CrewAI needed) ────────────────
+# Grok is called via direct HTTP requests (requests library below).
+# Optional: keep langchain-xai if you use any LangChain tooling elsewhere.
+# langchain>=0.3.0
+# langchain-xai>=0.2.0
 
 # ── Finance & Banking ──────────────────────────────────────────────────────────
 plaid-python>=20.0.0
