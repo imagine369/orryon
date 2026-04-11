@@ -16,7 +16,10 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import streamlit as st
 
-from db import fetch_rows, get_connection, get_nw_history, snapshot_net_worth, get_total_monthly_income
+from db import (
+    fetch_rows, get_connection, get_nw_history, snapshot_net_worth,
+    get_total_monthly_income, get_balance,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,25 +125,31 @@ _DASH_CSS = """
 def render_dashboard(user_id: str) -> None:
     st.markdown(_DASH_CSS, unsafe_allow_html=True)
 
-    # ── Net Worth Hero ────────────────────────────────────────────────────────
-    accounts = fetch_rows("accounts", {"user_id": user_id})
-    assets = sum(a["balance"] for a in accounts if a["balance"] > 0)
-    liabs = abs(sum(a["balance"] for a in accounts if a["balance"] < 0))
-    net_worth = assets - liabs
+    # ── Balance Hero ───────────────────────────────────────────────────────────
+    bal = get_balance(user_id)
 
-    nw_color = "#22c55e" if net_worth >= 0 else "#ef4444"
+    # Goals earmarked
+    conn_g = get_connection()
+    goals_row = conn_g.execute(
+        "SELECT SUM(current_amount) as total FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchone()
+    conn_g.close()
+    goals_total = float(goals_row["total"] or 0) if goals_row else 0
+    bal_after_goals = bal - goals_total
+
+    bal_color = "#22c55e" if bal >= 0 else "#ef4444"
     st.markdown(
         f"""<div class="nw-card">
-          <div class="nw-label">Net Worth</div>
-          <div class="nw-value" style="color:{nw_color}">${net_worth:,.0f}</div>
-          <div class="nw-sub">Assets ${assets:,.0f} &nbsp;·&nbsp; Liabilities ${liabs:,.0f}</div>
+          <div class="nw-label">Balance</div>
+          <div class="nw-value" style="color:{bal_color}">${bal:,.0f}</div>
+          <div class="nw-sub">Goals ${goals_total:,.0f} &nbsp;·&nbsp; After Goals ${bal_after_goals:,.0f}</div>
         </div>""",
         unsafe_allow_html=True,
     )
 
-    # Ensure today's snapshot exists, then render real history
     snapshot_net_worth(user_id)
-    _render_nw_sparkline(user_id, net_worth)
+    _render_nw_sparkline(user_id, bal)
 
     # ── Safe to Spend ─────────────────────────────────────────────────────────
     _render_safe_to_spend(user_id)
@@ -238,7 +247,6 @@ def _render_safe_to_spend(user_id: str) -> None:
     remaining_days = max(days_in_month - now.day, 1)
     remaining_weeks = max(remaining_days / 7, 0.5)
 
-    # This month's total spending so far (excluding income / rent)
     conn = get_connection()
     monthly_spend = conn.execute(
         "SELECT SUM(amount) as total FROM transactions "
@@ -246,34 +254,31 @@ def _render_safe_to_spend(user_id: str) -> None:
         (user_id, f"{month_str}%"),
     ).fetchone()
 
-    # Monthly income
-    monthly_income = conn.execute(
+    monthly_income_txn = conn.execute(
         "SELECT ABS(SUM(amount)) as total FROM transactions "
         "WHERE user_id=? AND date LIKE ? AND amount<0",
         (user_id, f"{month_str}%"),
     ).fetchone()
 
-    # Upcoming bills this month
-    end_of_month = now.replace(day=28).strftime("%Y-%m-%d")  # safe end
     upcoming_bills = conn.execute(
         "SELECT SUM(amount) as total FROM subscriptions "
         "WHERE user_id=? AND is_active=1 AND next_due LIKE ?",
         (user_id, f"{month_str}%"),
     ).fetchone()
-    conn.close()
 
-    spent = float(monthly_spend["total"] or 0)
-    income = float(monthly_income["total"] or 5000)
-    bills_left = float(upcoming_bills["total"] or 0)
-
-    conn2 = get_connection()
-    recurring_bills = conn2.execute(
+    recurring_bills = conn.execute(
         "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
         (user_id,),
     ).fetchone()
-    conn2.close()
+    conn.close()
+
+    spent = float(monthly_spend["total"] or 0)
+    txn_income = float(monthly_income_txn["total"] or 0)
+    recurring_income = get_total_monthly_income(user_id)
+    income = txn_income if txn_income > 0 else recurring_income if recurring_income > 0 else 0
+    bills_left = float(upcoming_bills["total"] or 0)
     fixed_estimate = float(recurring_bills["total"] or 0) if recurring_bills else 0
-    discretionary_remaining = max(income - fixed_estimate - spent - bills_left, 0)
+    discretionary_remaining = max(income - fixed_estimate - spent - bills_left, 0) if income > 0 else 0
     safe_week = discretionary_remaining / max(remaining_weeks, 1)
     safe_today = discretionary_remaining / max(remaining_days, 1)
 
@@ -349,79 +354,43 @@ def _render_budget_highlights(user_id: str) -> None:
 
 
 def _render_money_left_after_goals(user_id: str) -> None:
-    """Card showing free spending money after bills + goal contributions."""
-    now = datetime.now()
-    month = now.strftime("%Y-%m")
+    """Card showing balance after goals — the real 'free money' picture."""
+    bal = get_balance(user_id)
 
     conn = get_connection()
-    # Monthly income (negative transactions)
-    income_row = conn.execute(
-        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount<0",
-        (user_id, f"{month}%"),
-    ).fetchone()
-    # This month expenses
-    exp_row = conn.execute(
-        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
-        (user_id, f"{month}%"),
-    ).fetchone()
-    # Recurring bills total
+    goals = conn.execute(
+        "SELECT name, target_amount, current_amount FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchall()
     bills_row = conn.execute(
         "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
         (user_id,),
     ).fetchone()
-    # Active goals
-    goals = conn.execute(
-        "SELECT name, target_amount, current_amount, target_date FROM goals WHERE user_id=? AND is_completed=0",
-        (user_id,),
-    ).fetchall()
     conn.close()
 
-    monthly_income = abs(float(income_row["total"] or 0))
-    total_spent = float(exp_row["total"] or 0)
-    monthly_bills = float(bills_row["total"] or 0)
+    goals_total = sum(float(g["current_amount"]) for g in goals)
+    monthly_bills = float(bills_row["total"] or 0) if bills_row else 0
+    bal_after_goals = bal - goals_total
 
-    # Fallback estimate if no income tracked
-    if monthly_income < 1:
-        monthly_income = total_spent * 1.3
+    color = "#22c55e" if bal_after_goals > 200 else "#f59e0b" if bal_after_goals > 0 else "#ef4444"
 
-    # Monthly goal contributions needed
-    today = now.date()
-    goal_monthly = 0.0
+    goals_html = ""
     for g in goals:
-        remaining = float(g["target_amount"]) - float(g["current_amount"])
-        if remaining <= 0:
-            continue
-        if g["target_date"]:
-            try:
-                td = datetime.strptime(g["target_date"], "%Y-%m-%d").date()
-                months_left = max(1, (td - today).days / 30.44)
-                goal_monthly += remaining / months_left
-            except Exception:
-                goal_monthly += remaining / 12
-        else:
-            goal_monthly += remaining / 12
-
-    free_budget = monthly_income - monthly_bills - goal_monthly
-    used = total_spent - monthly_bills  # non-bill spending
-    free_remaining = max(0, free_budget - used)
-    used_pct = min(100, round((used / free_budget * 100) if free_budget > 0 else 0, 0))
-
-    color = "#22c55e" if free_remaining > 200 else "#f59e0b" if free_remaining > 0 else "#ef4444"
-    bar_color = color
+        current = float(g["current_amount"])
+        target = float(g["target_amount"])
+        if current > 0:
+            goals_html += f'<span style="font-size:0.76rem;color:#94a3b8;">{g["name"]} ${current:,.0f}/${target:,.0f}</span> '
 
     st.markdown(
         f"""<div class="mlag-card">
-          <div class="mlag-label">💚 Free to Spend (After Goals & Bills)</div>
-          <div class="mlag-value" style="color:{color}">${free_remaining:,.0f}</div>
-          <div style="background:#1e293b;border-radius:99px;height:6px;margin:6px 0;">
-            <div style="width:{used_pct}%;height:6px;border-radius:99px;background:{bar_color};"></div>
-          </div>
+          <div class="mlag-label">Balance After Goals</div>
+          <div class="mlag-value" style="color:{color}">${bal_after_goals:,.0f}</div>
           <div class="mlag-row">
-            <span>📥 Income ~${monthly_income:,.0f}</span>
-            <span>📋 Bills ${monthly_bills:,.0f}</span>
-            <span>🎯 Goals ${goal_monthly:,.0f}/mo</span>
-            <span>💸 Spent ${used:,.0f}</span>
+            <span>💰 Balance ${bal:,.0f}</span>
+            <span>🎯 Goals ${goals_total:,.0f}</span>
+            <span>📋 Bills ${monthly_bills:,.0f}/mo</span>
           </div>
+          <div style="margin-top:6px;">{goals_html}</div>
         </div>""",
         unsafe_allow_html=True,
     )

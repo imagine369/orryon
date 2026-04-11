@@ -295,6 +295,8 @@ def render_budget(user_id: str) -> None:
                     "metadata": _json.dumps({"notes": m_notes}),
                     "attachment_path": attachment,
                 })
+                from db import adjust_balance
+                adjust_balance(user_id, -float(m_amount))
                 st.success(f"Added ${m_amount:.2f} at {m_merchant} to {m_cat}")
                 st.rerun()
             else:
@@ -321,8 +323,15 @@ def render_budget(user_id: str) -> None:
                     preview.columns = ["Date", "Merchant", "Category", "Amount ($)"]
                     st.dataframe(preview, use_container_width=True, hide_index=True)
                     if st.button(f"✅ Import {len(txn_list)} transactions", type="primary", use_container_width=True, key="csv_confirm"):
+                        total_expense = 0.0
                         for t in txn_list:
                             insert_row("transactions", t)
+                            amt = float(t.get("amount", 0))
+                            if amt > 0:
+                                total_expense += amt
+                        if total_expense > 0:
+                            from db import adjust_balance
+                            adjust_balance(user_id, -total_expense)
                         st.success(f"Imported {len(txn_list)} transactions!")
                         st.rerun()
 

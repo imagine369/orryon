@@ -14,7 +14,10 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from db import delete_row, fetch_rows, get_connection, insert_row, update_row
+from db import (
+    delete_row, fetch_rows, get_connection, insert_row, update_row,
+    get_balance, adjust_balance, update_balance, get_or_create_balance_account,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,13 +163,16 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "add_note",
-            "description": "Save a note, journal entry, idea, or memo.",
+            "description": "Save a note, journal entry, idea, or memo. Supports Markdown content, mood tracking, pinning, and linking to goals.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Short note title"},
-                    "content": {"type": "string", "description": "Note body / content"},
+                    "content": {"type": "string", "description": "Note body / content (Markdown supported)"},
                     "tags": {"type": "string", "description": "Comma-separated tags (optional)"},
+                    "mood": {"type": "string", "description": "Mood for this entry: happy, grateful, motivated, neutral, stressed, anxious, reflective (optional)"},
+                    "is_pinned": {"type": "boolean", "description": "Pin the note to the top (optional, default false)"},
+                    "linked_goal": {"type": "string", "description": "Goal name to link this note to (optional)"},
                 },
                 "required": ["title", "content"],
             },
@@ -244,6 +250,50 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "get_net_worth",
             "description": "Get the user's current net worth — total assets minus liabilities.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_balance",
+            "description": (
+                "Set the user's balance to a specific amount. Use when the user says "
+                "'I have $3000', 'my balance is $3000', or 'set my balance to $3000'."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "The exact balance amount in USD"},
+                },
+                "required": ["amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_money",
+            "description": (
+                "Add money to the user's balance. Use when the user says they got paid, received money, "
+                "want to deposit, or add funds. This logs an income transaction AND increases the balance."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "Amount to add in USD"},
+                    "description": {"type": "string", "description": "Source description (e.g. 'Paycheck', 'Freelance payment', 'Gift')"},
+                    "date": {"type": "string", "description": "Date as YYYY-MM-DD. Defaults to today."},
+                },
+                "required": ["amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_balance",
+            "description": "Get the user's current balance — how much money they have.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -520,6 +570,57 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_notes",
+            "description": "Search through user's notes by keyword, tag, or mood. Returns matching notes with previews.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search keyword to match in title, content, or tags"},
+                    "tag": {"type": "string", "description": "Filter by specific tag"},
+                    "mood": {"type": "string", "description": "Filter by mood (happy, grateful, motivated, neutral, stressed, anxious, reflective)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_note",
+            "description": "Edit an existing note — update title, content, tags, mood, or link it to a goal.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string", "description": "The ID of the note to edit"},
+                    "title": {"type": "string", "description": "New title"},
+                    "content": {"type": "string", "description": "New content (Markdown supported)"},
+                    "tags": {"type": "string", "description": "New comma-separated tags"},
+                    "mood": {"type": "string", "description": "Mood (happy, grateful, motivated, neutral, stressed, anxious, reflective)"},
+                    "linked_goal": {"type": "string", "description": "Goal name to link this note to"},
+                    "is_pinned": {"type": "boolean", "description": "Pin or unpin the note"},
+                },
+                "required": ["note_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pin_note",
+            "description": "Pin or unpin a note so it stays at the top.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string", "description": "The ID of the note to pin/unpin"},
+                    "pin": {"type": "boolean", "description": "True to pin, false to unpin. Defaults to true."},
+                },
+                "required": ["note_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "delete_bill",
             "description": "Cancel/delete a recurring bill or subscription by its ID.",
             "parameters": {
@@ -662,7 +763,7 @@ def _add_expense(args: dict, user_id: str) -> dict:
         "metadata": _json.dumps({"notes": args.get("notes", "")}),
     }
     insert_row("transactions", row)
-    # Return budget context
+    new_bal = adjust_balance(user_id, -row["amount"])
     month = date[:7]
     spent = _get_category_spending(user_id, args.get("category", "Other"), month)
     budget = _get_category_budget(user_id, args.get("category", "Other"), month)
@@ -675,6 +776,7 @@ def _add_expense(args: dict, user_id: str) -> dict:
         "date": date,
         "month_spent": spent,
         "month_budget": budget,
+        "new_balance": round(new_bal, 2),
     }
 
 
@@ -806,11 +908,76 @@ def _add_note(args: dict, user_id: str) -> dict:
         "title": args["title"],
         "content": args["content"],
         "tags": args.get("tags", ""),
+        "mood": args.get("mood", ""),
+        "is_pinned": 1 if args.get("is_pinned") else 0,
+        "linked_goal": args.get("linked_goal", ""),
+        "linked_account": "",
         "created_at": now_iso,
         "updated_at": now_iso,
     }
     insert_row("notes", row)
     return {"status": "ok", "id": row["id"], "title": row["title"]}
+
+
+def _search_notes(args: dict, user_id: str) -> dict:
+    query = args.get("query", "").lower()
+    tag = args.get("tag", "").lower()
+    mood_filter = args.get("mood", "")
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM notes WHERE user_id=? ORDER BY is_pinned DESC, updated_at DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in [dict(r) for r in rows]:
+        if query:
+            searchable = f"{r.get('title','')} {r.get('content','')} {r.get('tags','')}".lower()
+            if query not in searchable:
+                continue
+        if tag and tag not in (r.get("tags") or "").lower():
+            continue
+        if mood_filter and r.get("mood") != mood_filter:
+            continue
+        preview = (r.get("content") or "")[:200]
+        results.append({
+            "id": r["id"], "title": r["title"], "preview": preview,
+            "tags": r.get("tags", ""), "mood": r.get("mood", ""),
+            "is_pinned": bool(r.get("is_pinned")),
+            "linked_goal": r.get("linked_goal", ""),
+            "updated_at": r.get("updated_at", ""),
+        })
+    return {"status": "ok", "count": len(results), "notes": results[:20]}
+
+
+def _edit_note(args: dict, user_id: str) -> dict:
+    nid = args["note_id"]
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM notes WHERE id=? AND user_id=?", (nid, user_id)).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Note not found."}
+    updates = {"updated_at": _now_iso()}
+    for field in ("title", "content", "tags", "mood", "linked_goal"):
+        if field in args:
+            updates[field] = args[field]
+    if "is_pinned" in args:
+        updates["is_pinned"] = 1 if args["is_pinned"] else 0
+    update_row("notes", updates, {"id": nid})
+    return {"status": "ok", "id": nid, "updated": list(updates.keys())}
+
+
+def _pin_note(args: dict, user_id: str) -> dict:
+    nid = args["note_id"]
+    pin = 1 if args.get("pin", True) else 0
+    conn = get_connection()
+    row = conn.execute("SELECT id, title, is_pinned FROM notes WHERE id=? AND user_id=?", (nid, user_id)).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Note not found."}
+    update_row("notes", {"is_pinned": pin, "updated_at": _now_iso()}, {"id": nid})
+    action = "pinned" if pin else "unpinned"
+    return {"status": "ok", "action": action, "title": row["title"]}
 
 
 def _set_budget(args: dict, user_id: str) -> dict:
@@ -868,6 +1035,71 @@ def _complete_task(args: dict, user_id: str) -> dict:
         update_row("action_items", {"status": "done", "updated_at": _now_iso()}, {"id": matched["id"]})
         return {"status": "ok", "completed": matched["title"]}
     return {"status": "not_found", "searched": args["task_title"]}
+
+
+# ── Balance tools ─────────────────────────────────────────────────────────────
+
+def _set_balance(args: dict, user_id: str) -> dict:
+    amount = float(args["amount"])
+    update_balance(user_id, amount)
+    return {
+        "status": "ok",
+        "balance": round(amount, 2),
+    }
+
+
+def _add_money(args: dict, user_id: str) -> dict:
+    amount = float(args["amount"])
+    date = args.get("date") or _today()
+    description = args.get("description", "Income")
+    import json as _json
+
+    row = {
+        "id": _uid(),
+        "user_id": user_id,
+        "date": date,
+        "amount": -amount,  # negative = income
+        "merchant": description,
+        "description": description,
+        "category": "Income",
+        "is_recurring": 0,
+        "metadata": _json.dumps({"type": "deposit"}),
+    }
+    insert_row("transactions", row)
+
+    new_bal = adjust_balance(user_id, amount)
+    return {
+        "status": "ok",
+        "id": row["id"],
+        "amount_added": round(amount, 2),
+        "description": description,
+        "date": date,
+        "new_balance": round(new_bal, 2),
+    }
+
+
+def _get_balance(args: dict, user_id: str) -> dict:
+    bal = get_balance(user_id)
+    conn = get_connection()
+    goals = conn.execute(
+        "SELECT SUM(current_amount) as total FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchone()
+    bills = conn.execute(
+        "SELECT SUM(amount) as total FROM subscriptions "
+        "WHERE user_id=? AND is_active=1 AND frequency='monthly'",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    goals_total = float(goals["total"] or 0) if goals else 0
+    bills_total = float(bills["total"] or 0) if bills else 0
+    free_to_spend = round(bal - goals_total, 2)
+    return {
+        "balance": round(bal, 2),
+        "goals_earmarked": round(goals_total, 2),
+        "monthly_bills": round(bills_total, 2),
+        "free_to_spend": free_to_spend,
+    }
 
 
 # ── Read tools ────────────────────────────────────────────────────────────────
@@ -933,15 +1165,19 @@ def _get_spending_summary(args: dict, user_id: str) -> dict:
 
 
 def _get_net_worth(args: dict, user_id: str) -> dict:
-    accounts = fetch_rows("accounts", {"user_id": user_id})
-    assets = sum(a["balance"] for a in accounts if a["balance"] > 0)
-    liabilities = abs(sum(a["balance"] for a in accounts if a["balance"] < 0))
-    net_worth = assets - liabilities
+    bal = get_balance(user_id)
+    conn = get_connection()
+    goals = conn.execute(
+        "SELECT SUM(current_amount) as total FROM goals WHERE user_id=? AND is_completed=0",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    goals_total = float(goals["total"] or 0) if goals else 0
     return {
-        "net_worth": round(net_worth, 2),
-        "total_assets": round(assets, 2),
-        "total_liabilities": round(liabilities, 2),
-        "account_count": len(accounts),
+        "net_worth": round(bal, 2),
+        "balance": round(bal, 2),
+        "goals_earmarked": round(goals_total, 2),
+        "balance_after_goals": round(bal - goals_total, 2),
     }
 
 
@@ -1356,8 +1592,15 @@ def _delete_expense(args: dict, user_id: str) -> dict:
     conn.close()
     if not row:
         return {"status": "not_found", "message": "Expense not found."}
+    amt = float(row["amount"])
     delete_row("transactions", {"id": expense_id, "user_id": user_id})
-    return {"status": "ok", "deleted": row["merchant"], "amount": row["amount"]}
+    if amt > 0:
+        new_bal = adjust_balance(user_id, amt)  # refund expense
+    elif amt < 0:
+        new_bal = adjust_balance(user_id, amt)  # remove income
+    else:
+        new_bal = get_balance(user_id)
+    return {"status": "ok", "deleted": row["merchant"], "amount": amt, "new_balance": round(new_bal, 2)}
 
 
 def _delete_event(args: dict, user_id: str) -> dict:
@@ -1409,10 +1652,17 @@ def _edit_expense(args: dict, user_id: str) -> dict:
         updates["date"] = args["date"]
     if not updates:
         return {"status": "no_changes", "message": "No fields to update."}
+    old_amount = float(row["amount"])
+    new_amount = updates.get("amount", old_amount)
+    if old_amount > 0 and new_amount != old_amount:
+        diff = old_amount - new_amount  # positive if amount decreased (refund), negative if increased
+        adjust_balance(user_id, diff)
     update_row("transactions", updates, {"id": eid})
+    new_bal = get_balance(user_id)
     return {"status": "ok", "id": eid, "updated": list(updates.keys()),
             "merchant": updates.get("merchant", row["merchant"]),
-            "amount": updates.get("amount", row["amount"])}
+            "amount": updates.get("amount", row["amount"]),
+            "new_balance": round(new_bal, 2)}
 
 
 def _add_recurring_income(args: dict, user_id: str) -> dict:
@@ -1526,11 +1776,13 @@ def _split_expense(args: dict, user_id: str) -> dict:
         }),
     }
     insert_row("transactions", row)
+    new_bal = adjust_balance(user_id, -user_share)
     return {
         "status": "ok", "id": row["id"],
         "full_amount": total, "your_share": user_share,
         "split_count": split_count, "split_with": args.get("split_with", ""),
         "merchant": row["merchant"], "category": row["category"],
+        "new_balance": round(new_bal, 2),
     }
 
 
@@ -1670,86 +1922,65 @@ def _get_money_left_after_goals(args: dict, user_id: str) -> dict:
     month = args.get("month") or _current_month()
     now = datetime.now()
 
-    # Estimate monthly income from negative transactions (income = negative amount)
+    bal = get_balance(user_id)
+    from db import get_total_monthly_income
+    monthly_income = get_total_monthly_income(user_id)
+
     conn = get_connection()
-    income_rows = conn.execute(
-        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount<0",
-        (user_id, f"{month}%"),
-    ).fetchone()
-    # Total expenses this month
     expense_rows = conn.execute(
         "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
         (user_id, f"{month}%"),
     ).fetchone()
-    # Recurring monthly bills
     bills = conn.execute(
         "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
         (user_id,),
     ).fetchone()
-    # Active goals - estimate monthly contribution needed
     goals = conn.execute(
         "SELECT * FROM goals WHERE user_id=? AND is_completed=0",
         (user_id,),
     ).fetchall()
     conn.close()
 
-    monthly_income = abs(float(income_rows["total"] or 0))
     total_expenses = float(expense_rows["total"] or 0)
     monthly_bills = float(bills["total"] or 0)
 
-    # If no income tracked, estimate from prior month average spending
-    if monthly_income == 0:
-        monthly_income = total_expenses * 1.2  # rough estimate: spend is ~83% of income
-
-    # Calculate monthly goal contributions needed
-    goal_monthly_needed = 0.0
+    goals_total = 0.0
     goal_details = []
-    today = now.date()
     for g in goals:
-        target = float(g["target_amount"])
         current = float(g["current_amount"])
-        remaining = target - current
-        if remaining <= 0:
-            continue
-        monthly_contrib = 0.0
-        if g["target_date"]:
-            try:
-                target_dt = datetime.strptime(g["target_date"], "%Y-%m-%d").date()
-                months_left = max(1, (target_dt - today).days / 30.44)
-                monthly_contrib = round(remaining / months_left, 2)
-            except Exception:
-                monthly_contrib = round(remaining / 12, 2)
-        else:
-            monthly_contrib = round(remaining / 12, 2)
-        goal_monthly_needed += monthly_contrib
-        goal_details.append({"name": g["name"], "monthly_needed": monthly_contrib})
+        goals_total += current
+        goal_details.append({"name": g["name"], "saved": round(current, 2),
+                             "target": float(g["target_amount"])})
 
-    free_spending = round(monthly_income - monthly_bills - goal_monthly_needed, 2)
-    already_spent_this_month = total_expenses
-    free_remaining = round(free_spending - already_spent_this_month + monthly_bills, 2)
+    balance_after_goals = round(bal - goals_total, 2)
 
     return {
         "month": month,
-        "estimated_monthly_income": round(monthly_income, 2),
+        "balance": round(bal, 2),
+        "monthly_income": round(monthly_income, 2),
         "monthly_bills_total": round(monthly_bills, 2),
-        "monthly_goal_contributions": round(goal_monthly_needed, 2),
-        "free_spending_budget": free_spending,
+        "goals_earmarked": round(goals_total, 2),
+        "balance_after_goals": balance_after_goals,
         "spent_so_far": round(total_expenses, 2),
-        "free_remaining": free_remaining,
         "goal_breakdown": goal_details,
-        "income_note": "Income estimated from transactions" if float(income_rows["total"] or 0) < 0 else "Estimated from spending patterns",
     }
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
+    "set_balance": _set_balance,
+    "add_money": _add_money,
+    "get_balance": _get_balance,
     "add_expense": _add_expense,
     "add_calendar_event": _add_calendar_event,
     "add_grocery_items": _add_grocery_items,
     "add_recurring_bill": _add_recurring_bill,
     "add_task": _add_task,
     "add_note": _add_note,
+    "search_notes": _search_notes,
+    "edit_note": _edit_note,
+    "pin_note": _pin_note,
     "set_budget": _set_budget,
     "check_grocery_item": _check_grocery_item,
     "complete_task": _complete_task,
@@ -1779,6 +2010,9 @@ _TOOL_MAP = {
 }
 
 _TAB_REFRESH_MAP = {
+    "set_balance": ["dashboard", "forecast"],
+    "add_money": ["dashboard", "budget", "forecast"],
+    "get_balance": [],
     "add_expense": ["dashboard", "budget"],
     "set_budget": ["dashboard", "budget"],
     "add_calendar_event": ["dashboard", "schedule"],
@@ -1788,6 +2022,9 @@ _TAB_REFRESH_MAP = {
     "add_task": ["schedule"],
     "complete_task": ["schedule"],
     "add_note": ["notes"],
+    "search_notes": [],
+    "edit_note": ["notes"],
+    "pin_note": ["notes"],
     "add_goal": ["dashboard", "goals"],
     "update_goal_progress": ["dashboard", "goals"],
     "get_spending_summary": [],
@@ -1842,23 +2079,12 @@ def seed_sample_data(user_id: str) -> None:
     month = now.strftime("%Y-%m")
     today = now.strftime("%Y-%m-%d")
 
-    # ── Accounts ─────────────────────────────────────────────────────────────
-    accounts = [
-        {"id": _uid(), "user_id": user_id, "name": "Chase Checking", "type": "checking",
-         "institution": "Chase", "balance": 4280.50, "currency": "USD", "last_updated": today},
-        {"id": _uid(), "user_id": user_id, "name": "HYSA Savings", "type": "savings",
-         "institution": "Marcus", "balance": 18500.00, "currency": "USD", "last_updated": today},
-        {"id": _uid(), "user_id": user_id, "name": "Fidelity Brokerage", "type": "investment",
-         "institution": "Fidelity", "balance": 34200.00, "currency": "USD", "last_updated": today},
-        {"id": _uid(), "user_id": user_id, "name": "Roth IRA", "type": "investment",
-         "institution": "Vanguard", "balance": 22000.00, "currency": "USD", "last_updated": today},
-        {"id": _uid(), "user_id": user_id, "name": "Chase Sapphire", "type": "credit",
-         "institution": "Chase", "balance": -1240.00, "currency": "USD", "last_updated": today},
-        {"id": _uid(), "user_id": user_id, "name": "Student Loan", "type": "loan",
-         "institution": "Navient", "balance": -12000.00, "currency": "USD", "last_updated": today},
-    ]
-    for a in accounts:
-        insert_row("accounts", a)
+    # ── Balance account ─────────────────────────────────────────────────────
+    insert_row("accounts", {
+        "id": _uid(), "user_id": user_id, "name": "Balance",
+        "type": "checking", "institution": "", "balance": 5500.00,
+        "currency": "USD", "last_updated": today, "metadata": "",
+    })
 
     # ── Transactions (this month) ─────────────────────────────────────────────
     def txn(date, amount, merchant, category):

@@ -326,6 +326,7 @@ def init_db() -> None:
     _migrate_budget_rollover(conn)
     _migrate_transactions_currency(conn)
     _migrate_users_weekly_report(conn)
+    _migrate_notes_rich(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -420,6 +421,19 @@ def _migrate_users_weekly_report(conn: sqlite3.Connection) -> None:
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_users_weekly_report: %s (non-fatal)", exc)
+
+
+def _migrate_notes_rich(conn: sqlite3.Connection) -> None:
+    """Add is_pinned and mood columns to notes table."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(notes)").fetchall()]
+        if "is_pinned" not in cols:
+            conn.execute("ALTER TABLE notes ADD COLUMN is_pinned INTEGER DEFAULT 0")
+        if "mood" not in cols:
+            conn.execute("ALTER TABLE notes ADD COLUMN mood TEXT DEFAULT ''")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_notes_rich: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:
@@ -784,6 +798,65 @@ def get_user_memories(user_id: str, limit: int = 50) -> list[dict]:
     except Exception as exc:
         logger.error("get_user_memories error: %s", exc)
         return []
+
+
+# ── Balance account helpers ────────────────────────────────────────────────
+
+def get_or_create_balance_account(user_id: str) -> dict:
+    """Return the single balance account for a user, creating it if needed."""
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT * FROM accounts WHERE user_id=? AND name='Balance' LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception as exc:
+        logger.error("get_or_create_balance_account lookup: %s", exc)
+
+    account = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "name": "Balance",
+        "type": "checking",
+        "institution": "",
+        "balance": 0.0,
+        "currency": "USD",
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "metadata": "",
+    }
+    insert_row("accounts", account)
+    return account
+
+
+def get_balance(user_id: str) -> float:
+    """Return the user's current balance."""
+    acct = get_or_create_balance_account(user_id)
+    return float(acct.get("balance", 0))
+
+
+def update_balance(user_id: str, new_balance: float) -> bool:
+    """Set the user's balance to an exact amount."""
+    acct = get_or_create_balance_account(user_id)
+    return update_row(
+        "accounts",
+        {"balance": new_balance, "last_updated": datetime.now(timezone.utc).isoformat()},
+        {"id": acct["id"]},
+    )
+
+
+def adjust_balance(user_id: str, delta: float) -> float:
+    """Add (positive) or subtract (negative) from the balance. Returns the new balance."""
+    acct = get_or_create_balance_account(user_id)
+    new_bal = float(acct["balance"]) + delta
+    update_row(
+        "accounts",
+        {"balance": new_bal, "last_updated": datetime.now(timezone.utc).isoformat()},
+        {"id": acct["id"]},
+    )
+    return new_bal
 
 
 # ── Recurring income helpers ───────────────────────────────────────────────

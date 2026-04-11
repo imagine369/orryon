@@ -1199,6 +1199,8 @@ with _qa1:
                     "is_recurring": 0, "metadata": _qjson.dumps(_meta),
                     "attachment_path": _att_path,
                 })
+                from db import adjust_balance as _adj_bal
+                _adj_bal(_active_uid, -_log_amount)
                 if _qa_split:
                     st.success(f"✅ ${_qa_amount:.2f} split {int(_qa_split_count)} ways → your share: ${_log_amount:.2f}")
                 else:

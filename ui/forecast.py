@@ -73,7 +73,7 @@ def render_forecast(user_id: str) -> None:
 
     # Prefer recurring_income table, fall back to transaction-based estimate
     _recurring_monthly = get_total_monthly_income(user_id)
-    avg_income = _recurring_monthly if _recurring_monthly > 0 else float(income_rows["avg_income"] or 5000)
+    avg_income = _recurring_monthly if _recurring_monthly > 0 else float(income_rows["avg_income"] or 0)
     avg_expense = float(expense_rows["avg_expense"] or 3000)
     current_liquid = float(liquid["total"] or 4000)
     total_assets = float(all_assets["total"] or 0)

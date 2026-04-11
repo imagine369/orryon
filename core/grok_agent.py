@@ -42,6 +42,9 @@ MAX_TOOL_ROUNDS = 8
 HISTORY_WINDOW = 50
 
 _TOOL_LABELS = {
+    "set_balance": "Setting balance",
+    "add_money": "Adding to balance",
+    "get_balance": "Checking balance",
     "add_expense": "Logging expense",
     "add_calendar_event": "Adding to calendar",
     "add_grocery_items": "Updating grocery list",
@@ -70,6 +73,9 @@ _TOOL_LABELS = {
     "edit_event": "Updating event",
     "edit_task": "Updating task",
     "delete_note": "Removing note",
+    "search_notes": "Searching notes",
+    "edit_note": "Updating note",
+    "pin_note": "Pinning note",
     "delete_bill": "Cancelling bill",
     "split_expense": "Splitting expense",
     "get_spending_patterns": "Analysing patterns",
@@ -391,25 +397,67 @@ def _build_messages(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _get_context_snapshot(user_id: str) -> str:
-    """Brief plain-text context snapshot injected into the system prompt."""
+    """Full context snapshot injected into the system prompt so the AI sees everything."""
     try:
-        from core.tools import _get_net_worth, _get_spending_summary, _get_budget_status
-        nw = _get_net_worth({}, user_id)
+        from core.tools import (
+            _get_net_worth, _get_spending_summary, _get_budget_status,
+            _get_goals, _get_upcoming_schedule, _get_balance,
+        )
+        from db import get_total_monthly_income, get_balance as db_get_balance
+
+        bal_data = _get_balance({}, user_id)
         spend = _get_spending_summary({"period": "this_month"}, user_id)
         budget = _get_budget_status({}, user_id)
+        goals = _get_goals({}, user_id)
+        schedule = _get_upcoming_schedule({"days": 7}, user_id)
+        monthly_income = get_total_monthly_income(user_id)
 
         lines = [
-            f"- Net worth: ${nw['net_worth']:,.0f}",
-            f"- Total assets: ${nw['total_assets']:,.0f}",
-            f"- Total liabilities: ${nw['total_liabilities']:,.0f}",
-            f"- This month's spending: ${spend['total']:,.0f}",
+            f"- Balance: ${bal_data['balance']:,.0f}",
+            f"- Goals earmarked: ${bal_data['goals_earmarked']:,.0f}",
+            f"- Free to spend (balance after goals): ${bal_data['free_to_spend']:,.0f}",
+            f"- Monthly income: ${monthly_income:,.0f}" if monthly_income > 0 else "- Monthly income: not set",
+            f"- Monthly bills: ${bal_data['monthly_bills']:,.0f}",
+            f"- This month's spending: ${spend['total']:,.0f} ({spend['transaction_count']} transactions)",
         ]
         for cat in spend.get("by_category", [])[:5]:
             lines.append(f"  · {cat['category']}: ${cat['total']:,.0f}")
-        for b in budget.get("categories", [])[:4]:
+        for b in budget.get("categories", [])[:5]:
             lines.append(
                 f"  · Budget {b['category']}: ${b['spent']:,.0f}/${b['planned']:,.0f} ({b['pct_used']}%)"
             )
+        if goals.get("goals"):
+            lines.append("- Goals:")
+            for g in goals["goals"][:5]:
+                lines.append(
+                    f"  · {g['name']}: ${g['current_amount']:,.0f}/${g['target_amount']:,.0f} ({g['pct_complete']}%)"
+                )
+        if schedule.get("items"):
+            lines.append("- Upcoming (7 days):")
+            for item in schedule["items"][:5]:
+                amt = f" ${item['amount']:,.0f}" if item.get("amount") else ""
+                lines.append(f"  · [{item['type']}] {item['title']} — {item.get('date', '')}{amt}")
+
+        try:
+            from db import get_connection
+            conn = get_connection()
+            recent_notes = conn.execute(
+                "SELECT id, title, tags, mood, is_pinned, linked_goal FROM notes "
+                "WHERE user_id=? ORDER BY is_pinned DESC, updated_at DESC LIMIT 10",
+                (user_id,),
+            ).fetchall()
+            conn.close()
+            if recent_notes:
+                lines.append("- Recent notes:")
+                for n in recent_notes:
+                    n = dict(n)
+                    pin = " 📌" if n.get("is_pinned") else ""
+                    mood = f" ({n['mood']})" if n.get("mood") else ""
+                    goal = f" → {n['linked_goal']}" if n.get("linked_goal") else ""
+                    lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}{goal}")
+        except Exception:
+            pass
+
         return "\n".join(lines)
     except Exception as exc:
         logger.warning("Context snapshot failed: %s", exc)
