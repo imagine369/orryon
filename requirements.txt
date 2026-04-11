@@ -9,5 +9,12 @@ pandas>=2.1.0
 numpy>=1.26.0
 plotly>=5.18.0
 
+# ── Notifications (background scheduler for email reminders) ───────────────────
+apscheduler>=3.10.0
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0
+
+# ── Google Calendar (optional — for Phase 5 calendar sync) ─────────────────────
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.100.0

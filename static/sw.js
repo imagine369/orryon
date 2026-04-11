@@ -1,4 +1,4 @@
-const CACHE = "guddd-v1";
+const CACHE = "orryon-v1";
 
 const PRECACHE = [
   "/",

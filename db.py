@@ -16,7 +16,7 @@ Tables:
   events              - calendar events and bill reminders
   subscriptions       - auto-detected or manually added recurring charges
   credit_scores       - credit score history snapshots
-  action_items        - Edward's task/action-item tracker
+  action_items        - orryon's task/action-item tracker
   links               - user's saved links (Linktree-style)
   inspo_images        - user's inspiration image board
   link_pages          - public Linktree-style page settings and share tokens
@@ -35,7 +35,7 @@ import random
 import sqlite3
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -166,6 +166,8 @@ def init_db() -> None:
             is_recurring          INTEGER DEFAULT 0,
             recurrence            TEXT,        -- monthly | weekly | yearly
             is_synced_to_google   INTEGER DEFAULT 0,
+            reminder_minutes      INTEGER DEFAULT 30,  -- 0=none, 10, 30, 60, 360, 1440
+            reminder_sent         INTEGER DEFAULT 0,
             created_at            TEXT
         );
 
@@ -278,6 +280,38 @@ def init_db() -> None:
             is_active   INTEGER DEFAULT 1,
             created_at  TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS user_memory (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            fact        TEXT NOT NULL,
+            category    TEXT DEFAULT 'general',
+            source      TEXT DEFAULT 'conversation',
+            created_at  TEXT NOT NULL,
+            UNIQUE(user_id, fact)
+        );
+
+        CREATE TABLE IF NOT EXISTS recurring_income (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            amount      REAL NOT NULL,
+            frequency   TEXT DEFAULT 'monthly',
+            source      TEXT DEFAULT '',
+            next_date   TEXT,
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+            id              TEXT PRIMARY KEY,
+            user_id         TEXT NOT NULL,
+            total_assets    REAL DEFAULT 0,
+            total_liabilities REAL DEFAULT 0,
+            net_worth       REAL DEFAULT 0,
+            snapshot_date   TEXT NOT NULL,
+            UNIQUE(user_id, snapshot_date)
+        );
     """)
 
     conn.commit()
@@ -286,6 +320,12 @@ def init_db() -> None:
     _migrate_users_table(conn)
     _migrate_goals_table(conn)
     _migrate_subscriptions_table(conn)
+    _migrate_events_reminders(conn)
+    _migrate_users_notifications(conn)
+    _migrate_user_memory(conn)
+    _migrate_budget_rollover(conn)
+    _migrate_transactions_currency(conn)
+    _migrate_users_weekly_report(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -300,8 +340,8 @@ def _migrate_subscriptions_table(conn: sqlite3.Connection) -> None:
         if "last_changed" not in cols:
             conn.execute("ALTER TABLE subscriptions ADD COLUMN last_changed TEXT DEFAULT ''")
         conn.commit()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("_migrate_subscriptions_table: %s (non-fatal)", exc)
 
 
 def _migrate_goals_table(conn: sqlite3.Connection) -> None:
@@ -311,8 +351,94 @@ def _migrate_goals_table(conn: sqlite3.Connection) -> None:
         if "linked_budget_category" not in cols:
             conn.execute("ALTER TABLE goals ADD COLUMN linked_budget_category TEXT DEFAULT ''")
             conn.commit()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("_migrate_goals_table: %s (non-fatal)", exc)
+
+
+def _migrate_events_reminders(conn: sqlite3.Connection) -> None:
+    """Add reminder_minutes + reminder_sent columns to events table."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()]
+        if "reminder_minutes" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN reminder_minutes INTEGER DEFAULT 30")
+        if "reminder_sent" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN reminder_sent INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_events_reminders: %s (non-fatal)", exc)
+
+
+def _migrate_users_notifications(conn: sqlite3.Connection) -> None:
+    """Add notification preference columns to users table."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "default_reminder_minutes" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN default_reminder_minutes INTEGER DEFAULT 30")
+        if "daily_digest_enabled" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN daily_digest_enabled INTEGER DEFAULT 1")
+        if "daily_digest_time" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN daily_digest_time TEXT DEFAULT '08:00'")
+        if "last_digest_sent" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN last_digest_sent TEXT DEFAULT ''")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_users_notifications: %s (non-fatal)", exc)
+
+
+def _migrate_budget_rollover(conn: sqlite3.Connection) -> None:
+    """Add rollover column to budget_categories."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(budget_categories)").fetchall()]
+        if "rollover" not in cols:
+            conn.execute("ALTER TABLE budget_categories ADD COLUMN rollover INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_budget_rollover: %s (non-fatal)", exc)
+
+
+def _migrate_transactions_currency(conn: sqlite3.Connection) -> None:
+    """Add currency and attachment_path columns to transactions."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()]
+        if "currency" not in cols:
+            conn.execute("ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT 'USD'")
+        if "attachment_path" not in cols:
+            conn.execute("ALTER TABLE transactions ADD COLUMN attachment_path TEXT DEFAULT ''")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_transactions_currency: %s (non-fatal)", exc)
+
+
+def _migrate_users_weekly_report(conn: sqlite3.Connection) -> None:
+    """Add weekly_report_enabled column to users."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "weekly_report_enabled" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN weekly_report_enabled INTEGER DEFAULT 1")
+        if "last_weekly_report" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN last_weekly_report TEXT DEFAULT ''")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_users_weekly_report: %s (non-fatal)", exc)
+
+
+def _migrate_user_memory(conn: sqlite3.Connection) -> None:
+    """Ensure user_memory table exists (added in v2)."""
+    try:
+        conn.execute("SELECT 1 FROM user_memory LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_memory (
+                id          TEXT PRIMARY KEY,
+                user_id     TEXT NOT NULL,
+                fact        TEXT NOT NULL,
+                category    TEXT DEFAULT 'general',
+                source      TEXT DEFAULT 'conversation',
+                created_at  TEXT NOT NULL,
+                UNIQUE(user_id, fact)
+            )
+        """)
+        conn.commit()
 
 
 def _migrate_users_table(conn: sqlite3.Connection) -> None:
@@ -463,7 +589,7 @@ def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
         "id": str(uuid.uuid4()),
         "email": email,
         "display_name": name,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     insert_row("users", user)
     logger.info("Created user: %s (%s)", email, user["id"])
@@ -478,14 +604,14 @@ def create_verification_code(email: str) -> str:
     """
     email = email.strip().lower()
     code = f"{random.SystemRandom().randint(0, 999999):06d}"
-    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
     insert_row("verification_codes", {
         "id": str(uuid.uuid4()),
         "email": email,
         "code_hash": _hash_code(code),
         "expires_at": expires_at,
         "used": 0,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     })
     logger.info("Verification code created for: %s (expires %s)", email, expires_at)
     return code
@@ -499,7 +625,7 @@ def verify_code(email: str, code: str) -> bool:
     """
     email = email.strip().lower()
     code_hash = _hash_code(code.strip())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     try:
         conn = get_connection()
         row = conn.execute(
@@ -539,7 +665,7 @@ def save_chat_message(user_id: str, msg: dict) -> bool:
         "confidence": msg.get("confidence", 0),
         "evidence": msg.get("evidence", ""),
         "next_steps": msg.get("next_steps_or_question", ""),
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     return insert_row("chat_messages", row)
 
@@ -598,7 +724,7 @@ def get_or_create_link_page(user_id: str) -> dict:
         logger.error("get_or_create_link_page lookup: %s", exc)
 
     token = uuid.uuid4().hex[:16]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     record = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -629,6 +755,127 @@ def get_link_page_by_token(token: str) -> dict | None:
     except Exception as exc:
         logger.error("get_link_page_by_token: %s", exc)
         return None
+
+
+# ── User memory helpers ────────────────────────────────────────────────────────
+
+def save_user_memory(user_id: str, fact: str, category: str = "general") -> bool:
+    """Store a learned fact about the user. Duplicates are silently ignored."""
+    return insert_row("user_memory", {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "fact": fact.strip(),
+        "category": category,
+        "source": "conversation",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def get_user_memories(user_id: str, limit: int = 50) -> list[dict]:
+    """Retrieve stored facts/preferences for a user, newest first."""
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM user_memory WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_user_memories error: %s", exc)
+        return []
+
+
+# ── Recurring income helpers ───────────────────────────────────────────────
+
+def get_recurring_income(user_id: str) -> list[dict]:
+    """Get all active recurring income sources for a user."""
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM recurring_income WHERE user_id=? AND is_active=1 ORDER BY amount DESC",
+            (user_id,),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_recurring_income error: %s", exc)
+        return []
+
+
+def get_total_monthly_income(user_id: str) -> float:
+    """Sum all active recurring income, normalised to monthly."""
+    sources = get_recurring_income(user_id)
+    total = 0.0
+    for s in sources:
+        amt = float(s["amount"])
+        freq = (s.get("frequency") or "monthly").lower()
+        if freq == "weekly":
+            total += amt * 4.33
+        elif freq == "biweekly":
+            total += amt * 2.167
+        elif freq == "yearly":
+            total += amt / 12
+        else:
+            total += amt
+    return total
+
+
+# ── Net worth snapshot helpers ────────────────────────────────────────────
+
+def snapshot_net_worth(user_id: str) -> bool:
+    """Take a daily net worth snapshot. No-ops if already taken today."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        conn = get_connection()
+        existing = conn.execute(
+            "SELECT id FROM net_worth_snapshots WHERE user_id=? AND snapshot_date=?",
+            (user_id, today),
+        ).fetchone()
+        if existing:
+            conn.close()
+            return False
+
+        assets = conn.execute(
+            "SELECT SUM(balance) as total FROM accounts WHERE user_id=? AND balance>0",
+            (user_id,),
+        ).fetchone()
+        liabs = conn.execute(
+            "SELECT ABS(SUM(balance)) as total FROM accounts WHERE user_id=? AND balance<0",
+            (user_id,),
+        ).fetchone()
+        conn.close()
+
+        total_assets = float(assets["total"] or 0) if assets else 0
+        total_liabs = float(liabs["total"] or 0) if liabs else 0
+        nw = total_assets - total_liabs
+
+        return insert_row("net_worth_snapshots", {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "total_assets": total_assets,
+            "total_liabilities": total_liabs,
+            "net_worth": nw,
+            "snapshot_date": today,
+        })
+    except Exception as exc:
+        logger.error("snapshot_net_worth error: %s", exc)
+        return False
+
+
+def get_nw_history(user_id: str, limit: int = 90) -> list[dict]:
+    """Retrieve net worth snapshots for sparkline, oldest-first."""
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM net_worth_snapshots WHERE user_id=? ORDER BY snapshot_date DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in reversed(rows)]
+    except Exception as exc:
+        logger.error("get_nw_history error: %s", exc)
+        return []
 
 
 # Auto-initialise on import

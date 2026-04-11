@@ -236,7 +236,7 @@ def _create_goal_form(user_id: str) -> None:
             st.error("Target amount must be > 0.")
             return
         import uuid
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timezone as _tz
         insert_row("goals", {
             "id": str(uuid.uuid4()),
             "user_id": user_id,
@@ -247,11 +247,57 @@ def _create_goal_form(user_id: str) -> None:
             "category": category,
             "linked_budget_category": linked_cat.strip(),
             "notes": notes.strip(),
-            "created_at": _dt.utcnow().isoformat(),
+            "created_at": _dt.now(_tz.utc).isoformat(),
             "is_completed": 1 if current >= target else 0,
         })
         st.success(f"✅ Goal **{name}** created!")
         st.rerun()
+
+
+def _check_milestones(user_id: str) -> None:
+    """Show celebration banners for goals that recently hit milestones."""
+    goals = _load_goals(user_id, include_completed=True)
+    milestone_key = "goals_celebrated"
+    celebrated = st.session_state.get(milestone_key, set())
+
+    for g in goals:
+        target = float(g["target_amount"])
+        current = float(g["current_amount"])
+        pct = _pct(current, target)
+        gid = g["id"]
+
+        if g["is_completed"] and gid not in celebrated:
+            st.markdown(
+                f'<div class="goal-celebration">'
+                f'<span class="confetti">🎉</span> <span class="confetti">🎊</span> '
+                f'<span class="confetti">✨</span><br>'
+                f'<span style="font-size:1.1rem;font-weight:700;color:#22c55e;">'
+                f'Goal Complete! {g["name"]} — ${target:,.0f} reached!</span><br>'
+                f'<span style="font-size:0.85rem;color:#94a3b8;">Amazing work! You crushed it. 🏆</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            celebrated.add(gid)
+        elif pct >= 75 and f"{gid}_75" not in celebrated:
+            st.markdown(
+                f'<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);'
+                f'border-radius:10px;padding:0.6rem 1rem;margin-bottom:0.5rem;font-size:0.88rem;">'
+                f'🔥 <b>{g["name"]}</b> is at <b>{pct:.0f}%</b> — the finish line is in sight!'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            celebrated.add(f"{gid}_75")
+        elif pct >= 50 and f"{gid}_50" not in celebrated:
+            st.markdown(
+                f'<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);'
+                f'border-radius:10px;padding:0.6rem 1rem;margin-bottom:0.5rem;font-size:0.88rem;">'
+                f'💪 <b>{g["name"]}</b> just hit <b>{pct:.0f}%</b> — halfway there!'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            celebrated.add(f"{gid}_50")
+
+    st.session_state[milestone_key] = celebrated
 
 
 # ─── Main render ──────────────────────────────────────────────────────────────
@@ -265,12 +311,25 @@ def render_goals(user_id: str) -> None:
           -webkit-background-clip:text;-webkit-text-fill-color:transparent;
           margin-bottom:2px;}
         .goals-sub{color:#64748b;font-size:.85rem;margin-bottom:1rem;}
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(40px) rotate(360deg); opacity: 0; }
+        }
+        .goal-celebration {
+          background: linear-gradient(135deg, rgba(34,197,94,0.15), rgba(250,204,21,0.1));
+          border: 1px solid rgba(34,197,94,0.4); border-radius: 14px;
+          padding: 1rem 1.2rem; margin-bottom: 0.8rem; text-align: center;
+        }
+        .goal-celebration .confetti { display: inline-block; animation: confetti-fall 2s ease-out infinite; }
         </style>
         <div class="goals-header">🎯 Goals</div>
         <div class="goals-sub">Track your savings targets. Ask orryon to create or update goals naturally.</div>
         """,
         unsafe_allow_html=True,
     )
+
+    # Check for milestone celebrations
+    _check_milestones(user_id)
 
     show_completed = st.toggle("Show completed goals", value=False, key="goals_show_completed")
     goals = _load_goals(user_id, include_completed=show_completed)

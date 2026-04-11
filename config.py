@@ -5,8 +5,7 @@ All secrets are read from environment variables (loaded from .env).
 NEVER hardcode API keys here. Use .env.example as a template.
 
 LLM:
-  Grok (xAI) via langchain-xai. Set LLM_PROVIDER=grok and XAI_API_KEY in .env.
-  GROK_MODEL=grok-latest auto-tracks the newest Grok release.
+  Grok (xAI) via direct HTTP (core/grok_agent.py). Set XAI_API_KEY in .env.
   OpenAI is intentionally not supported.
 
 Email OTP auth:
@@ -40,50 +39,6 @@ GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-3-mini")
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1")
 
-
-def get_llm(temperature: float = 0.1):
-    """
-    Returns the configured LangChain chat model.
-
-    "grok"   → ChatXAI with GROK_MODEL (default: grok-latest).
-               grok-latest automatically upgrades whenever xAI ships a new model,
-               so your agents always run on the most current Grok — zero code changes.
-    "ollama" → ChatOllama running locally (100% private, no cloud).
-
-    No OpenAI dependency anywhere in this project.
-    """
-    if LLM_PROVIDER == "grok":
-        if not XAI_API_KEY:
-            raise RuntimeError(
-                "XAI_API_KEY is not set. Add it to your .env file.\n"
-                "Get a key at: https://console.x.ai"
-            )
-        try:
-            from langchain_xai import ChatXAI
-            logger.info("Using Grok LLM: %s", GROK_MODEL)
-            return ChatXAI(
-                model=GROK_MODEL,
-                xai_api_key=XAI_API_KEY,
-                temperature=temperature,
-            )
-        except ImportError:
-            raise RuntimeError(
-                "langchain-xai is not installed. Run: pip install langchain-xai"
-            )
-
-    # Ollama fallback — local/private
-    try:
-        from langchain_ollama import ChatOllama
-        logger.info("Using Ollama LLM: %s at %s", OLLAMA_MODEL, OLLAMA_BASE_URL)
-        return ChatOllama(
-            model=OLLAMA_MODEL,
-            base_url=OLLAMA_BASE_URL,
-            temperature=temperature,
-        )
-    except ImportError:
-        raise RuntimeError(
-            "langchain-ollama is not installed. Run: pip install langchain-ollama"
-        )
 
 
 # ── Banking — Plaid ───────────────────────────────────────────────────────────
@@ -142,5 +97,8 @@ SMTP_PASS: str = os.getenv("SMTP_PASS", "")
 SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
 SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
+ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
+
 # ── Ensure directories exist ──────────────────────────────────────────────────
 os.makedirs(NOTES_DIR, exist_ok=True)
+os.makedirs(ATTACHMENTS_DIR, exist_ok=True)

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from db import delete_row, fetch_rows, get_connection, insert_row, update_row
 
@@ -70,6 +70,11 @@ TOOL_SCHEMAS = [
                         "type": "string",
                         "enum": ["event", "reminder", "errand", "bill_due", "task"],
                         "description": "Type of event",
+                    },
+                    "reminder_minutes": {
+                        "type": "integer",
+                        "enum": [0, 10, 30, 60, 360, 1440],
+                        "description": "Email reminder: 0=none, 10=10min, 30=30min (default), 60=1hr, 360=6hr, 1440=1day before",
                     },
                 },
                 "required": ["title", "date"],
@@ -178,6 +183,7 @@ TOOL_SCHEMAS = [
                     "category": {"type": "string", "description": "Budget category name"},
                     "amount": {"type": "number", "description": "Monthly budget amount in USD"},
                     "month": {"type": "string", "description": "Month as YYYY-MM. Defaults to current month."},
+                    "rollover": {"type": "boolean", "description": "If true, unspent budget carries over to next month. Default false."},
                 },
                 "required": ["category", "amount"],
             },
@@ -393,6 +399,229 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_notification_preferences",
+            "description": (
+                "Update the user's notification settings: default reminder time for new events, "
+                "daily digest on/off, or daily digest time. Use when the user says things like "
+                "'set my default reminder to 1 hour', 'turn off daily digest', 'send my morning "
+                "summary at 7am', etc."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "default_reminder_minutes": {
+                        "type": "integer",
+                        "enum": [0, 10, 30, 60, 360, 1440],
+                        "description": "Default reminder for new events: 0=none, 10/30/60/360/1440 minutes before",
+                    },
+                    "daily_digest_enabled": {
+                        "type": "boolean",
+                        "description": "Enable or disable the daily morning digest email",
+                    },
+                    "daily_digest_time": {
+                        "type": "string",
+                        "description": "Time to send daily digest as HH:MM (24h), e.g. '08:00', '07:30'",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_expense",
+            "description": "Edit/update an existing expense. Use when user says 'change that to $55', 'recategorise that expense', 'fix that transaction'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expense_id": {"type": "string", "description": "The ID of the expense to edit"},
+                    "amount": {"type": "number", "description": "New amount (optional)"},
+                    "merchant": {"type": "string", "description": "New merchant name (optional)"},
+                    "category": {"type": "string", "description": "New category (optional)"},
+                    "date": {"type": "string", "description": "New date as YYYY-MM-DD (optional)"},
+                },
+                "required": ["expense_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_recurring_income",
+            "description": "Track a recurring income source (salary, freelance, dividends, etc). Use when user mentions their income, salary, or earnings.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Income source name (e.g. 'Salary', 'Freelance Design')"},
+                    "amount": {"type": "number", "description": "Amount per period in USD"},
+                    "frequency": {
+                        "type": "string",
+                        "enum": ["monthly", "weekly", "biweekly", "yearly"],
+                        "description": "How often this income is received",
+                    },
+                    "source": {"type": "string", "description": "Source description (e.g. 'Employer', 'Side gig')"},
+                },
+                "required": ["name", "amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_event",
+            "description": "Edit/update a calendar event. Use when user says 'move that to 3pm', 'rename that event', 'change the meeting time'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "event_id": {"type": "string", "description": "The ID of the event to edit"},
+                    "title": {"type": "string", "description": "New title (optional)"},
+                    "date": {"type": "string", "description": "New date as YYYY-MM-DD (optional)"},
+                    "time": {"type": "string", "description": "New time as HH:MM (optional)"},
+                    "description": {"type": "string", "description": "New description (optional)"},
+                },
+                "required": ["event_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_task",
+            "description": "Edit/update a task. Use when user says 'change that task', 'move the due date', 'make that high priority'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "The ID of the task to edit"},
+                    "title": {"type": "string", "description": "New title (optional)"},
+                    "due_date": {"type": "string", "description": "New due date as YYYY-MM-DD (optional)"},
+                    "priority": {"type": "string", "enum": ["high", "medium", "low"], "description": "New priority (optional)"},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_note",
+            "description": "Delete a note by its ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string", "description": "The ID of the note to delete"},
+                },
+                "required": ["note_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_bill",
+            "description": "Cancel/delete a recurring bill or subscription by its ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bill_id": {"type": "string", "description": "The ID of the bill to cancel"},
+                },
+                "required": ["bill_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "split_expense",
+            "description": "Split an expense with other people and log the user's share. Use when user says 'split dinner with Kirk', 'split the $100 with 3 people'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "Full amount before split"},
+                    "merchant": {"type": "string", "description": "Merchant or description"},
+                    "category": {"type": "string", "description": "Expense category"},
+                    "split_with": {"type": "string", "description": "Name(s) of people splitting with"},
+                    "split_count": {"type": "integer", "description": "Total number of people including user (default 2)"},
+                    "date": {"type": "string", "description": "Date as YYYY-MM-DD (optional)"},
+                },
+                "required": ["amount", "merchant", "category"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spending_patterns",
+            "description": "Analyse spending patterns and trends. Use when user asks about habits, trends, weekday vs weekend spending, month-over-month changes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "months": {"type": "integer", "description": "Number of months to analyse (default 3)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_transactions",
+            "description": "Search past transactions by keyword, date range, or category. Use when user asks 'find my Sushi Agato expense', 'show all uber rides', etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search keyword (matches merchant, description)"},
+                    "date_from": {"type": "string", "description": "Start date as YYYY-MM-DD (optional)"},
+                    "date_to": {"type": "string", "description": "End date as YYYY-MM-DD (optional)"},
+                    "category": {"type": "string", "description": "Filter by category (optional)"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_expense",
+            "description": "Delete/remove an expense by its ID. Use when user says 'undo that expense', 'remove that', or 'delete the expense I just added'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expense_id": {"type": "string", "description": "The ID of the expense to delete"},
+                },
+                "required": ["expense_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_event",
+            "description": "Delete/remove a calendar event by its ID. Use when user says 'remove that event' or 'cancel that appointment'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "event_id": {"type": "string", "description": "The ID of the event to delete"},
+                },
+                "required": ["event_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_task",
+            "description": "Delete/remove a task by its ID. Use when user says 'remove that task' or 'delete the task I just added'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "The ID of the task to delete"},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
 ]
 
 
@@ -409,7 +638,7 @@ def _current_month() -> str:
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _uid() -> str:
@@ -454,6 +683,16 @@ def _add_calendar_event(args: dict, user_id: str) -> dict:
     date = args.get("date") or _today()
     time = args.get("time", "")
     event_datetime = f"{date} {time}".strip()
+    reminder = int(args.get("reminder_minutes", 30))
+
+    conn = get_connection()
+    user_row = conn.execute(
+        "SELECT default_reminder_minutes FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    conn.close()
+    if "reminder_minutes" not in args and user_row and user_row["default_reminder_minutes"] is not None:
+        reminder = int(user_row["default_reminder_minutes"])
+
     row = {
         "id": _uid(),
         "user_id": user_id,
@@ -463,10 +702,17 @@ def _add_calendar_event(args: dict, user_id: str) -> dict:
         "event_type": args.get("event_type", "event"),
         "amount": 0,
         "is_recurring": 0,
+        "reminder_minutes": reminder,
+        "reminder_sent": 0,
         "created_at": _now_iso(),
     }
     insert_row("events", row)
-    return {"status": "ok", "id": row["id"], "title": title, "date": date, "time": time}
+
+    reminder_label = _reminder_label(reminder)
+    return {
+        "status": "ok", "id": row["id"], "title": title,
+        "date": date, "time": time, "reminder": reminder_label,
+    }
 
 
 def _add_grocery_items(args: dict, user_id: str) -> dict:
@@ -571,6 +817,7 @@ def _set_budget(args: dict, user_id: str) -> dict:
     month = args.get("month") or _current_month()
     category = args["category"]
     amount = float(args["amount"])
+    rollover = 1 if args.get("rollover") else 0
     conn = get_connection()
     existing = conn.execute(
         "SELECT id FROM budget_categories WHERE user_id=? AND category=? AND month=?",
@@ -578,7 +825,7 @@ def _set_budget(args: dict, user_id: str) -> dict:
     ).fetchone()
     conn.close()
     if existing:
-        update_row("budget_categories", {"planned": amount}, {"id": existing["id"]})
+        update_row("budget_categories", {"planned": amount, "rollover": rollover}, {"id": existing["id"]})
     else:
         insert_row("budget_categories", {
             "id": _uid(),
@@ -586,10 +833,11 @@ def _set_budget(args: dict, user_id: str) -> dict:
             "category": category,
             "planned": amount,
             "month": month,
+            "rollover": rollover,
             "created_at": _now_iso(),
         })
     spent = _get_category_spending(user_id, category, month)
-    return {"status": "ok", "category": category, "planned": amount, "spent": spent, "month": month}
+    return {"status": "ok", "category": category, "planned": amount, "spent": spent, "month": month, "rollover": bool(rollover)}
 
 
 def _check_grocery_item(args: dict, user_id: str) -> dict:
@@ -789,6 +1037,17 @@ def _get_budget_status(args: dict, user_id: str) -> dict:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _reminder_label(minutes: int) -> str:
+    """Human-readable label for a reminder_minutes value."""
+    if minutes <= 0:
+        return "none"
+    if minutes < 60:
+        return f"{minutes} min before"
+    if minutes < 1440:
+        return f"{minutes // 60} hour{'s' if minutes >= 120 else ''} before"
+    return "1 day before"
+
 
 def _get_category_spending(user_id: str, category: str, month: str) -> float:
     conn = get_connection()
@@ -1062,6 +1321,339 @@ def _add_custom_category(args: dict, user_id: str) -> dict:
     return {"status": "ok", "name": name, "icon": icon, "color": color}
 
 
+def _set_notification_preferences(args: dict, user_id: str) -> dict:
+    updates = {}
+    messages = []
+    if "default_reminder_minutes" in args:
+        val = int(args["default_reminder_minutes"])
+        updates["default_reminder_minutes"] = val
+        messages.append(f"Default reminder set to {_reminder_label(val)}" if val > 0 else "Default reminders turned off")
+    if "daily_digest_enabled" in args:
+        val = 1 if args["daily_digest_enabled"] else 0
+        updates["daily_digest_enabled"] = val
+        messages.append("Daily digest enabled" if val else "Daily digest disabled")
+    if "daily_digest_time" in args:
+        val = args["daily_digest_time"].strip()
+        updates["daily_digest_time"] = val
+        messages.append(f"Daily digest time set to {val}")
+
+    if not updates:
+        return {"status": "no_changes", "message": "No preferences specified."}
+
+    update_row("users", updates, {"id": user_id})
+    return {"status": "ok", "changes": messages}
+
+
+# ── Delete tools (for undo) ──────────────────────────────────────────────────
+
+def _delete_expense(args: dict, user_id: str) -> dict:
+    expense_id = args["expense_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, merchant, amount FROM transactions WHERE id=? AND user_id=?",
+        (expense_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Expense not found."}
+    delete_row("transactions", {"id": expense_id, "user_id": user_id})
+    return {"status": "ok", "deleted": row["merchant"], "amount": row["amount"]}
+
+
+def _delete_event(args: dict, user_id: str) -> dict:
+    event_id = args["event_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, title FROM events WHERE id=? AND user_id=?",
+        (event_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Event not found."}
+    delete_row("events", {"id": event_id, "user_id": user_id})
+    return {"status": "ok", "deleted": row["title"]}
+
+
+def _delete_task(args: dict, user_id: str) -> dict:
+    task_id = args["task_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, title FROM action_items WHERE id=? AND user_id=?",
+        (task_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Task not found."}
+    delete_row("action_items", {"id": task_id, "user_id": user_id})
+    return {"status": "ok", "deleted": row["title"]}
+
+
+def _edit_expense(args: dict, user_id: str) -> dict:
+    eid = args["expense_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM transactions WHERE id=? AND user_id=?", (eid, user_id)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Expense not found."}
+    updates = {}
+    if "amount" in args:
+        updates["amount"] = float(args["amount"])
+    if "merchant" in args:
+        updates["merchant"] = args["merchant"]
+        updates["description"] = args["merchant"]
+    if "category" in args:
+        updates["category"] = args["category"]
+    if "date" in args:
+        updates["date"] = args["date"]
+    if not updates:
+        return {"status": "no_changes", "message": "No fields to update."}
+    update_row("transactions", updates, {"id": eid})
+    return {"status": "ok", "id": eid, "updated": list(updates.keys()),
+            "merchant": updates.get("merchant", row["merchant"]),
+            "amount": updates.get("amount", row["amount"])}
+
+
+def _add_recurring_income(args: dict, user_id: str) -> dict:
+    from db import get_recurring_income, get_total_monthly_income
+    row = {
+        "id": _uid(),
+        "user_id": user_id,
+        "name": args["name"],
+        "amount": float(args["amount"]),
+        "frequency": args.get("frequency", "monthly"),
+        "source": args.get("source", ""),
+        "next_date": "",
+        "is_active": 1,
+        "created_at": _now_iso(),
+    }
+    insert_row("recurring_income", row)
+    total = get_total_monthly_income(user_id)
+    return {"status": "ok", "id": row["id"], "name": row["name"],
+            "amount": row["amount"], "frequency": row["frequency"],
+            "total_monthly_income": round(total, 2)}
+
+
+def _edit_event(args: dict, user_id: str) -> dict:
+    eid = args["event_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM events WHERE id=? AND user_id=?", (eid, user_id)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Event not found."}
+    updates = {}
+    new_date = args.get("date")
+    new_time = args.get("time")
+    if new_date or new_time:
+        old_date_str = (row["event_date"] or "")[:10]
+        old_time_str = (row["event_date"] or "")[11:16] if len(row["event_date"] or "") > 10 else ""
+        d = new_date or old_date_str
+        t = new_time or old_time_str
+        updates["event_date"] = f"{d} {t}".strip()
+    if "title" in args:
+        updates["title"] = args["title"]
+    if "description" in args:
+        updates["description"] = args["description"]
+    if not updates:
+        return {"status": "no_changes"}
+    update_row("events", updates, {"id": eid})
+    return {"status": "ok", "id": eid, "updated": list(updates.keys()), "title": updates.get("title", row["title"])}
+
+
+def _edit_task(args: dict, user_id: str) -> dict:
+    tid = args["task_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM action_items WHERE id=? AND user_id=?", (tid, user_id)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Task not found."}
+    updates = {"updated_at": _now_iso()}
+    if "title" in args:
+        updates["title"] = args["title"]
+    if "due_date" in args:
+        updates["due_date"] = args["due_date"]
+    if "priority" in args:
+        updates["priority"] = args["priority"]
+    update_row("action_items", updates, {"id": tid})
+    return {"status": "ok", "id": tid, "updated": list(updates.keys()), "title": updates.get("title", row["title"])}
+
+
+def _delete_note(args: dict, user_id: str) -> dict:
+    nid = args["note_id"]
+    conn = get_connection()
+    row = conn.execute("SELECT id, title FROM notes WHERE id=? AND user_id=?", (nid, user_id)).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Note not found."}
+    delete_row("notes", {"id": nid, "user_id": user_id})
+    return {"status": "ok", "deleted": row["title"]}
+
+
+def _delete_bill(args: dict, user_id: str) -> dict:
+    bid = args["bill_id"]
+    conn = get_connection()
+    row = conn.execute("SELECT id, name FROM subscriptions WHERE id=? AND user_id=?", (bid, user_id)).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Bill not found."}
+    update_row("subscriptions", {"is_active": 0}, {"id": bid})
+    return {"status": "ok", "cancelled": row["name"]}
+
+
+def _split_expense(args: dict, user_id: str) -> dict:
+    total = float(args["amount"])
+    split_count = int(args.get("split_count", 2))
+    user_share = round(total / split_count, 2)
+    date = args.get("date") or _today()
+    import json as _json
+    row = {
+        "id": _uid(),
+        "user_id": user_id,
+        "date": date,
+        "amount": user_share,
+        "merchant": args.get("merchant", "Split expense"),
+        "description": f"Split {split_count} ways with {args.get('split_with', 'others')}",
+        "category": args.get("category", "Other"),
+        "is_recurring": 0,
+        "metadata": _json.dumps({
+            "split": True, "full_amount": total,
+            "split_count": split_count, "split_with": args.get("split_with", ""),
+        }),
+    }
+    insert_row("transactions", row)
+    return {
+        "status": "ok", "id": row["id"],
+        "full_amount": total, "your_share": user_share,
+        "split_count": split_count, "split_with": args.get("split_with", ""),
+        "merchant": row["merchant"], "category": row["category"],
+    }
+
+
+def _get_spending_patterns(args: dict, user_id: str) -> dict:
+    months_back = int(args.get("months", 3))
+    now = datetime.now()
+    start = (now - timedelta(days=months_back * 30)).strftime("%Y-%m-%d")
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM transactions WHERE user_id=? AND date>=? AND amount>0 ORDER BY date ASC",
+        (user_id, start),
+    ).fetchall()
+    conn.close()
+
+    weekday_total = 0.0
+    weekend_total = 0.0
+    weekday_count = 0
+    weekend_count = 0
+    monthly_totals: dict[str, float] = {}
+    cat_totals: dict[str, float] = {}
+
+    for r in rows:
+        amt = float(r["amount"])
+        try:
+            d = datetime.strptime(r["date"], "%Y-%m-%d")
+            if d.weekday() < 5:
+                weekday_total += amt
+                weekday_count += 1
+            else:
+                weekend_total += amt
+                weekend_count += 1
+            month_key = d.strftime("%Y-%m")
+            monthly_totals[month_key] = monthly_totals.get(month_key, 0) + amt
+        except ValueError:
+            pass
+        cat = r["category"] or "Other"
+        cat_totals[cat] = cat_totals.get(cat, 0) + amt
+
+    months_sorted = sorted(monthly_totals.keys())
+    mom_changes = []
+    for i in range(1, len(months_sorted)):
+        prev = monthly_totals[months_sorted[i - 1]]
+        curr = monthly_totals[months_sorted[i]]
+        change = curr - prev
+        pct = round(change / prev * 100, 1) if prev > 0 else 0
+        mom_changes.append({"month": months_sorted[i], "change": round(change, 2), "pct": pct})
+
+    biggest_cat_increase = None
+    if len(months_sorted) >= 2:
+        last_month = months_sorted[-1]
+        prev_month = months_sorted[-2]
+        last_by_cat: dict[str, float] = {}
+        prev_by_cat: dict[str, float] = {}
+        for r in rows:
+            if r["date"][:7] == last_month:
+                c = r["category"] or "Other"
+                last_by_cat[c] = last_by_cat.get(c, 0) + float(r["amount"])
+            elif r["date"][:7] == prev_month:
+                c = r["category"] or "Other"
+                prev_by_cat[c] = prev_by_cat.get(c, 0) + float(r["amount"])
+        max_increase = 0
+        for cat in last_by_cat:
+            inc = last_by_cat[cat] - prev_by_cat.get(cat, 0)
+            if inc > max_increase:
+                max_increase = inc
+                biggest_cat_increase = {"category": cat, "increase": round(inc, 2),
+                                        "current": round(last_by_cat[cat], 2),
+                                        "previous": round(prev_by_cat.get(cat, 0), 2)}
+
+    return {
+        "period_months": months_back,
+        "total_transactions": len(rows),
+        "weekday_avg": round(weekday_total / max(weekday_count, 1), 2),
+        "weekend_avg": round(weekend_total / max(weekend_count, 1), 2),
+        "weekday_total": round(weekday_total, 2),
+        "weekend_total": round(weekend_total, 2),
+        "monthly_totals": {k: round(v, 2) for k, v in monthly_totals.items()},
+        "month_over_month": mom_changes,
+        "biggest_category_increase": biggest_cat_increase,
+        "top_categories": sorted(
+            [{"category": k, "total": round(v, 2)} for k, v in cat_totals.items()],
+            key=lambda x: -x["total"]
+        )[:10],
+    }
+
+
+def _search_transactions(args: dict, user_id: str) -> dict:
+    query = args.get("query", "").lower()
+    date_from = args.get("date_from", "")
+    date_to = args.get("date_to", "")
+    category = args.get("category", "")
+
+    conn = get_connection()
+    sql = "SELECT * FROM transactions WHERE user_id=?"
+    params: list = [user_id]
+    if date_from:
+        sql += " AND date>=?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND date<=?"
+        params.append(date_to)
+    if category:
+        sql += " AND category=?"
+        params.append(category)
+    sql += " ORDER BY date DESC LIMIT 50"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+
+    results = []
+    for r in rows:
+        merchant = (r["merchant"] or "").lower()
+        desc = (r["description"] or "").lower()
+        if query and query not in merchant and query not in desc:
+            continue
+        results.append({
+            "id": r["id"], "date": r["date"],
+            "merchant": r["merchant"], "category": r["category"],
+            "amount": float(r["amount"]),
+        })
+
+    return {"query": query, "results": results, "count": len(results)}
+
+
 def _get_custom_categories(user_id: str) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
@@ -1171,9 +1763,21 @@ _TOOL_MAP = {
     "get_spending_recap": _get_spending_recap,
     "add_custom_category": _add_custom_category,
     "get_money_left_after_goals": _get_money_left_after_goals,
+    "set_notification_preferences": _set_notification_preferences,
+    "delete_expense": _delete_expense,
+    "delete_event": _delete_event,
+    "delete_task": _delete_task,
+    "edit_expense": _edit_expense,
+    "add_recurring_income": _add_recurring_income,
+    "edit_event": _edit_event,
+    "edit_task": _edit_task,
+    "delete_note": _delete_note,
+    "delete_bill": _delete_bill,
+    "split_expense": _split_expense,
+    "get_spending_patterns": _get_spending_patterns,
+    "search_transactions": _search_transactions,
 }
 
-# Which tools cause which tabs to refresh
 _TAB_REFRESH_MAP = {
     "add_expense": ["dashboard", "budget"],
     "set_budget": ["dashboard", "budget"],
@@ -1194,6 +1798,19 @@ _TAB_REFRESH_MAP = {
     "get_spending_recap": [],
     "add_custom_category": ["budget"],
     "get_money_left_after_goals": [],
+    "set_notification_preferences": [],
+    "delete_expense": ["dashboard", "budget"],
+    "delete_event": ["dashboard", "schedule"],
+    "delete_task": ["schedule"],
+    "edit_expense": ["dashboard", "budget"],
+    "add_recurring_income": ["dashboard", "budget", "forecast"],
+    "edit_event": ["dashboard", "schedule"],
+    "edit_task": ["schedule"],
+    "delete_note": ["notes"],
+    "delete_bill": ["schedule", "forecast"],
+    "split_expense": ["dashboard", "budget"],
+    "get_spending_patterns": [],
+    "search_transactions": [],
 }
 
 

@@ -92,9 +92,11 @@ def _init_state() -> None:
         "auth_dev_code": "",
         "orryon_last_message": "",
         "orryon_actions": [],
+        "orryon_undo_info": None,
         "show_chat_history": False,
         "active_tab": 0,
         "lp_sending": False,
+        "show_onboarding": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -306,11 +308,11 @@ if not st.session_state.data_loaded:
                     st.session_state.user_id = _user["id"]
                     st.session_state.display_name = _user["display_name"]
                     st.session_state.chat_history = load_chat_history(_user["id"])
-                    # Seed sample data on first login
                     existing_txns = fetch_rows("transactions", {"user_id": _user["id"]})
                     if not existing_txns:
                         from core.tools import seed_sample_data
                         seed_sample_data(_user["id"])
+                        st.session_state.show_onboarding = True
                     st.session_state.data_loaded = True
                     st.session_state.last_sync = datetime.now().isoformat()
                     st.session_state.screen = "home"
@@ -522,7 +524,7 @@ if not st.session_state.data_loaded:
     st.markdown(
         '<p style="text-align:center;font-size:0.88rem;color:rgba(255,255,255,0.36);'
         'max-width:300px;margin:0 auto 1.8rem;line-height:1.65;">'
-        'Just talk to him naturally — whether you\'re adding an expense, planning your week, tracking goals, or organizing your daily life. Orryon understands you and takes care of the rest.</p>',
+        "I'm your personal concierge. Whether you're tracking expenses, planning your week, working toward your goals, or organizing daily life, I've got you covered.</p>",
         unsafe_allow_html=True,
     )
 
@@ -571,7 +573,7 @@ if not st.session_state.data_loaded:
     _pill_l, _pill_r = st.columns([20, 1])
     with _pill_l:
         st.text_input(
-            "q", placeholder="What can orryon help you with?",
+            "q", placeholder="What can I help you with?",
             label_visibility="collapsed", key="lp_q",
         )
     with _pill_r:
@@ -597,14 +599,14 @@ if not st.session_state.data_loaded:
     )
 
     _steps = [
-        ("1", "Just tell Orryon what you need",
+        ("1", "Just tell me what you need",
          "Speak naturally — “Add coffee and breakfast $9.50”, “Help me save $4000 for a vacation by December”, or “Doctor appointment next Tuesday at 10am”."),
-        ("2", "Orryon understands and acts",
-         "He takes care of the details — adding expenses, updating your schedule, tracking goals, and keeping your daily life organized."),
+        ("2", "I understand and take action",
+         "I take care of the details — adding expenses, updating your schedule, tracking goals, and keeping your daily life organized."),
         ("3", "Everything updates automatically",
          "Your Dashboard, Budget, Forecast, Schedule, and Goals stay perfectly in sync in real time."),
         ("4", "Ask anything, get real answers",
-         '“How much did I spend on dining this week?” “How close am I to my vacation goal?” Orryon gives you clear, helpful answers from your actual data.'),
+         '“How much did I spend on dining this week?” “How close am I to my vacation goal?” I give you clear, helpful answers from your actual data.'),
     ]
     for num, title, desc in _steps:
         st.markdown(
@@ -624,7 +626,7 @@ if not st.session_state.data_loaded:
     )
     st.markdown(
         '<h2 style="font-size:1.5rem;font-weight:800;color:#fff;margin:0 0 0.4rem;">'
-        "Here's what you can ask Orryon</h2>",
+        "Here's what you can ask me</h2>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -645,7 +647,7 @@ if not st.session_state.data_loaded:
     st.markdown(
         '<p style="font-size:0.82rem;color:rgba(255,255,255,0.32);margin:1.1rem 0 0;'
         'line-height:1.6;text-align:center;">'
-        'Orryon understands natural language and automatically updates your budget, '
+        'I understand natural language and automatically update your budget, '
         'schedule, goals, and dashboard.</p>',
         unsafe_allow_html=True,
     )
@@ -678,7 +680,7 @@ if not st.session_state.data_loaded:
         ("🎯", "Savings goals with progress"),
         ("📅", "Schedule, tasks & grocery list"),
         ("📊", "Smart spending recaps"),
-        ("✦",  "Orryon — your intelligent personal concierge, always ready to help."),
+        ("✦",  "I'm your intelligent personal concierge, always ready to help."),
     ]:
         st.markdown(
             f'<div class="feat-row">'
@@ -705,6 +707,12 @@ if not st.session_state.data_loaded:
 # ─────────────────────────────────────────────────────────────────────────────
 # POST-LOGIN APP
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Start notification scheduler (idempotent — only launches once)
+if not st.session_state.get("_scheduler_started"):
+    from core.scheduler import start_scheduler
+    start_scheduler()
+    st.session_state["_scheduler_started"] = True
 
 _active_uid = st.session_state.get("user_id") or USER_ID
 _display_name = st.session_state.get("display_name", "")
@@ -916,6 +924,104 @@ with col_menu:
             st.code(_share_url, language=None)
             st.caption("Anyone with this link can view your Dashboard (read-only).")
         st.divider()
+        st.markdown("**🔔 Notifications**")
+        from db import get_connection as _gc_notif, update_row as _upd_notif
+        _nc = _gc_notif()
+        _notif_row = _nc.execute(
+            "SELECT default_reminder_minutes, daily_digest_enabled, daily_digest_time "
+            "FROM users WHERE id=?", (_active_uid,)
+        ).fetchone()
+        _nc.close()
+
+        _reminder_opts = {"None": 0, "10 min before": 10, "30 min before": 30,
+                          "1 hour before": 60, "6 hours before": 360, "1 day before": 1440}
+        _current_reminder = int(_notif_row["default_reminder_minutes"]) if _notif_row and _notif_row["default_reminder_minutes"] is not None else 30
+        _current_label = next((k for k, v in _reminder_opts.items() if v == _current_reminder), "30 min before")
+        _new_reminder_label = st.selectbox(
+            "Default reminder", options=list(_reminder_opts.keys()),
+            index=list(_reminder_opts.keys()).index(_current_label),
+            key="notif_default_reminder",
+        )
+        _new_reminder_val = _reminder_opts[_new_reminder_label]
+        if _new_reminder_val != _current_reminder:
+            _upd_notif("users", {"default_reminder_minutes": _new_reminder_val}, {"id": _active_uid})
+
+        _digest_on = bool(_notif_row["daily_digest_enabled"]) if _notif_row and _notif_row["daily_digest_enabled"] is not None else True
+        _new_digest = st.toggle("Daily morning digest", value=_digest_on, key="notif_digest_toggle")
+        if _new_digest != _digest_on:
+            _upd_notif("users", {"daily_digest_enabled": 1 if _new_digest else 0}, {"id": _active_uid})
+
+        if _new_digest:
+            _current_dtime = (_notif_row["daily_digest_time"] or "08:00") if _notif_row else "08:00"
+            _digest_times = ["06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00"]
+            _dtime_idx = _digest_times.index(_current_dtime) if _current_dtime in _digest_times else 4
+            _new_dtime = st.selectbox("Digest time", _digest_times, index=_dtime_idx, key="notif_digest_time")
+            if _new_dtime != _current_dtime:
+                _upd_notif("users", {"daily_digest_time": _new_dtime}, {"id": _active_uid})
+
+        from config import SMTP_ENABLED as _smtp_on
+        if not _smtp_on:
+            st.caption("⚠️ SMTP not configured — reminders won't send. Set SMTP in .env.")
+        else:
+            st.caption("✅ Email reminders active")
+
+        st.divider()
+        st.markdown("**💱 Currency**")
+        _currency_opts = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "CNY", "INR", "BRL"]
+        _current_currency = st.session_state.get("user_currency", "USD")
+        _new_currency = st.selectbox("Display currency", _currency_opts,
+                                     index=_currency_opts.index(_current_currency) if _current_currency in _currency_opts else 0,
+                                     key="currency_selector")
+        if _new_currency != _current_currency:
+            st.session_state["user_currency"] = _new_currency
+
+        st.divider()
+        st.markdown("**📦 Data Export**")
+        if st.button("⬇️ Export All Data (ZIP)", use_container_width=True, key="export_all"):
+            import shutil, zipfile, tempfile
+            from db import get_connection as _gc_exp
+            from config import DB_PATH
+            with tempfile.TemporaryDirectory() as tmpdir:
+                db_copy = os.path.join(tmpdir, "finance.db")
+                shutil.copy2(DB_PATH, db_copy)
+                json_path = os.path.join(tmpdir, "data.json")
+                _cexp = _gc_exp()
+                _tables = [r["name"] for r in _cexp.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()]
+                export_data = {}
+                for tbl in _tables:
+                    rows = _cexp.execute(f"SELECT * FROM {tbl} WHERE user_id=?", (_active_uid,)).fetchall()
+                    export_data[tbl] = [dict(r) for r in rows]
+                _cexp.close()
+                with open(json_path, "w") as jf:
+                    json.dump(export_data, jf, indent=2, default=str)
+                zip_path = os.path.join(tmpdir, "orryon_export.zip")
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(db_copy, "finance.db")
+                    zf.write(json_path, "data.json")
+                with open(zip_path, "rb") as zr:
+                    st.download_button(
+                        "💾 Download ZIP",
+                        data=zr.read(),
+                        file_name="orryon_export.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                    )
+
+        st.divider()
+        st.markdown("**📊 Weekly Reports**")
+        _nc_wr = _gc_notif()
+        _wr_row = _nc_wr.execute(
+            "SELECT weekly_report_enabled FROM users WHERE id=?", (_active_uid,)
+        ).fetchone()
+        _nc_wr.close()
+        _wr_on = bool(_wr_row["weekly_report_enabled"]) if _wr_row and _wr_row["weekly_report_enabled"] is not None else True
+        _new_wr = st.toggle("Weekly email report", value=_wr_on, key="notif_weekly_toggle")
+        if _new_wr != _wr_on:
+            _upd_notif("users", {"weekly_report_enabled": 1 if _new_wr else 0}, {"id": _active_uid})
+
+        st.divider()
         if st.button("← Sign out", use_container_width=True):
             for key in ["data_loaded", "user_id", "display_name", "chat_history",
                         "orryon_last_message", "orryon_actions"]:
@@ -925,21 +1031,74 @@ with col_menu:
             st.rerun()
 
 
+# ── Global Search ──────────────────────────────────────────────────────────────
+_search_q = st.text_input("🔍 Search", placeholder="Search transactions, events, tasks, notes, goals…",
+                           label_visibility="collapsed", key="global_search")
+if _search_q and _search_q.strip():
+    _sq = _search_q.strip().lower()
+    _search_conn = __import__("db").get_connection()
+    _s_txns = _search_conn.execute(
+        "SELECT 'transaction' as type, merchant as title, date, amount FROM transactions "
+        "WHERE user_id=? AND (LOWER(merchant) LIKE ? OR LOWER(category) LIKE ?) LIMIT 5",
+        (_active_uid, f"%{_sq}%", f"%{_sq}%"),
+    ).fetchall()
+    _s_events = _search_conn.execute(
+        "SELECT 'event' as type, title, event_date as date FROM events "
+        "WHERE user_id=? AND LOWER(title) LIKE ? LIMIT 5",
+        (_active_uid, f"%{_sq}%"),
+    ).fetchall()
+    _s_tasks = _search_conn.execute(
+        "SELECT 'task' as type, title, due_date as date FROM action_items "
+        "WHERE user_id=? AND LOWER(title) LIKE ? LIMIT 5",
+        (_active_uid, f"%{_sq}%"),
+    ).fetchall()
+    _s_notes = _search_conn.execute(
+        "SELECT 'note' as type, title, created_at as date FROM notes "
+        "WHERE user_id=? AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?) LIMIT 5",
+        (_active_uid, f"%{_sq}%", f"%{_sq}%"),
+    ).fetchall()
+    _s_goals = _search_conn.execute(
+        "SELECT 'goal' as type, name as title FROM goals "
+        "WHERE user_id=? AND LOWER(name) LIKE ? LIMIT 5",
+        (_active_uid, f"%{_sq}%"),
+    ).fetchall()
+    _search_conn.close()
+
+    _type_badges = {"transaction": "💸", "event": "📅", "task": "✅", "note": "📝", "goal": "🎯"}
+    _all_results = list(_s_txns) + list(_s_events) + list(_s_tasks) + list(_s_notes) + list(_s_goals)
+    if _all_results:
+        for _sr in _all_results[:12]:
+            _badge = _type_badges.get(_sr["type"], "•")
+            _extra = f" — ${float(_sr['amount']):,.2f}" if "amount" in _sr.keys() and _sr["amount"] else ""
+            _date_str = f" · {(_sr.get('date') or '')[:10]}" if _sr.get("date") else ""
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;'
+                f'border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.84rem;">'
+                f'<span>{_badge}</span>'
+                f'<span style="flex:1;color:#e2e8f0;">{_sr["title"]}{_extra}</span>'
+                f'<span style="color:#64748b;font-size:0.75rem;">{_sr["type"]}{_date_str}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption(f"No results for '{_search_q}'")
+
 # ── orryon last response banner ───────────────────────────────────────────────
 if st.session_state.get("orryon_last_message"):
     st.markdown(
-        f'<div class="orryon-response">'
-        f'<div class="orryon-badge">✦ orryon</div><br>'
-        f'{st.session_state.orryon_last_message}'
-        f'</div>',
+        '<div class="orryon-response"><div class="orryon-badge">✦ orryon</div></div>',
         unsafe_allow_html=True,
     )
-    col_dismiss, col_history = st.columns([3, 1])
-    with col_dismiss:
+    st.markdown(st.session_state.orryon_last_message)
+
+    _btn_cols = [3, 1, 1] if st.session_state.get("orryon_undo_info") else [3, 1]
+    _bcols = st.columns(_btn_cols)
+    with _bcols[0]:
         if st.button("✕ Dismiss", key="dismiss_resp", use_container_width=False):
             st.session_state.orryon_last_message = ""
+            st.session_state.orryon_undo_info = None
             st.rerun()
-    with col_history:
+    with _bcols[1]:
         if st.button(
             "🕐 History" if not st.session_state.show_chat_history else "Hide",
             key="toggle_hist",
@@ -947,22 +1106,52 @@ if st.session_state.get("orryon_last_message"):
         ):
             st.session_state.show_chat_history = not st.session_state.show_chat_history
             st.rerun()
+    if st.session_state.get("orryon_undo_info") and len(_bcols) > 2:
+        with _bcols[2]:
+            if st.button("↩ Undo", key="undo_action", use_container_width=True):
+                _undo = st.session_state.orryon_undo_info
+                from db import delete_row as _del_undo
+                _del_undo(_undo["table"], {"id": _undo["id"]})
+                st.session_state.orryon_last_message = f"↩ Undone: {_undo.get('label', 'last action')}"
+                st.session_state.orryon_undo_info = None
+                st.rerun()
 
-# Chat history
+# Chat history (scrollable with date separators)
 if st.session_state.show_chat_history and st.session_state.chat_history:
-    with st.expander("Conversation history", expanded=True):
-        recent = st.session_state.chat_history[-20:]
-        for msg in recent:
-            if msg["role"] == "user":
-                st.markdown(
-                    f'<div class="chat-bubble-user">👤 {msg["content"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f'<div class="chat-bubble-ai">✦ orryon: {msg.get("content","")}</div>',
-                    unsafe_allow_html=True,
-                )
+    st.markdown(
+        '<div style="max-height:400px;overflow-y:auto;padding:0.5rem;border:1px solid rgba(255,255,255,0.06);'
+        'border-radius:12px;background:rgba(0,0,0,0.3);margin-bottom:0.75rem;">',
+        unsafe_allow_html=True,
+    )
+    recent = st.session_state.chat_history[-30:]
+    last_date = ""
+    for msg in recent:
+        msg_date = ""
+        if msg.get("created_at"):
+            try:
+                msg_date = datetime.fromisoformat(msg["created_at"][:10]).strftime("%B %d, %Y")
+            except Exception:
+                pass
+        if msg_date and msg_date != last_date:
+            st.markdown(
+                f'<div style="text-align:center;font-size:0.72rem;color:#475569;'
+                f'margin:0.8rem 0 0.4rem;padding:2px 12px;'
+                f'border-top:1px solid rgba(255,255,255,0.05);">{msg_date}</div>',
+                unsafe_allow_html=True,
+            )
+            last_date = msg_date
+        if msg["role"] == "user":
+            st.markdown(
+                f'<div class="chat-bubble-user">👤 {msg["content"]}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            content = msg.get("content", "")
+            st.markdown(
+                f'<div class="chat-bubble-ai">✦ {content}</div>',
+                unsafe_allow_html=True,
+            )
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── QUICK-ADD STRIP ──────────────────────────────────────────────────────────
@@ -979,20 +1168,41 @@ with _qa1:
             "Health & Fitness", "Shopping", "Rent & Housing", "Utilities",
             "Entertainment", "Travel", "Other"
         ], key="qa_cat")
+        _qa_receipt = st.file_uploader("Receipt (optional)", type=["png", "jpg", "jpeg", "pdf"], key="qa_receipt")
+        _qa_split = st.toggle("Split expense", key="qa_split_toggle")
+        if _qa_split:
+            _qa_split_with = st.text_input("Split with", placeholder="e.g. Kirk", key="qa_split_with")
+            _qa_split_count = st.number_input("Total people (including you)", min_value=2, max_value=20, value=2, key="qa_split_count")
         if st.button("Add", type="primary", use_container_width=True, key="qa_exp_submit"):
             if _qa_merchant and _qa_amount > 0:
                 import json as _qjson
                 from db import insert_row as _qi, get_connection as _qc
                 from core.tools import _uid as _quid, _now_iso as _qnow
                 from datetime import datetime as _qdt
+                from config import ATTACHMENTS_DIR as _qa_att_dir
+                _att_path = ""
+                if _qa_receipt is not None:
+                    _att_fname = f"{_quid()}_{_qa_receipt.name}"
+                    _att_path = os.path.join(_qa_att_dir, _att_fname)
+                    with open(_att_path, "wb") as _af:
+                        _af.write(_qa_receipt.getvalue())
+                _log_amount = float(_qa_amount)
+                _meta = {}
+                if _qa_split:
+                    _log_amount = round(float(_qa_amount) / int(_qa_split_count), 2)
+                    _meta = {"split_total": float(_qa_amount), "split_with": _qa_split_with, "split_count": int(_qa_split_count)}
                 _qi("transactions", {
                     "id": _quid(), "user_id": _active_uid,
                     "date": _qdt.now().strftime("%Y-%m-%d"),
-                    "amount": float(_qa_amount), "merchant": _qa_merchant,
+                    "amount": _log_amount, "merchant": _qa_merchant,
                     "description": _qa_merchant, "category": _qa_cat,
-                    "is_recurring": 0, "metadata": _qjson.dumps({}),
+                    "is_recurring": 0, "metadata": _qjson.dumps(_meta),
+                    "attachment_path": _att_path,
                 })
-                st.success(f"✅ ${_qa_amount:.2f} at {_qa_merchant}")
+                if _qa_split:
+                    st.success(f"✅ ${_qa_amount:.2f} split {int(_qa_split_count)} ways → your share: ${_log_amount:.2f}")
+                else:
+                    st.success(f"✅ ${_qa_amount:.2f} at {_qa_merchant}")
                 st.rerun()
 
 with _qa2:
@@ -1051,6 +1261,35 @@ with _qa4:
                 st.rerun()
 
 
+# ── ONBOARDING (first-time users) ──────────────────────────────────────────────
+if st.session_state.get("show_onboarding"):
+    st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(0,201,255,0.08),rgba(146,254,157,0.06));
+border:1px solid rgba(0,201,255,0.2);border-radius:14px;padding:1.2rem 1.3rem;margin-bottom:1rem;">
+<h3 style="margin:0 0 0.3rem;font-size:1.1rem;color:#fff;">Welcome to orryon! ✦</h3>
+<p style="color:#94a3b8;font-size:0.88rem;margin:0 0 0.8rem;line-height:1.5;">
+I'm your personal concierge. Just type naturally in the chat below — I'll handle the rest.</p>
+<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.8rem;">
+<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+padding:0.4rem 0.7rem;font-size:0.82rem;color:#e2e8f0;">💸 "Coffee $6.50"</span>
+<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+padding:0.4rem 0.7rem;font-size:0.82rem;color:#e2e8f0;">📅 "Dentist Tuesday 10am"</span>
+<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+padding:0.4rem 0.7rem;font-size:0.82rem;color:#e2e8f0;">🎯 "Save $5k for vacation"</span>
+<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+padding:0.4rem 0.7rem;font-size:0.82rem;color:#e2e8f0;">🛒 "Add milk, eggs, bread"</span>
+</div>
+<p style="color:#64748b;font-size:0.78rem;margin:0;">
+Sample data has been loaded so you can explore. Everything updates live as you chat.</p>
+</div>
+""", unsafe_allow_html=True)
+    if st.button("Got it — let's go!", type="primary", use_container_width=True, key="dismiss_onboarding"):
+        st.session_state.show_onboarding = False
+        st.rerun()
+
+# ── Streaming placeholder (filled during AI response) ─────────────────────────
+_stream_area = st.empty()
+
 # ── 6 TABS ────────────────────────────────────────────────────────────────────
 tab_dash, tab_budget, tab_forecast, tab_schedule, tab_goals, tab_notes = st.tabs([
     "📊 Dashboard",
@@ -1085,43 +1324,88 @@ with tab_notes:
     from ui.notes import render_notes
     render_notes(_active_uid)
 
+# ── Tab persistence via JS ─────────────────────────────────────────────────────
+st.markdown("""<script>
+(function() {
+    var KEY = 'orryon_active_tab';
+    function setup() {
+        var tabs = window.parent.document.querySelectorAll('button[data-baseweb="tab"]');
+        if (!tabs || tabs.length === 0) { setTimeout(setup, 100); return; }
+        var saved = sessionStorage.getItem(KEY);
+        if (saved !== null) {
+            var idx = parseInt(saved);
+            if (idx > 0 && idx < tabs.length) { tabs[idx].click(); }
+            sessionStorage.removeItem(KEY);
+        }
+        tabs.forEach(function(tab, i) {
+            tab.addEventListener('click', function() {
+                sessionStorage.setItem(KEY, i);
+            });
+        });
+    }
+    setup();
+})();
+</script>""", unsafe_allow_html=True)
+
 
 # ── FLOATING "ASK ORRYON" INPUT ───────────────────────────────────────────────
-# st.chat_input renders as a sticky bottom bar — it's always visible across all tabs.
 _user_input = st.chat_input("Ask orryon anything…")
 
 if _user_input:
-    # Save user message
-    _user_msg = {"role": "user", "content": _user_input}
+    _user_msg = {"role": "user", "content": _user_input, "created_at": datetime.now().isoformat()}
     st.session_state.chat_history.append(_user_msg)
     save_chat_message(_active_uid, _user_msg)
 
-    # Run orryon
-    with st.spinner("orryon is thinking…"):
-        try:
-            from core.grok_agent import run_orryon
-            result = run_orryon(
+    _full_response = ""
+    _actions = []
+    _tabs_to_refresh = []
+    _undo_info = None
+
+    try:
+        from core.grok_agent import run_orryon_stream
+
+        with _stream_area.container():
+            st.markdown(
+                '<div class="orryon-badge" style="margin-bottom:0.3rem">✦ orryon</div>',
+                unsafe_allow_html=True,
+            )
+            _tool_status = st.empty()
+            _response_display = st.empty()
+
+            for _event in run_orryon_stream(
                 user_message=_user_input,
                 user_id=_active_uid,
-                chat_history=st.session_state.chat_history[:-1],  # exclude the just-added msg
+                chat_history=st.session_state.chat_history[:-1],
                 user_name=_display_name or "there",
-            )
-        except Exception as exc:
-            logger.error("run_orryon failed: %s", exc)
-            result = {
-                "message": f"Something went wrong: {exc}",
-                "actions_taken": [],
-                "tabs_to_refresh": [],
-                "error": str(exc),
-            }
+            ):
+                if _event["type"] == "token":
+                    _full_response += _event["content"]
+                    _response_display.markdown(_full_response + "▍")
+                elif _event["type"] == "tool":
+                    _tool_status.caption(f"✦ {_event['label']}…")
+                elif _event["type"] == "done":
+                    _full_response = _event.get("message", _full_response)
+                    _actions = _event.get("actions", [])
+                    _tabs_to_refresh = _event.get("tabs", [])
+                    _undo_info = _event.get("undo_info")
+                    _tool_status.empty()
+                    _response_display.markdown(_full_response)
+                elif _event["type"] == "error":
+                    _full_response = _event["message"]
+                    _tool_status.empty()
+                    _response_display.markdown(_full_response)
+    except Exception as exc:
+        logger.error("run_orryon_stream failed: %s", exc)
+        _full_response = f"Something went wrong: {exc}"
 
-    # Save orryon response
-    _ai_msg = {"role": "assistant", "content": result["message"]}
+    _stream_area.empty()
+
+    _ai_msg = {"role": "assistant", "content": _full_response, "created_at": datetime.now().isoformat()}
     st.session_state.chat_history.append(_ai_msg)
     save_chat_message(_active_uid, _ai_msg)
 
-    # Surface response + trigger re-render
-    st.session_state.orryon_last_message = result["message"]
-    st.session_state.orryon_actions = result.get("actions_taken", [])
-    st.session_state.show_chat_history = False  # auto-hide history on new message
+    st.session_state.orryon_last_message = _full_response
+    st.session_state.orryon_actions = _actions
+    st.session_state.orryon_undo_info = _undo_info
+    st.session_state.show_chat_history = False
     st.rerun()

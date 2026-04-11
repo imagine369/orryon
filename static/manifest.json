@@ -1,7 +1,7 @@
 {
-  "name": "guddd — Personal Finance AI",
-  "short_name": "guddd",
-  "description": "Local-first personal finance command center powered by AI agents.",
+  "name": "orryon — Your Intelligent Personal Concierge",
+  "short_name": "orryon",
+  "description": "Local-first personal finance and daily life concierge powered by AI.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

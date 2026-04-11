@@ -15,7 +15,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from db import fetch_rows, get_connection
+from db import fetch_rows, get_connection, get_total_monthly_income
 
 
 def render_forecast(user_id: str) -> None:
@@ -71,7 +71,9 @@ def render_forecast(user_id: str) -> None:
     ).fetchone()
     conn.close()
 
-    avg_income = float(income_rows["avg_income"] or 5000)
+    # Prefer recurring_income table, fall back to transaction-based estimate
+    _recurring_monthly = get_total_monthly_income(user_id)
+    avg_income = _recurring_monthly if _recurring_monthly > 0 else float(income_rows["avg_income"] or 5000)
     avg_expense = float(expense_rows["avg_expense"] or 3000)
     current_liquid = float(liquid["total"] or 4000)
     total_assets = float(all_assets["total"] or 0)

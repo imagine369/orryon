@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import streamlit as st
 
-from db import fetch_rows, get_connection
+from db import fetch_rows, get_connection, get_nw_history, snapshot_net_worth, get_total_monthly_income
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -138,14 +138,27 @@ def render_dashboard(user_id: str) -> None:
         unsafe_allow_html=True,
     )
 
-    # Net worth sparkline (placeholder — last 6 months based on running balance)
-    _render_nw_sparkline(net_worth)
+    # Ensure today's snapshot exists, then render real history
+    snapshot_net_worth(user_id)
+    _render_nw_sparkline(user_id, net_worth)
 
     # ── Safe to Spend ─────────────────────────────────────────────────────────
     _render_safe_to_spend(user_id)
 
     # ── Money Left After Goals ────────────────────────────────────────────────
     _render_money_left_after_goals(user_id)
+
+    # ── Monthly Income (from recurring_income table) ─────────────────────────
+    _monthly_income = get_total_monthly_income(user_id)
+    if _monthly_income > 0:
+        st.markdown(
+            f"""<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);
+            border-radius:12px;padding:0.7rem 1rem;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.78rem;color:#a5b4fc;">📥 Monthly Income</span>
+            <span style="font-size:1.15rem;font-weight:700;color:#c4b5fd;">${_monthly_income:,.0f}</span>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
     # ── Two-column lower section ──────────────────────────────────────────────
     col_left, col_right = st.columns([1, 1])
@@ -157,6 +170,10 @@ def render_dashboard(user_id: str) -> None:
     with col_right:
         st.markdown("#### 📅 Coming Up")
         _render_upcoming_with_bills(user_id)
+
+    # ── Spending Insights ──────────────────────────────────────────────────────
+    st.markdown("#### 💡 Spending Insights")
+    _render_spending_insights(user_id)
 
     # ── Goals preview ─────────────────────────────────────────────────────────
     st.markdown("#### 🎯 Goals Progress")
@@ -177,18 +194,25 @@ def render_dashboard(user_id: str) -> None:
 # SUB-RENDERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _render_nw_sparkline(current_nw: float) -> None:
-    """Simple sparkline showing projected/estimated NW trend."""
-    import numpy as np
-    # Generate a realistic-looking trailing sparkline
-    points = 7
-    noise = np.random.normal(0, current_nw * 0.008, points)
-    base = current_nw - abs(noise.sum())
-    values = [base + abs(noise[:i].sum()) for i in range(1, points + 1)]
-    values[-1] = current_nw  # ensure last point is real
+def _render_nw_sparkline(user_id: str, current_nw: float) -> None:
+    """Sparkline from real net_worth_snapshots when available, synthetic fallback."""
+    snapshots = get_nw_history(user_id, limit=30)
+    if len(snapshots) >= 2:
+        dates = [s["snapshot_date"] for s in snapshots]
+        values = [float(s["net_worth"]) for s in snapshots]
+    else:
+        import hashlib
+        points = 7
+        seed = int(hashlib.md5(str(int(current_nw)).encode()).hexdigest()[:8], 16)
+        rng = __import__("numpy").random.RandomState(seed)
+        noise = rng.normal(0, current_nw * 0.008, points)
+        base = current_nw - abs(noise.sum())
+        values = [base + abs(noise[:i].sum()) for i in range(1, points + 1)]
+        values[-1] = current_nw
+        dates = list(range(len(values)))
 
     fig = go.Figure(go.Scatter(
-        x=list(range(len(values))), y=values,
+        x=dates, y=values,
         mode="lines",
         line=dict(color="#00c9ff", width=2),
         fill="tozeroy",
@@ -206,11 +230,11 @@ def _render_nw_sparkline(current_nw: float) -> None:
 
 def _render_safe_to_spend(user_id: str) -> None:
     """Calculate and display Safe-to-Spend prominently."""
+    import calendar
     now = datetime.now()
     month_str = now.strftime("%Y-%m")
-    days_in_month = 31  # safe upper bound
+    days_in_month = calendar.monthrange(now.year, now.month)[1]
 
-    # Remaining days in month
     remaining_days = max(days_in_month - now.day, 1)
     remaining_weeks = max(remaining_days / 7, 0.5)
 
@@ -242,8 +266,13 @@ def _render_safe_to_spend(user_id: str) -> None:
     income = float(monthly_income["total"] or 5000)
     bills_left = float(upcoming_bills["total"] or 0)
 
-    # Discretionary budget = income - fixed bills estimate - spent
-    fixed_estimate = 2800  # rough fixed costs
+    conn2 = get_connection()
+    recurring_bills = conn2.execute(
+        "SELECT SUM(amount) as total FROM subscriptions WHERE user_id=? AND is_active=1 AND frequency='monthly'",
+        (user_id,),
+    ).fetchone()
+    conn2.close()
+    fixed_estimate = float(recurring_bills["total"] or 0) if recurring_bills else 0
     discretionary_remaining = max(income - fixed_estimate - spent - bills_left, 0)
     safe_week = discretionary_remaining / max(remaining_weeks, 1)
     safe_today = discretionary_remaining / max(remaining_days, 1)
@@ -537,6 +566,101 @@ def _render_goals_preview(user_id: str) -> None:
         """
     goal_items_html += "</div>"
     st.markdown(goal_items_html, unsafe_allow_html=True)
+
+
+def _render_spending_insights(user_id: str) -> None:
+    """Weekday/weekend comparison, MoM trend, biggest category increase."""
+    now = datetime.now()
+    this_month = now.strftime("%Y-%m")
+    last_month_dt = now.replace(day=1) - timedelta(days=1)
+    last_month = last_month_dt.strftime("%Y-%m")
+
+    conn = get_connection()
+    this_txns = conn.execute(
+        "SELECT date, category, amount FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
+        (user_id, f"{this_month}%"),
+    ).fetchall()
+    last_txns = conn.execute(
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0 GROUP BY category",
+        (user_id, f"{last_month}%"),
+    ).fetchall()
+    last_total_row = conn.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE user_id=? AND date LIKE ? AND amount>0",
+        (user_id, f"{last_month}%"),
+    ).fetchone()
+    conn.close()
+
+    if not this_txns:
+        st.caption("Not enough data yet — insights will appear as you track spending.")
+        return
+
+    weekday_total = 0.0
+    weekend_total = 0.0
+    this_total = 0.0
+    this_by_cat: dict[str, float] = {}
+    for t in this_txns:
+        amt = float(t["amount"])
+        this_total += amt
+        cat = t["category"] or "Other"
+        this_by_cat[cat] = this_by_cat.get(cat, 0) + amt
+        try:
+            d = datetime.strptime(t["date"], "%Y-%m-%d")
+            if d.weekday() < 5:
+                weekday_total += amt
+            else:
+                weekend_total += amt
+        except ValueError:
+            weekday_total += amt
+
+    last_total = float(last_total_row["total"] or 0) if last_total_row else 0
+    last_by_cat = {r["category"]: float(r["total"]) for r in last_txns}
+
+    insights_html = '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:0.5rem;">'
+
+    # Weekday vs Weekend
+    wd_pct = round(weekday_total / this_total * 100, 0) if this_total else 0
+    we_pct = 100 - wd_pct
+    insights_html += (
+        f'<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px 14px;">'
+        f'<div style="font-size:0.78rem;color:#64748b;margin-bottom:4px;">Weekday vs Weekend</div>'
+        f'<div style="display:flex;gap:12px;">'
+        f'<span style="font-size:0.88rem;color:#e2e8f0;">📅 Weekday <b>${weekday_total:,.0f}</b> ({wd_pct:.0f}%)</span>'
+        f'<span style="font-size:0.88rem;color:#e2e8f0;">🎉 Weekend <b>${weekend_total:,.0f}</b> ({we_pct:.0f}%)</span>'
+        f'</div></div>'
+    )
+
+    # Month-over-month
+    if last_total > 0:
+        change = this_total - last_total
+        change_pct = round(change / last_total * 100, 0)
+        arrow = "📈" if change > 0 else "📉"
+        color = "#ef4444" if change > 0 else "#22c55e"
+        direction = "more" if change > 0 else "less"
+        insights_html += (
+            f'<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px 14px;">'
+            f'<div style="font-size:0.78rem;color:#64748b;margin-bottom:4px;">vs Last Month</div>'
+            f'<span style="font-size:0.88rem;color:{color};">{arrow} ${abs(change):,.0f} {direction} ({abs(change_pct):.0f}%)</span>'
+            f'</div>'
+        )
+
+    # Biggest category increase
+    max_inc = 0
+    max_cat = ""
+    for cat, total in this_by_cat.items():
+        inc = total - last_by_cat.get(cat, 0)
+        if inc > max_inc:
+            max_inc = inc
+            max_cat = cat
+    if max_cat and max_inc > 10:
+        insights_html += (
+            f'<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px 14px;">'
+            f'<div style="font-size:0.78rem;color:#64748b;margin-bottom:4px;">Biggest Increase</div>'
+            f'<span style="font-size:0.88rem;color:#f59e0b;">⚡ {max_cat} up ${max_inc:,.0f} vs last month</span>'
+            f'</div>'
+        )
+
+    insights_html += '</div>'
+    st.markdown(insights_html, unsafe_allow_html=True)
 
 
 def _render_grocery_preview(user_id: str) -> None:

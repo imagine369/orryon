@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 import streamlit as st
 
-from db import fetch_rows, get_connection, insert_row, update_row
+from db import fetch_rows, get_connection, insert_row, update_row, delete_row
 from core.tools import _uid, _now_iso
 
 
@@ -38,6 +38,11 @@ _SCHED_CSS = """
 .ev-badge {
   font-size: 0.68rem; padding: 1px 7px; border-radius: 20px;
   border: 1px solid; margin-right: 4px;
+}
+.ev-reminder-badge {
+  font-size: 0.65rem; padding: 1px 6px; border-radius: 20px;
+  background: rgba(146,254,157,0.1); border: 1px solid rgba(146,254,157,0.3);
+  color: #92fe9d; margin-left: 4px;
 }
 
 .task-row {
@@ -76,26 +81,74 @@ def render_schedule(user_id: str) -> None:
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
 
-    # Tab-within-tab for schedule sections
-    sub_events, sub_tasks, sub_bills, sub_grocery = st.tabs([
-        "📅 Events", "✅ Tasks", "💸 Bills", "🛒 Grocery",
-    ])
+    # ── TODAY AT A GLANCE ─────────────────────────────────────────────────────
+    conn = get_connection()
+    today_events = conn.execute(
+        "SELECT title, event_date FROM events WHERE user_id=? AND event_date LIKE ? ORDER BY event_date ASC",
+        (user_id, f"{today}%"),
+    ).fetchall()
+    today_tasks = conn.execute(
+        "SELECT title, priority FROM action_items WHERE user_id=? AND status='open' AND due_date=? ORDER BY priority DESC",
+        (user_id, today),
+    ).fetchall()
+    today_bills = conn.execute(
+        "SELECT name, amount FROM subscriptions WHERE user_id=? AND is_active=1 AND next_due=?",
+        (user_id, today),
+    ).fetchall()
+    conn.close()
 
-    # ── EVENTS ────────────────────────────────────────────────────────────────
-    with sub_events:
-        _render_events(user_id, now, today)
+    _today_items = len(today_events) + len(today_tasks) + len(today_bills)
+    if _today_items > 0:
+        st.markdown('<p class="section-head">📌 Today</p>', unsafe_allow_html=True)
+        _today_parts = []
+        for e in today_events:
+            _t = (e["event_date"] or "")[11:16]
+            _time_str = f" at {_t}" if _t else ""
+            _today_parts.append(f"📅 {e['title']}{_time_str}")
+        for t in today_tasks:
+            _pi = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(t["priority"], "•")
+            _today_parts.append(f"{_pi} {t['title']}")
+        for b in today_bills:
+            _today_parts.append(f"💸 {b['name']} — ${float(b['amount']):,.2f}")
+        for _item_text in _today_parts:
+            st.markdown(
+                f'<div class="ev-card" style="padding:0.55rem 0.9rem;margin-bottom:0.3rem">'
+                f'<span style="font-size:0.86rem">{_item_text}</span></div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
 
-    # ── TASKS ────────────────────────────────────────────────────────────────
-    with sub_tasks:
-        _render_tasks(user_id, now, today)
+    # ── GOOGLE CALENDAR SYNC ──────────────────────────────────────────────────
+    from core.google_calendar import is_gcal_configured
+    if is_gcal_configured():
+        with st.expander("🔗 Google Calendar", expanded=False):
+            st.success("Google Calendar is connected.")
+            if st.button("Sync upcoming events", key="gcal_sync_btn"):
+                from core.google_calendar import list_upcoming_gcal_events
+                _gev = list_upcoming_gcal_events(10)
+                if _gev:
+                    for _ge in _gev:
+                        _gs = _ge.get("start", {})
+                        _gdate = _gs.get("dateTime", _gs.get("date", ""))[:10]
+                        st.markdown(f"- **{_ge.get('summary', 'Untitled')}** — {_gdate}")
+                else:
+                    st.info("No upcoming Google Calendar events.")
 
-    # ── BILLS ─────────────────────────────────────────────────────────────────
-    with sub_bills:
-        _render_bills(user_id, now)
+    # ── EVENTS SECTION ────────────────────────────────────────────────────────
+    st.markdown('<p class="section-head">📅 Upcoming Events</p>', unsafe_allow_html=True)
+    _render_events(user_id, now, today)
 
-    # ── GROCERY ───────────────────────────────────────────────────────────────
-    with sub_grocery:
-        _render_grocery(user_id)
+    # ── TASKS SECTION ─────────────────────────────────────────────────────────
+    st.markdown('<p class="section-head">✅ Tasks</p>', unsafe_allow_html=True)
+    _render_tasks(user_id, now, today)
+
+    # ── BILLS SECTION ─────────────────────────────────────────────────────────
+    st.markdown('<p class="section-head">💸 Bills & Subscriptions</p>', unsafe_allow_html=True)
+    _render_bills(user_id, now)
+
+    # ── GROCERY SECTION ───────────────────────────────────────────────────────
+    st.markdown('<p class="section-head">🛒 Grocery List</p>', unsafe_allow_html=True)
+    _render_grocery(user_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -124,7 +177,7 @@ def _render_events(user_id: str, now: datetime, today: str) -> None:
             "event": "📅", "errand": "🚗", "reminder": "⏰",
             "bill_due": "💸", "task": "✅",
         }
-        for e in events:
+        for ev_idx, e in enumerate(events):
             etype = e["event_type"] or "event"
             bg, border = type_colors.get(etype, ("rgba(255,255,255,0.06)", "#64748b"))
             icon = type_icons.get(etype, "•")
@@ -144,22 +197,58 @@ def _render_events(user_id: str, now: datetime, today: str) -> None:
                 f'<span class="ev-badge" style="color:{border};border-color:{border}">'
                 f'{delta_str}</span>'
             )
-            st.markdown(
-                f"""<div class="ev-card" style="border-left:3px solid {border}">
-                  <div class="ev-date-box">
-                    <div class="ev-day">{day_num}</div>
-                    <div class="ev-mon">{mon_str}</div>
-                  </div>
-                  <div class="ev-body">
-                    <div class="ev-title">{icon} {e['title']}</div>
-                    <div class="ev-meta">{badge_html}{time_display}</div>
-                    {"<div class='ev-meta'>" + e['description'] + "</div>" if e['description'] else ""}
-                  </div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
+            reminder_mins = int(e["reminder_minutes"]) if e.get("reminder_minutes") else 0
+            reminder_html = ""
+            if reminder_mins > 0:
+                if reminder_mins < 60:
+                    r_label = f"{reminder_mins}m"
+                elif reminder_mins < 1440:
+                    r_label = f"{reminder_mins // 60}h"
+                else:
+                    r_label = "1d"
+                reminder_html = f'<span class="ev-reminder-badge">🔔 {r_label}</span>'
+
+            col_ev_body, col_ev_actions = st.columns([5, 1])
+            with col_ev_body:
+                st.markdown(
+                    f"""<div class="ev-card" style="border-left:3px solid {border}">
+                      <div class="ev-date-box">
+                        <div class="ev-day">{day_num}</div>
+                        <div class="ev-mon">{mon_str}</div>
+                      </div>
+                      <div class="ev-body">
+                        <div class="ev-title">{icon} {e['title']}{reminder_html}</div>
+                        <div class="ev-meta">{badge_html}{time_display}</div>
+                        {"<div class='ev-meta'>" + e['description'] + "</div>" if e['description'] else ""}
+                      </div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+            with col_ev_actions:
+                with st.popover("⋮", use_container_width=True):
+                    _ev_new_title = st.text_input("Title", value=e["title"], key=f"eev_t_{ev_idx}")
+                    _ev_new_date = st.text_input("Date (YYYY-MM-DD)", value=date_str, key=f"eev_d_{ev_idx}")
+                    _ev_new_time = st.text_input("Time (HH:MM)", value=time_str, key=f"eev_tm_{ev_idx}")
+                    _ev_new_desc = st.text_input("Notes", value=e["description"] or "", key=f"eev_ds_{ev_idx}")
+                    if st.button("Save", key=f"eev_save_{ev_idx}", type="primary"):
+                        new_dt = f"{_ev_new_date} {_ev_new_time}".strip()
+                        update_row("events", {"title": _ev_new_title, "event_date": new_dt, "description": _ev_new_desc}, {"id": e["id"]})
+                        st.success("Updated!")
+                        st.rerun()
+                    if st.button("🗑️ Delete", key=f"eev_del_{ev_idx}"):
+                        delete_row("events", {"id": e["id"]})
+                        st.rerun()
 
     # Quick add event
+    _REMINDER_OPTIONS = {
+        "None": 0,
+        "At time of event": 0,
+        "10 minutes before": 10,
+        "30 minutes before": 30,
+        "1 hour before": 60,
+        "6 hours before": 360,
+        "1 day before": 1440,
+    }
     with st.expander("➕ Add event", expanded=False):
         c1, c2 = st.columns(2)
         with c1:
@@ -168,7 +257,16 @@ def _render_events(user_id: str, now: datetime, today: str) -> None:
         with c2:
             ev_time = st.text_input("Time (optional)", placeholder="e.g. 3:00 PM", key="ev_time")
             ev_type = st.selectbox("Type", ["event", "errand", "reminder", "bill_due"], key="ev_type")
-        ev_desc = st.text_input("Notes (optional)", key="ev_desc")
+        c3, c4 = st.columns(2)
+        with c3:
+            ev_desc = st.text_input("Notes (optional)", key="ev_desc")
+        with c4:
+            ev_reminder_label = st.selectbox(
+                "Reminder",
+                options=list(_REMINDER_OPTIONS.keys()),
+                index=3,
+                key="ev_reminder",
+            )
         if st.button("Add Event", type="primary", use_container_width=True, key="ev_add"):
             if ev_title:
                 time_fmt = ""
@@ -179,14 +277,17 @@ def _render_events(user_id: str, now: datetime, today: str) -> None:
                         time_fmt = parsed_t.strftime("%H:%M")
                     except Exception:
                         time_fmt = ev_time
+                reminder_val = _REMINDER_OPTIONS.get(ev_reminder_label, 30)
                 insert_row("events", {
                     "id": _uid(), "user_id": user_id,
                     "title": ev_title, "description": ev_desc,
                     "event_date": f"{ev_date.strftime('%Y-%m-%d')} {time_fmt}".strip(),
                     "event_type": ev_type, "amount": 0,
-                    "is_recurring": 0, "created_at": _now_iso(),
+                    "is_recurring": 0, "reminder_minutes": reminder_val,
+                    "reminder_sent": 0, "created_at": _now_iso(),
                 })
-                st.success(f"Added: {ev_title}")
+                reminder_msg = f" (reminder: {ev_reminder_label})" if reminder_val > 0 else ""
+                st.success(f"Added: {ev_title}{reminder_msg}")
                 st.rerun()
             else:
                 st.warning("Please enter an event title.")
@@ -214,7 +315,7 @@ def _render_tasks(user_id: str, now: datetime, today: str) -> None:
     if not tasks:
         st.info("No open tasks.\n\nTry: *'remind me to pay electricity bill on the 15th'*")
     else:
-        for t in tasks:
+        for t_idx, t in enumerate(tasks):
             pri = t["priority"] or "medium"
             icon = priority_icons.get(pri, "•")
             color = priority_colors.get(pri, "#64748b")
@@ -228,7 +329,7 @@ def _render_tasks(user_id: str, now: datetime, today: str) -> None:
                 except Exception:
                     due_str = t["due_date"]
 
-            col_check, col_body = st.columns([0.08, 0.92])
+            col_check, col_body, col_tact = st.columns([0.06, 0.82, 0.12])
             with col_check:
                 done = st.checkbox("", key=f"task_{t['id']}", label_visibility="collapsed")
             with col_body:
@@ -241,6 +342,20 @@ def _render_tasks(user_id: str, now: datetime, today: str) -> None:
                     </div>""",
                     unsafe_allow_html=True,
                 )
+            with col_tact:
+                with st.popover("⋮", use_container_width=True):
+                    _t_title = st.text_input("Title", value=t["title"], key=f"etsk_t_{t_idx}")
+                    _t_due = st.text_input("Due (YYYY-MM-DD)", value=t["due_date"] or "", key=f"etsk_d_{t_idx}")
+                    _t_pri = st.selectbox("Priority", ["high", "medium", "low"],
+                                          index=["high", "medium", "low"].index(pri),
+                                          key=f"etsk_p_{t_idx}")
+                    if st.button("Save", key=f"etsk_save_{t_idx}", type="primary"):
+                        update_row("action_items", {"title": _t_title, "due_date": _t_due, "priority": _t_pri, "updated_at": _now_iso()}, {"id": t["id"]})
+                        st.success("Updated!")
+                        st.rerun()
+                    if st.button("🗑️ Delete", key=f"etsk_del_{t_idx}"):
+                        delete_row("action_items", {"id": t["id"]})
+                        st.rerun()
             if done:
                 update_row("action_items", {"status": "done", "updated_at": _now_iso()}, {"id": t["id"]})
                 st.rerun()
