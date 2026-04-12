@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Settings, LayoutGrid, Bell, X, CheckSquare, Calendar, Search } from "lucide-react";
+import { BreathingWidget } from "@/components/dashboard/breathing-widget";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -142,6 +143,8 @@ export function NavBar() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-5 py-4">
+                  <BreathingWidget />
+
                   <p className="text-[0.6rem] uppercase tracking-wide text-white/20 mb-4">
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </p>

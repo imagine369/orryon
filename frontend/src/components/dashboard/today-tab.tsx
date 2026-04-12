@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
-import { BreathingWidget } from "@/components/dashboard/breathing-widget";
 
 interface Event {
   id: string;
@@ -73,9 +72,6 @@ export function TodayTab() {
 
   return (
     <div>
-      {/* Breathing widget — always at the top of Today */}
-      <BreathingWidget />
-
       <div className="flex items-center justify-between mb-4">
         <p className="text-[0.65rem] uppercase tracking-wide text-white/20">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
