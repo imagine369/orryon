@@ -1,0 +1,17 @@
+# ── FastAPI backend ────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pyjwt>=2.8.0
+
+# ── AI (direct xAI Grok API via HTTP) ─────────────────────────────────────────
+requests>=2.31.0
+
+# ── Notifications (background scheduler for email reminders) ───────────────────
+apscheduler>=3.10.0
+
+# ── Config ─────────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ── Google Calendar (optional) ────────────────────────────────────────────────
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.100.0
