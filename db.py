@@ -328,6 +328,7 @@ def init_db() -> None:
     _migrate_users_weekly_report(conn)
     _migrate_notes_rich(conn)
     _migrate_users_preferences(conn)
+    _migrate_users_plan(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -452,6 +453,23 @@ def _migrate_users_preferences(conn: sqlite3.Connection) -> None:
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_users_preferences: %s (non-fatal)", exc)
+
+
+def _migrate_users_plan(conn: sqlite3.Connection) -> None:
+    """Add billing plan columns to users (plan, trial_ends_at, stripe_customer_id, stripe_subscription_id)."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "plan" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'")
+        if "trial_ends_at" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN trial_ends_at TEXT DEFAULT ''")
+        if "stripe_customer_id" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT DEFAULT ''")
+        if "stripe_subscription_id" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT DEFAULT ''")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_users_plan: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:
@@ -615,16 +633,20 @@ def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
     except Exception as exc:
         logger.error("get_or_create_user_by_email lookup error: %s", exc)
 
-    # New user
+    # New user — start on a 14-day Pro trial
+    from config import TRIAL_DAYS
     name = display_name.strip() or email.split("@")[0]
+    trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
     user = {
         "id": str(uuid.uuid4()),
         "email": email,
         "display_name": name,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "plan": "trial",
+        "trial_ends_at": trial_ends_at,
     }
     insert_row("users", user)
-    logger.info("Created user: %s (%s)", email, user["id"])
+    logger.info("Created user: %s (%s) — trial until %s", email, user["id"], trial_ends_at)
     return user
 
 

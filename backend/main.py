@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -1124,6 +1124,182 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(get_cu
         raise HTTPException(500, "Could not parse receipt data from image")
 
     return result
+
+
+# ===========================================================================
+# SUBSCRIPTION / BILLING
+# ===========================================================================
+
+def _resolve_plan(user_row: dict) -> dict:
+    """Return the effective plan info for a user, expiring trials automatically."""
+    plan = user_row.get("plan") or "free"
+    trial_ends_at_str = user_row.get("trial_ends_at") or ""
+    trial_days_remaining = 0
+
+    if plan == "trial" and trial_ends_at_str:
+        try:
+            trial_ends = datetime.fromisoformat(trial_ends_at_str)
+            if trial_ends.tzinfo is None:
+                trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+            delta = trial_ends - datetime.now(timezone.utc)
+            if delta.total_seconds() <= 0:
+                # Trial has expired — downgrade to free
+                plan = "free"
+                conn = get_connection()
+                conn.execute("UPDATE users SET plan='free' WHERE id=?", (user_row["id"],))
+                conn.commit()
+                conn.close()
+            else:
+                trial_days_remaining = max(0, delta.days)
+        except Exception:
+            pass
+
+    return {
+        "plan": plan,
+        "trial_ends_at": trial_ends_at_str or None,
+        "trial_days_remaining": trial_days_remaining,
+        "is_active_pro": plan in ("trial", "pro"),
+    }
+
+
+@app.get("/api/subscription")
+async def get_subscription(user: dict = Depends(get_current_user)):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "User not found")
+    return _resolve_plan(dict(row))
+
+
+class CheckoutReq(BaseModel):
+    price_id: str
+    success_url: str
+    cancel_url: str
+
+
+@app.post("/api/subscription/checkout")
+async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_user)):
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+    if not STRIPE_ENABLED:
+        raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed. Run: pip install stripe")
+
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "User not found")
+    row = dict(row)
+
+    customer_id = row.get("stripe_customer_id") or ""
+    if not customer_id:
+        customer = stripe_lib.Customer.create(
+            email=row["email"],
+            metadata={"user_id": row["id"]},
+        )
+        customer_id = customer.id
+        conn = get_connection()
+        conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
+        conn.commit()
+        conn.close()
+
+    session = stripe_lib.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        line_items=[{"price": body.price_id, "quantity": 1}],
+        mode="subscription",
+        success_url=body.success_url,
+        cancel_url=body.cancel_url,
+        metadata={"user_id": row["id"]},
+    )
+    return {"checkout_url": session.url}
+
+
+@app.post("/api/subscription/portal")
+async def billing_portal(user: dict = Depends(get_current_user)):
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, APP_URL
+    if not STRIPE_ENABLED:
+        raise HTTPException(503, "Stripe is not configured")
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed")
+
+    conn = get_connection()
+    row = conn.execute("SELECT stripe_customer_id FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    conn.close()
+    if not row or not row["stripe_customer_id"]:
+        raise HTTPException(400, "No billing account found. Please subscribe first.")
+
+    portal = stripe_lib.billing_portal.Session.create(
+        customer=row["stripe_customer_id"],
+        return_url=f"{APP_URL}/home",
+    )
+    return {"portal_url": portal.url}
+
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    from config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed")
+
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe_lib.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except stripe_lib.errors.SignatureVerificationError:
+        raise HTTPException(400, "Invalid Stripe signature")
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        user_id = session.get("metadata", {}).get("user_id")
+        sub_id = session.get("subscription")
+        if user_id and sub_id:
+            conn = get_connection()
+            conn.execute(
+                "UPDATE users SET plan='pro', stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
+                (sub_id, user_id),
+            )
+            conn.commit()
+            conn.close()
+
+    elif event["type"] in ("customer.subscription.deleted", "customer.subscription.paused"):
+        sub = event["data"]["object"]
+        sub_id = sub.get("id")
+        if sub_id:
+            conn = get_connection()
+            conn.execute(
+                "UPDATE users SET plan='free', stripe_subscription_id='' WHERE stripe_subscription_id=?",
+                (sub_id,),
+            )
+            conn.commit()
+            conn.close()
+
+    elif event["type"] == "customer.subscription.updated":
+        sub = event["data"]["object"]
+        sub_id = sub.get("id")
+        status = sub.get("status")
+        if sub_id and status:
+            new_plan = "pro" if status == "active" else "free"
+            conn = get_connection()
+            conn.execute(
+                "UPDATE users SET plan=? WHERE stripe_subscription_id=?",
+                (new_plan, sub_id),
+            )
+            conn.commit()
+            conn.close()
+
+    return {"received": True}
 
 
 # ===========================================================================

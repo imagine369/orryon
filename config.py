@@ -99,6 +99,18 @@ SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
 
+# ── Stripe (billing) ──────────────────────────────────────────────────────────
+# Set up at https://dashboard.stripe.com
+# Test keys start with sk_test_ / pk_test_
+STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")   # e.g. price_xxx
+STRIPE_PRICE_ANNUAL: str = os.getenv("STRIPE_PRICE_ANNUAL", "")     # e.g. price_yyy
+STRIPE_ENABLED: bool = bool(STRIPE_SECRET_KEY)
+
+# Trial length for new users (days)
+TRIAL_DAYS: int = int(os.getenv("TRIAL_DAYS", "14"))
+
 # ── Ensure directories exist ──────────────────────────────────────────────────
 os.makedirs(NOTES_DIR, exist_ok=True)
 os.makedirs(ATTACHMENTS_DIR, exist_ok=True)

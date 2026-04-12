@@ -693,7 +693,7 @@ function AppDemo() {
         setIdx((i) => (i + 1) % APP_SCREENS.length);
         setVisible(true);
       }, 300);
-    }, 3800);
+    }, 1000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [idx]);
 
@@ -1102,7 +1102,7 @@ function AppTourDemo() {
                 <span className="text-xs text-white/50">Good evening. You have 1 task due today.</span>
               </div>
               <div className="w-full max-w-xl">
-                <div className="flex items-end gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-colors duration-200"
+                <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-colors duration-200"
                   style={{ borderColor: hasInput ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)" }}>
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
                     {hasInput
@@ -1148,7 +1148,7 @@ function AppTourDemo() {
                 )}
               </div>
               <div className="shrink-0 px-4 pt-2 bg-gradient-to-t from-black via-black/90 to-transparent" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
-                <div className="flex items-end gap-2 rounded-full border border-white/10 bg-[#1c1c1e] px-4 py-2">
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#1c1c1e] px-4 py-2">
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
                     {inputText
                       ? <span className="text-white">{inputText}</span>

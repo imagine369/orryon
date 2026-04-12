@@ -9,12 +9,15 @@ import { NavBar } from "@/components/nav-bar";
 import { Footer } from "@/components/footer";
 import { DashboardPanel } from "@/components/dashboard-panel";
 import { SettingsPanel } from "@/components/settings-panel";
+import { TrialBanner } from "@/components/trial-banner";
+import { useSubscription } from "@/lib/use-subscription";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { openPanel } = usePanels();
   const isPanelOpen = openPanel !== null;
+  const { sub } = useSubscription();
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -43,6 +46,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         style={{ transformOrigin: "center center", willChange: "transform" }}
       >
         <NavBar />
+        {sub && <TrialBanner sub={sub} />}
         <main className="flex-1">{children}</main>
         <Footer />
       </motion.div>
