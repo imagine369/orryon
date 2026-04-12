@@ -126,7 +126,7 @@ export default function HomePage() {
       <div className="flex flex-col items-center justify-center px-4 py-8 min-h-[calc(100vh-93px)]">
         <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover mb-6 ring-1 ring-white/10" />
         <p className="text-white/60 text-[15px] mb-8 max-w-[260px] text-center leading-tight">
-          Hello{user?.display_name ? `, ${user.display_name}` : ""}.<br />I am Orryon.<br />What shall we organize today?
+          Hello{user?.display_name ? `, ${user.display_name}` : ""}.
         </p>
 
         {tasksDueToday !== null && tasksDueToday > 0 && (
