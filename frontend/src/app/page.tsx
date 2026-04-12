@@ -1076,17 +1076,17 @@ function AppTourDemo() {
 
           {/* Nav bar — matches real app exactly */}
           <nav className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0">
-            <span className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">ORRYON</span>
+            <span className="text-white font-extrabold tracking-widest uppercase text-[0.5rem] font-[family-name:var(--font-playfair)]">ORRYON</span>
             <div className="flex items-center gap-1">
-              <button className="p-2 rounded-lg text-white/60"><Search className="h-5 w-5" strokeWidth={1.5} /></button>
+              <button className="p-2 rounded-lg text-white/60"><Search className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
               <button className="relative p-2 rounded-lg text-white/60">
-                <Bell className="h-5 w-5" strokeWidth={1.5} />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-white" />
+                <Bell className="h-2.5 w-2.5" strokeWidth={1.5} />
+                <span className="absolute top-1.5 right-1.5 w-1 h-1 rounded-full bg-white" />
               </button>
               <button className={`p-2 rounded-lg transition-colors ${gridLit ? "text-white bg-white/5" : "text-white/60"}`}>
-                <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />
+                <LayoutGrid className="h-2.5 w-2.5" strokeWidth={1.5} />
               </button>
-              <button className="p-2 rounded-lg text-white/60"><Settings className="h-5 w-5" strokeWidth={1.5} /></button>
+              <button className="p-2 rounded-lg text-white/60"><Settings className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
             </div>
           </nav>
 
