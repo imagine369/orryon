@@ -733,15 +733,19 @@ function AppDemo() {
 
 type TourPhase =
   | "home" | "typing" | "sending" | "chat-bubble"
-  | "thinking" | "responding" | "pre-dash"
+  | "thinking" | "responding" | "next-chat" | "clearing" | "pre-dash"
   | "tap-grid" | "panel-open"
-  | "tab-budget" | "tab-goals"
+  | "tab-budget" | "tab-schedule" | "tab-goals"
   | "panel-close" | "reset";
 
-const TOUR_PROMPT   = "Add lunch $14";
-const TOUR_RESPONSE = "Done — lunch logged for $14.";
+const TOUR_CHATS = [
+  { prompt: "Add coffee and breakfast $12.50",                        response: "Done — coffee & breakfast logged for $12.50." },
+  { prompt: "What's on my schedule today?",                           response: "You have 2 events today: doctor at 10am and lunch with team at 1pm." },
+  { prompt: "Help me save $4,000 for a vacation by December",         response: "Goal created. Save $444/mo to hit $4,000 by December." },
+  { prompt: "Doctor appointment on July 15 at 10am",                  response: "Scheduled — doctor on July 15 at 10am." },
+];
 
-const TOUR_TABS = ["Insights","Schedule","Goals"] as const;
+const TOUR_TABS = ["Insights","Budget","Schedule","Goals"] as const;
 type TourTab = typeof TOUR_TABS[number];
 
 const INSIGHT_COLORS = ["#60a5fa","#2dd4bf","#c084fc","#fbbf24","#818cf8","#86efac"];
@@ -899,35 +903,41 @@ function TourScheduleTab() {
 
 function TourBudgetTab() {
   const cats = [
-    {name:"Food & Dining",spent:320,planned:400},
-    {name:"Transport",    spent:95, planned:150},
-    {name:"Entertainment",spent:145,planned:100},
+    { name: "Entertainment",  spent: 0,    planned: 100  },
+    { name: "Food & Dining",  spent: 386,  planned: 600  },
+    { name: "Groceries",      spent: 173,  planned: 400  },
+    { name: "Health & Fitness",spent: 42,  planned: 150  },
+    { name: "Rent & Housing", spent: 2200, planned: 2300 },
+    { name: "Shopping",       spent: 0,    planned: 200  },
   ];
-  const totalPlanned = 770; const totalSpent = 560;
+  const totalPlanned = cats.reduce((s, c) => s + c.planned, 0);
+  const totalSpent   = cats.reduce((s, c) => s + c.spent, 0);
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · April</p>
-          <p className="text-base font-bold">${totalPlanned} <span className="text-xs font-normal text-white/30">/ ${totalSpent} spent</span></p>
+          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · 2026-04</p>
+          <p className="text-lg font-bold">${totalPlanned.toLocaleString()} <span className="text-sm font-normal text-white/30">/ ${totalSpent.toLocaleString()} spent</span></p>
         </div>
-        <button className="flex items-center justify-center w-6 h-6 rounded-full bg-white shrink-0"><Plus className="h-3 w-3 text-black" strokeWidth={2} /></button>
+        <button className="flex items-center justify-center w-7 h-7 rounded-full bg-white shrink-0">
+          <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
+        </button>
       </div>
-      {cats.map((c)=>{
-        const pct=Math.round((c.spent/c.planned)*100);
-        const bar=pct>=100?"bg-red-500":pct>=80?"bg-yellow-500":"bg-green-500";
+      {cats.map((c) => {
+        const pct = c.planned > 0 ? Math.round((c.spent / c.planned) * 100) : 0;
+        const bar = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-yellow-500" : "bg-green-500";
         return (
-          <div key={c.name} className="py-2.5 border-b border-white/5">
+          <div key={c.name} className="py-3 border-b border-white/5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold">{c.name}</span>
-              <span className="text-xs text-white/50">${c.spent}/${c.planned}</span>
+              <span className="text-sm font-semibold">{c.name}</span>
+              <span className="text-sm text-white/50">${c.spent.toLocaleString()} / ${c.planned.toLocaleString()}</span>
             </div>
-            <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
-              <div className={`absolute inset-y-0 left-0 rounded-full ${bar}`} style={{width:`${Math.min(100,pct)}%`}} />
+            <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
+              <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
             </div>
-            <div className="flex justify-between mt-0.5">
-              <span className="text-[0.6rem] text-white/25">{pct}% used</span>
-              <span className="text-[0.6rem] text-white/25">${Math.max(0,c.planned-c.spent)} left</span>
+            <div className="flex justify-between mt-1">
+              <span className="text-[0.65rem] text-white/25">{pct}% used</span>
+              <span className="text-[0.65rem] text-white/25">${Math.max(0, c.planned - c.spent).toLocaleString()} left</span>
             </div>
           </div>
         );
@@ -970,63 +980,89 @@ function TourGoalsTab() {
 }
 
 function AppTourDemo() {
-  const [phase, setPhase]           = useState<TourPhase>("home");
-  const [inputText, setInputText]   = useState("");
-  const [sending, setSending]       = useState(false);
-  const [userBubble, setUserBubble] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const [thinking, setThinking]     = useState(false);
-  const [gridLit, setGridLit]       = useState(false);
-  const [panelOpen, setPanelOpen]   = useState(false);
-  const [activeTab, setActiveTab]   = useState<TourTab>("Insights");
-  const [visible, setVisible]       = useState(true);
-  const tmr = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [phase, setPhase]             = useState<TourPhase>("home");
+  const [chatIdx, setChatIdx]         = useState(0);
+  const [inputText, setInputText]     = useState("");
+  const [sending, setSending]         = useState(false);
+  const [currentBubble, setCurrentBubble] = useState("");
+  const [currentResponse, setCurrentResponse] = useState("");
+  const [thinking, setThinking]       = useState(false);
+  const [gridLit, setGridLit]         = useState(false);
+  const [panelOpen, setPanelOpen]     = useState(false);
+  const [activeTab, setActiveTab]     = useState<TourTab>("Insights");
+  const [visible, setVisible]         = useState(true);
+  const tmr         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const go = (next: TourPhase, delay: number) => { tmr.current = setTimeout(() => setPhase(next), delay); };
 
   useEffect(() => {
     if (tmr.current) clearTimeout(tmr.current);
 
+    const chat = TOUR_CHATS[chatIdx];
+
     if (phase === "home") {
-      setInputText(""); setUserBubble(""); setAiResponse(""); setThinking(false);
-      setSending(false); setGridLit(false); setPanelOpen(false); setActiveTab("Insights"); setVisible(true);
-      go("typing", 2000);
+      setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
+      setSending(false); setGridLit(false); setPanelOpen(false); setActiveTab("Insights");
+      setChatIdx(0); setVisible(true);
+      go("typing", 900);
     }
     if (phase === "typing") {
       let i = 0;
       const type = () => {
-        if (i <= TOUR_PROMPT.length) { setInputText(TOUR_PROMPT.slice(0,i)); i++; tmr.current = setTimeout(type, 60); }
-        else go("sending", 400);
+        if (i <= chat.prompt.length) { setInputText(chat.prompt.slice(0,i)); i++; tmr.current = setTimeout(type, 32); }
+        else go("sending", 200);
       };
-      tmr.current = setTimeout(type, 300);
+      tmr.current = setTimeout(type, 150);
     }
-    if (phase === "sending") { setSending(true); go("chat-bubble", 300); }
-    if (phase === "chat-bubble") { setUserBubble(TOUR_PROMPT); setInputText(""); setSending(false); go("thinking", 300); }
-    if (phase === "thinking")   { setThinking(true); go("responding", 950); }
+    if (phase === "sending") { setSending(true); go("chat-bubble", 180); }
+    if (phase === "chat-bubble") {
+      setCurrentBubble(chat.prompt); setInputText(""); setSending(false);
+      go("thinking", 180);
+    }
+    if (phase === "thinking") { setThinking(true); go("responding", 650); }
     if (phase === "responding") {
       setThinking(false);
       let i = 0;
       const type = () => {
-        if (i <= TOUR_RESPONSE.length) { setAiResponse(TOUR_RESPONSE.slice(0,i)); i++; tmr.current = setTimeout(type, 38); }
-        else go("pre-dash", 1800);
+        if (i <= chat.response.length) { setCurrentResponse(chat.response.slice(0,i)); i++; tmr.current = setTimeout(type, 22); }
+        else go("next-chat", 700);
       };
-      tmr.current = setTimeout(type, 80);
+      tmr.current = setTimeout(type, 50);
     }
-    if (phase === "pre-dash")  { go("tap-grid", 400); }
-    if (phase === "tap-grid")  { setGridLit(true); go("panel-open", 380); }
-    if (phase === "panel-open"){ setPanelOpen(true); setGridLit(false); go("tab-budget", 2200); }
-    if (phase === "tab-budget"){ setActiveTab("Schedule"); go("tab-goals", 2000); }
-    if (phase === "tab-goals") { setActiveTab("Goals");  go("panel-close", 2000); }
-    if (phase === "panel-close"){ setPanelOpen(false); go("reset", 900); }
+    if (phase === "next-chat") {
+      setCurrentBubble(""); setCurrentResponse("");
+      if (chatIdx < TOUR_CHATS.length - 1) {
+        setPhase("clearing");
+        setChatIdx(c => c + 1);
+      } else {
+        go("pre-dash", 200);
+      }
+    }
+    if (phase === "clearing") { go("typing", 500); }
+    if (phase === "pre-dash")    { go("tap-grid", 100); }
+    if (phase === "tap-grid")    { setGridLit(true); go("panel-open", 200); }
+    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 2400); }
+    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-schedule", 2000); }
+    if (phase === "tab-schedule"){ setActiveTab("Schedule"); go("tab-goals", 2000); }
+    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 2000); }
+    if (phase === "panel-close") { setPanelOpen(false); go("reset", 900); }
     if (phase === "reset") {
       setVisible(false);
       tmr.current = setTimeout(() => setPhase("home"), 450);
     }
     return () => { if (tmr.current) clearTimeout(tmr.current); };
-  }, [phase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, chatIdx]);
 
-  const hasInput    = inputText.length > 0;
-  const isChatMode  = !["home","typing","sending"].includes(phase);
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [currentBubble, currentResponse, thinking]);
+
+  const hasInput      = inputText.length > 0;
+  // Stay in chat mode for subsequent messages once the conversation has started
+  const isChatMode    = chatIdx > 0 || !["home","typing","sending"].includes(phase);
   const isTypingPhase = phase === "typing";
 
   return (
@@ -1086,25 +1122,26 @@ function AppTourDemo() {
           {/* Chat screen */}
           {isChatMode && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 px-4 py-6 space-y-3 flex flex-col justify-end">
-                {userBubble && (
-                  <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white">{userBubble}</div>
+              <div ref={chatScrollRef} className="flex-1 px-4 py-4 space-y-2.5 flex flex-col overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                <div className="flex-1" />
+                {currentBubble && (
+                  <div className="flex justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white">{currentBubble}</div>
                   </div>
                 )}
                 {thinking && (
-                  <div className="flex items-start gap-2">
-                    <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-1 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 flex gap-1 items-center">
+                  <div className="flex items-start gap-2" style={{ animation: "msgIn 0.18s ease-out both" }}>
+                    <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-1 shrink-0" />
+                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 flex gap-1 items-center">
                       {[0,1,2].map((i)=><span key={i} className="w-1 h-1 rounded-full bg-white/40" style={{animation:`bounce 1s ease-in-out ${i*0.18}s infinite`}} />)}
                     </div>
                   </div>
                 )}
-                {aiResponse && (
-                  <div className="flex items-start gap-2">
-                    <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-1 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[90%]">
-                      {aiResponse}
+                {currentResponse && (
+                  <div className="flex items-start gap-2" style={{ animation: "msgIn 0.18s ease-out both" }}>
+                    <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-1 shrink-0" />
+                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 text-sm leading-relaxed text-gray-200 max-w-[85%]">
+                      {currentResponse}
                       {phase === "responding" && <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />}
                     </div>
                   </div>
@@ -1112,10 +1149,14 @@ function AppTourDemo() {
               </div>
               <div className="shrink-0 px-4 pt-2 bg-gradient-to-t from-black via-black/90 to-transparent" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
                 <div className="flex items-end gap-2 rounded-full border border-white/10 bg-[#1c1c1e] px-4 py-2">
-                  <span className="flex-1 text-[15px] py-1.5 text-white/35 min-h-[1.5em]">Ask me anything…</span>
+                  <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
+                    {inputText
+                      ? <span className="text-white">{inputText}</span>
+                      : <span className="text-white/35">Ask me anything…</span>}
+                  </span>
                   <Mic className="h-5 w-5 text-white/40 shrink-0" strokeWidth={1.5} />
-                  <button className="shrink-0 flex items-center justify-center rounded-full w-8 h-8 bg-white/20 scale-95">
-                    <ArrowUp className="h-4 w-4 text-white/40" strokeWidth={1.5} />
+                  <button className={`shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all ${sending ? "bg-white scale-100" : "bg-white/20 scale-95"}`}>
+                    <ArrowUp className={`h-4 w-4 ${sending ? "text-black" : "text-white/40"}`} strokeWidth={1.5} />
                   </button>
                 </div>
               </div>
@@ -1164,6 +1205,7 @@ function AppTourDemo() {
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
               {activeTab === "Insights"  && <TourInsightsTab />}
+              {activeTab === "Budget"   && <TourBudgetTab />}
               {activeTab === "Schedule" && <TourScheduleTab />}
               {activeTab === "Goals"    && <TourGoalsTab />}
             </div>
@@ -1296,26 +1338,16 @@ export default function LandingPage() {
         </p>
       </div>
 
-      <div className="flex items-center gap-4 px-6 py-10">
-        <div className="flex-1 border-t border-white/5" />
-        <StarEight className="w-2.5 h-2.5 text-white/20 shrink-0" />
-        <div className="flex-1 border-t border-white/5" />
-      </div>
-
-      {/* Examples — live chat demo */}
-      <div className="max-w-lg mx-auto px-6 pb-10 border-b border-white/5 text-center">
-        <h2 className="text-xl font-bold text-white mb-8 font-[family-name:var(--font-playfair)]">
-          Simply tell me what you need.
-        </h2>
-        <ChatDemo />
-      </div>
 
       <style>{`
         @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
           50% { transform: translateY(-4px); opacity: 1; }
         }
-
+        @keyframes msgIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
       {/* Closing CTA */}
