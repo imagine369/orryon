@@ -21,6 +21,7 @@ const PRO_FEATURES = [
   "Cash flow forecast",
   "Calendar events, reminders & errands",
   "Today view — tasks + events at a glance",
+  "Guided breathing sessions — box breathing & double inhale destress",
   "Grocery lists",
   "Rich notes with pinning & mood tags",
   "Shareable read-only finance link",
