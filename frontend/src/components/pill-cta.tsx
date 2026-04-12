@@ -33,7 +33,7 @@ const base = (size: "sm" | "md" | "lg") =>
 const fillClass = (variant: Variant) => {
   const fill =
     variant === "primary" ? "bg-black"
-    : variant === "calm"   ? "bg-white/15"
+    : variant === "calm"   ? "bg-white/50"
     : "bg-white";
   return `absolute inset-0 ${fill} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
 };

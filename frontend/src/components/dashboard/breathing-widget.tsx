@@ -324,8 +324,8 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
         <p style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.40)", marginBottom: "0.5rem" }}>
           Choose your session
         </p>
-        <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "#fff", marginBottom: "1.8rem", textAlign: "center" }}>
-          How would you like to breathe?
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "1.8rem", textAlign: "center" }}>
+          How would you like to relax?
         </h2>
 
         {/* ── Box Breathing card ── */}
@@ -337,7 +337,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
               transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
             />
             <div>
-              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginBottom: "0.15rem" }}>Box Breathing</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Box Breathing</p>
               <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>Guided circle · 4-4-4-4 · calming & focused</p>
             </div>
           </div>
@@ -392,7 +392,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
               }}
             />
             <div>
-              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginBottom: "0.15rem" }}>Double Inhale Quick Destress</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Double Inhale Quick Destress</p>
               <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>Research-backed quick stress relief</p>
             </div>
           </div>
