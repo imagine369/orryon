@@ -80,6 +80,8 @@ _TOOL_LABELS = {
     "split_expense": "Splitting expense",
     "get_spending_patterns": "Analysing patterns",
     "search_transactions": "Searching transactions",
+    "get_subscription_health": "Checking subscriptions",
+    "get_mood_spending_report": "Analysing mood patterns",
 }
 
 _UNDO_TABLE_MAP = {
@@ -455,6 +457,21 @@ def _get_context_snapshot(user_id: str) -> str:
                     mood = f" ({n['mood']})" if n.get("mood") else ""
                     goal = f" → {n['linked_goal']}" if n.get("linked_goal") else ""
                     lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}{goal}")
+        except Exception:
+            pass
+
+        # Proactively surface dormant subscriptions
+        try:
+            from core.tools import _get_subscription_health
+            sub_health = _get_subscription_health({}, user_id)
+            if sub_health.get("dormant_count", 0) > 0:
+                dormant = sub_health["dormant_subscriptions"]
+                lines.append(
+                    f"- ⚠️ Potentially unused subscriptions ({sub_health['dormant_count']} found, "
+                    f"${sub_health['dormant_monthly_cost']:.0f}/mo):"
+                )
+                for d in dormant[:4]:
+                    lines.append(f"  · {d['name']} — ${d['amount']:.2f}/{d['frequency']} [id:{d['id'][:8]}]")
         except Exception:
             pass
 

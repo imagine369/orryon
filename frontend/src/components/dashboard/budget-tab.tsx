@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
 
 interface BudgetCategory {
   id: string;
@@ -66,9 +67,12 @@ export function BudgetTab() {
           <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · {data.month}</p>
           <p className="text-lg font-bold">{fmt(totalPlanned)} <span className="text-sm font-normal text-white/30">/ {fmt(totalSpent)} spent</span></p>
         </div>
-        <button onClick={() => setAdding((v) => !v)} className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition">
-          {adding ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} /> : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <ReceiptScanner onSaved={load} />
+          <button onClick={() => setAdding((v) => !v)} className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition">
+            {adding ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} /> : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />}
+          </button>
+        </div>
       </div>
 
       {adding && (

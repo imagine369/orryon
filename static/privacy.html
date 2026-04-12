@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — orryon</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 1rem;
+      line-height: 1.7;
+      padding: 3rem 1.25rem 5rem;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      color: #fff;
+      text-decoration: none;
+      margin-bottom: 2.5rem;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+    }
+    .back:hover { opacity: 1; }
+
+    .wordmark {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #1d9bf0;
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.35rem;
+    }
+
+    .updated {
+      font-size: 0.78rem;
+      color: #fff;
+      opacity: 0.35;
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 2rem 0 0.6rem;
+    }
+
+    p {
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 0.75rem;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin-bottom: 0.75rem;
+    }
+    ul li {
+      color: rgba(255, 255, 255, 0.6);
+      padding: 0.25rem 0 0.25rem 1.1rem;
+      position: relative;
+    }
+    ul li::before {
+      content: "—";
+      position: absolute;
+      left: 0;
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    a { color: #1d9bf0; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 0.1em 0.4em;
+      font-size: 0.9em;
+      color: #fff;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin: 2.5rem 0;
+    }
+
+    .callout {
+      background: rgba(29, 155, 240, 0.08);
+      border: 1px solid rgba(29, 155, 240, 0.3);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 0.88rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 2rem;
+    }
+
+    footer {
+      margin-top: 4rem;
+      font-size: 0.68rem;
+      color: rgba(255, 255, 255, 0.2);
+      text-align: center;
+    }
+    footer a { color: rgba(255, 255, 255, 0.35); }
+    footer a:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <a class="back" href="javascript:history.back()">← Back</a>
+
+    <div class="wordmark">orryon</div>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: April 11, 2026</p>
+
+    <p>orryon is a fully local, privacy-first personal finance and productivity tool. This page explains exactly what we do — and don't — do with your data.</p>
+
+    <h2>Your data stays on your device</h2>
+    <p>Everything you add to orryon — transactions, budgets, goals, calendar events, grocery lists, notes, and chat history — is stored <strong>only</strong> in a local SQLite file called <code>finance.db</code> on your own device. We do not run a cloud server that collects or stores your personal data.</p>
+
+    <h2>What we store locally</h2>
+    <ul>
+      <li><strong>Email address:</strong> If you sign in with OTP, your email is saved in the local <code>finance.db</code> to identify your account across sessions. It never leaves your device.</li>
+      <li><strong>Financial &amp; personal data:</strong> All transactions, budgets, goals, events, notes, and chat history are stored only in <code>finance.db</code> on your device.</li>
+    </ul>
+    <p>We do not transmit, collect, or store any of this data on any server.</p>
+
+    <h2>What we do not do</h2>
+    <ul>
+      <li>We do not track you across websites or devices.</li>
+      <li>We do not use advertising networks, tracking pixels, or third-party analytics.</li>
+      <li>We do not sell, rent, or share any user data — ever.</li>
+      <li>We do not have access to your data.</li>
+    </ul>
+
+    <h2>The one thing that leaves your device</h2>
+    <p>When you chat with orryon, your message is sent to the <strong>xAI Grok API</strong> so the AI can understand and respond. That's it. Please review <a href="https://x.ai/legal/privacy-policy" target="_blank" rel="noopener">xAI's Privacy Policy</a> for how they handle those messages.</p>
+
+    <h2>Email notifications (optional)</h2>
+    <p>If you choose to configure SMTP reminders, emails are sent directly from your own email account credentials. We never see the content of those emails.</p>
+
+    <h2>Shared dashboard links</h2>
+    <p>You can generate a read-only share link to your Dashboard. Anyone with that link can view your financial overview. The data still comes from your local database — we do not host or store a copy of it.</p>
+
+    <h2>Your responsibilities</h2>
+    <ul>
+      <li>Back up your <code>finance.db</code> file regularly.</li>
+      <li>Keep your device and its contents secure.</li>
+      <li>Protect your xAI API key.</li>
+      <li>Understand that shared links expose your data to whoever has the link.</li>
+    </ul>
+
+    <h2>Changes to this policy</h2>
+    <p>We may update this Privacy Policy from time to time. Material changes will be reflected by an updated date at the top of this page.</p>
+
+    <hr />
+
+    <div class="callout">
+      <strong>orryon was built with one core principle:</strong><br>
+      Your data belongs to you, not to us. No cloud servers. No tracking. Your email stays local.
+    </div>
+
+    <footer>
+      <p>orryon v1.0 &nbsp;•&nbsp; <a href="/app/static/privacy.html">Privacy</a> &nbsp;•&nbsp; <a href="/app/static/terms.html">Terms</a></p>
+    </footer>
+
+  </div>
+</body>
+</html>

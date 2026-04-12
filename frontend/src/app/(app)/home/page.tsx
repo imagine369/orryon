@@ -17,12 +17,6 @@ interface Message {
   isError?: boolean;
 }
 
-const suggestions = [
-  "Add an expense",
-  "What's on my schedule?",
-  "How are my goals looking?",
-  "Show me this week's spending",
-];
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -129,10 +123,10 @@ export default function HomePage() {
 
   if (!hasMessages) {
     return (
-      <div className="flex flex-col items-center px-4 pt-[12vh] pb-16 min-h-[calc(100vh-93px)]">
-        <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover mb-5" />
-        <p className="text-white/55 text-sm mb-8 font-[family-name:var(--font-playfair)]">
-          Hi{user?.display_name ? `, ${user.display_name}` : ""}. What can I help you with?
+      <div className="flex flex-col items-center justify-center px-4 py-8 min-h-[calc(100vh-93px)]">
+        <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover mb-6 ring-1 ring-white/10" />
+        <p className="text-white/60 text-[15px] mb-8 max-w-[260px] text-center leading-tight">
+          Hello{user?.display_name ? `, ${user.display_name}` : ""}.<br />I am Orryon.<br />What shall we organize today?
         </p>
 
         {tasksDueToday !== null && tasksDueToday > 0 && (
@@ -149,17 +143,6 @@ export default function HomePage() {
           <ChatInput onSend={handleSend} disabled={streaming} variant="center" />
         </div>
 
-        <div className="flex flex-col items-center gap-2 mt-[50px] max-w-xl w-full">
-          {suggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => handleSend(s)}
-              className="bg-white/5 border border-white/[0.07] rounded-full px-4 py-2 text-sm text-white/50 hover:text-white/80 hover:bg-white/10 hover:border-white/15 transition-colors w-full text-center"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -223,8 +206,8 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Copy + Retry actions */}
-                    <div className="flex items-center gap-3 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Copy + Retry actions — always visible on touch, hover-revealed on pointer devices */}
+                    <div className="flex items-center gap-3 mt-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       {!streaming && msg.content && (
                         <button
                           onClick={() => handleCopy(msg.content, i)}
@@ -255,7 +238,7 @@ export default function HomePage() {
         </div>
       </ScrollArea>
 
-      <div className="shrink-0 px-4 pb-[50px] pt-2 bg-gradient-to-t from-black via-black/90 to-transparent">
+      <div className="shrink-0 px-4 pt-2 bg-gradient-to-t from-black via-black/90 to-transparent" style={{ paddingBottom: 'max(50px, calc(20px + env(safe-area-inset-bottom)))' }}>
         <ChatInput onSend={handleSend} disabled={streaming} variant="bottom" />
       </div>
     </div>

@@ -13,7 +13,7 @@ Features:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import streamlit as st
 
@@ -30,6 +30,16 @@ _MOOD_MAP = {
     "stressed": ("😰", "Stressed"),
     "anxious": ("😟", "Anxious"),
     "reflective": ("🤔", "Reflective"),
+}
+
+_MOOD_COLORS = {
+    "happy": "#22c55e",
+    "grateful": "#a78bfa",
+    "motivated": "#f97316",
+    "neutral": "#94a3b8",
+    "stressed": "#ef4444",
+    "anxious": "#f59e0b",
+    "reflective": "#38bdf8",
 }
 
 _TEMPLATES = {
@@ -171,6 +181,110 @@ _NOTES_CSS = """
 """
 
 
+def _compute_mood_spending(user_id: str) -> list[dict]:
+    """Correlate mood journal entries with daily spending (±1 day window)."""
+    conn = get_connection()
+    notes = conn.execute(
+        "SELECT mood, created_at FROM notes WHERE user_id=? AND mood!='' AND mood IS NOT NULL",
+        (user_id,),
+    ).fetchall()
+
+    if len(notes) < 3:
+        conn.close()
+        return []
+
+    mood_buckets: dict[str, list[float]] = {}
+    for note in notes:
+        mood = note["mood"]
+        note_date_str = (note["created_at"] or "")[:10]
+        if not note_date_str:
+            continue
+        try:
+            note_dt = datetime.strptime(note_date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+        date_from = (note_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+        date_to = (note_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+        row = conn.execute(
+            "SELECT SUM(amount) as total FROM transactions "
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0",
+            (user_id, date_from, date_to),
+        ).fetchone()
+        day_spend = float(row["total"] or 0)
+        mood_buckets.setdefault(mood, []).append(day_spend)
+
+    conn.close()
+
+    results = []
+    for mood, amounts in mood_buckets.items():
+        avg = round(sum(amounts) / len(amounts), 2) if amounts else 0
+        results.append({
+            "mood": mood,
+            "avg_daily_spending": avg,
+            "sample_size": len(amounts),
+        })
+    results.sort(key=lambda x: -x["avg_daily_spending"])
+    return results
+
+
+def _render_mood_spending_insights(user_id: str) -> None:
+    """Render the Mood × Spending correlation panel inside an expander."""
+    data = _compute_mood_spending(user_id)
+    if not data:
+        return
+
+    max_spend = max(d["avg_daily_spending"] for d in data) or 1
+    highest = data[0]
+    lowest = data[-1]
+
+    with st.expander("✨ Mood × Spending Insights", expanded=False):
+        if highest["mood"] != lowest["mood"] and len(data) > 1:
+            diff = round(highest["avg_daily_spending"] - lowest["avg_daily_spending"], 2)
+            st.markdown(
+                f'<p style="font-size:0.84rem;color:#94a3b8;margin-bottom:0.8rem">'
+                f'You spend <strong style="color:#f1f5f9">${diff:.0f}/day more</strong> '
+                f'when <strong style="color:{_MOOD_COLORS.get(highest["mood"], "#fff")}">'
+                f'{_MOOD_MAP.get(highest["mood"], ("",""))[0]} {highest["mood"]}</strong> '
+                f'than when <strong style="color:{_MOOD_COLORS.get(lowest["mood"], "#fff")}">'
+                f'{_MOOD_MAP.get(lowest["mood"], ("",""))[0]} {lowest["mood"]}</strong>. '
+                f'Ask orryon: <em>"do I spend more when stressed?"</em> for a full breakdown.'
+                f'</p>',
+                unsafe_allow_html=True,
+            )
+
+        for item in data:
+            mood = item["mood"]
+            emoji, label = _MOOD_MAP.get(mood, ("", mood.title()))
+            avg = item["avg_daily_spending"]
+            n = item["sample_size"]
+            bar_pct = int((avg / max_spend) * 100)
+            color = _MOOD_COLORS.get(mood, "#6366f1")
+
+            st.markdown(
+                f"""<div style="margin-bottom:0.55rem">
+                  <div style="display:flex;justify-content:space-between;
+                    font-size:0.82rem;margin-bottom:3px">
+                    <span style="color:#f1f5f9">{emoji} {label}</span>
+                    <span style="color:#94a3b8">${avg:.0f}/day &nbsp;
+                      <span style="color:#475569;font-size:0.72rem">({n} entries)</span>
+                    </span>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.07);border-radius:4px;height:6px">
+                    <div style="width:{bar_pct}%;height:6px;border-radius:4px;
+                      background:{color};transition:width .3s"></div>
+                  </div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            '<p style="font-size:0.68rem;color:#334155;margin-top:0.5rem">'
+            'Based on transactions within ±1 day of each mood journal entry. '
+            'Not financial advice — just your data, clearly laid out.</p>',
+            unsafe_allow_html=True,
+        )
+
+
 def _word_count(text: str) -> int:
     return len(text.split()) if text else 0
 
@@ -220,6 +334,8 @@ def render_notes(user_id: str) -> None:
 
 def _render_notes_list(user_id: str) -> None:
     """Main notes list with search, filter, pinned section."""
+
+    _render_mood_spending_insights(user_id)
 
     search = st.text_input(
         "Search notes",

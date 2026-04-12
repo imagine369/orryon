@@ -723,6 +723,30 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_subscription_health",
+            "description": (
+                "Check which subscriptions may be unused — finds active recurring bills with no matching "
+                "transaction in the last 90 days. Use when the user asks 'am I paying for anything I don't use?', "
+                "'which subscriptions should I cancel?', 'find unused subscriptions', or similar."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_mood_spending_report",
+            "description": (
+                "Analyse how spending varies by mood — correlates notes mood entries with transaction amounts "
+                "on the same day. Use when the user asks 'does my mood affect my spending?', "
+                "'do I spend more when stressed?', 'show me mood spending patterns', or similar."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -748,6 +772,40 @@ def _uid() -> str:
 
 # ── Write tools ───────────────────────────────────────────────────────────────
 
+def _get_goal_impact_for_category(user_id: str, category: str, month: str) -> dict | None:
+    """Return goal impact data if any active goal is linked to this expense category."""
+    conn = get_connection()
+    goals = conn.execute(
+        "SELECT * FROM goals WHERE user_id=? AND is_completed=0 AND linked_budget_category=?",
+        (user_id, category),
+    ).fetchall()
+    conn.close()
+    if not goals:
+        return None
+    g = dict(goals[0])
+    target = float(g["target_amount"])
+    current = float(g["current_amount"])
+    remaining = round(target - current, 2)
+    pct = round((current / target * 100), 1) if target else 0
+    monthly_needed = None
+    months_left = None
+    if g.get("target_date"):
+        try:
+            target_dt = datetime.strptime(g["target_date"], "%Y-%m-%d")
+            months_left = max(1, round((target_dt - datetime.now()).days / 30))
+            monthly_needed = round(remaining / months_left, 2)
+        except Exception:
+            pass
+    return {
+        "goal_name": g["name"],
+        "pct_complete": pct,
+        "remaining": round(remaining, 2),
+        "monthly_needed": monthly_needed,
+        "months_left": months_left,
+        "target_date": g.get("target_date", ""),
+    }
+
+
 def _add_expense(args: dict, user_id: str) -> dict:
     date = args.get("date") or _today()
     import json as _json
@@ -765,8 +823,10 @@ def _add_expense(args: dict, user_id: str) -> dict:
     insert_row("transactions", row)
     new_bal = adjust_balance(user_id, -row["amount"])
     month = date[:7]
-    spent = _get_category_spending(user_id, args.get("category", "Other"), month)
-    budget = _get_category_budget(user_id, args.get("category", "Other"), month)
+    category = args.get("category", "Other")
+    spent = _get_category_spending(user_id, category, month)
+    budget = _get_category_budget(user_id, category, month)
+    goal_impact = _get_goal_impact_for_category(user_id, category, month)
     return {
         "status": "ok",
         "id": row["id"],
@@ -777,6 +837,7 @@ def _add_expense(args: dict, user_id: str) -> dict:
         "month_spent": spent,
         "month_budget": budget,
         "new_balance": round(new_bal, 2),
+        "goal_impact": goal_impact,
     }
 
 
@@ -1966,6 +2027,133 @@ def _get_money_left_after_goals(args: dict, user_id: str) -> dict:
     }
 
 
+# ── Subscription Health ────────────────────────────────────────────────────────
+
+def _get_subscription_health(args: dict, user_id: str) -> dict:
+    """Find active subscriptions with no matching transaction in the last 90 days."""
+    ninety_days_ago = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    conn = get_connection()
+    subs = conn.execute(
+        "SELECT * FROM subscriptions WHERE user_id=? AND is_active=1",
+        (user_id,),
+    ).fetchall()
+
+    dormant = []
+    healthy = []
+    for sub in [dict(s) for s in subs]:
+        name_fragment = sub["name"].lower()[:12]
+        txn = conn.execute(
+            "SELECT id FROM transactions WHERE user_id=? AND date>=? AND amount>0 AND LOWER(merchant) LIKE ?",
+            (user_id, ninety_days_ago, f"%{name_fragment}%"),
+        ).fetchone()
+        if txn:
+            healthy.append(sub["name"])
+        else:
+            freq = sub.get("frequency", "monthly")
+            amt = float(sub.get("amount", 0))
+            if freq == "yearly":
+                monthly_cost = round(amt / 12, 2)
+            elif freq == "weekly":
+                monthly_cost = round(amt * 4.33, 2)
+            elif freq == "bi-weekly":
+                monthly_cost = round(amt * 2.17, 2)
+            else:
+                monthly_cost = amt
+            dormant.append({
+                "name": sub["name"],
+                "amount": amt,
+                "frequency": freq,
+                "monthly_cost": monthly_cost,
+                "next_due": sub.get("next_due", ""),
+                "id": sub["id"],
+            })
+
+    conn.close()
+    total_dormant_monthly = round(sum(d["monthly_cost"] for d in dormant), 2)
+    return {
+        "status": "ok",
+        "dormant_subscriptions": dormant,
+        "dormant_count": len(dormant),
+        "dormant_monthly_cost": total_dormant_monthly,
+        "dormant_annual_cost": round(total_dormant_monthly * 12, 2),
+        "healthy_subscriptions": healthy,
+        "healthy_count": len(healthy),
+        "check_window_days": 90,
+    }
+
+
+# ── Mood × Spending Correlation ────────────────────────────────────────────────
+
+def _get_mood_spending_report(args: dict, user_id: str) -> dict:
+    """Correlate mood journal entries with spending on the same day (±1 day window)."""
+    conn = get_connection()
+    notes = conn.execute(
+        "SELECT mood, created_at FROM notes WHERE user_id=? AND mood!='' AND mood IS NOT NULL",
+        (user_id,),
+    ).fetchall()
+
+    if len(notes) < 3:
+        conn.close()
+        return {
+            "status": "insufficient_data",
+            "message": "Need at least 3 mood journal entries to generate a pattern.",
+            "notes_with_mood": len(notes),
+        }
+
+    mood_buckets: dict[str, list[float]] = {}
+    for note in notes:
+        mood = note["mood"]
+        note_date_str = (note["created_at"] or "")[:10]
+        if not note_date_str:
+            continue
+        try:
+            note_dt = datetime.strptime(note_date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+        date_from = (note_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+        date_to = (note_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+        row = conn.execute(
+            "SELECT SUM(amount) as total FROM transactions "
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0",
+            (user_id, date_from, date_to),
+        ).fetchone()
+        day_spend = float(row["total"] or 0)
+        mood_buckets.setdefault(mood, []).append(day_spend)
+
+    conn.close()
+
+    results = []
+    for mood, amounts in mood_buckets.items():
+        avg = round(sum(amounts) / len(amounts), 2) if amounts else 0
+        results.append({
+            "mood": mood,
+            "avg_daily_spending": avg,
+            "sample_size": len(amounts),
+            "total_spending": round(sum(amounts), 2),
+        })
+    results.sort(key=lambda x: -x["avg_daily_spending"])
+
+    highest = results[0] if results else None
+    lowest = results[-1] if len(results) > 1 else None
+    insight = ""
+    if highest and lowest and highest["mood"] != lowest["mood"]:
+        diff = round(highest["avg_daily_spending"] - lowest["avg_daily_spending"], 2)
+        insight = (
+            f"You spend ${diff:.0f}/day more when {highest['mood']} than when {lowest['mood']}. "
+            f"On {highest['mood']} days: ${highest['avg_daily_spending']:.0f} avg. "
+            f"On {lowest['mood']} days: ${lowest['avg_daily_spending']:.0f} avg."
+        )
+
+    return {
+        "status": "ok",
+        "mood_spending": results,
+        "highest_spending_mood": highest,
+        "lowest_spending_mood": lowest,
+        "insight": insight,
+        "total_mood_entries_analysed": len(notes),
+    }
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
@@ -2007,6 +2195,8 @@ _TOOL_MAP = {
     "split_expense": _split_expense,
     "get_spending_patterns": _get_spending_patterns,
     "search_transactions": _search_transactions,
+    "get_subscription_health": _get_subscription_health,
+    "get_mood_spending_report": _get_mood_spending_report,
 }
 
 _TAB_REFRESH_MAP = {
@@ -2048,6 +2238,8 @@ _TAB_REFRESH_MAP = {
     "split_expense": ["dashboard", "budget"],
     "get_spending_patterns": [],
     "search_transactions": [],
+    "get_subscription_health": [],
+    "get_mood_spending_report": [],
 }
 
 

@@ -327,6 +327,7 @@ def init_db() -> None:
     _migrate_transactions_currency(conn)
     _migrate_users_weekly_report(conn)
     _migrate_notes_rich(conn)
+    _migrate_users_preferences(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -434,6 +435,23 @@ def _migrate_notes_rich(conn: sqlite3.Connection) -> None:
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_notes_rich: %s (non-fatal)", exc)
+
+
+def _migrate_users_preferences(conn: sqlite3.Connection) -> None:
+    """Add user preference columns: currency, budget_cycle_start, spending_alert_pct, bill_due_alert_days."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "currency" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN currency TEXT DEFAULT 'USD'")
+        if "budget_cycle_start" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN budget_cycle_start INTEGER DEFAULT 1")
+        if "spending_alert_pct" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN spending_alert_pct INTEGER DEFAULT 80")
+        if "bill_due_alert_days" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN bill_due_alert_days INTEGER DEFAULT 3")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_users_preferences: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:

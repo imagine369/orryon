@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Footer } from "@/components/footer";
 
 export default function PrivacyPage() {
   return (
-    <div className="max-w-xl mx-auto px-4 py-12">
+    <div className="min-h-screen flex flex-col">
+    <div className="flex-1 max-w-xl mx-auto px-4 py-12 w-full">
       <Link href="/" className="text-white/30 hover:text-white text-sm">← Back</Link>
       <h1 className="text-3xl font-bold mt-4 mb-6">Privacy Policy</h1>
       <div className="prose prose-invert prose-sm">
@@ -16,6 +18,8 @@ export default function PrivacyPage() {
         <h2>Email</h2>
         <p>If SMTP is configured, we send only: OTP codes, daily digests, and event reminders. No marketing emails, ever.</p>
       </div>
+    </div>
+    <Footer />
     </div>
   );
 }

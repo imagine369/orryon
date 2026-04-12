@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Footer } from "@/components/footer";
 
 export default function TermsPage() {
   return (
-    <div className="max-w-xl mx-auto px-4 py-12">
+    <div className="min-h-screen flex flex-col">
+    <div className="flex-1 max-w-xl mx-auto px-4 py-12 w-full">
       <Link href="/" className="text-white/30 hover:text-white text-sm">← Back</Link>
       <h1 className="text-3xl font-bold mt-4 mb-6">Terms of Use</h1>
       <div className="prose prose-invert prose-sm">
@@ -16,6 +18,8 @@ export default function TermsPage() {
         <h2>Availability</h2>
         <p>orryon is provided as-is. We aim for reliability but cannot guarantee 100% uptime.</p>
       </div>
+    </div>
+    <Footer />
     </div>
   );
 }

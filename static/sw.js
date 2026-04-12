@@ -1,58 +1,75 @@
-const CACHE = "orryon-v1";
+/* orryon service worker — v2
+   Handles caching for static assets so the installed PWA loads fast.
+*/
 
-const PRECACHE = [
-  "/",
+const CACHE_NAME = "orryon-v2";
+
+const PRECACHE_URLS = [
   "/app/static/manifest.json",
   "/app/static/icon-192.png",
-  "/app/static/icon-512.png"
+  "/app/static/icon-512.png",
 ];
 
-// Install: precache shell assets
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE))
+/* Install: pre-cache static shell assets */
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.addAll(PRECACHE_URLS).catch(() => {})
+    )
   );
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
+/* Activate: remove stale caches from previous versions */
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
     )
   );
   self.clients.claim();
 });
 
-// Fetch: network-first for navigation, cache-first for static assets
-self.addEventListener("fetch", (e) => {
-  const { request } = e;
-  const url = new URL(request.url);
+/* Fetch: cache-first for static assets, network-first for everything else */
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
 
-  // Only handle same-origin requests
-  if (url.origin !== location.origin) return;
+  // Only handle GET requests from the same origin
+  if (event.request.method !== "GET" || url.origin !== self.location.origin) {
+    return;
+  }
 
-  // Static assets: cache-first
-  if (url.pathname.startsWith("/app/static/")) {
-    e.respondWith(
-      caches.match(request).then((cached) =>
-        cached || fetch(request).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, clone));
-          return res;
-        })
+  // Static assets (icons, manifest) — cache-first
+  if (
+    url.pathname.startsWith("/app/static/") &&
+    (url.pathname.endsWith(".png") ||
+      url.pathname.endsWith(".json") ||
+      url.pathname.endsWith(".js") ||
+      url.pathname.endsWith(".css"))
+  ) {
+    event.respondWith(
+      caches.match(event.request).then(
+        (cached) =>
+          cached ||
+          fetch(event.request).then((response) => {
+            if (response && response.status === 200) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) =>
+                cache.put(event.request, clone)
+              );
+            }
+            return response;
+          })
       )
     );
     return;
   }
 
-  // Navigation: network-first with offline fallback
-  if (request.mode === "navigate") {
-    e.respondWith(
-      fetch(request).catch(() =>
-        caches.match("/").then((cached) => cached || Response.error())
-      )
-    );
-  }
+  // All other requests — network-first, no offline fallback
+  // (Streamlit requires a live server; we don't pretend otherwise)
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });

@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -148,11 +148,22 @@ class BudgetReq(BaseModel):
     month: Optional[str] = None
 
 class SettingsUpdate(BaseModel):
+    display_name: Optional[str] = None
     default_reminder_minutes: Optional[int] = None
     daily_digest_enabled: Optional[int] = None
     daily_digest_time: Optional[str] = None
     weekly_report_enabled: Optional[int] = None
-    display_name: Optional[str] = None
+    bill_due_alert_days: Optional[int] = None
+    currency: Optional[str] = None
+    budget_cycle_start: Optional[int] = None
+    spending_alert_pct: Optional[int] = None
+
+class EmailChangeSendReq(BaseModel):
+    new_email: str
+
+class EmailChangeVerifyReq(BaseModel):
+    new_email: str
+    code: str
 
 class ChatReq(BaseModel):
     message: str
@@ -678,6 +689,35 @@ async def list_bills(user: dict = Depends(get_current_user)):
     return [dict(r) for r in rows]
 
 
+class BillReq(BaseModel):
+    name: str
+    amount: float
+    frequency: Optional[str] = "monthly"
+    next_due: Optional[str] = None
+    category: Optional[str] = "Subscriptions"
+
+
+@app.post("/api/bills")
+async def create_bill(body: BillReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    bill_id = str(uuid.uuid4())
+    next_due = body.next_due or datetime.now().strftime("%Y-%m-%d")
+    insert_row("subscriptions", {
+        "id": bill_id, "user_id": uid, "name": body.name,
+        "amount": body.amount, "frequency": body.frequency,
+        "next_due": next_due, "category": body.category,
+        "is_active": 1, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"id": bill_id}
+
+
+@app.delete("/api/bills/{bill_id}")
+async def delete_bill(bill_id: str, user: dict = Depends(get_current_user)):
+    from db import delete_row
+    delete_row("subscriptions", {"id": bill_id})
+    return {"deleted": True}
+
+
 # ===========================================================================
 # CHAT (SSE streaming)
 # ===========================================================================
@@ -760,6 +800,67 @@ async def update_settings(body: SettingsUpdate, user: dict = Depends(get_current
         raise HTTPException(400, "No fields to update")
     update_row("users", updates, {"id": uid})
     return {"updated": True}
+
+
+@app.post("/api/settings/email-change/send-code")
+async def email_change_send_code(body: EmailChangeSendReq, user: dict = Depends(get_current_user)):
+    new_email = body.new_email.strip().lower()
+    if not new_email or "@" not in new_email:
+        raise HTTPException(400, "Invalid email address")
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT id FROM users WHERE email=? AND id!=?", (new_email, user["user_id"])
+    ).fetchone()
+    conn.close()
+    if existing:
+        raise HTTPException(400, "That email is already associated with another account")
+    code = create_verification_code(new_email)
+    sent = send_verification_code(new_email, code)
+    return {
+        "sent": sent,
+        "dev_code": "" if sent else code,
+        "message": "Code sent" if sent else "SMTP not configured — code returned for dev mode",
+    }
+
+
+@app.post("/api/settings/email-change/verify")
+async def email_change_verify(body: EmailChangeVerifyReq, user: dict = Depends(get_current_user)):
+    new_email = body.new_email.strip().lower()
+    if not verify_code(new_email, body.code.strip()):
+        raise HTTPException(401, "Invalid or expired code")
+    uid = user["user_id"]
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT id FROM users WHERE email=? AND id!=?", (new_email, uid)
+    ).fetchone()
+    conn.close()
+    if existing:
+        raise HTTPException(400, "That email is already in use")
+    update_row("users", {"email": new_email}, {"id": uid})
+    token = create_token(uid, new_email)
+    return {"token": token, "email": new_email}
+
+
+@app.delete("/api/account")
+async def delete_account(user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    user_data_tables = [
+        "transactions", "accounts", "holdings", "goals", "notes", "events",
+        "subscriptions", "credit_scores", "action_items", "links", "inspo_images",
+        "budget_categories", "grocery_items", "custom_categories", "share_tokens",
+        "user_memory", "recurring_income", "net_worth_snapshots", "link_pages",
+        "chat_messages",
+    ]
+    for table in user_data_tables:
+        try:
+            conn.execute(f"DELETE FROM {table} WHERE user_id=?", (uid,))
+        except Exception:
+            pass
+    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+    conn.commit()
+    conn.close()
+    return {"deleted": True}
 
 
 # ===========================================================================
@@ -960,6 +1061,69 @@ async def list_income(user: dict = Depends(get_current_user)):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ===========================================================================
+# RECEIPT SCANNING
+# ===========================================================================
+
+@app.post("/api/receipts/scan")
+async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    import base64
+    import re as re_module
+
+    contents = await file.read()
+    b64 = base64.b64encode(contents).decode("utf-8")
+    mime = file.content_type or "image/jpeg"
+
+    payload = {
+        "model": "grok-2-vision-1212",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{b64}"},
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "This is a receipt image. Extract the following and respond ONLY with valid JSON, no markdown:\n"
+                            '{"merchant": "store name", "amount": 12.34, "date": "YYYY-MM-DD", "category": "one of: Food & Dining, Groceries, Transport, Entertainment, Shopping, Health & Fitness, Utilities, Travel, Subscriptions, Personal Care, Education, Other", "items": ["item1", "item2"]}\n'
+                            "If you cannot determine a field, use null. Amount must be a number (total paid). Date must be YYYY-MM-DD format."
+                        ),
+                    },
+                ],
+            }
+        ],
+        "max_tokens": 300,
+        "temperature": 0,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    import requests as req_lib
+    resp = req_lib.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload, timeout=30)
+
+    if not resp.ok:
+        raise HTTPException(500, f"Vision API error: {resp.text}")
+
+    raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+    # Strip markdown code fences if present
+    raw = re_module.sub(r"^```[a-z]*\n?", "", raw)
+    raw = re_module.sub(r"\n?```$", "", raw)
+
+    try:
+        result = json.loads(raw)
+    except Exception:
+        raise HTTPException(500, "Could not parse receipt data from image")
+
+    return result
 
 
 # ===========================================================================

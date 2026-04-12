@@ -96,7 +96,7 @@ export function ChatInput({ onSend, disabled, placeholder = "Ask me anything…"
         placeholder={listening ? "Listening…" : placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none bg-transparent text-white text-[15px] placeholder:text-white/35 outline-none py-1.5 max-h-32"
+        className="flex-1 min-w-0 resize-none bg-transparent text-white text-[15px] placeholder:text-white/35 outline-none py-1.5 max-h-32"
       />
 
       {/* Mic button — Grok-style: left of send, no background at rest */}

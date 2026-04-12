@@ -11,7 +11,7 @@ import os
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -24,7 +24,7 @@ _JWT_EXPIRY_DAYS = 30
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
-_cached_secret: str | None = None
+_cached_secret: Optional[str] = None
 
 
 def _get_secret() -> str:
@@ -59,7 +59,7 @@ def decode_token(token: str) -> dict[str, Any]:
 
 
 async def get_current_user(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> dict[str, str]:
     """FastAPI dependency — extracts and validates the JWT from the Authorization header."""
     if creds is None:

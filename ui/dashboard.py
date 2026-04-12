@@ -528,8 +528,8 @@ def _render_goals_preview(user_id: str) -> None:
             <div class="goal-bar" style="width:{bar_width}%;background:{bar_color};"></div>
           </div>
           <div class="goal-meta">
-            <span>${current:,.0f} saved of ${target:,.0f}</span>
-            <span>${remaining:,.0f} to go {days_str}</span>
+            <span>&#36;{current:,.0f} saved of &#36;{target:,.0f}</span>
+            <span>&#36;{remaining:,.0f} to go {days_str}</span>
           </div>
         </div>
         """

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: orryon
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: XAI_API_KEY
+        sync: false
+      - key: DB_PATH
+        value: /data/finance.db
+      - key: GROK_MODEL
+        value: grok-3-mini
+      - key: APP_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+    disk:
+      name: orryon-data
+      mountPath: /data
+      sizeGB: 1

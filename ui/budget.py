@@ -146,7 +146,7 @@ def render_budget(user_id: str) -> None:
         for b in budgets:
             cat = b["category"]
             planned = float(b["planned"])
-            has_rollover = bool(b.get("rollover"))
+            has_rollover = bool(dict(b).get("rollover", False))
             rollover_amt = 0.0
             if has_rollover and cat in prev_budget_map:
                 prev_plan = prev_budget_map[cat]
