@@ -26,11 +26,23 @@ export function ChatInput({ onSend, disabled, placeholder = "Ask me anything…"
     );
   }, []);
 
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   const handleSend = () => {
     const msg = value.trim();
     if (!msg || disabled) return;
     onSend(msg);
     setValue("");
+    // Reset height after clearing
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
     inputRef.current?.focus();
   };
 
@@ -82,7 +94,8 @@ export function ChatInput({ onSend, disabled, placeholder = "Ask me anything…"
   return (
     <div
       className={cn(
-        "flex items-end gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-colors duration-200",
+        "flex items-end gap-2 border bg-[#1c1c1e] px-4 py-2 transition-all duration-200",
+        value.includes("\n") || value.length > 60 ? "rounded-2xl" : "rounded-full",
         listening ? "border-white/30" : "border-white/10",
         variant === "bottom" && "mx-auto max-w-xl",
         variant === "center" && "mx-auto max-w-lg",
@@ -96,7 +109,8 @@ export function ChatInput({ onSend, disabled, placeholder = "Ask me anything…"
         placeholder={listening ? "Listening…" : placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 min-w-0 resize-none bg-transparent text-white text-[15px] placeholder:text-white/35 outline-none py-1.5 max-h-32"
+        className="flex-1 min-w-0 resize-none bg-transparent text-white text-[15px] placeholder:text-white/35 outline-none py-1.5 overflow-y-auto"
+        style={{ maxHeight: "200px" }}
       />
 
       {/* Mic button — Grok-style: left of send, no background at rest */}
