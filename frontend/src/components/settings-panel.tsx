@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, ChevronRight } from "lucide-react";
+import { X, Check, ChevronRight, Download, CreditCard } from "lucide-react";
 import { api, setToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
+import { useSubscription } from "@/lib/use-subscription";
 import { Separator } from "@/components/ui/separator";
 
 interface Settings {
@@ -129,6 +130,7 @@ function SelectField({ value, onChange, options }: {
 export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
+  const { sub, refresh: refreshSub } = useSubscription();
   const isOpen = openPanel === "settings";
 
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -149,6 +151,12 @@ export function SettingsPanel() {
   // delete account flow
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // billing portal
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  // export
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -190,11 +198,12 @@ export function SettingsPanel() {
         new_email: newEmail,
         code: emailCode,
       });
+      const me = await api.get<{ id: string; email: string; display_name: string }>("/api/auth/me");
       setToken(res.token);
       login(res.token, {
-        id: "",
+        id: me.id,
         email: res.email,
-        display_name: settings?.display_name || "",
+        display_name: me.display_name || settings?.display_name || "",
       });
       setSettings((prev) => prev ? { ...prev, email: res.email } : prev);
       setEmailStep("idle");
@@ -521,6 +530,84 @@ export function SettingsPanel() {
                     </p>
                   </section>
 
+                  {/* ── SUBSCRIPTION ── */}
+                  {sub && sub.plan !== "free" && (
+                    <>
+                      <Separator className="bg-white/5" />
+                      <section>
+                        <SectionLabel>Subscription</SectionLabel>
+                        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+                          <Row
+                            label="Current plan"
+                            sublabel={sub.plan === "trial"
+                              ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
+                              : "Pro"}
+                            right={
+                              <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60 uppercase tracking-wider">
+                                {sub.plan === "trial" ? "Trial" : "Active"}
+                              </span>
+                            }
+                          />
+                          {sub.plan === "pro" && (
+                            <div className="px-3 py-3">
+                              <button
+                                onClick={async () => {
+                                  setBillingLoading(true);
+                                  try {
+                                    const res = await api.post<{ portal_url: string }>("/api/subscription/portal");
+                                    window.location.href = res.portal_url;
+                                  } catch {
+                                    setBillingLoading(false);
+                                  }
+                                }}
+                                disabled={billingLoading}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white/60 hover:text-white border border-white/10 rounded-xl hover:bg-white/5 transition disabled:opacity-40"
+                              >
+                                <CreditCard className="h-4 w-4" strokeWidth={1.5} />
+                                {billingLoading ? "Opening…" : "Manage billing & cancel"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    </>
+                  )}
+
+                  <Separator className="bg-white/5" />
+
+                  {/* ── DATA ── */}
+                  <section>
+                    <SectionLabel>Data</SectionLabel>
+                    <button
+                      onClick={async () => {
+                        setExportLoading(true);
+                        try {
+                          const token = localStorage.getItem("orryon_token");
+                          const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                          const res = await fetch(`${base}/api/export`, {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {},
+                          });
+                          if (!res.ok) throw new Error("Export failed");
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "orryon_export.zip";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                        } finally {
+                          setExportLoading(false);
+                        }
+                      }}
+                      disabled={exportLoading}
+                      className="w-full flex items-center justify-center gap-2 py-3 text-sm text-white/60 hover:text-white border border-white/[0.06] rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition disabled:opacity-40"
+                    >
+                      <Download className="h-4 w-4" strokeWidth={1.5} />
+                      {exportLoading ? "Exporting…" : "Export all data (ZIP)"}
+                    </button>
+                  </section>
+
                   <Separator className="bg-white/5" />
 
                   {/* ── SIGN OUT + DELETE ── */}
@@ -531,8 +618,6 @@ export function SettingsPanel() {
                     >
                       Sign out
                     </button>
-
-
 
                     {!deleteConfirm ? (
                       <button

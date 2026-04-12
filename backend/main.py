@@ -18,7 +18,7 @@ import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +45,54 @@ from email_sender import send_verification_code
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(name)s  %(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
+
+_IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter (in-memory, per-user)
+# ---------------------------------------------------------------------------
+
+import time as _time
+from collections import defaultdict as _defaultdict
+
+_rate_buckets: dict[str, list[float]] = _defaultdict(list)
+_RATE_WINDOW = 60
+_RATE_LIMIT_CHAT = 20
+_RATE_LIMIT_DEFAULT = 120
+
+
+def _check_rate_limit(user_id: str, limit: int = _RATE_LIMIT_DEFAULT) -> None:
+    now = _time.time()
+    bucket = _rate_buckets[user_id]
+    _rate_buckets[user_id] = [t for t in bucket if now - t < _RATE_WINDOW]
+    if len(_rate_buckets[user_id]) >= limit:
+        raise HTTPException(429, "Too many requests. Please wait a moment.")
+    _rate_buckets[user_id].append(now)
+
+
+# ---------------------------------------------------------------------------
+# Subscription enforcement dependency
+# ---------------------------------------------------------------------------
+
+def _resolve_plan_for_user(user_id: str) -> dict:
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "User not found")
+    return _resolve_plan(dict(row))
+
+
+async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
+    """FastAPI dependency — blocks requests if subscription is inactive."""
+    info = _resolve_plan_for_user(user["user_id"])
+    if not info["is_active_pro"]:
+        raise HTTPException(
+            403,
+            "Your Pro trial has ended. Upgrade to continue using this feature.",
+        )
+    return user
 
 # ---------------------------------------------------------------------------
 # Lifespan — start/stop scheduler
@@ -78,6 +126,12 @@ class SendCodeReq(BaseModel):
 class VerifyReq(BaseModel):
     email: str
     code: str
+    display_name: Optional[str] = None
+
+class SignupCheckoutReq(BaseModel):
+    price_id: str
+    success_url: str
+    cancel_url: str
 
 class AuthRes(BaseModel):
     token: str
@@ -182,7 +236,7 @@ async def auth_send_code(body: SendCodeReq):
     sent = send_verification_code(email, code)
     return {
         "sent": sent,
-        "dev_code": "" if sent else code,
+        "dev_code": "" if (sent or _IS_PRODUCTION) else code,
         "message": "Code sent" if sent else "SMTP not configured — code returned for dev mode",
     }
 
@@ -192,7 +246,11 @@ async def auth_verify(body: VerifyReq):
     email = body.email.strip().lower()
     if not verify_code(email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
-    user = get_or_create_user_by_email(email)
+    display_name = (body.display_name or "").strip()
+    user = get_or_create_user_by_email(email, display_name=display_name)
+    if display_name and user.get("display_name") != display_name:
+        update_row("users", {"display_name": display_name}, {"id": user["id"]})
+        user["display_name"] = display_name
     existing_txns = fetch_rows("transactions", {"user_id": user["id"]})
     if not existing_txns:
         from core.tools import seed_sample_data
@@ -201,8 +259,58 @@ async def auth_verify(body: VerifyReq):
     return {"token": token, "user": user}
 
 
+@app.post("/api/auth/signup-checkout")
+async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_current_user)):
+    """Create a Stripe Checkout session with a 14-day trial as part of signup."""
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, TRIAL_DAYS
+    if not STRIPE_ENABLED:
+        raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed")
+
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "User not found")
+    row = dict(row)
+
+    if row.get("stripe_subscription_id"):
+        raise HTTPException(400, "You already have an active subscription")
+
+    customer_id = row.get("stripe_customer_id") or ""
+    if not customer_id:
+        customer = stripe_lib.Customer.create(
+            email=row["email"],
+            name=row.get("display_name") or "",
+            metadata={"user_id": row["id"]},
+        )
+        customer_id = customer.id
+        conn = get_connection()
+        conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
+        conn.commit()
+        conn.close()
+
+    session = stripe_lib.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        line_items=[{"price": body.price_id, "quantity": 1}],
+        mode="subscription",
+        subscription_data={"trial_period_days": TRIAL_DAYS},
+        success_url=body.success_url,
+        cancel_url=body.cancel_url,
+        metadata={"user_id": row["id"]},
+    )
+    return {"checkout_url": session.url}
+
+
 @app.post("/api/auth/demo", response_model=AuthRes)
 async def auth_demo():
+    if _IS_PRODUCTION:
+        raise HTTPException(403, "Demo mode is disabled in production")
     email = "demo@orryon.app"
     user = get_or_create_user_by_email(email)
     existing_txns = fetch_rows("transactions", {"user_id": user["id"]})
@@ -797,8 +905,9 @@ async def delete_bill(bill_id: str, user: dict = Depends(get_current_user)):
 # ===========================================================================
 
 @app.post("/api/chat")
-async def chat_stream(body: ChatReq, user: dict = Depends(get_current_user)):
+async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
     uid = user["user_id"]
+    _check_rate_limit(uid, _RATE_LIMIT_CHAT)
     message = body.message.strip()
     if not message:
         raise HTTPException(400, "Empty message")
@@ -892,7 +1001,7 @@ async def email_change_send_code(body: EmailChangeSendReq, user: dict = Depends(
     sent = send_verification_code(new_email, code)
     return {
         "sent": sent,
-        "dev_code": "" if sent else code,
+        "dev_code": "" if (sent or _IS_PRODUCTION) else code,
         "message": "Code sent" if sent else "SMTP not configured — code returned for dev mode",
     }
 
@@ -1282,15 +1391,24 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
         conn.commit()
         conn.close()
 
-    session = stripe_lib.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        line_items=[{"price": body.price_id, "quantity": 1}],
-        mode="subscription",
-        success_url=body.success_url,
-        cancel_url=body.cancel_url,
-        metadata={"user_id": row["id"]},
-    )
+    from config import TRIAL_DAYS
+    current_plan = _resolve_plan(row)
+    checkout_params: dict[str, Any] = {
+        "customer": customer_id,
+        "payment_method_types": ["card"],
+        "line_items": [{"price": body.price_id, "quantity": 1}],
+        "mode": "subscription",
+        "success_url": body.success_url,
+        "cancel_url": body.cancel_url,
+        "metadata": {"user_id": row["id"]},
+    }
+    if current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
+        checkout_params["subscription_data"] = {
+            "trial_period_days": max(current_plan.get("trial_days_remaining", 0), 1)
+            if current_plan["plan"] == "trial"
+            else TRIAL_DAYS,
+        }
+    session = stripe_lib.checkout.Session.create(**checkout_params)
     return {"checkout_url": session.url}
 
 
@@ -1311,9 +1429,10 @@ async def billing_portal(user: dict = Depends(get_current_user)):
     if not row or not row["stripe_customer_id"]:
         raise HTTPException(400, "No billing account found. Please subscribe first.")
 
+    frontend_url = os.getenv("FRONTEND_URL", APP_URL)
     portal = stripe_lib.billing_portal.Session.create(
         customer=row["stripe_customer_id"],
-        return_url=f"{APP_URL}/home",
+        return_url=f"{frontend_url}/home",
     )
     return {"portal_url": portal.url}
 

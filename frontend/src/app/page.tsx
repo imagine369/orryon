@@ -18,7 +18,7 @@ import { PillLink } from "@/components/pill-cta";
 const HOW_STEPS = [
   { n: "01", title: "Tell me what you need",        desc: "Speak naturally. I understand context, amounts, dates, and intent." },
   { n: "02", title: "I understand and act",          desc: "I log it, track it, and keep everything organized — no forms." },
-  { n: "03", title: "Ask anything, get real answers",desc: "Your data is always in sync. Just ask." },
+  { n: "03", title: "Ask me anything. I'll give you real answers.", desc: "Your data is always in sync. Just ask." },
 ];
 
 type HowPhase =

@@ -73,9 +73,9 @@ ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 # ── User ──────────────────────────────────────────────────────────────────────
 USER_ID: str = os.getenv("USER_ID", "default_user")
 
-# ── Public URL (used for share links) ─────────────────────────────────────────
+# ── Public URL (used for share links + Stripe portal return) ─────────────────
 # Change this to your deployed URL in production, e.g. https://orryon.app
-APP_URL: str = os.getenv("APP_URL", "http://localhost:8501")
+APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
 
 # ── Email / SMTP (for OTP verification codes) ─────────────────────────────────
 # Works with any SMTP provider. Leave blank to use on-screen dev mode.

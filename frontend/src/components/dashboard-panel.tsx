@@ -122,6 +122,7 @@ export function DashboardPanel() {
                         <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                         <TabsTrigger value="forecast" className="text-xs">Forecast</TabsTrigger>
                         <TabsTrigger value="yearly" className="text-xs">Yearly</TabsTrigger>
+                        <TabsTrigger value="schedule" className="text-xs">Schedule</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="overview"><OverviewTab /></TabsContent>

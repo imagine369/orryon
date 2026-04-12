@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check, RefreshCw } from "lucide-react";
@@ -25,14 +26,48 @@ function getGreeting() {
   return "Good evening";
 }
 
+const ONBOARDING_PROMPTS = [
+  "I spent $45 on groceries at Whole Foods today",
+  "Set a monthly budget of $500 for dining out",
+  "Show me my spending this month",
+  "Add a goal to save $5,000 for a vacation",
+];
+
 export default function HomePage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [toolLabel, setToolLabel] = useState("");
   const [tasksDueToday, setTasksDueToday] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [upgradeBanner, setUpgradeBanner] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (searchParams.get("upgraded") === "1") {
+      setUpgradeBanner(true);
+      const t = setTimeout(() => setUpgradeBanner(false), 5000);
+      window.history.replaceState({}, "", "/home");
+      return () => clearTimeout(t);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    api.get<{ role: string; content: string }[]>("/api/chat/history?limit=50")
+      .then((history) => {
+        if (history?.length) {
+          setMessages(
+            history
+              .filter((m) => m.role === "user" || m.role === "assistant")
+              .map((m) => ({ role: m.role as "user" | "assistant", content: m.content || "" }))
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoaded(true));
+  }, []);
 
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -124,19 +159,39 @@ export default function HomePage() {
   if (!hasMessages) {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-8 min-h-[calc(100vh-93px)]">
+        {upgradeBanner && (
+          <div className="mb-6 px-4 py-2.5 rounded-full border border-green-500/20 bg-green-500/10 text-green-400 text-sm animate-in fade-in">
+            Welcome to Pro! Your upgrade is active.
+          </div>
+        )}
         <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover mb-6 ring-1 ring-white/10" />
-        <p className="text-white/60 text-[15px] mb-8 max-w-[260px] text-center leading-tight">
+        <p className="text-white/60 text-[15px] mb-4 max-w-[260px] text-center leading-tight">
           Hello{user?.display_name ? `, ${user.display_name}` : ""}.
         </p>
 
         {tasksDueToday !== null && tasksDueToday > 0 && (
           <Link
             href="/dashboard"
-            className="mb-8 flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition text-sm text-white/50 hover:text-white/80"
+            className="mb-6 flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition text-sm text-white/50 hover:text-white/80"
           >
             <span className="text-white/30">✦</span>
             <span>{getGreeting()}. You have {tasksDueToday} task{tasksDueToday !== 1 ? "s" : ""} due today.</span>
           </Link>
+        )}
+
+        {historyLoaded && (
+          <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-lg">
+            {ONBOARDING_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => handleSend(prompt)}
+                disabled={streaming}
+                className="px-3 py-1.5 text-xs text-white/40 border border-white/8 rounded-full hover:bg-white/5 hover:text-white/60 hover:border-white/15 transition-all disabled:opacity-30"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         )}
 
         <div className="w-full max-w-xl">
@@ -149,6 +204,11 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-93px)]">
+      {upgradeBanner && (
+        <div className="mx-4 mt-2 px-4 py-2.5 rounded-xl border border-green-500/20 bg-green-500/10 text-green-400 text-sm text-center animate-in fade-in">
+          Welcome to Pro! Your upgrade is active.
+        </div>
+      )}
 
       {/* New conversation */}
       <div className="flex items-center justify-end px-4 py-2 border-b border-white/5 shrink-0">

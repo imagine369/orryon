@@ -33,6 +33,11 @@ def _get_secret() -> str:
         return _cached_secret
     secret = os.getenv("JWT_SECRET", "")
     if not secret:
+        if os.getenv("NODE_ENV", "").lower() == "production":
+            raise RuntimeError(
+                "JWT_SECRET must be set in production. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
         secret = secrets.token_hex(32)
         logger.warning("JWT_SECRET not set — generated ephemeral secret (tokens won't survive restarts)")
     _cached_secret = secret
