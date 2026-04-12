@@ -1238,7 +1238,7 @@ export default function LandingPage() {
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
     <>
-      <PillLink href="/login" variant="primary" size="sm">Sign up</PillLink>
+      <PillLink href="/login" variant="primary" size="sm">Get started</PillLink>
       <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
@@ -1248,7 +1248,7 @@ export default function LandingPage() {
   const closingCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/login" variant="primary" size="sm">Sign up</PillLink>
+    <PillLink href="/login" variant="primary" size="sm">Get started</PillLink>
   );
 
   return (
@@ -1267,31 +1267,33 @@ export default function LandingPage() {
       {/* Hero */}
       <FadeIn>
         <div className="flex flex-col items-center text-center pt-[100px] sm:pt-[160px] pb-16 px-6 border-b border-white/5">
-          <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={91} height={91} className="rounded-full object-cover mb-8" />
-          <p className="text-[0.65rem] uppercase tracking-[4px] text-white/45 mb-[28px]">
-            Your otherworldly personal concierge
+          <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={91} height={91} className="rounded-full object-cover mb-10 mt-20" />
+          <p className="text-[1rem] text-white/45 mb-4" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+            Hi, I&rsquo;m Orryon.
           </p>
-          <h1 className="text-[2.25rem] sm:text-[3rem] font-extrabold text-white mb-6 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
-            Talk to me.<br />I will organize everything.
+          <p className="text-[0.65rem] uppercase tracking-[4px] text-white/45 mb-10">
+            Your AI personal concierge
+          </p>
+          <h1 className="text-[2.25rem] sm:text-[3rem] font-extrabold text-white mb-8 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
+            Talk to me.<br />I&rsquo;ll organize everything.
           </h1>
-          <p className="text-[14px] text-white/60 max-w-sm leading-relaxed mb-8">
-            Finance, scheduling, and daily life — organized through natural conversation.
-          </p>
-
-          {/* CTA — above the fold */}
-          <div className="flex flex-col items-center gap-3 mb-3">
-            {heroCta}
-          </div>
-
-          {/* Trust signal */}
-          <p className="text-[0.6rem] text-white/35 tracking-wide mb-10">
-            Fully local-first · Nothing leaves your device
+          <p className="text-[15px] text-white/80 max-w-[340px] leading-relaxed mb-10 font-medium">
+            Budget, goals, schedule, notes, and bills —<br className="hidden sm:block" /> all through natural conversation. No forms.
           </p>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
-            <p className="text-[0.6rem] uppercase tracking-[4px] text-white/30 mb-5">See it in action</p>
+            {/* CTA */}
+            <div className="flex flex-col items-center gap-3 mb-10">
+              {heroCta}
+            </div>
+
             <AppTourDemo />
+
+            {/* Trust signal — after the demo, before they decide */}
+            <p className="text-xs text-white/40 mt-10">
+              Orryon doesn&rsquo;t connect to your bank.<br />That&rsquo;s the point. Your data stays yours.
+            </p>
           </div>
         </div>
       </FadeIn>
@@ -1322,23 +1324,6 @@ export default function LandingPage() {
         <AppDemo />
       </div>
 
-      <div className="flex items-center gap-4 px-6 py-10">
-        <div className="flex-1 border-t border-white/5" />
-        <StarEight className="w-2.5 h-2.5 text-white/20 shrink-0" />
-        <div className="flex-1 border-t border-white/5" />
-      </div>
-
-      {/* Privacy callout */}
-      <div className="max-w-lg mx-auto px-6 pb-10 text-center">
-        <p className="text-[1.15rem] sm:text-[1.35rem] font-semibold text-white leading-snug font-[family-name:var(--font-playfair)] mb-3">
-          Orryon doesn&rsquo;t connect to your bank.
-        </p>
-        <p className="text-[1.15rem] sm:text-[1.35rem] font-semibold text-white/50 leading-snug font-[family-name:var(--font-playfair)]">
-          That&rsquo;s the point. Your data stays yours.
-        </p>
-      </div>
-
-
       <style>{`
         @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -1357,9 +1342,6 @@ export default function LandingPage() {
         <div className="flex flex-col items-center gap-3">
           {closingCta}
         </div>
-        <p className="text-[0.6rem] text-white/25 mt-10">
-          Fully local-first · Nothing leaves your device
-        </p>
       </div>
 
       <Footer />
