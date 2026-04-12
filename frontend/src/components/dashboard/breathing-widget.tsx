@@ -338,7 +338,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
             />
             <div>
               <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Box Breathing</p>
-              <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>Guided circle · 4-4-4-4 · calming & focused</p>
+              <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For focus & daily routine</p>
             </div>
           </div>
 
@@ -393,7 +393,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
             />
             <div>
               <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Double Inhale Quick Destress</p>
-              <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>Research-backed quick stress relief</p>
+              <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For acute stress & quick reset</p>
             </div>
           </div>
           <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,.50)", lineHeight: 1.6, marginBottom: "0.6rem" }}>
@@ -443,7 +443,7 @@ export function BreathingWidget() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white mb-0.5">Take a breath</p>
           <p className="text-[0.72rem] text-white/38 leading-snug">
-            Box breathing or double inhale quick destress
+            Breathe for focus or quick stress relief
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-white/25 shrink-0" strokeWidth={1.5} />
