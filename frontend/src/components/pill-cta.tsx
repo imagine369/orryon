@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 
+type Variant = "primary" | "secondary" | "calm";
+
 interface PillLinkProps {
   href: string;
   children: React.ReactNode;
-  variant?: "primary" | "secondary";
+  variant?: Variant;
   size?: "sm" | "md" | "lg";
   className?: string;
 }
@@ -13,7 +15,7 @@ interface PillLinkProps {
 interface PillButtonProps {
   onClick?: () => void;
   children: React.ReactNode;
-  variant?: "primary" | "secondary";
+  variant?: Variant;
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
   className?: string;
@@ -28,21 +30,26 @@ const base = (size: "sm" | "md" | "lg") =>
       : "px-8 py-3 text-sm"
   }`;
 
-const fillClass = (variant: "primary" | "secondary") =>
-  `absolute inset-0 ${variant === "primary" ? "bg-black" : "bg-white"} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
+const fillClass = (variant: Variant) => {
+  const fill =
+    variant === "primary" ? "bg-black"
+    : variant === "calm"   ? "bg-[#4a85c0]"
+    : "bg-white";
+  return `absolute inset-0 ${fill} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
+};
 
-const textClass = (variant: "primary" | "secondary") =>
+const textClass = (variant: Variant) =>
   `relative z-10 transition-colors duration-300 ${
-    variant === "primary"
-      ? "text-black group-hover:text-white"
-      : "text-white group-hover:text-black"
+    variant === "secondary"
+      ? "text-white group-hover:text-black"
+      : "text-black group-hover:text-white"
   }`;
 
-const borderClass = (variant: "primary" | "secondary") =>
-  variant === "primary" ? "border-white" : "border-white/40";
+const borderClass = (variant: Variant) =>
+  variant === "secondary" ? "border-white/40" : "border-white";
 
-const bgClass = (variant: "primary" | "secondary") =>
-  variant === "primary" ? "bg-white" : "bg-black";
+const bgClass = (variant: Variant) =>
+  variant === "secondary" ? "bg-black" : "bg-white";
 
 export function PillLink({
   href,
