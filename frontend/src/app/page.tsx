@@ -1,17 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useState, useEffect } from "react";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
+import { Footer } from "@/components/footer";
+import { PillLink } from "@/components/pill-cta";
 
 const steps = [
-  { n: "1", title: "Just tell me what you need", desc: "Speak naturally — \"Add coffee $9.50\", \"Save $4000 for vacation by December\", or \"Doctor appointment Tuesday 10am\"." },
-  { n: "2", title: "I understand and take action", desc: "I handle the details — adding expenses, updating your schedule, tracking goals, and keeping your daily life organized." },
-  { n: "3", title: "Everything updates automatically", desc: "Your Dashboard, Budget, Forecast, Schedule, and Goals stay perfectly in sync in real time." },
-  { n: "4", title: "Ask anything, get real answers", desc: "\"How much did I spend on dining this week?\" I give you clear, helpful answers from your actual data." },
+  {
+    n: "01",
+    title: "Tell me what you need",
+    desc: "Speak naturally — \"Add coffee $9.50\", \"Save $4000 for vacation by December\", or \"Doctor appointment Tuesday 10am\".",
+  },
+  {
+    n: "02",
+    title: "I understand and act",
+    desc: "I handle the details — logging expenses, updating your schedule, tracking goals, and keeping your daily life organized.",
+  },
+  {
+    n: "03",
+    title: "Ask anything, get real answers",
+    desc: "\"How much did I spend on dining this week?\" Your dashboard, budget, and forecast stay perfectly in sync.",
+  },
 ];
 
 const examples = [
@@ -22,90 +34,167 @@ const examples = [
   "Give me a spending recap for this week",
 ];
 
-const features = [
-  { icon: "💳", label: "Budget & expense tracking" },
-  { icon: "🎯", label: "Savings goals with progress" },
-  { icon: "📅", label: "Schedule, tasks & grocery list" },
-  { icon: "📊", label: "Smart spending recaps" },
-  { icon: "✦", label: "Your intelligent personal concierge, always ready" },
+const moneyFeatures = [
+  "Budget & expense tracking",
+  "Savings goals with progress",
+  "Smart spending recaps",
+  "Recurring bills tracker",
+];
+
+const lifeFeatures = [
+  "Schedule, tasks & grocery list",
+  "Receipt scanning",
+];
+
+const capabilities = [
+  "Budget & expenses",
+  "Savings goals",
+  "Schedule & tasks",
+  "Receipt scanning",
+  "Smart recaps",
+  "Bills tracker",
 ];
 
 export default function LandingPage() {
-  const router = useRouter();
+  const [loggedIn, setLoggedIn] = useState(false);
+
   useEffect(() => {
-    if (hasToken()) router.replace("/home");
-  }, [router]);
+    setLoggedIn(hasToken());
+  }, []);
+
+  const ctaButtons = loggedIn ? (
+    <PillLink href="/home">Go to app</PillLink>
+  ) : (
+    <>
+      <PillLink href="/login" variant="primary">Sign up</PillLink>
+      <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors mt-1">
+        Already have an account? Sign in
+      </Link>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Top nav */}
-      <div className="fixed top-3 right-4 z-50 flex items-center gap-2">
-        <Link href="/login" className="rounded-full border border-white/30 px-4 py-2 text-sm font-semibold text-white hover:border-white/60 transition">
-          Sign in
-        </Link>
-        <Link href="/login" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-gray-200 transition">
-          Sign up
-        </Link>
-      </div>
+    <div className="min-h-screen bg-black text-white">
+
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
+        <span className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
+          ORRYON
+        </span>
+        <div className="flex items-center gap-3">
+          <PillLink href="/login" variant="secondary" size="sm">Sign in</PillLink>
+          <PillLink href="/login" variant="primary" size="sm">Sign up</PillLink>
+        </div>
+      </nav>
 
       {/* Hero */}
       <FadeIn>
-        <div className="flex flex-col items-center text-center pt-24 px-4">
-          <Image src="/avatar.png" alt="orryon" width={82} height={82} className="rounded-full object-cover mb-4" />
-          <h1 className="text-[2.5rem] font-extrabold tracking-[4px] uppercase text-white mb-1 font-[family-name:var(--font-playfair)]">orryon</h1>
-          <p className="text-base font-semibold text-white/70 mb-2 font-[family-name:var(--font-playfair)]">Your intelligent personal concierge</p>
-          <p className="text-sm text-white/35 max-w-xs leading-relaxed mb-8">
-            Whether you&apos;re tracking expenses, planning your week, working toward your goals, or organizing daily life, I&apos;ve got you covered.
+        <div className="flex flex-col items-center text-center pt-[200px] pb-16 px-6 border-b border-white/5">
+          <Image src="/avatar.png" alt="Orryon AI personal concierge" width={91} height={91} className="rounded-full object-cover mb-8" />
+          <p className="text-[0.65rem] uppercase tracking-[4px] text-white/45 mb-5">Your intelligent personal concierge</p>
+          <h1 className="text-[2.4rem] font-extrabold text-white mb-5 font-[family-name:var(--font-playfair)] leading-tight max-w-sm">
+            Everything organized —<br />just by talking.
+          </h1>
+          <p className="text-sm text-white/65 max-w-xs leading-relaxed mb-10">
+            Track expenses, plan your week, work toward goals, and manage daily life. No forms. No menus. Just say what you need.
           </p>
+          <div className="flex flex-col items-center gap-3">
+            {ctaButtons}
+          </div>
         </div>
       </FadeIn>
 
+      {/* Capability bar */}
+      <div className="border-b border-white/5 py-5 px-6">
+        <div className="flex items-center justify-center gap-2 flex-wrap max-w-lg mx-auto">
+          {capabilities.map((cap) => (
+            <span key={cap} className="text-[0.65rem] uppercase tracking-[2px] text-white/35 px-3 py-1 border border-white/10 rounded-full whitespace-nowrap">
+              {cap}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* How it works */}
-      <div className="max-w-md mx-auto px-4 mt-8">
-        <p className="text-[0.65rem] uppercase tracking-[2px] text-white/25 text-center mb-4">How it works</p>
-        <h2 className="text-xl font-extrabold text-white mb-4">Your all-in-one intelligent personal concierge</h2>
-        {steps.map((s) => (
-          <div key={s.n} className="flex items-start gap-3 py-3 border-b border-white/5">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-sm font-bold text-white">{s.n}</div>
-            <div>
-              <p className="text-[0.92rem] font-bold text-white">{s.title}</p>
-              <p className="text-[0.8rem] text-white/40 leading-relaxed">{s.desc}</p>
+      <div className="max-w-lg mx-auto px-6 py-16 border-b border-white/5 text-center">
+        <p className="text-[0.65rem] uppercase tracking-[4px] text-white/40 mb-10">How it works</p>
+        <div className="space-y-0 mb-12">
+          {steps.map((s) => (
+            <div key={s.n} className="py-6 border-b border-white/5 last:border-0">
+              <span className="block text-[0.65rem] text-white/35 tracking-widest mb-2">{s.n}</span>
+              <p className="text-sm font-semibold text-white mb-1">{s.title}</p>
+              <p className="text-xs text-white/55 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="flex justify-center">
+          {loggedIn ? (
+            <PillLink href="/home">Go to app</PillLink>
+          ) : (
+            <PillLink href="/login" variant="primary">Sign up</PillLink>
+          )}
+        </div>
       </div>
 
       {/* Examples */}
-      <div className="max-w-md mx-auto px-4 mt-14">
-        <p className="text-[0.65rem] uppercase tracking-[2px] text-white/25 text-center mb-4">Real examples</p>
-        <h2 className="text-xl font-extrabold text-white mb-1">Here&apos;s what you can ask me</h2>
-        <p className="text-sm text-white/35 mb-5">No commands to learn. Just type like you&apos;re texting a friend.</p>
-        {examples.map((ex) => (
-          <div key={ex} className="bg-[#0f0f0f] border border-white/[0.07] rounded-xl px-4 py-3 text-sm text-gray-200 mb-2 leading-snug">
-            &ldquo;{ex}&rdquo;
-          </div>
-        ))}
+      <div className="max-w-lg mx-auto px-6 py-16 border-b border-white/5 text-center">
+        <p className="text-[0.65rem] uppercase tracking-[4px] text-white/40 mb-3">Real examples</p>
+        <h2 className="text-xl font-bold text-white mb-2 font-[family-name:var(--font-playfair)]">You don&apos;t need to learn commands</h2>
+        <p className="text-xs text-white/50 mb-8">Just type like you&apos;re texting a friend.</p>
+        <div className="space-y-2">
+          {examples.map((ex) => (
+            <div key={ex} className="py-3 border-b border-white/5">
+              <p className="text-sm text-white/70 italic">&ldquo;{ex}&rdquo;</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* CTA */}
-      <div className="max-w-md mx-auto px-4 mt-14 text-center">
-        <h2 className="text-xl font-extrabold text-white mb-1">You&apos;re ready to start</h2>
-        <p className="text-sm text-white/35 mb-6">Free forever. All your data stays private on your device.</p>
-        {features.map((f) => (
-          <div key={f.label} className="flex items-center gap-3 py-2 border-b border-white/5 text-sm text-white/55">
-            <span className="text-base w-6 text-center">{f.icon}</span>
-            <span>{f.label}</span>
+      {/* Features */}
+      <div className="max-w-lg mx-auto px-6 py-16 border-b border-white/5">
+        <p className="text-[0.65rem] uppercase tracking-[4px] text-white/40 mb-3 text-center">What&apos;s included</p>
+        <h2 className="text-xl font-bold text-white mb-8 font-[family-name:var(--font-playfair)] text-center">Everything you need, nothing you don&apos;t</h2>
+
+        <div className="mb-10 text-center">
+          <p className="text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-4">Money</p>
+          <div className="space-y-0 mb-8">
+            {moneyFeatures.map((f) => (
+              <div key={f} className="py-3 border-b border-white/5">
+                <span className="text-sm text-white/65">{f}</span>
+              </div>
+            ))}
           </div>
-        ))}
-        <div className="mt-6">
-          <Link href="/login" className="block w-full rounded-full bg-white text-black py-3 text-base font-bold hover:bg-gray-200 transition text-center">
-            Create free account →
-          </Link>
+          <p className="text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-4">Life</p>
+          <div className="space-y-0">
+            {lifeFeatures.map((f) => (
+              <div key={f} className="py-3 border-b border-white/5">
+                <span className="text-sm text-white/65">{f}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="text-[0.68rem] text-white/15 mt-6 mb-8">
-          orryon v2.0 · Not financial advice. All data stays local.
+
+        <div className="border border-white/10 rounded-xl px-5 py-4 text-center">
+          <p className="text-xs text-white/55 leading-relaxed">
+            <span className="text-white/80 font-medium">Private by default.</span>{" "}
+            Your data stays on your device. Nothing is shared or sold.
+          </p>
+        </div>
+      </div>
+
+      {/* Closing CTA */}
+      <div className="max-w-lg mx-auto px-6 py-16 text-center">
+        <h2 className="text-xl font-bold text-white mb-3 font-[family-name:var(--font-playfair)]">Ready to simplify your life?</h2>
+        <p className="text-xs text-white/45 mb-8">Your personal concierge, always on hand.</p>
+        <div className="flex flex-col items-center gap-3">
+          {ctaButtons}
+        </div>
+        <p className="text-[0.6rem] text-white/20 mt-10">
+          Not financial advice. All data stays local on your device.
         </p>
       </div>
+
+      <Footer />
     </div>
   );
 }
