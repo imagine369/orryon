@@ -12,6 +12,70 @@ const BG        = "linear-gradient(180deg, #0f2a42 0%, #162f4a 45%, #0f2540 100%
 const ORB_BG    = "linear-gradient(135deg, #7dc8f5 0%, #5aa3d8 50%, #4082c0 100%)";
 const FONT      = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
+// ── Tibetan bowl synthesizer ──────────────────────────────────────────────────
+
+function playBowl() {
+  try {
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    const root = 196; // G3 — warm, grounding fundamental
+
+    // Authentic inharmonic partials of a metal singing bowl
+    const partials: { ratio: number; amp: number; decay: number }[] = [
+      { ratio: 1,    amp: 0.32, decay: 14 },
+      { ratio: 2.76, amp: 0.18, decay: 10 },
+      { ratio: 5.40, amp: 0.09, decay: 7  },
+      { ratio: 8.93, amp: 0.04, decay: 4  },
+    ];
+
+    // Brief metallic strike transient — bandpass-filtered noise
+    const strikeBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.1), ctx.sampleRate);
+    const strikeData = strikeBuf.getChannelData(0);
+    for (let i = 0; i < strikeData.length; i++) strikeData[i] = Math.random() * 2 - 1;
+    const strikeNode = ctx.createBufferSource();
+    strikeNode.buffer = strikeBuf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = root * 2.5;
+    bp.Q.value = 1.8;
+    const strikeGain = ctx.createGain();
+    strikeGain.gain.setValueAtTime(0.18, now);
+    strikeGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    strikeNode.connect(bp);
+    bp.connect(strikeGain);
+    strikeGain.connect(ctx.destination);
+    strikeNode.start(now);
+    strikeNode.stop(now + 0.1);
+
+    // Slow vibrato LFO — 0.4 Hz, ±1.5 Hz depth
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.4;
+    lfoGain.gain.value = 1.5;
+    lfo.connect(lfoGain);
+    lfo.start(now);
+    lfo.stop(now + 15);
+
+    // Tone partials
+    partials.forEach(({ ratio, amp, decay }) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = root * ratio;
+      if (ratio === 1) lfoGain.connect(osc.frequency); // vibrato only on fundamental
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(amp, now + 0.012); // crisp attack
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+      osc.start(now);
+      osc.stop(now + decay);
+    });
+
+    setTimeout(() => ctx.close(), 15500);
+  } catch (_) { /* audio unavailable — fail silently */ }
+}
+
 
 const ghostBtn: CSSProperties = {
   background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)",
@@ -289,14 +353,94 @@ function SighSession({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Do Nothing session ────────────────────────────────────────────────────────
+
+function DoNothingSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => void }) {
+  const [tick, setTick]   = useState(0);
+  const [done, setDone]   = useState(false);
+
+  // Strike bowl on open
+  useEffect(() => {
+    const t = setTimeout(playBowl, 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (done) return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [done]);
+
+  useEffect(() => {
+    if (!done && tick >= totalSecs) { setDone(true); playBowl(); }
+  }, [tick, done, totalSecs]);
+
+  const restart = useCallback(() => { setTick(0); setDone(false); setTimeout(playBowl, 300); }, []);
+
+  const remaining = Math.max(0, totalSecs - tick);
+  const countLabel = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
+
+  return (
+    <Session>
+      <BackBtn onClick={onBack} />
+
+      {/* Ambient glow — very dim, barely perceptible */}
+      <div style={{
+        position: "absolute", width: "92vw", height: "92vw",
+        maxWidth: 420, maxHeight: 420, borderRadius: "50%",
+        background: "radial-gradient(circle, hsla(200,50%,60%,.07) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* Orb — extremely slow pulse */}
+      <motion.div
+        style={{ position: "relative", width: "76vw", height: "76vw", maxWidth: 340, maxHeight: 340, zIndex: 2 }}
+        animate={done ? {} : { scale: [1, 1.055, 1] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <svg viewBox="0 0 100 100" aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <defs>
+            <linearGradient id="nothing-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%"   stopColor="hsl(200,58%,78%)" stopOpacity="0"    />
+              <stop offset="40%"  stopColor="hsl(200,55%,72%)" stopOpacity="0.19" />
+              <stop offset="60%"  stopColor="hsl(200,55%,74%)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="hsl(200,58%,78%)" stopOpacity="0"    />
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="50" r="47" fill="none" stroke="url(#nothing-grad)" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          background: "radial-gradient(circle, hsl(200,55%,58%) 0%, hsl(200,52%,44%) 50%, hsl(202,50%,32%) 100%)",
+          opacity: 0.55,
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {!done ? (
+            <span style={{ fontSize: "clamp(2rem,9vw,2.8rem)", fontWeight: 200, color: "rgba(255,255,255,.65)", letterSpacing: "2px", fontVariantNumeric: "tabular-nums" as const }}>
+              {countLabel}
+            </span>
+          ) : (
+            <span style={{ fontSize: "1.8rem", color: "rgba(255,255,255,.65)", fontWeight: 200 }}>✓</span>
+          )}
+        </div>
+      </motion.div>
+
+      {done && <DoneFooter label="Rest complete." onRestart={restart} onBack={onBack} />}
+    </Session>
+  );
+}
+
 // ── Selection screen ──────────────────────────────────────────────────────────
 
-function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
-  onClose:     () => void;
-  onSelectBox: (secs: number) => void;
-  onSelectSigh: () => void;
+function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }: {
+  onClose:        () => void;
+  onSelectBox:    (secs: number) => void;
+  onSelectSigh:   () => void;
+  onSelectNothing:(secs: number) => void;
 }) {
-  const [boxMins, setBoxMins] = useState<1 | 3 | 6>(1);
+  const [boxMins,     setBoxMins]     = useState<1 | 3 | 6>(1);
+  const [nothingMins, setNothingMins] = useState<3 | 6 | 9>(3);
 
   const card: CSSProperties = {
     background: "rgba(255,255,255,0.15)", backdropFilter: "blur(14px)",
@@ -372,22 +516,22 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", marginBottom: "0.85rem" }}>
             {/* Pill icon */}
             <motion.div
-              style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: "rgba(255,255,255,.15)" }}
+              style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: ORB_BG }}
               animate={{
                 scale:     [1, 1.16, 1.06, 1.16, 1,    1],
                 boxShadow: [
-                  "0 0 0 1.5px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
-                  "0 0 0 1.5px rgba(255,255,255,0.60), 0 0 14px rgba(255,255,255,0.24)",
-                  "0 0 0 1.5px rgba(255,255,255,0.30), 0 0 6px rgba(255,255,255,0.10)",
-                  "0 0 0 1.5px rgba(255,255,255,0.60), 0 0 14px rgba(255,255,255,0.24)",
-                  "0 0 0 1.5px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
-                  "0 0 0 1.5px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
+                  "0 0 0 3px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
+                  "0 0 0 3px rgba(255,255,255,0.60), 0 0 14px rgba(255,255,255,0.24)",
+                  "0 0 0 3px rgba(255,255,255,0.30), 0 0 6px rgba(255,255,255,0.10)",
+                  "0 0 0 3px rgba(255,255,255,0.60), 0 0 14px rgba(255,255,255,0.24)",
+                  "0 0 0 3px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
+                  "0 0 0 3px rgba(255,255,255,0.22), 0 0 5px rgba(255,255,255,0.07)",
                 ],
               }}
               transition={{
-                duration: 4,
+                duration: 2.2,
                 repeat: Infinity,
-                times: [0, 0.12, 0.22, 0.34, 0.48, 1],
+                times: [0, 0.08, 0.16, 0.26, 0.38, 1],
                 ease: "easeOut",
               }}
             />
@@ -404,6 +548,46 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
             <PillButton onClick={onSelectSigh} variant="calm" size="sm">Start</PillButton>
           </div>
         </div>
+
+        {/* ── Do Nothing card ── */}
+        <div style={card}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", marginBottom: "0.85rem" }}>
+            <motion.div
+              style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: "rgba(255,255,255,.55)" }}
+              animate={{ scale: [1, 1.055, 1], boxShadow: ["0 0 0 1px rgba(255,255,255,0.22)", "0 0 0 1px rgba(255,255,255,0.40), 0 0 12px rgba(255,255,255,0.10)", "0 0 0 1px rgba(255,255,255,0.22)"] }}
+              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Do Nothing</p>
+              <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For deep rest & nervous system reset</p>
+            </div>
+          </div>
+          <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,.50)", lineHeight: 1.6, marginBottom: "0.6rem" }}>
+            No instructions. No technique. Just stillness. A Tibetan bowl marks the start and end.
+          </p>
+          <p style={{ fontSize: "0.60rem", textTransform: "uppercase", letterSpacing: "1.5px", color: "rgba(255,255,255,.50)", marginBottom: "0.5rem" }}>Duration</p>
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.1rem" }}>
+            {([3, 6, 9] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setNothingMins(m)}
+                style={{
+                  flex: 1, padding: "0.44rem 0", borderRadius: "50px", cursor: "pointer", fontFamily: FONT,
+                  border: nothingMins === m ? "1.5px solid rgba(255,255,255,0.90)" : "1.5px solid rgba(255,255,255,0.25)",
+                  background: nothingMins === m ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
+                  color: nothingMins === m ? "#fff" : "rgba(255,255,255,0.45)",
+                  fontSize: "0.80rem", fontWeight: nothingMins === m ? 600 : 400,
+                  transition: "all 0.15s",
+                }}
+              >
+                {m} min
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <PillButton onClick={() => onSelectNothing(nothingMins * 60)} variant="calm" size="sm">Start</PillButton>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -411,12 +595,13 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh }: {
 
 // ── Entry card (Today tab) ────────────────────────────────────────────────────
 
-type Screen = "idle" | "select" | "box" | "sigh";
+type Screen = "idle" | "select" | "box" | "sigh" | "nothing";
 
 export function BreathingWidget() {
-  const [screen,      setScreen]      = useState<Screen>("idle");
-  const [boxDuration, setBoxDuration] = useState(60);
-  const [container,   setContainer]   = useState<HTMLElement | null>(null);
+  const [screen,          setScreen]          = useState<Screen>("idle");
+  const [boxDuration,     setBoxDuration]     = useState(60);
+  const [nothingDuration, setNothingDuration] = useState(180);
+  const [container,       setContainer]       = useState<HTMLElement | null>(null);
 
   useEffect(() => { setContainer(document.body); }, []);
 
@@ -443,7 +628,7 @@ export function BreathingWidget() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white mb-0.5">Take a breath</p>
           <p className="text-[0.72rem] text-white/38 leading-snug">
-            Breathe for focus or quick stress relief
+            Breathe, reset, or just be still
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-white/25 shrink-0" strokeWidth={1.5} />
@@ -466,6 +651,7 @@ export function BreathingWidget() {
                   onClose={() => setScreen("idle")}
                   onSelectBox={secs => { setBoxDuration(secs); setScreen("box"); }}
                   onSelectSigh={() => setScreen("sigh")}
+                  onSelectNothing={secs => { setNothingDuration(secs); setScreen("nothing"); }}
                 />
               )}
               {screen === "box" && (
@@ -473,6 +659,9 @@ export function BreathingWidget() {
               )}
               {screen === "sigh" && (
                 <SighSession onBack={() => setScreen("select")} />
+              )}
+              {screen === "nothing" && (
+                <DoNothingSession totalSecs={nothingDuration} onBack={() => setScreen("select")} />
               )}
             </motion.div>
           )}
