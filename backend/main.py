@@ -673,6 +673,21 @@ async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
     return {"id": budget_id, "created": True}
 
 
+@app.delete("/api/budget/{cat_id}")
+async def delete_budget_category(cat_id: str, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id FROM budget_categories WHERE id=? AND user_id=?", (cat_id, uid)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Budget category not found")
+    from db import delete_row
+    delete_row("budget_categories", {"id": cat_id})
+    return {"deleted": True}
+
+
 # ===========================================================================
 # SUBSCRIPTIONS / BILLS
 # ===========================================================================

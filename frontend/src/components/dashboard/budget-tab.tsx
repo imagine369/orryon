@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
 
 interface BudgetCategory {
@@ -102,22 +103,33 @@ export function BudgetTab() {
         <p className="text-white/30 text-sm text-center py-8">No budgets set yet. Ask orryon to set one!</p>
       ) : (
         data.categories.map((c) => (
-          <div key={c.id} className="py-3 border-b border-white/5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-semibold">{c.category}</span>
-              <span className="text-sm text-white/50">{fmt(c.spent)} / {fmt(c.planned)}</span>
+          <SwipeToDelete
+            key={c.id}
+            onDelete={() =>
+              api.delete(`/api/budget/${c.id}`).then(() =>
+                setData((prev) =>
+                  prev ? { ...prev, categories: prev.categories.filter((x) => x.id !== c.id) } : prev
+                )
+              ).catch(() => {})
+            }
+          >
+            <div className="py-3 border-b border-white/5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold">{c.category}</span>
+                <span className="text-sm text-white/50">{fmt(c.spent)} / {fmt(c.planned)}</span>
+              </div>
+              <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-all ${barColor(c.pct_used)}`}
+                  style={{ width: `${Math.min(100, c.pct_used)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-[0.65rem] text-white/25">{Math.round(c.pct_used)}% used</span>
+                <span className="text-[0.65rem] text-white/25">{fmt(Math.max(0, c.remaining))} left</span>
+              </div>
             </div>
-            <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
-              <div
-                className={`absolute inset-y-0 left-0 rounded-full transition-all ${barColor(c.pct_used)}`}
-                style={{ width: `${Math.min(100, c.pct_used)}%` }}
-              />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[0.65rem] text-white/25">{Math.round(c.pct_used)}% used</span>
-              <span className="text-[0.65rem] text-white/25">{fmt(Math.max(0, c.remaining))} left</span>
-            </div>
-          </div>
+          </SwipeToDelete>
         ))
       )}
     </div>
