@@ -66,7 +66,7 @@ export function ScheduleTab() {
             <div key={e.id} className="flex items-start gap-3 py-2.5 border-b border-white/5">
               <span className="text-base mt-0.5">{typeIcon(e.event_type)}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">{e.title}</p>
+                <p className="text-sm font-semibold text-white/85">{e.title}</p>
                 <p className="text-[0.7rem] text-white/30">{e.event_date}</p>
                 {e.description && <p className="text-[0.7rem] text-white/20 mt-0.5">{e.description}</p>}
               </div>
@@ -85,7 +85,7 @@ export function ScheduleTab() {
             <div key={t.id} className="flex items-center gap-2.5 py-2.5 border-b border-white/5">
               <span className={`w-2 h-2 rounded-full shrink-0 ${priorityDot(t.priority)}`} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white truncate">{t.title}</p>
+                <p className="text-sm text-white/85 truncate">{t.title}</p>
                 <p className="text-[0.65rem] text-white/25">
                   {t.priority} · {t.category || "general"}{t.due_date ? ` · ${t.due_date}` : ""}
                 </p>

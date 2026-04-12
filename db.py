@@ -142,6 +142,15 @@ def init_db() -> None:
             is_completed           INTEGER DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS goal_contributions (
+            id         TEXT PRIMARY KEY,
+            goal_id    TEXT NOT NULL,
+            user_id    TEXT NOT NULL,
+            amount     REAL NOT NULL,
+            note       TEXT,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS notes (
             id              TEXT PRIMARY KEY,
             user_id         TEXT NOT NULL,

@@ -87,7 +87,7 @@ export function NotesTab() {
         className="w-full text-left py-3 border-b border-white/5 active:bg-white/[0.02] transition"
       >
         <div className="flex items-baseline justify-between mb-0.5">
-          <p className="text-sm font-semibold text-white truncate flex-1 pr-3">{n.title || "Untitled"}</p>
+          <p className="text-sm font-semibold text-white/85 truncate flex-1 pr-3">{n.title || "Untitled"}</p>
           <span className="text-[0.6rem] text-white/25 shrink-0">{smartDate(n.updated_at || n.created_at)}</span>
         </div>
         <p className="text-[0.78rem] text-white/35 truncate">

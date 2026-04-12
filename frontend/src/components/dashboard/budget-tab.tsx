@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
@@ -25,6 +25,22 @@ function barColor(pct: number) {
   return "bg-green-500";
 }
 
+function nowMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function offsetMonth(base: string, delta: number): string {
+  const [y, m] = base.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(m: string) {
+  const [year, month] = m.split("-");
+  return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 const categories = [
   "Food & Dining", "Groceries", "Transport", "Entertainment",
   "Shopping", "Health & Fitness", "Utilities", "Rent & Housing",
@@ -32,17 +48,20 @@ const categories = [
 ];
 
 export function BudgetTab() {
+  const [selectedMonth, setSelectedMonth] = useState(nowMonth);
   const [data, setData] = useState<{ month: string; categories: BudgetCategory[] } | null>(null);
   const [adding, setAdding] = useState(false);
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food & Dining");
 
+  const isCurrentMonth = selectedMonth === nowMonth();
+
   const load = () => {
-    api.get<{ month: string; categories: BudgetCategory[] }>("/api/budget").then(setData).catch(() => {});
+    api.get<{ month: string; categories: BudgetCategory[] }>(`/api/budget?month=${selectedMonth}`).then(setData).catch(() => {});
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [selectedMonth]);
 
   const addExpense = () => {
     if (!merchant.trim() || !amount) return;
@@ -63,20 +82,40 @@ export function BudgetTab() {
 
   return (
     <div>
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setSelectedMonth((m) => offsetMonth(m, -1))}
+          className="p-1 text-white/30 hover:text-white transition"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+        <p className="text-sm font-semibold text-white/85">{formatMonthLabel(selectedMonth)}</p>
+        <button
+          onClick={() => setSelectedMonth((m) => offsetMonth(m, 1))}
+          disabled={isCurrentMonth}
+          className="p-1 text-white/30 hover:text-white disabled:opacity-20 transition"
+        >
+          <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · {data.month}</p>
-          <p className="text-lg font-bold">{fmt(totalPlanned)} <span className="text-sm font-normal text-white/30">/ {fmt(totalSpent)} spent</span></p>
+          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget</p>
+          <p className="text-lg font-bold text-white/85">{fmt(totalPlanned)} <span className="text-sm font-normal text-white/30">/ {fmt(totalSpent)} spent</span></p>
         </div>
         <div className="flex items-center gap-2">
-          <ReceiptScanner onSaved={load} />
-          <button onClick={() => setAdding((v) => !v)} className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition">
-            {adding ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} /> : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />}
-          </button>
+          {isCurrentMonth && <ReceiptScanner onSaved={load} />}
+          {isCurrentMonth && (
+            <button onClick={() => setAdding((v) => !v)} className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition">
+              {adding ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} /> : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />}
+            </button>
+          )}
         </div>
       </div>
 
-      {adding && (
+      {adding && isCurrentMonth && (
         <div className="flex flex-col gap-2 mb-4 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
           <input
             autoFocus

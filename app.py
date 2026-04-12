@@ -208,6 +208,7 @@ def _init_state() -> None:
         "lp_sending": False,
         "show_onboarding": False,
         "app_view": "home",  # "home" | "dash_panel" | "settings_panel" | "full_dash"
+        "go_to_today_tab": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1999,11 +2000,30 @@ Type naturally in the chat below — I'll handle everything.</p>
 
     _stream_area = st.empty()
 
-    # ── 6 Tabs ────────────────────────────────────────────────────────────────
-    tab_dash, tab_budget, tab_forecast, tab_schedule, tab_goals, tab_notes = st.tabs([
-        "📊 Dashboard", "💳 Budget", "📈 Forecast",
+    # ── Auto-navigate to Today tab when requested ─────────────────────────────
+    if st.session_state.get("go_to_today_tab"):
+        st.session_state.go_to_today_tab = False
+        st.markdown("""<script>
+(function(){
+  try { sessionStorage.setItem('orryon_active_tab','0'); } catch(e){}
+  var attempts=0;
+  function clickToday(){
+    var tabs=window.parent.document.querySelectorAll('button[data-baseweb="tab"]');
+    if(tabs&&tabs.length>0){ tabs[0].click(); }
+    else if(attempts<20){ attempts++; setTimeout(clickToday,150); }
+  }
+  setTimeout(clickToday,200);
+})();
+</script>""", unsafe_allow_html=True)
+
+    # ── 7 Tabs ────────────────────────────────────────────────────────────────
+    tab_today, tab_dash, tab_budget, tab_forecast, tab_schedule, tab_goals, tab_notes = st.tabs([
+        "🌅 Today", "📊 Dashboard", "💳 Budget", "📈 Forecast",
         "📅 Schedule", "🎯 Goals", "📝 Notes",
     ])
+    with tab_today:
+        from ui.today import render_today
+        render_today(_active_uid)
     with tab_dash:
         from ui.dashboard import render_dashboard
         render_dashboard(_active_uid)
@@ -2030,7 +2050,7 @@ Type naturally in the chat below — I'll handle everything.</p>
     var tabs=window.parent.document.querySelectorAll('button[data-baseweb="tab"]');
     if(!tabs||!tabs.length){setTimeout(setup,100);return;}
     var saved=sessionStorage.getItem(KEY);
-    if(saved!==null){var idx=parseInt(saved);if(idx>0&&idx<tabs.length)tabs[idx].click();sessionStorage.removeItem(KEY);}
+    if(saved!==null){var idx=parseInt(saved);if(idx<tabs.length)tabs[idx].click();sessionStorage.removeItem(KEY);}
     tabs.forEach(function(t,i){t.addEventListener('click',function(){sessionStorage.setItem(KEY,i);});});
   }
   setup();

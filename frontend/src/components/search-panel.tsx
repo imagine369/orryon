@@ -144,7 +144,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
               {results.transactions.map((t) => (
                 <div key={t.id} className="flex items-center justify-between py-2.5 border-b border-white/5">
                   <div>
-                    <p className="text-sm text-white">{t.merchant}</p>
+                    <p className="text-sm text-white/85">{t.merchant}</p>
                     <p className="text-[0.65rem] text-white/30">{t.category} · {t.date}</p>
                   </div>
                   <span className="text-sm font-semibold text-white/70">-{fmt(t.amount)}</span>
@@ -162,7 +162,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
               </div>
               {results.notes.map((n) => (
                 <div key={n.id} className="py-2.5 border-b border-white/5">
-                  <p className="text-sm text-white">{n.title}</p>
+                  <p className="text-sm text-white/85">{n.title}</p>
                   {n.content && (
                     <p className="text-[0.72rem] text-white/30 truncate mt-0.5">{n.content.split("\n")[0]}</p>
                   )}
@@ -182,7 +182,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
                 <div key={t.id} className="flex items-center gap-2.5 py-2.5 border-b border-white/5">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === "high" ? "bg-red-400" : t.priority === "medium" ? "bg-yellow-400" : "bg-green-400"}`} />
                   <div>
-                    <p className="text-sm text-white">{t.title}</p>
+                    <p className="text-sm text-white/85">{t.title}</p>
                     {t.due_date && <p className="text-[0.65rem] text-white/30">Due {t.due_date}</p>}
                   </div>
                 </div>

@@ -134,9 +134,9 @@ export function NavBar() {
               className="fixed top-0 right-0 h-full z-50 flex flex-col"
               style={{ width: "95vw", maxWidth: 600 }}
             >
-              <div className="h-full bg-[#141414] rounded-l-2xl shadow-2xl flex flex-col">
+              <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl flex flex-col">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                  <p className="text-sm font-semibold text-white">Today</p>
+                  <p className="text-sm font-semibold text-white/85">Today</p>
                   <button onClick={() => setNotifOpen(false)} className="text-white/40 hover:text-white transition">
                     <X className="h-4 w-4" strokeWidth={1.5} />
                   </button>

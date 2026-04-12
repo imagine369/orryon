@@ -94,7 +94,7 @@ export function BillsTab() {
         <div>
           <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Recurring Bills</p>
           {bills.length > 0 && (
-            <p className="text-lg font-bold text-white mt-0.5">
+            <p className="text-lg font-bold text-white/85 mt-0.5">
               {fmt(totalMonthly)} <span className="text-sm font-normal text-white/30">/ month</span>
             </p>
           )}
@@ -163,8 +163,8 @@ export function BillsTab() {
             <div className="flex items-center gap-3 py-3 border-b border-white/5">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-white truncate">{b.name}</p>
-                  <p className="text-sm font-semibold text-white ml-3">{fmt(b.amount)}</p>
+                  <p className="text-sm font-medium text-white/85 truncate">{b.name}</p>
+                  <p className="text-sm font-semibold text-white/85 ml-3">{fmt(b.amount)}</p>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
                   <p className="text-[0.65rem] text-white/30">{freqLabel(b.frequency)}</p>

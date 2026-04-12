@@ -443,11 +443,70 @@ async def create_goal(body: GoalReq, user: dict = Depends(get_current_user)):
 
 @app.patch("/api/goals/{goal_id}")
 async def update_goal(goal_id: str, body: GoalUpdate, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(400, "No fields to update")
+
+    # Auto-log a contribution when current_amount changes
+    if "current_amount" in updates:
+        conn = get_connection()
+        old = conn.execute(
+            "SELECT current_amount FROM goals WHERE id=? AND user_id=?", (goal_id, uid)
+        ).fetchone()
+        conn.close()
+        if old:
+            delta = float(updates["current_amount"]) - float(old["current_amount"])
+            if delta != 0:
+                insert_row("goal_contributions", {
+                    "id": str(uuid.uuid4()),
+                    "goal_id": goal_id,
+                    "user_id": uid,
+                    "amount": delta,
+                    "note": "",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+
     update_row("goals", updates, {"id": goal_id})
     return {"updated": True}
+
+
+@app.get("/api/goals/{goal_id}/contributions")
+async def get_goal_contributions(goal_id: str, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM goal_contributions WHERE goal_id=? AND user_id=? ORDER BY created_at DESC",
+        (goal_id, uid),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/goals/{goal_id}/contributions")
+async def add_goal_contribution(goal_id: str, body: dict, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    amount = float(body.get("amount", 0))
+    if amount == 0:
+        raise HTTPException(400, "Amount required")
+    conn = get_connection()
+    goal = conn.execute(
+        "SELECT current_amount FROM goals WHERE id=? AND user_id=?", (goal_id, uid)
+    ).fetchone()
+    conn.close()
+    if not goal:
+        raise HTTPException(404, "Goal not found")
+    new_amount = float(goal["current_amount"]) + amount
+    update_row("goals", {"current_amount": new_amount}, {"id": goal_id})
+    insert_row("goal_contributions", {
+        "id": str(uuid.uuid4()),
+        "goal_id": goal_id,
+        "user_id": uid,
+        "amount": amount,
+        "note": body.get("note", ""),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"current_amount": new_amount}
 
 
 # ===========================================================================

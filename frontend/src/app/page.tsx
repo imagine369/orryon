@@ -188,7 +188,7 @@ function HowItWorksDemo() {
               <div className="px-4 pt-5 pb-3 space-y-3 min-h-[140px] flex flex-col justify-end">
                 {bubble1 && (
                   <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white">{bubble1}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85">{bubble1}</div>
                   </div>
                 )}
                 {thinking && (
@@ -210,7 +210,7 @@ function HowItWorksDemo() {
                 )}
                 {bubble2 && !thinking && !response && (
                   <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white">{bubble2}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85">{bubble2}</div>
                   </div>
                 )}
               </div>
@@ -219,7 +219,7 @@ function HowItWorksDemo() {
                   style={{ borderColor: hasInput ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)" }}>
                   <span className="flex-1 min-w-0 text-[15px] py-1.5 min-h-[1.5em]">
                     {hasInput
-                      ? <span className="text-white">{inputText}{(phase === "s1-typing" || phase === "s3-typing") && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
+                      ? <span className="text-white/85">{inputText}{(phase === "s1-typing" || phase === "s3-typing") && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
                       : <span className="text-white/35">Ask me anything…</span>}
                   </span>
                   <button className="shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all"
@@ -394,7 +394,7 @@ function ChatDemo() {
       <div className="px-4 pt-5 pb-3 space-y-3 min-h-[110px] flex flex-col justify-end">
         {userBubble.length > 0 && (
           <div className="flex justify-end">
-            <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white">
+            <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white/85">
               {userBubble}
             </div>
           </div>
@@ -436,7 +436,7 @@ function ChatDemo() {
         >
           <span className="flex-1 min-w-0 text-[15px] py-1.5 min-h-[1.5em] text-left">
             {hasInput ? (
-              <span className="text-white">
+              <span className="text-white/85">
                 {inputText}
                 {phase === "typing-input" && (
                   <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />
@@ -576,7 +576,7 @@ function TodayScreen() {
           <div key={t.title} className="flex items-center gap-3 py-2.5 border-b border-white/5">
             <span className={`w-2 h-2 rounded-full shrink-0 ${priorityDot(t.priority)}`} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-white">{t.title}</p>
+              <p className="text-sm text-white/85">{t.title}</p>
               <p className="text-[0.65rem] text-white/25">{t.priority} priority · {t.category}</p>
             </div>
             <span className="text-[0.65rem] text-white/25 shrink-0">✓ Done</span>
@@ -589,7 +589,7 @@ function TodayScreen() {
           <div key={e.title} className="flex items-start gap-3 py-2.5 border-b border-white/5">
             <span className="text-[0.6rem] uppercase tracking-wide text-white/30 mt-1 w-12 shrink-0">{typeLabel(e.event_type)}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white">{e.title}</p>
+              <p className="text-sm font-medium text-white/85">{e.title}</p>
               {e.description && <p className="text-[0.7rem] text-white/25 mt-0.5">{e.description}</p>}
             </div>
           </div>
@@ -610,7 +610,7 @@ function NotesScreen() {
   const NoteRow = ({ title, date, preview }: { title: string; date: string; preview: string }) => (
     <button className="w-full text-left py-3 border-b border-white/5">
       <div className="flex items-baseline justify-between mb-0.5">
-        <p className="text-sm font-semibold text-white truncate flex-1 pr-3">{title}</p>
+        <p className="text-sm font-semibold text-white/85 truncate flex-1 pr-3">{title}</p>
         <span className="text-[0.6rem] text-white/25 shrink-0">{date}</span>
       </div>
       <p className="text-[0.78rem] text-white/35 truncate">{preview}</p>
@@ -649,7 +649,7 @@ function BillsScreen() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Recurring Bills</p>
-          <p className="text-lg font-bold text-white mt-0.5">
+          <p className="text-lg font-bold text-white/85 mt-0.5">
             {fmt(totalMonthly)} <span className="text-sm font-normal text-white/30">/ month</span>
           </p>
         </div>
@@ -659,8 +659,8 @@ function BillsScreen() {
         <div key={b.name} className="flex items-center gap-3 py-3 border-b border-white/5">
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white truncate">{b.name}</p>
-              <p className="text-sm font-semibold text-white ml-3">{fmt(b.amount)}</p>
+              <p className="text-sm font-medium text-white/85 truncate">{b.name}</p>
+              <p className="text-sm font-semibold text-white/85 ml-3">{fmt(b.amount)}</p>
             </div>
             <div className="flex items-center justify-between mt-0.5">
               <p className="text-[0.65rem] text-white/30">Monthly</p>
@@ -765,14 +765,14 @@ function TourInsightsTab() {
       {/* Month nav */}
       <div className="flex items-center justify-between mb-3">
         <button className="p-1 text-white/30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
-        <p className="text-sm font-semibold text-white">April 2026</p>
+        <p className="text-sm font-semibold text-white/85">April 2026</p>
         <button className="p-1 text-white/30 opacity-20"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
       </div>
 
       {/* Total */}
       <div className="text-center mb-1">
         <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Total Spent</p>
-        <p className="text-3xl font-bold text-white mt-0.5">${totalSpent.toLocaleString()}</p>
+        <p className="text-3xl font-bold text-white/85 mt-0.5">${totalSpent.toLocaleString()}</p>
         <div className="flex items-center justify-center gap-1 mt-1">
           <TrendingDown className="h-3 w-3 text-green-400" strokeWidth={1.5} />
           <p className="text-xs text-green-400">↓ 8% vs last month</p>
@@ -799,10 +799,10 @@ function TourInsightsTab() {
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INSIGHT_COLORS[i] }} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm text-white truncate">{c.name}</p>
+                <p className="text-sm text-white/85 truncate">{c.name}</p>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
                   <span className={`text-xs ${c.trend.startsWith("+") ? "text-red-400" : "text-green-400"}`}>{c.trend}</span>
-                  <span className="text-sm font-semibold text-white">${c.total.toLocaleString()}</span>
+                  <span className="text-sm font-semibold text-white/85">${c.total.toLocaleString()}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -853,7 +853,7 @@ function TourScheduleTab() {
       {/* Calendar header */}
       <div className="flex items-center justify-between mb-3">
         <button className="p-1 text-white/30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
-        <p className="text-sm font-semibold text-white">April 2026</p>
+        <p className="text-sm font-semibold text-white/85">April 2026</p>
         <button className="p-1 text-white/30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
       </div>
 
@@ -892,7 +892,7 @@ function TourScheduleTab() {
         <div key={e.title} className="flex items-start gap-3 py-2.5 border-b border-white/5">
           <span className="text-base mt-0.5 shrink-0">{e.icon}</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white">{e.title}</p>
+            <p className="text-sm font-semibold text-white/85">{e.title}</p>
             <p className="text-[0.7rem] text-white/30">{e.date}</p>
           </div>
         </div>
@@ -1106,7 +1106,7 @@ function AppTourDemo() {
                   style={{ borderColor: hasInput ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)" }}>
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
                     {hasInput
-                      ? <span className="text-white">{inputText}{isTypingPhase && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
+                      ? <span className="text-white/85">{inputText}{isTypingPhase && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
                       : <span className="text-white/35">Ask me anything…</span>}
                   </span>
                   <Mic className="h-5 w-5 text-white/40 shrink-0" strokeWidth={1.5} />
@@ -1126,7 +1126,7 @@ function AppTourDemo() {
                 <div className="flex-1" />
                 {currentBubble && (
                   <div className="flex justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white">{currentBubble}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white/85">{currentBubble}</div>
                   </div>
                 )}
                 {thinking && (
@@ -1151,7 +1151,7 @@ function AppTourDemo() {
                 <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#1c1c1e] px-4 py-2">
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
                     {inputText
-                      ? <span className="text-white">{inputText}</span>
+                      ? <span className="text-white/85">{inputText}</span>
                       : <span className="text-white/35">Ask me anything…</span>}
                   </span>
                   <Mic className="h-5 w-5 text-white/40 shrink-0" strokeWidth={1.5} />
@@ -1179,11 +1179,11 @@ function AppTourDemo() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
                   <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-1">Net Balance</p>
-                  <p className="text-xl font-bold text-white">$5,500</p>
+                  <p className="text-xl font-bold text-white/85">$5,500</p>
                 </div>
                 <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
                   <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-1">This Month</p>
-                  <p className="text-xl font-bold text-white">$2,862</p>
+                  <p className="text-xl font-bold text-white/85">$2,862</p>
                   <p className="text-[0.65rem] text-white/30 mt-0.5">spent</p>
                 </div>
               </div>
@@ -1274,10 +1274,10 @@ export default function LandingPage() {
           <p className="text-[0.65rem] uppercase tracking-[4px] text-white/45 mb-[55px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[2.25rem] sm:text-[3rem] font-extrabold text-white mb-8 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
+          <h1 className="text-[2.25rem] sm:text-[3rem] font-extrabold text-white/85 mb-8 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
             Talk to me.<br />I&rsquo;ll organize everything.
           </h1>
-          <p className="text-[15px] text-white/80 max-w-[340px] leading-relaxed mb-10 font-medium">
+          <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
             Budget, goals, schedule, notes, and bills —<br className="hidden sm:block" /> all through natural conversation. No forms.
           </p>
 
@@ -1305,7 +1305,7 @@ export default function LandingPage() {
           {HOW_STEPS.map((s) => (
             <div key={s.n} className="py-6 border-b border-white/5 last:border-0">
               <span className="block text-[0.65rem] text-white/40 tracking-widest mb-2">{s.n}</span>
-              <p className="text-sm font-semibold text-white mb-1">{s.title}</p>
+              <p className="text-sm font-semibold text-white/85 mb-1">{s.title}</p>
               <p className="text-xs text-white/60 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
             </div>
           ))}
@@ -1337,7 +1337,7 @@ export default function LandingPage() {
 
       {/* Closing CTA */}
       <div className="max-w-lg mx-auto px-6 pt-12 pb-16 text-center">
-        <h2 className="text-2xl font-bold text-white mb-4 font-[family-name:var(--font-playfair)]">Ready to free yourself of chaos?</h2>
+        <h2 className="text-2xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)]">Ready to free yourself of chaos?</h2>
         <p className="text-sm text-white/50 mb-10">Nothing to configure. Just talk.</p>
         <div className="flex flex-col items-center gap-3">
           {closingCta}

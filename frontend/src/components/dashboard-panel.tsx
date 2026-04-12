@@ -14,6 +14,8 @@ import { GoalsTab } from "@/components/dashboard/goals-tab";
 import { NotesTab } from "@/components/dashboard/notes-tab";
 import { InsightsTab } from "@/components/dashboard/insights-tab";
 import { BillsTab } from "@/components/dashboard/bills-tab";
+import { YearlyTab } from "@/components/dashboard/yearly-tab";
+import { OverviewTab } from "@/components/dashboard/overview-tab";
 
 interface DashboardData {
   balance: number;
@@ -73,9 +75,9 @@ export function DashboardPanel() {
             className="fixed top-0 right-0 h-full z-50 flex flex-col"
             style={{ width: "95vw", maxWidth: 600 }}
           >
-            <div className="h-full bg-[#141414] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
+            <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between px-5 pt-6 pb-4 sticky top-0 bg-[#141414] z-10 border-b border-white/5 rounded-tl-2xl">
+              <div className="flex items-center justify-between px-5 pt-6 pb-4 sticky top-0 bg-[#080808] z-10 border-b border-white/5 rounded-tl-2xl">
                 <h1 className="text-2xl font-extrabold">Dashboard</h1>
                 <button
                   onClick={close}
@@ -119,49 +121,13 @@ export function DashboardPanel() {
                         <TabsTrigger value="goals" className="text-xs">Goals</TabsTrigger>
                         <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                         <TabsTrigger value="forecast" className="text-xs">Forecast</TabsTrigger>
+                        <TabsTrigger value="yearly" className="text-xs">Yearly</TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="overview">
-                        {data.top_categories.length > 0 && (
-                          <div className="mb-5">
-                            <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Top Categories</p>
-                            {data.top_categories.map((c) => (
-                              <div key={c.category} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
-                                <span className="text-white/80">{c.category}</span>
-                                <span className="font-semibold">{fmt(c.total)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {data.recent_transactions.length > 0 && (
-                          <div className="mb-5">
-                            <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Recent Transactions</p>
-                            {data.recent_transactions.map((t) => (
-                              <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-white truncate">{t.merchant}</p>
-                                  <p className="text-[0.7rem] text-white/25">{t.category} · {t.date}</p>
-                                </div>
-                                <span className="font-semibold text-white ml-3">-{fmt(t.amount)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {data.open_tasks.length > 0 && (
-                          <div>
-                            <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Open Tasks</p>
-                            {data.open_tasks.map((t) => (
-                              <div key={t.id} className="flex items-center gap-2 py-2 border-b border-white/5 text-sm">
-                                <span className={`w-1.5 h-1.5 rounded-full ${t.priority === "high" ? "bg-red-400" : t.priority === "medium" ? "bg-yellow-400" : "bg-green-400"}`} />
-                                <span className="text-white/80 flex-1">{t.title}</span>
-                                {t.due_date && <span className="text-white/25 text-xs">{t.due_date}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
+                      <TabsContent value="overview"><OverviewTab /></TabsContent>
 
                       <TabsContent value="insights"><InsightsTab /></TabsContent>
+                      <TabsContent value="yearly"><YearlyTab /></TabsContent>
                       <TabsContent value="budget"><BudgetTab /></TabsContent>
                       <TabsContent value="bills"><BillsTab /></TabsContent>
                       <TabsContent value="forecast"><ForecastTab /></TabsContent>

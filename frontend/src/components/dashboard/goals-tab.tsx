@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
-
 
 interface Goal {
   id: string;
@@ -16,6 +15,13 @@ interface Goal {
   category: string;
   notes: string;
   is_completed: number;
+}
+
+interface Contribution {
+  id: string;
+  amount: number;
+  note: string;
+  created_at: string;
 }
 
 function fmt(n: number) {
@@ -36,12 +42,46 @@ function barColor(pct: number): string {
   return "bg-green-600/50";
 }
 
+function GoalHistory({ goalId }: { goalId: string }) {
+  const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get<Contribution[]>(`/api/goals/${goalId}/contributions`)
+      .then(setContributions).catch(() => {}).finally(() => setLoading(false));
+  }, [goalId]);
+
+  if (loading) return <div className="flex justify-center py-3"><div className="h-3.5 w-3.5 animate-spin rounded-full border border-white/20 border-t-white" /></div>;
+  if (contributions.length === 0) return <p className="text-[0.7rem] text-white/25 py-2 text-center">No contributions logged yet.</p>;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/5">
+      <p className="text-[0.6rem] uppercase tracking-wide text-white/25 mb-2">Progress History</p>
+      {contributions.map((c) => {
+        const date = new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        return (
+          <div key={c.id} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
+            <div>
+              <span className={`text-xs font-semibold ${c.amount >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {c.amount >= 0 ? "+" : ""}{fmt(c.amount)}
+              </span>
+              {c.note && <span className="text-[0.65rem] text-white/30 ml-2">{c.note}</span>}
+            </div>
+            <span className="text-[0.6rem] text-white/20">{date}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function GoalsTab() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
+  const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Goal[]>("/api/goals?include_completed=true")
@@ -117,7 +157,18 @@ export function GoalsTab() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-sm">{g.name}</span>
-                  <span className="text-sm font-bold text-green-400">{Math.round(pct)}%</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-green-400">{Math.round(pct)}%</span>
+                    <button
+                      onClick={() => setExpandedGoal(expandedGoal === g.id ? null : g.id)}
+                      className="text-white/25 hover:text-white/60 transition"
+                    >
+                      {expandedGoal === g.id
+                        ? <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        : <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      }
+                    </button>
+                  </div>
                 </div>
                 <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                   <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${barColor(pct)}`} style={{ width: `${pct}%` }} />
@@ -127,6 +178,7 @@ export function GoalsTab() {
                   <span>{fmt(remaining)} to go{g.target_date ? ` · ${daysLeft(g.target_date)}` : ""}</span>
                 </div>
                 {g.notes && <p className="text-[0.65rem] text-white/15 mt-1">{g.notes}</p>}
+                {expandedGoal === g.id && <GoalHistory goalId={g.id} />}
               </CardContent>
             </Card>
           </SwipeToDelete>

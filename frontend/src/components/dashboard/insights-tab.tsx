@@ -82,43 +82,48 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { name
   return null;
 };
 
+async function fetchMonth(m: string): Promise<MonthData> {
+  const [year, month] = m.split("-");
+  const from = `${year}-${month}-01`;
+  const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const to = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+  const txns = await api.get<{ category: string; amount: number }[]>(
+    `/api/transactions?date_from=${from}&date_to=${to}&limit=500`
+  );
+  const map: Record<string, number> = {};
+  for (const t of txns) {
+    if (t.amount > 0) map[t.category] = (map[t.category] || 0) + t.amount;
+  }
+  const categories = Object.entries(map)
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+  const total = categories.reduce((s, c) => s + c.total, 0);
+  return { month: m, categories, total };
+}
+
 export function InsightsTab() {
-  const months = getMonths(3);
+  const months = getMonths(12);
   const [monthIndex, setMonthIndex] = useState(months.length - 1);
   const [data, setData] = useState<Record<string, MonthData>>({});
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      const results: Record<string, MonthData> = {};
-      await Promise.all(
-        months.map(async (m) => {
-          const [year, month] = m.split("-");
-          const from = `${year}-${month}-01`;
-          const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-          const to = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
-          const txns = await api.get<{ category: string; amount: number }[]>(
-            `/api/transactions?date_from=${from}&date_to=${to}&limit=500`
-          );
-          const map: Record<string, number> = {};
-          for (const t of txns) {
-            if (t.amount > 0) map[t.category] = (map[t.category] || 0) + t.amount;
-          }
-          const categories = Object.entries(map)
-            .map(([category, total]) => ({ category, total }))
-            .sort((a, b) => b.total - a.total);
-          const total = categories.reduce((s, c) => s + c.total, 0);
-          results[m] = { month: m, categories, total };
-        })
-      );
-      setData(results);
+    const current = months[monthIndex];
+    const prev = months[monthIndex - 1];
+    const toFetch = [current, prev].filter((m) => m && !data[m]);
+    if (toFetch.length === 0) { setLoading(false); return; }
+    setLoading(true);
+    Promise.all(toFetch.map(fetchMonth)).then((results) => {
+      setData((d) => {
+        const next = { ...d };
+        results.forEach((r) => { next[r.month] = r; });
+        return next;
+      });
       setLoading(false);
-    };
-    fetchAll();
+    }).catch(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [monthIndex]);
 
   const currentMonth = months[monthIndex];
   const prevMonth = months[monthIndex - 1];
@@ -150,7 +155,7 @@ export function InsightsTab() {
       {/* Total */}
       <div className="text-center mb-2">
         <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Total Spent</p>
-        <p className="text-3xl font-bold text-white mt-0.5">{fmt(current.total)}</p>
+        <p className="text-3xl font-bold text-white/85 mt-0.5">{fmt(current.total)}</p>
         {previous && (
           <p className={`text-xs mt-1 ${trendColor(current.total, previous.total)}`}>
             {trendLabel(current.total, previous.total)} vs last month
@@ -200,13 +205,13 @@ export function InsightsTab() {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-white truncate">{c.category}</p>
+                  <p className="text-sm text-white/85 truncate">{c.category}</p>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     {prevCat && trendIcon(c.total, prevCat.total)}
                     <span className={`text-xs ${trendColor(c.total, prevCat?.total || 0)}`}>
                       {prevCat ? trendLabel(c.total, prevCat.total) : ""}
                     </span>
-                    <span className="text-sm font-semibold text-white">{fmt(c.total)}</span>
+                    <span className="text-sm font-semibold text-white/85">{fmt(c.total)}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -240,7 +245,7 @@ function MonthNav({ months, monthIndex, setMonthIndex }: { months: string[]; mon
       >
         <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
       </button>
-      <p className="text-sm font-semibold text-white">{formatMonthLabel(months[monthIndex])}</p>
+      <p className="text-sm font-semibold text-white/85">{formatMonthLabel(months[monthIndex])}</p>
       <button
         onClick={() => setMonthIndex(Math.min(months.length - 1, monthIndex + 1))}
         disabled={monthIndex === months.length - 1}

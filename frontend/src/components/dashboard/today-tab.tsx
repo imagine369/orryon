@@ -107,7 +107,7 @@ export function TodayTab() {
               <div className="flex items-center gap-3 py-2.5 border-b border-white/5">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${priorityDot(t.priority)}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white">{t.title}</p>
+                  <p className="text-sm text-white/85">{t.title}</p>
                   <p className="text-[0.65rem] text-white/25">{t.priority} priority · {t.category || "general"}</p>
                 </div>
                 <button
@@ -134,7 +134,7 @@ export function TodayTab() {
               <div className="flex items-start gap-3 py-2.5 border-b border-white/5">
                 <span className="text-[0.6rem] uppercase tracking-wide text-white/30 mt-1 w-12 shrink-0">{typeLabel(e.event_type)}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{e.title}</p>
+                  <p className="text-sm font-medium text-white/85">{e.title}</p>
                   {e.description && <p className="text-[0.7rem] text-white/25 mt-0.5">{e.description}</p>}
                 </div>
               </div>

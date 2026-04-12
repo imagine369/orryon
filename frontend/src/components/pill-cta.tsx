@@ -33,7 +33,7 @@ const base = (size: "sm" | "md" | "lg") =>
 const fillClass = (variant: Variant) => {
   const fill =
     variant === "primary" ? "bg-black"
-    : variant === "calm"   ? "bg-white/50"
+    : variant === "calm"   ? "bg-white/40"
     : "bg-white";
   return `absolute inset-0 ${fill} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
 };
@@ -43,18 +43,18 @@ const textClass = (variant: Variant) =>
     variant === "secondary"
       ? "text-white group-hover:text-black"
       : variant === "calm"
-      ? "text-white/80 group-hover:text-white"
+      ? "text-white/50 group-hover:text-white/80"
       : "text-black group-hover:text-white"
   }`;
 
 const borderClass = (variant: Variant) =>
   variant === "secondary" ? "border-white/40"
-  : variant === "calm"    ? "border-white/30"
+  : variant === "calm"    ? "border-transparent"
   : "border-white";
 
 const bgClass = (variant: Variant) =>
   variant === "secondary" ? "bg-black"
-  : variant === "calm"    ? "bg-[#162f4a]"
+  : variant === "calm"    ? "bg-[#0b1a28]"
   : "bg-white";
 
 export function PillLink({

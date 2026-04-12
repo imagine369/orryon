@@ -8,8 +8,8 @@ import { PillButton } from "@/components/pill-cta";
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
-const BG        = "linear-gradient(180deg, #0f2a42 0%, #162f4a 45%, #0f2540 100%)";
-const ORB_BG    = "linear-gradient(135deg, #7dc8f5 0%, #5aa3d8 50%, #4082c0 100%)";
+const BG        = "linear-gradient(180deg, #0d2535 0%, #112e40 45%, #0c2233 100%)";
+const ORB_BG    = "linear-gradient(135deg, hsl(200,45%,68%) 0%, hsl(205,40%,52%) 50%, hsl(210,38%,38%) 100%)";
 const FONT      = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // ── Tibetan bowl synthesizer ──────────────────────────────────────────────────
@@ -112,10 +112,10 @@ function BackBtn({ onClick }: { onClick: () => void }) {
 function DoneFooter({ label, onRestart, onBack }: { label: string; onRestart: () => void; onBack: () => void }) {
   return (
     <div className="flex flex-col items-center mt-10 px-8 text-center">
-      <p style={{ color: "rgba(255,255,255,.92)", fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.35rem" }}>
+      <p style={{ color: "rgba(255,255,255,.38)", fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.35rem" }}>
         Well done
       </p>
-      <p style={{ color: "rgba(255,255,255,.50)", fontSize: "0.82rem", lineHeight: 1.55, marginBottom: "1.5rem" }}>
+      <p style={{ color: "rgba(255,255,255,.24)", fontSize: "0.82rem", lineHeight: 1.55, marginBottom: "1.5rem" }}>
         {label}
       </p>
       <div style={{ display: "flex", gap: "0.65rem" }}>
@@ -169,16 +169,16 @@ function BoxSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => vo
       <div style={{
         position: "absolute", width: "88vw", height: "88vw",
         maxWidth: 400, maxHeight: 400, borderRadius: "50%",
-        background: "radial-gradient(circle, hsla(200,60%,68%,.18) 0%, transparent 70%)", pointerEvents: "none",
+        background: "radial-gradient(circle, hsla(200,42%,60%,.14) 0%, transparent 70%)", pointerEvents: "none",
         transform: `scale(${expanded ? 1.14 : 1.0})`,
         opacity: expanded ? 1 : 0.6,
         transition: "transform 4s ease-in-out, opacity 4s ease-in-out",
       }} />
 
-      <p style={{ fontSize: "0.60rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.50)", marginBottom: "0.4rem" }}>
+      <p style={{ fontSize: "0.60rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.20)", marginBottom: "0.4rem" }}>
         Box Breathing · 4 – 4 – 4 – 4
       </p>
-      <p style={{ fontSize: "0.76rem", color: "rgba(255,255,255,.50)", marginBottom: "1.8rem", maxWidth: 200, textAlign: "center", lineHeight: 1.55 }}>
+      <p style={{ fontSize: "0.76rem", color: "rgba(255,255,255,.24)", marginBottom: "1.8rem", maxWidth: 200, textAlign: "center", lineHeight: 1.55 }}>
         Follow the circle — breathe with it.
       </p>
 
@@ -198,20 +198,20 @@ function BoxSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => vo
         </svg>
         <div style={{
           position: "absolute", inset: 0, borderRadius: "50%",
-          background: "radial-gradient(circle, hsl(200,60%,65%) 0%, hsl(200,58%,52%) 45%, hsl(202,55%,40%) 100%)",
+          background: "radial-gradient(circle, hsl(200,42%,58%) 0%, hsl(200,38%,42%) 50%, hsl(202,34%,26%) 100%)",
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-          boxShadow: expanded ? "0 0 55px hsla(200,60%,55%,.45)" : "0 0 30px hsla(200,60%,55%,.22)",
+          boxShadow: expanded ? "0 0 55px hsla(200,42%,50%,.35)" : "0 0 30px hsla(200,42%,50%,.16)",
           transition: "box-shadow 4s ease-in-out",
           display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 8,
         }}>
           {done ? (
-            <span style={{ fontSize: "1.5rem", color: "#fff", fontWeight: 300 }}>✓</span>
+            <span style={{ fontSize: "1.5rem", color: "rgba(255,255,255,.18)", fontWeight: 300 }}>✓</span>
           ) : (
             <>
-              <span style={{ fontSize: "clamp(1.4rem,6vw,1.9rem)", fontWeight: 300, color: "#fff", letterSpacing: "2px" }}>
+              <span style={{ fontSize: "clamp(1.4rem,6vw,1.9rem)", fontWeight: 300, color: "rgba(255,255,255,.32)", letterSpacing: "2px" }}>
                 {phase.name}
               </span>
-              <span style={{ fontSize: "0.70rem", color: "rgba(255,255,255,.50)", letterSpacing: "0.5px" }}>
+              <span style={{ fontSize: "0.70rem", color: "rgba(255,255,255,.18)", letterSpacing: "0.5px" }}>
                 {remStr(remaining)}
               </span>
             </>
@@ -287,17 +287,17 @@ function SighSession({ onBack }: { onBack: () => void }) {
       <div style={{
         position: "absolute", width: "88vw", height: "88vw",
         maxWidth: 400, maxHeight: 400, borderRadius: "50%",
-        background: "radial-gradient(circle, hsla(200,60%,68%,.18) 0%, transparent 70%)", pointerEvents: "none",
+        background: "radial-gradient(circle, hsla(200,42%,60%,.14) 0%, transparent 70%)", pointerEvents: "none",
         transform: `scale(${isExpanded ? 1.14 : 1.0})`,
         opacity: isExpanded ? 1 : 0.6,
         transition: circleTr,
       }} />
 
-      <p style={{ fontSize: "0.60rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.50)", marginBottom: "0.4rem" }}>
+      <p style={{ fontSize: "0.60rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.20)", marginBottom: "0.4rem" }}>
         Double Inhale Quick Destress
       </p>
-      <p style={{ fontSize: "0.76rem", color: "rgba(255,255,255,.50)", marginBottom: "1.8rem", maxWidth: 220, textAlign: "center", lineHeight: 1.55 }}>
-        Two inhales, then a long exhale.
+      <p style={{ fontSize: "0.76rem", color: "rgba(255,255,255,.24)", marginBottom: "1.8rem", maxWidth: 220, textAlign: "center", lineHeight: 1.55 }}>
+        Inhale fully. Then force a sharp, powerful sniff to pack extra air into already-full lungs. Then a long, slow exhale.
       </p>
 
       {/* Circle */}
@@ -322,19 +322,19 @@ function SighSession({ onBack }: { onBack: () => void }) {
         </svg>
         <div style={{
           position: "absolute", inset: 0, borderRadius: "50%",
-          background: "radial-gradient(circle, hsl(200,60%,65%) 0%, hsl(200,58%,52%) 45%, hsl(202,55%,40%) 100%)",
+          background: "radial-gradient(circle, hsl(200,42%,58%) 0%, hsl(200,38%,42%) 50%, hsl(202,34%,26%) 100%)",
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-          boxShadow: isExpanded ? "0 0 55px hsla(200,60%,55%,.45)" : "0 0 30px hsla(200,60%,55%,.22)",
+          boxShadow: isExpanded ? "0 0 55px hsla(200,42%,50%,.35)" : "0 0 30px hsla(200,42%,50%,.16)",
           transition: `box-shadow ${isInhale ? "4s" : "8s"} ease-in-out`,
           display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6,
         }}>
           {done
-            ? <span style={{ fontSize: "1.5rem", color: "#fff", fontWeight: 300 }}>✓</span>
+            ? <span style={{ fontSize: "1.5rem", color: "rgba(255,255,255,.18)", fontWeight: 300 }}>✓</span>
             : <>
-                <span style={{ fontSize: "clamp(1.4rem,6vw,1.9rem)", fontWeight: 300, color: "#fff", letterSpacing: "2px" }}>
+                <span style={{ fontSize: "clamp(1.4rem,6vw,1.9rem)", fontWeight: 300, color: "rgba(255,255,255,.32)", letterSpacing: "2px" }}>
                   {phase.name}
                 </span>
-                <span style={{ fontSize: "0.70rem", color: "rgba(255,255,255,.50)", letterSpacing: "0.5px", textAlign: "center", padding: "0 1rem" }}>
+                <span style={{ fontSize: "0.70rem", color: "rgba(255,255,255,.18)", letterSpacing: "0.5px", textAlign: "center", padding: "0 1rem" }}>
                   {phase.sub || remStr(remaining)}
                 </span>
               </>
@@ -343,7 +343,7 @@ function SighSession({ onBack }: { onBack: () => void }) {
       </div>
 
       {!done && (
-        <p style={{ marginTop: "1.6rem", fontSize: "0.70rem", color: "rgba(255,255,255,.40)", letterSpacing: "0.5px" }}>
+        <p style={{ marginTop: "1.6rem", fontSize: "0.70rem", color: "rgba(255,255,255,.18)", letterSpacing: "0.5px" }}>
           Sigh {sigNum} of {SIGH_COUNT} · {remStr(remaining)}
         </p>
       )}
@@ -411,17 +411,17 @@ function DoNothingSession({ totalSecs, onBack }: { totalSecs: number; onBack: ()
         </svg>
         <div style={{
           position: "absolute", inset: 0, borderRadius: "50%",
-          background: "radial-gradient(circle, hsl(200,55%,58%) 0%, hsl(200,52%,44%) 50%, hsl(202,50%,32%) 100%)",
-          opacity: 0.55,
+          background: "radial-gradient(circle, hsl(200,42%,52%) 0%, hsl(200,36%,38%) 50%, hsl(202,32%,24%) 100%)",
+          opacity: 0.70,
           backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {!done ? (
-            <span style={{ fontSize: "clamp(2rem,9vw,2.8rem)", fontWeight: 200, color: "rgba(255,255,255,.65)", letterSpacing: "2px", fontVariantNumeric: "tabular-nums" as const }}>
+            <span style={{ fontSize: "clamp(2rem,9vw,2.8rem)", fontWeight: 200, color: "rgba(255,255,255,.28)", letterSpacing: "2px", fontVariantNumeric: "tabular-nums" as const }}>
               {countLabel}
             </span>
           ) : (
-            <span style={{ fontSize: "1.8rem", color: "rgba(255,255,255,.65)", fontWeight: 200 }}>✓</span>
+            <span style={{ fontSize: "1.8rem", color: "rgba(255,255,255,.18)", fontWeight: 200 }}>✓</span>
           )}
         </div>
       </motion.div>
@@ -443,9 +443,9 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
   const [nothingMins, setNothingMins] = useState<3 | 6 | 9>(3);
 
   const card: CSSProperties = {
-    background: "rgba(255,255,255,0.15)", backdropFilter: "blur(14px)",
+    background: "hsla(200,35%,22%,0.60)", backdropFilter: "blur(14px)",
     WebkitBackdropFilter: "blur(14px)", borderRadius: "20px",
-    border: "1px solid rgba(255,255,255,0.28)", padding: "1.2rem 1.3rem",
+    border: "1px solid hsla(198,40%,55%,0.16)", padding: "1.2rem 1.3rem",
     width: "100%", maxWidth: 440, marginBottom: "0.8rem", fontFamily: FONT,
   };
 
@@ -468,7 +468,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
         <p style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.40)", marginBottom: "0.5rem" }}>
           Choose your session
         </p>
-        <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "1.8rem", textAlign: "center" }}>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "rgba(255,255,255,.62)", marginBottom: "1.8rem", textAlign: "center" }}>
           How would you like to relax?
         </h2>
 
@@ -477,11 +477,11 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", marginBottom: "1rem" }}>
             <motion.div
               style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: ORB_BG }}
-              animate={{ scale: [1, 1.14, 1], boxShadow: ["0 0 8px rgba(90,163,216,.40)", "0 0 20px rgba(90,163,216,.70)", "0 0 8px rgba(90,163,216,.40)"] }}
+              animate={{ scale: [1, 1.14, 1], boxShadow: ["0 0 8px hsla(200,40%,60%,.30)", "0 0 20px hsla(200,40%,60%,.55)", "0 0 8px hsla(200,40%,60%,.30)"] }}
               transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
             />
             <div>
-              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Box Breathing</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.52)", marginBottom: "0.15rem" }}>Box Breathing</p>
               <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For focus & daily routine</p>
             </div>
           </div>
@@ -495,9 +495,9 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
                 onClick={() => setBoxMins(m)}
                 style={{
                   flex: 1, padding: "0.44rem 0", borderRadius: "50px", cursor: "pointer", fontFamily: FONT,
-                  border: boxMins === m ? "1.5px solid rgba(255,255,255,0.90)" : "1.5px solid rgba(255,255,255,0.25)",
-                  background: boxMins === m ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
-                  color: boxMins === m ? "#fff" : "rgba(255,255,255,0.45)",
+                  border: boxMins === m ? "1.5px solid rgba(255,255,255,0.25)" : "1.5px solid rgba(255,255,255,0.08)",
+                  background: boxMins === m ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                  color: boxMins === m ? "rgba(255,255,255,0.60)" : "rgba(255,255,255,0.28)",
                   fontSize: "0.80rem", fontWeight: boxMins === m ? 600 : 400,
                   transition: "all 0.15s",
                 }}
@@ -536,12 +536,12 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
               }}
             />
             <div>
-              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Double Inhale Quick Destress</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.52)", marginBottom: "0.15rem" }}>Double Inhale Quick Destress</p>
               <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For acute stress & quick reset</p>
             </div>
           </div>
           <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,.50)", lineHeight: 1.6, marginBottom: "0.6rem" }}>
-            Two inhales through the nose, then a long exhale through the mouth. Clinical studies show this pattern reduces stress faster than other breathing techniques.
+            Take a full inhale through the nose. Then immediately force a second sharp, deep sniff — not a gentle one, but a powerful sniff that packs extra air into already-full lungs. Then release everything in one long, slow exhale through the mouth. This forceful double-load is what activates the body's rapid stress reset.
           </p>
           <p style={{ fontSize: "0.68rem", color: "rgba(255,255,255,.40)", marginBottom: "1.1rem" }}>5 sighs · ~70 seconds</p>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -558,7 +558,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
               transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
             />
             <div>
-              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.72)", marginBottom: "0.15rem" }}>Do Nothing</p>
+              <p style={{ fontSize: "0.95rem", fontWeight: 600, color: "rgba(255,255,255,.52)", marginBottom: "0.15rem" }}>Do Nothing</p>
               <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,.40)" }}>For deep rest & nervous system reset</p>
             </div>
           </div>
@@ -573,9 +573,9 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
                 onClick={() => setNothingMins(m)}
                 style={{
                   flex: 1, padding: "0.44rem 0", borderRadius: "50px", cursor: "pointer", fontFamily: FONT,
-                  border: nothingMins === m ? "1.5px solid rgba(255,255,255,0.90)" : "1.5px solid rgba(255,255,255,0.25)",
-                  background: nothingMins === m ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
-                  color: nothingMins === m ? "#fff" : "rgba(255,255,255,0.45)",
+                  border: nothingMins === m ? "1.5px solid rgba(255,255,255,0.25)" : "1.5px solid rgba(255,255,255,0.08)",
+                  background: nothingMins === m ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                  color: nothingMins === m ? "rgba(255,255,255,0.60)" : "rgba(255,255,255,0.28)",
                   fontSize: "0.80rem", fontWeight: nothingMins === m ? 600 : 400,
                   transition: "all 0.15s",
                 }}
@@ -626,7 +626,7 @@ export function BreathingWidget() {
           transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white mb-0.5">Take a breath</p>
+          <p className="text-sm font-semibold text-white/70 mb-0.5">Take a breath</p>
           <p className="text-[0.72rem] text-white/38 leading-snug">
             Breathe, reset, or just be still
           </p>

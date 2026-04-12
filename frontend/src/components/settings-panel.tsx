@@ -100,7 +100,7 @@ function Row({ label, sublabel, right }: { label: string; sublabel?: string; rig
   return (
     <div className="flex items-center justify-between px-3 py-3 border-b border-white/5 last:border-0 gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white">{label}</p>
+        <p className="text-sm text-white/85">{label}</p>
         {sublabel && <p className="text-xs text-white/30 mt-0.5">{sublabel}</p>}
       </div>
       <div className="shrink-0">{right}</div>
@@ -252,9 +252,9 @@ export function SettingsPanel() {
             className="fixed top-0 right-0 h-full z-50 flex flex-col"
             style={{ width: "95vw", maxWidth: 600 }}
           >
-            <div className="h-full bg-[#141414] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
+            <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between px-5 pt-6 pb-4 sticky top-0 bg-[#141414] z-10 border-b border-white/5 rounded-tl-2xl">
+              <div className="flex items-center justify-between px-5 pt-6 pb-4 sticky top-0 bg-[#080808] z-10 border-b border-white/5 rounded-tl-2xl">
                 <h1 className="text-2xl font-extrabold">Settings</h1>
                 <button
                   onClick={close}
