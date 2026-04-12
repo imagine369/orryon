@@ -12,7 +12,6 @@ import { ForecastTab } from "@/components/dashboard/forecast-tab";
 import { ScheduleTab } from "@/components/dashboard/schedule-tab";
 import { GoalsTab } from "@/components/dashboard/goals-tab";
 import { NotesTab } from "@/components/dashboard/notes-tab";
-import { TodayTab } from "@/components/dashboard/today-tab";
 import { InsightsTab } from "@/components/dashboard/insights-tab";
 import { BillsTab } from "@/components/dashboard/bills-tab";
 
@@ -111,9 +110,8 @@ export function DashboardPanel() {
                     </div>
 
                     {/* Tabs */}
-                    <Tabs defaultValue="today">
+                    <Tabs defaultValue="notes">
                       <TabsList className="bg-[#111] border border-white/5 p-0.5 mb-4 h-auto w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
-                        <TabsTrigger value="today" className="text-xs">Today</TabsTrigger>
                         <TabsTrigger value="notes" className="text-xs">Notes</TabsTrigger>
                         <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
                         <TabsTrigger value="budget" className="text-xs">Budget</TabsTrigger>
@@ -163,7 +161,6 @@ export function DashboardPanel() {
                         )}
                       </TabsContent>
 
-                      <TabsContent value="today"><TodayTab /></TabsContent>
                       <TabsContent value="insights"><InsightsTab /></TabsContent>
                       <TabsContent value="budget"><BudgetTab /></TabsContent>
                       <TabsContent value="bills"><BillsTab /></TabsContent>
