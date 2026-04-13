@@ -300,6 +300,14 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "get_grocery_list",
+            "description": "Retrieve the user's current grocery/shopping list — all unchecked items.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_upcoming_schedule",
             "description": "Get upcoming events, bills, and tasks for the next N days.",
             "parameters": {
@@ -1081,6 +1089,12 @@ def _check_grocery_item(args: dict, user_id: str) -> dict:
         update_row("grocery_items", {"is_checked": 1}, {"id": matched["id"]})
         return {"status": "ok", "checked": matched["name"]}
     return {"status": "not_found", "searched": args["item_name"]}
+
+
+def _get_grocery_list(args: dict, user_id: str) -> dict:
+    items = fetch_rows("grocery_items", {"user_id": user_id, "is_checked": 0})
+    names = [i["name"] for i in items]
+    return {"status": "ok", "items": names, "count": len(names)}
 
 
 def _complete_task(args: dict, user_id: str) -> dict:
@@ -2171,6 +2185,7 @@ _TOOL_MAP = {
     "pin_note": _pin_note,
     "set_budget": _set_budget,
     "check_grocery_item": _check_grocery_item,
+    "get_grocery_list": _get_grocery_list,
     "complete_task": _complete_task,
     "get_spending_summary": _get_spending_summary,
     "get_net_worth": _get_net_worth,

@@ -739,10 +739,11 @@ type TourPhase =
   | "panel-close" | "bell-tap" | "breathe-open" | "breathe-close" | "reset";
 
 const TOUR_CHATS = [
-  { prompt: "Add coffee and breakfast $12.50",                        response: "Done — coffee & breakfast logged for $12.50." },
-  { prompt: "What's on my schedule today?",                           response: "You have 2 events today: doctor at 10am and lunch with team at 1pm." },
-  { prompt: "Help me save $4,000 for a vacation by December",         response: "Goal created. Save $444/mo to hit $4,000 by December." },
-  { prompt: "Doctor appointment on July 15 at 10am",                  response: "Scheduled — doctor on July 15 at 10am." },
+  { prompt: "Add coffee and breakfast $12.50",                response: "Done — coffee & breakfast logged for $12.50." },
+  { prompt: "Help me save $4,000 for a vacation by December", response: "Goal created. Save $444/mo to hit $4,000 by December." },
+  { prompt: "How did I do with spending this month?",         response: "Great month — you're down 8% overall. Dining is your only category running a bit hot, everything else is under budget." },
+  { prompt: "Pull up my grocery list",                        response: "Here's your list:\n• Greek yogurt\n• Oat milk\n• Sourdough\n• Chicken thighs\n• Cherry tomatoes\n• Spinach\n• Avocados\n• Olive oil" },
+  { prompt: "Am I on track for my vacation goal?",            response: "You're at $2,720 of $4,000 — 68% there. Keep it up and you'll hit it with 3 weeks to spare." },
 ];
 
 const TOUR_TABS = ["Insights","Budget","Schedule","Goals"] as const;
@@ -1146,7 +1147,7 @@ function AppTourDemo() {
                 {currentResponse && (
                   <div className="flex items-start gap-2" style={{ animation: "msgIn 0.18s ease-out both" }}>
                     <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-1 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 text-sm leading-relaxed text-gray-200 max-w-[85%]">
+                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 text-sm leading-relaxed text-gray-200 max-w-[85%] whitespace-pre-line text-left">
                       {currentResponse}
                       {phase === "responding" && <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />}
                     </div>
