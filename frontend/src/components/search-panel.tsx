@@ -99,7 +99,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5">
           <Search className="h-4 w-4 text-white/30 shrink-0" strokeWidth={1.5} />
           <input
             ref={inputRef}
@@ -113,8 +113,8 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
               <X className="h-4 w-4" strokeWidth={1.5} />
             </button>
           )}
-          <button onClick={onClose} className="text-white/30 hover:text-white transition text-sm ml-1">
-            Cancel
+          <button onClick={onClose} className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors ml-1">
+            <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />
           </button>
         </div>
 
@@ -128,10 +128,6 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
 
           {!loading && hasQuery && total === 0 && (
             <p className="text-white/30 text-sm text-center py-10">No results for "{query}"</p>
-          )}
-
-          {!loading && !hasQuery && (
-            <p className="text-white/20 text-sm text-center py-10">Start typing to search…</p>
           )}
 
           {/* Transactions */}

@@ -283,7 +283,7 @@ export function SettingsPanel() {
           >
             <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between px-5 pt-6 pb-4 sticky top-0 bg-[#080808] z-10 border-b border-white/5 rounded-tl-2xl">
+              <div className="flex items-center justify-between px-5 py-4 sticky top-0 bg-[#080808] z-10 border-b border-white/5 rounded-tl-2xl">
                 <h1 className="text-2xl font-extrabold">Settings</h1>
                 <button
                   onClick={close}

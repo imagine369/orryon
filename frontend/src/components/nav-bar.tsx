@@ -260,8 +260,8 @@ export function NavBar() {
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
                   <p className="text-sm font-semibold text-white/85">Quick Access</p>
-                  <button onClick={() => setNotifOpen(false)} className="text-white/40 hover:text-white transition">
-                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  <button onClick={() => setNotifOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                    <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />
                   </button>
                 </div>
 
