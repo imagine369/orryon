@@ -120,12 +120,21 @@ static/
 
 ## Data & Privacy
 
-- All data is stored in `finance.db` (SQLite) on your local device.
-- Your email address is stored locally if you use OTP sign-in.
-- Chat messages are sent to the xAI Grok API to power AI responses. See [xAI's Privacy Policy](https://x.ai/legal/privacy-policy).
-- No analytics, no tracking, no cloud sync.
+See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full authoritative policies.
+
+**Key Points:**
+- **Local-first by default** — All data stays in a single SQLite file (`finance.db`) on your device or self-hosted server.
+- Hosted SaaS option available with secure server storage and optional at-rest encryption (`ENCRYPTION_KEY`).
+- AI chat sends your messages + limited context summary to xAI's Grok (no full database is shared).
+- Stripe handles all payments (we never store card details).
+- Full data export (ZIP with SQLite + JSON) and account deletion are available.
+
+**Legal Protections:**
+Our [Terms of Service](TERMS.md) include clear disclaimers that Orryon is not financial, legal, medical, or mental health advice. This includes the Breathe and Meditation features, which are provided for general wellness only. The Terms also contain limitation of liability, indemnification, and dispute resolution provisions.
 
 ---
+
+> **⚠️ Important:** Orryon is provided "AS IS". Never make important financial, legal, or medical decisions based solely on the app or AI. The Breathe/Meditation features are for general wellness and not a substitute for professional care. Always consult qualified professionals. You use the service at your own risk.
 
 ## Requirements
 

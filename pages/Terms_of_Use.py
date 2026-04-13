@@ -1,69 +1,49 @@
 import streamlit as st
 
-st.set_page_config(page_title="Terms of Use - orryon", page_icon="📜", layout="centered")
+st.set_page_config(page_title="Terms of Service - orryon", page_icon="📜", layout="centered")
 
-st.title("📜 Terms of Use & EULA")
-st.markdown("**Last updated: April 11, 2026**")
+st.title("📜 Terms of Service")
+st.markdown("**Last updated: April 12, 2026**")
+
+st.info("Thank you for using Orryon. We built this tool to genuinely help you with your finances, schedule, goals, and wellbeing.")
 
 st.markdown("""
-### 1. Acceptance of Terms
+### Important Disclaimers
 
-By using Orryon, you agree to these Terms of Use.
+**Orryon is not a financial advisor, lawyer, accountant, doctor, or therapist.**
 
-### 2. Not Financial Advice
+This includes all AI features and the Breathe/Meditation exercises. Everything in the app is provided for informational, organizational, and general wellness purposes only.
 
-**ORRYON IS NOT A FINANCIAL ADVISOR.**
+- Do not make important financial, legal, medical, or mental health decisions based solely on Orryon.
+- The Breathe and Meditation features are **not** medical treatment or therapy.
+- If you have any medical condition, please consult a qualified healthcare professional before using these features.
+- You use Orryon at your own risk.
 
-All budgets, forecasts, spending analysis, goal projections, and advice provided by orryon are for **informational and educational purposes only**.
+### AI and Wellness Features
+The AI assistant (powered by xAI Grok) may sometimes be inaccurate. The wellness features are meant to support relaxation and mindfulness but are not a substitute for professional care.
 
-- Do not make important financial decisions based solely on information from orryon.
-- orryon is not a licensed financial advisor, accountant, tax professional, or lawyer.
-- Past performance shown in the app is not indicative of future results.
-- You use orryon **entirely at your own risk**.
+### Subscription & Billing (Hosted Version)
+New users get a 14-day Pro trial. Continued Pro access requires a paid subscription. Self-hosted users do not need to subscribe. Payments are processed by Stripe.
 
-### 3. "As Is" Software
+### Your Data & Privacy
+You own your data. We provide easy export and account deletion tools. Self-hosted users keep everything locally in `finance.db`. See the full [Privacy Policy](/privacy) for details.
 
-Orryon is provided on an **"AS IS"** and **"AS AVAILABLE"** basis.
+### Service "As Is"
+Orryon is provided "AS IS" without warranties. We cannot guarantee perfect accuracy.
 
-We make no warranties of any kind, including:
-- Accuracy of forecasts or calculations
-- Reliability of reminders or notifications
-- Fitness for any particular purpose
-- That the software will be error-free
+### Limitation of Liability
+To the fullest extent permitted by law, Orryon and its owners are not liable for indirect or consequential damages. Our total liability is limited to the amount you paid in the past 12 months (or $0 for free/self-hosted use).
 
-### 4. Limitation of Liability
-
-To the maximum extent permitted by law, the creators of orryon shall not be liable for any damages whatsoever (including, without limitation, lost profits, loss of data, or financial loss) arising out of or related to your use of orryon.
-
-### 5. Local Data Responsibility
-
-All your data is stored locally in the `finance.db` file on *your* device. 
-
-**You are solely responsible for:**
-- Backing up your data
-- Keeping your device secure
-- Protecting your xAI API key
-
-We have no access to your data and cannot recover it if lost.
-
-### 6. License
-
-You are granted a limited, non-exclusive, non-transferable, revocable license to use orryon for personal, non-commercial use.
-
-You may not:
-- Sell, sublicense, or distribute orryon
-- Reverse engineer the application (except as permitted by law)
-- Remove or modify any disclaimers or legal notices
-
-### 7. Changes to These Terms
-
-We may update these Terms from time to time. Continued use of orryon after changes constitutes acceptance of the new terms.
+### Dispute Resolution
+Any disputes arising from these Terms will be resolved through binding individual arbitration in the State of Wyoming.
 
 ---
 
-**By using orryon, you acknowledge that you have read, understood, and agree to these terms.**
+**By using Orryon, you acknowledge that you have read and agree to these Terms.**
+
+We genuinely want Orryon to be a helpful tool for you. These terms exist to protect both users and the project while we focus on building something useful and privacy-first.
+
+See `TERMS.md` for the full authoritative version.
 """)
 
-st.warning("⚠️ This is not financial advice. Always consult qualified professionals for financial decisions.")
-
-st.caption("All data remains on your local device. orryon has no cloud component by default.")
+st.caption("This is not legal advice. Consider consulting with a qualified attorney if you have questions.")

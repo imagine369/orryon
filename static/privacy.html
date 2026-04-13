@@ -103,6 +103,14 @@
       margin: 2.5rem 0;
     }
 
+    .info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 2rem;
+    }
+
     .callout {
       background: rgba(29, 155, 240, 0.08);
       border: 1px solid rgba(29, 155, 240, 0.3);
@@ -130,53 +138,49 @@
 
     <div class="wordmark">orryon</div>
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: April 11, 2026</p>
+    <p class="updated">Last updated: April 12, 2026</p>
 
-    <p>orryon is a fully local, privacy-first personal finance and productivity tool. This page explains exactly what we do — and don't — do with your data.</p>
+    <div class="info">
+      We built Orryon with a strong focus on privacy and user control. Your data belongs to you.
+    </div>
 
-    <h2>Your data stays on your device</h2>
-    <p>Everything you add to orryon — transactions, budgets, goals, calendar events, grocery lists, notes, and chat history — is stored <strong>only</strong> in a local SQLite file called <code>finance.db</code> on your own device. We do not run a cloud server that collects or stores your personal data.</p>
+    <p>Orryon is designed local-first. When self-hosted or used locally, your data never leaves your device. In hosted mode, we only collect what is necessary and do not sell or monetize your personal data.</p>
 
-    <h2>What we store locally</h2>
+    <h2>Self-Hosted vs Hosted</h2>
+    <p><strong>Self-hosted/Local:</strong> All data stays in <code>finance.db</code> on your device. We have no access.</p>
+    <p><strong>Hosted SaaS:</strong> We store your data securely with optional encryption and provide full export and deletion tools.</p>
+
+    <h2>AI and Wellness Features</h2>
+    <p>When using the AI, limited context is sent to xAI's Grok. The Breathe and Meditation features are for general relaxation and wellness only. Please see our <a href="/app/static/terms.html">Terms of Service</a> for important disclaimers about these features.</p>
+
+    <h2>What We Do Not Do</h2>
     <ul>
-      <li><strong>Email address:</strong> If you sign in with OTP, your email is saved in the local <code>finance.db</code> to identify your account across sessions. It never leaves your device.</li>
-      <li><strong>Financial &amp; personal data:</strong> All transactions, budgets, goals, events, notes, and chat history are stored only in <code>finance.db</code> on your device.</li>
-    </ul>
-    <p>We do not transmit, collect, or store any of this data on any server.</p>
-
-    <h2>What we do not do</h2>
-    <ul>
-      <li>We do not track you across websites or devices.</li>
-      <li>We do not use advertising networks, tracking pixels, or third-party analytics.</li>
-      <li>We do not sell, rent, or share any user data — ever.</li>
-      <li>We do not have access to your data.</li>
-    </ul>
-
-    <h2>The one thing that leaves your device</h2>
-    <p>When you chat with orryon, your message is sent to the <strong>xAI Grok API</strong> so the AI can understand and respond. That's it. Please review <a href="https://x.ai/legal/privacy-policy" target="_blank" rel="noopener">xAI's Privacy Policy</a> for how they handle those messages.</p>
-
-    <h2>Email notifications (optional)</h2>
-    <p>If you choose to configure SMTP reminders, emails are sent directly from your own email account credentials. We never see the content of those emails.</p>
-
-    <h2>Shared dashboard links</h2>
-    <p>You can generate a read-only share link to your Dashboard. Anyone with that link can view your financial overview. The data still comes from your local database — we do not host or store a copy of it.</p>
-
-    <h2>Your responsibilities</h2>
-    <ul>
-      <li>Back up your <code>finance.db</code> file regularly.</li>
-      <li>Keep your device and its contents secure.</li>
-      <li>Protect your xAI API key.</li>
-      <li>Understand that shared links expose your data to whoever has the link.</li>
+      <li>We do not sell your data</li>
+      <li>We do not use tracking analytics or advertising networks</li>
+      <li>We do not share your data for marketing purposes</li>
     </ul>
 
-    <h2>Changes to this policy</h2>
-    <p>We may update this Privacy Policy from time to time. Material changes will be reflected by an updated date at the top of this page.</p>
+    <h2>Third-Party Services</h2>
+    <ul>
+      <li><strong>xAI Grok</strong>: Used for AI capabilities</li>
+      <li><strong>Stripe</strong>: Secure payment processing</li>
+      <li><strong>SMTP (optional)</strong>: Transactional emails through your own provider</li>
+    </ul>
+
+    <h2>Your Rights</h2>
+    <ul>
+      <li>Full data export at any time</li>
+      <li>Permanent account and data deletion</li>
+      <li>Complete control when self-hosting</li>
+    </ul>
+
+    <h2>Security</h2>
+    <p>We use secure authentication, optional encryption, and HTTPS for hosted instances. Self-hosted users are responsible for their own security.</p>
 
     <hr />
 
     <div class="callout">
-      <strong>orryon was built with one core principle:</strong><br>
-      Your data belongs to you, not to us. No cloud servers. No tracking. Your email stays local.
+      We genuinely want Orryon to be a helpful, privacy-first tool that puts you in control. Your trust matters to us.
     </div>
 
     <footer>
