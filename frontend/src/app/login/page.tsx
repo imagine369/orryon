@@ -14,7 +14,7 @@ const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
 const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
 
 const PRO_FEATURES = [
-  "Full access to your personal life concierge",
+  "Full access to your personal concierge",
   "Easy voice input",
   "Full transaction history & search",
   "Budget tracking with custom categories",
