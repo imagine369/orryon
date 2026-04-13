@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MAX_TOOL_ROUNDS = 8
-HISTORY_WINDOW = 50
+HISTORY_WINDOW = 20
 
 _TOOL_LABELS = {
     "set_balance": "Setting balance",
@@ -178,6 +178,7 @@ def run_orryon_stream(
     actions_taken: list[dict] = []
     all_tabs: set[str] = set()
     last_undo_info: dict | None = None
+    accumulated_usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0}
 
     try:
         for _round in range(MAX_TOOL_ROUNDS):
@@ -185,6 +186,12 @@ def run_orryon_stream(
             tool_calls_buf: list[dict] = []
 
             for chunk in _call_grok_stream(messages):
+                # Accumulate real token counts returned by the API
+                if chunk.get("usage"):
+                    u = chunk["usage"]
+                    accumulated_usage["prompt_tokens"]     += u.get("prompt_tokens", 0)
+                    accumulated_usage["completion_tokens"] += u.get("completion_tokens", 0)
+
                 choices = chunk.get("choices")
                 if not choices:
                     continue
@@ -229,6 +236,7 @@ def run_orryon_stream(
                     "actions": actions_taken,
                     "tabs": list(all_tabs),
                     "undo_info": last_undo_info,
+                    "usage": accumulated_usage,
                 }
                 return
 
@@ -269,6 +277,7 @@ def run_orryon_stream(
             "actions": actions_taken,
             "tabs": list(all_tabs),
             "undo_info": last_undo_info,
+            "usage": accumulated_usage,
         }
 
     except requests.exceptions.Timeout:
@@ -303,10 +312,11 @@ def _call_grok_stream(messages: list[dict]) -> Generator[dict, None, None]:
         "model": GROK_MODEL,
         "messages": messages,
         "temperature": 0.15,
-        "max_tokens": 2048,
+        "max_tokens": 600,
         "tools": TOOL_SCHEMAS,
         "tool_choice": "auto",
         "stream": True,
+        "stream_options": {"include_usage": True},
     }
     resp = requests.post(XAI_API_URL, headers=headers, json=payload, timeout=60, stream=True)
     resp.raise_for_status()

@@ -321,6 +321,17 @@ def init_db() -> None:
             snapshot_date   TEXT NOT NULL,
             UNIQUE(user_id, snapshot_date)
         );
+
+        CREATE TABLE IF NOT EXISTS user_api_spend (
+            id                TEXT PRIMARY KEY,
+            user_id           TEXT NOT NULL,
+            month             TEXT NOT NULL,
+            prompt_tokens     INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            cost_usd          REAL DEFAULT 0,
+            updated_at        TEXT NOT NULL,
+            UNIQUE(user_id, month)
+        );
     """)
 
     conn.commit()
@@ -338,6 +349,7 @@ def init_db() -> None:
     _migrate_notes_rich(conn)
     _migrate_users_preferences(conn)
     _migrate_users_plan(conn)
+    _migrate_user_api_spend(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -479,6 +491,26 @@ def _migrate_users_plan(conn: sqlite3.Connection) -> None:
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_users_plan: %s (non-fatal)", exc)
+
+
+def _migrate_user_api_spend(conn: sqlite3.Connection) -> None:
+    """Ensure user_api_spend table exists (added for per-user cost capping)."""
+    try:
+        conn.execute("SELECT 1 FROM user_api_spend LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_api_spend (
+                id                TEXT PRIMARY KEY,
+                user_id           TEXT NOT NULL,
+                month             TEXT NOT NULL,
+                prompt_tokens     INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
+                cost_usd          REAL DEFAULT 0,
+                updated_at        TEXT NOT NULL,
+                UNIQUE(user_id, month)
+            )
+        """)
+        conn.commit()
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:
@@ -998,6 +1030,53 @@ def get_nw_history(user_id: str, limit: int = 90) -> list[dict]:
     except Exception as exc:
         logger.error("get_nw_history error: %s", exc)
         return []
+
+
+# ── API spend tracking ────────────────────────────────────────────────────────
+
+_COST_PER_INPUT_TOKEN  = 0.30 / 1_000_000   # $0.30 / 1M input tokens  (grok-3-mini)
+_COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000   # $0.50 / 1M output tokens
+
+
+def record_token_spend(user_id: str, prompt_tokens: int, completion_tokens: int) -> None:
+    """Add the cost of one API call to the user's running monthly total."""
+    cost = prompt_tokens * _COST_PER_INPUT_TOKEN + completion_tokens * _COST_PER_OUTPUT_TOKEN
+    now   = datetime.now(timezone.utc).isoformat()
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_connection()
+        conn.execute(
+            """
+            INSERT INTO user_api_spend (id, user_id, month, prompt_tokens, completion_tokens, cost_usd, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, month) DO UPDATE SET
+                prompt_tokens     = prompt_tokens     + excluded.prompt_tokens,
+                completion_tokens = completion_tokens + excluded.completion_tokens,
+                cost_usd          = cost_usd          + excluded.cost_usd,
+                updated_at        = excluded.updated_at
+            """,
+            (str(uuid.uuid4()), user_id, month, prompt_tokens, completion_tokens, cost, now),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        logger.error("record_token_spend error: %s", exc)
+
+
+def get_monthly_spend(user_id: str) -> float:
+    """Return the user's total API spend (USD) for the current calendar month."""
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT cost_usd FROM user_api_spend WHERE user_id=? AND month=?",
+            (user_id, month),
+        ).fetchone()
+        conn.close()
+        return float(row["cost_usd"]) if row else 0.0
+    except Exception as exc:
+        logger.error("get_monthly_spend error: %s", exc)
+        return 0.0
 
 
 # Auto-initialise on import

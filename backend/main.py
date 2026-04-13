@@ -34,9 +34,11 @@ from db import (
     fetch_rows,
     get_balance,
     get_connection,
+    get_monthly_spend,
     get_or_create_user_by_email,
     insert_row,
     load_chat_history,
+    record_token_spend,
     save_chat_message,
     update_row,
     verify_code,
@@ -60,6 +62,8 @@ _rate_buckets: dict[str, list[float]] = _defaultdict(list)
 _RATE_WINDOW = 60
 _RATE_LIMIT_CHAT = 20
 _RATE_LIMIT_DEFAULT = 120
+
+MONTHLY_SPEND_CAP_USD = 1.80
 
 
 def _check_rate_limit(user_id: str, limit: int = _RATE_LIMIT_DEFAULT) -> None:
@@ -922,6 +926,13 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
     save_chat_message(uid, user_msg)
 
     async def event_generator():
+        # Block before hitting the API if this user has already exceeded the monthly cap
+        current_spend = get_monthly_spend(uid)
+        if current_spend >= MONTHLY_SPEND_CAP_USD:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'You have reached your monthly usage limit. It resets on the 1st of next month.'})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
         from core.grok_agent import run_orryon_stream
         full_text = ""
         try:
@@ -940,6 +951,14 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
                     final_text = event.get("message", full_text)
                     ai_msg = {"role": "assistant", "content": final_text, "created_at": datetime.now(timezone.utc).isoformat()}
                     save_chat_message(uid, ai_msg)
+                    # Record actual token spend so the monthly cap is enforced precisely
+                    usage = event.get("usage") or {}
+                    if usage.get("prompt_tokens") or usage.get("completion_tokens"):
+                        record_token_spend(
+                            uid,
+                            usage.get("prompt_tokens", 0),
+                            usage.get("completion_tokens", 0),
+                        )
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "error":
                     yield f"data: {json.dumps(event)}\n\n"
