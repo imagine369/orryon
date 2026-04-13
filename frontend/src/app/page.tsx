@@ -736,7 +736,7 @@ type TourPhase =
   | "thinking" | "responding" | "next-chat" | "clearing" | "pre-dash"
   | "tap-grid" | "panel-open"
   | "tab-budget" | "tab-schedule" | "tab-goals"
-  | "panel-close" | "reset";
+  | "panel-close" | "bell-tap" | "breathe-open" | "breathe-close" | "reset";
 
 const TOUR_CHATS = [
   { prompt: "Add coffee and breakfast $12.50",                        response: "Done — coffee & breakfast logged for $12.50." },
@@ -988,6 +988,8 @@ function AppTourDemo() {
   const [currentResponse, setCurrentResponse] = useState("");
   const [thinking, setThinking]       = useState(false);
   const [gridLit, setGridLit]         = useState(false);
+  const [bellLit, setBellLit]         = useState(false);
+  const [breatheOpen, setBreatheOpen] = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [activeTab, setActiveTab]     = useState<TourTab>("Insights");
   const [visible, setVisible]         = useState(true);
@@ -1003,7 +1005,8 @@ function AppTourDemo() {
 
     if (phase === "home") {
       setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
-      setSending(false); setGridLit(false); setPanelOpen(false); setActiveTab("Insights");
+      setSending(false); setGridLit(false); setBellLit(false); setBreatheOpen(false);
+      setPanelOpen(false); setActiveTab("Insights");
       setChatIdx(0); setVisible(true);
       go("typing", 900);
     }
@@ -1042,11 +1045,14 @@ function AppTourDemo() {
     if (phase === "clearing") { go("typing", 500); }
     if (phase === "pre-dash")    { go("tap-grid", 100); }
     if (phase === "tap-grid")    { setGridLit(true); go("panel-open", 200); }
-    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 2400); }
-    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-schedule", 2000); }
-    if (phase === "tab-schedule"){ setActiveTab("Schedule"); go("tab-goals", 2000); }
-    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 2000); }
-    if (phase === "panel-close") { setPanelOpen(false); go("reset", 900); }
+    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 1200); }
+    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-schedule", 800); }
+    if (phase === "tab-schedule"){ setActiveTab("Schedule"); go("tab-goals", 800); }
+    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 800); }
+    if (phase === "panel-close")  { setPanelOpen(false); go("bell-tap", 320); }
+    if (phase === "bell-tap")     { setBellLit(true); go("breathe-open", 300); }
+    if (phase === "breathe-open") { setBreatheOpen(true); setBellLit(false); go("breathe-close", 2500); }
+    if (phase === "breathe-close"){ setBreatheOpen(false); go("reset", 250); }
     if (phase === "reset") {
       setVisible(false);
       tmr.current = setTimeout(() => setPhase("home"), 450);
@@ -1079,7 +1085,7 @@ function AppTourDemo() {
             <span className="text-white font-extrabold tracking-widest uppercase text-[0.5rem] font-[family-name:var(--font-playfair)]">ORRYON</span>
             <div className="flex items-center gap-1">
               <button className="p-2 rounded-lg text-white/60"><Search className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
-              <button className="relative p-2 rounded-lg text-white/60">
+              <button className={`relative p-2 rounded-lg transition-colors ${bellLit ? "text-white bg-white/5" : "text-white/60"}`}>
                 <Bell className="h-2.5 w-2.5" strokeWidth={1.5} />
                 <span className="absolute top-1.5 right-1.5 w-1 h-1 rounded-full bg-white" />
               </button>
@@ -1162,6 +1168,45 @@ function AppTourDemo() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── Breathe panel (slides in from right, like the dashboard) ── */}
+        <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
+          style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl"
+            style={{ background: "linear-gradient(180deg, #0d2535 0%, #0e2a3a 50%, #0c2233 100%)" }}>
+
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+              <p className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Today</p>
+              <button className="transition" style={{ color: "rgba(255,255,255,0.35)" }}>
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </div>
+
+            {/* Orb + copy */}
+            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
+              <div
+                className="rounded-full mb-8"
+                style={{
+                  width: 96,
+                  height: 96,
+                  background: "linear-gradient(135deg, hsl(200,45%,68%) 0%, hsl(205,40%,52%) 50%, hsl(210,38%,38%) 100%)",
+                  animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
+                }}
+              />
+              <p style={{ color: "rgba(255,255,255,.60)", fontSize: "0.92rem", fontWeight: 600, marginBottom: "0.3rem" }}>
+                Take a breath
+              </p>
+              <p style={{ color: "rgba(255,255,255,.28)", fontSize: "0.62rem", letterSpacing: "0.07em", marginBottom: "0.85rem" }}>
+                Box Breathing · 4 – 4 – 4 – 4
+              </p>
+              <p style={{ color: "rgba(255,255,255,.18)", fontSize: "0.62rem", textAlign: "center", lineHeight: 1.65, maxWidth: 190 }}>
+                Pause everything and breathe — the orb expands as you inhale, contracts as you exhale.
+              </p>
+            </div>
+
+          </div>
         </div>
 
         {/* ── Dashboard panel (slides in from right) ── */}
@@ -1332,6 +1377,16 @@ export default function LandingPage() {
         @keyframes msgIn {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes breatheOrb {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 16px rgba(90,163,216,.42), 0 0 6px rgba(90,163,216,.22);
+          }
+          50% {
+            transform: scale(1.32);
+            box-shadow: 0 0 44px rgba(90,163,216,.78), 0 0 20px rgba(90,163,216,.46);
+          }
         }
       `}</style>
 
