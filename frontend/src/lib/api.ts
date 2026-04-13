@@ -41,6 +41,41 @@ async function request<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+async function uploadFile<T = unknown>(
+  path: string,
+  file: File,
+  fieldName = "file",
+  extraFields?: Record<string, string>,
+): Promise<T> {
+  const token = getToken();
+  const form = new FormData();
+  form.append(fieldName, file);
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) {
+      form.append(k, v);
+    }
+  }
+
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Upload failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   get: <T = unknown>(path: string) => request<T>(path),
   post: <T = unknown>(path: string, body?: unknown) =>
@@ -48,6 +83,8 @@ export const api = {
   patch: <T = unknown>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T = unknown>(path: string) => request<T>(path, { method: "DELETE" }),
+  upload: <T = unknown>(path: string, file: File, fieldName?: string, extraFields?: Record<string, string>) =>
+    uploadFile<T>(path, file, fieldName, extraFields),
 };
 
 

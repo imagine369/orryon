@@ -1,7 +1,15 @@
 """
-app.py — orryon v1  |  Your intelligent personal concierge.
+app.py — orryon legacy Streamlit UI (maintenance mode).
+
+STATUS: This is the original v1 interface. The primary stack is now
+        Next.js (frontend/) + FastAPI (backend/). See README.md and
+        ARCHITECTURE.md for the current recommended setup.
+
+        This file is kept as a functional quick-demo option but is not
+        actively developed. New features go into the FastAPI backend.
 
 Run:
+    pip install -r requirements.txt
     streamlit run app.py
 
 Architecture:
@@ -357,7 +365,8 @@ if not st.session_state.data_loaded:
                     st.rerun()
                 else:
                     _code = create_verification_code(_email_val)
-                    _sent = send_verification_code(_email_val, _code)
+                    _result = send_verification_code(_email_val, _code)
+                    _sent = _result["sent"]
                     st.session_state.auth_pending_email = _email_val
                     st.session_state.auth_step = "code"
                     st.session_state.auth_error = ""
@@ -1725,38 +1734,11 @@ elif _app_view == "settings_panel":
     st.markdown("---")
     st.markdown("**📦 Data Export**")
     if st.button("⬇️ Export All Data (ZIP)", use_container_width=True, key="export_all"):
-        import shutil, zipfile, tempfile
-        from db import get_connection as _gc_exp
-        from config import DB_PATH
-        with tempfile.TemporaryDirectory() as _tmpdir:
-            _db_copy = os.path.join(_tmpdir, "finance.db")
-            shutil.copy2(DB_PATH, _db_copy)
-            _json_path = os.path.join(_tmpdir, "data.json")
-            _cexp = _gc_exp()
-            _tables = [r["name"] for r in _cexp.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()]
-            _export_data = {}
-            for _tbl in _tables:
-                _cols = [r[1] for r in _cexp.execute(f"PRAGMA table_info({_tbl})").fetchall()]
-                if "user_id" in _cols:
-                    _rows = _cexp.execute(f"SELECT * FROM {_tbl} WHERE user_id=?", (_active_uid,)).fetchall()
-                elif _tbl == "users":
-                    _rows = _cexp.execute(f"SELECT * FROM {_tbl} WHERE id=?", (_active_uid,)).fetchall()
-                else:
-                    continue
-                _export_data[_tbl] = [dict(r) for r in _rows]
-            _cexp.close()
-            with open(_json_path, "w") as _jf:
-                json.dump(_export_data, _jf, indent=2, default=str)
-            _zip_path = os.path.join(_tmpdir, "orryon_export.zip")
-            with zipfile.ZipFile(_zip_path, "w", zipfile.ZIP_DEFLATED) as _zf:
-                _zf.write(_db_copy, "finance.db")
-                _zf.write(_json_path, "data.json")
-            with open(_zip_path, "rb") as _zr:
-                st.download_button("💾 Download ZIP", data=_zr.read(),
-                                   file_name="orryon_export.zip", mime="application/zip",
-                                   use_container_width=True)
+        from core.export import build_user_export_zip
+        _zip_bytes = build_user_export_zip(_active_uid)
+        st.download_button("💾 Download ZIP", data=_zip_bytes,
+                           file_name="orryon_export.zip", mime="application/zip",
+                           use_container_width=True)
 
     st.markdown("---")
     st.caption(f"Model: `{os.getenv('GROK_MODEL', 'grok-3-mini')}` · All data in `finance.db`")

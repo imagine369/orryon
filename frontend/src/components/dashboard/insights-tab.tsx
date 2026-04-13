@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { api } from "@/lib/api";
+import { isDemo, buildDemoData } from "./demo-data";
 
 interface CategorySpend {
   category: string;
@@ -99,32 +100,6 @@ async function fetchMonth(m: string): Promise<MonthData> {
     .sort((a, b) => b.total - a.total);
   const total = categories.reduce((s, c) => s + c.total, 0);
   return { month: m, categories, total };
-}
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
-
-function buildDemoData(): Record<string, MonthData> {
-  const months = getMonths(12);
-  const current = months[months.length - 1];
-  const prev = months[months.length - 2];
-  const cats = [
-    { category: "Rent & Housing", total: 2200 },
-    { category: "Food & Dining",  total: 386  },
-    { category: "Groceries",      total: 173  },
-    { category: "Transport",      total: 103  },
-  ];
-  const prevCats = [
-    { category: "Rent & Housing", total: 2200 },
-    { category: "Food & Dining",  total: 344  },
-    { category: "Groceries",      total: 180  },
-    { category: "Transport",      total: 100  },
-  ];
-  return {
-    [current]: { month: current, categories: cats, total: cats.reduce((s, c) => s + c.total, 0) },
-    [prev]:    { month: prev,    categories: prevCats, total: prevCats.reduce((s, c) => s + c.total, 0) },
-  };
 }
 
 export function InsightsTab() {

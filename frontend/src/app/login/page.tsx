@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Eye } from "lucide-react";
+import { X, Check, Eye, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -47,9 +47,11 @@ export default function LoginPage() {
 
   const [authToken, setAuthToken] = useState("");
   const [authUser, setAuthUser] = useState<{ id: string; email: string; display_name: string } | null>(null);
+  const [smtpConfigured, setSmtpConfigured] = useState(true);
+  const [resendCountdown, setResendCountdown] = useState(0);
 
-  const handleSendCode = async () => {
-    const val = email.trim().toLowerCase();
+  const sendCode = async (targetEmail?: string) => {
+    const val = (targetEmail ?? email).trim().toLowerCase();
     if (!val || !val.includes("@")) {
       setError("Please enter a valid email address.");
       return;
@@ -57,15 +59,31 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post<{ sent: boolean; dev_code: string }>("/api/auth/send-code", { email: val });
+      const res = await api.post<{ sent: boolean; dev_code: string; smtp_configured: boolean }>("/api/auth/send-code", { email: val });
       setDevCode(res.sent ? "" : res.dev_code);
+      setSmtpConfigured(res.smtp_configured);
       setStep("code");
+      setResendCountdown(30);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to send code");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleSendCode = () => sendCode();
+
+  const handleResend = () => {
+    if (resendCountdown > 0) return;
+    setCode("");
+    sendCode(email);
+  };
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const t = setTimeout(() => setResendCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCountdown]);
 
   const handleVerify = async () => {
     if (!code.trim() || code.trim().length !== 6) {
@@ -270,16 +288,27 @@ export default function LoginPage() {
       {/* ── Step 3: OTP code ── */}
       {step === "code" && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
-          <h1 className="text-2xl font-bold text-white mb-1">Check your inbox</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">
+            {devCode ? "Your verification code" : "Check your inbox"}
+          </h1>
           {devCode ? (
             <div className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl p-4 text-center mb-4">
               <p className="text-3xl font-bold tracking-[6px] text-white">{devCode}</p>
-              <p className="text-[0.7rem] text-white/30 mt-2">Dev mode — set SMTP in .env to send real emails</p>
+              <p className="text-[0.7rem] text-white/30 mt-2">
+                {smtpConfigured
+                  ? "Email delivery failed — code shown here as fallback"
+                  : "Dev mode — set SMTP_HOST, SMTP_USER, SMTP_PASS in .env to send real emails"}
+              </p>
             </div>
           ) : (
-            <p className="text-sm text-white/40 mb-4">
-              Code sent to <span className="text-white font-medium break-all">{email}</span>. Check your inbox.
-            </p>
+            <div className="mb-4 w-full">
+              <p className="text-sm text-white/40 text-center">
+                Code sent to <span className="text-white font-medium break-all">{email}</span>
+              </p>
+              <p className="text-[0.7rem] text-white/25 text-center mt-1">
+                Don&apos;t see it? Check your spam/junk folder.
+              </p>
+            </div>
           )}
           <Input
             type="text"
@@ -289,17 +318,29 @@ export default function LoginPage() {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && handleVerify()}
             className="mb-3 bg-[#111] border-white/10 text-white text-center text-lg tracking-[4px]"
+            autoFocus
           />
           {error && <p className="text-red-400 text-sm mb-3 w-full">{error}</p>}
           <PillButton onClick={handleVerify} disabled={loading} className="w-full">
             {loading ? "Verifying…" : "Verify"}
           </PillButton>
-          <button
-            onClick={() => { setStep("email"); setCode(""); setDevCode(""); setError(""); }}
-            className="mt-3 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200"
-          >
-            &larr; Use different email
-          </button>
+          <div className="flex items-center justify-center gap-4 mt-3 w-full">
+            <button
+              onClick={() => { setStep("email"); setCode(""); setDevCode(""); setError(""); }}
+              className="text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200"
+            >
+              &larr; Back
+            </button>
+            <span className="text-white/10">|</span>
+            <button
+              onClick={handleResend}
+              disabled={resendCountdown > 0 || loading}
+              className="text-xs text-white/30 hover:text-white/60 disabled:text-white/15 uppercase tracking-[3px] transition-colors duration-200 flex items-center gap-1.5"
+            >
+              <RotateCw className="h-3 w-3" strokeWidth={1.5} />
+              {resendCountdown > 0 ? `Resend (${resendCountdown}s)` : "Resend code"}
+            </button>
+          </div>
         </div>
       )}
 

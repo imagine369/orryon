@@ -8,7 +8,7 @@ const StarEight = ({ className }: { className?: string }) => (
   </svg>
 );
 import { useState, useEffect, useRef } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown } from "lucide-react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -554,83 +554,168 @@ function GoalsScreen() {
   );
 }
 
-function TodayScreen() {
-  const tasks = [
-    { title: "Pay credit card bill", priority: "high",   category: "finance" },
-    { title: "Call dentist",         priority: "medium", category: "health" },
+function ForecastScreen() {
+  const income            = 6500;
+  const balance           = 5500;
+  const totalBills        = 2258;
+  const totalGoalContribs = 4680;
+  const projectedRem      = 1560;
+  const freeAfterGoals    = 880;
+
+  const bills = [
+    { name: "Rent",    amount: 2200,  due: "May 1"  },
+    { name: "Netflix", amount: 15.99, due: "Apr 24" },
+    { name: "Gym",     amount: 29.99, due: "Apr 28" },
   ];
-  const events = [
-    { event_type: "event",    title: "Lunch with team",  description: "Noon at the usual spot" },
-    { event_type: "reminder", title: "Grocery run",      description: "Milk, eggs, bread" },
+
+  const goals = [
+    { name: "Vacation Fund",  current: 2720, target: 4000, pct: 68 },
+    { name: "Emergency Fund", current: 1600, target: 5000, pct: 32 },
   ];
-  const priorityDot = (p: string) => p === "high" ? "bg-red-400" : p === "medium" ? "bg-yellow-400" : "bg-green-400";
-  const typeLabel   = (t: string) => t === "bill_due" ? "Bill" : t === "reminder" ? "Reminder" : t === "errand" ? "Errand" : t === "task" ? "Task" : "Event";
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Saturday, April 11</p>
-        <AddBtn />
+      {/* Top stat cards */}
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+          <p className="text-[0.58rem] uppercase tracking-wide text-white/30 mb-0.5">Monthly Income</p>
+          <p className="text-lg font-bold text-white/85">{fmt(income)}</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+          <p className="text-[0.58rem] uppercase tracking-wide text-white/30 mb-0.5">Free to Spend</p>
+          <p className="text-lg font-bold text-green-400">{fmt(freeAfterGoals)}</p>
+        </div>
       </div>
-      <div className="mb-6">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Due Today</p>
-        {tasks.map((t) => (
-          <div key={t.title} className="flex items-center gap-3 py-2.5 border-b border-white/5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${priorityDot(t.priority)}`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-white/85">{t.title}</p>
-              <p className="text-[0.65rem] text-white/25">{t.priority} priority · {t.category}</p>
-            </div>
-            <span className="text-[0.65rem] text-white/25 shrink-0">✓ Done</span>
+
+      {/* Cash flow waterfall */}
+      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-2">Monthly Cash Flow</p>
+      <div className="space-y-2 text-sm mb-4">
+        <div className="flex justify-between">
+          <span className="text-white/55">Current balance</span>
+          <span className="font-semibold text-white/85">{fmt(balance)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-green-400/80">+ Monthly income</span>
+          <span className="font-semibold text-green-400">{fmt(income)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-red-400/80">− Monthly bills</span>
+          <span className="font-semibold text-red-400">{fmt(totalBills)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-yellow-400/80">− Goal contributions</span>
+          <span className="font-semibold text-yellow-400">{fmt(totalGoalContribs)}</span>
+        </div>
+        <div className="flex justify-between border-t border-white/8 pt-2">
+          <span className="font-bold text-white/85">Projected remaining</span>
+          <span className="font-bold text-green-400">{fmt(projectedRem)}</span>
+        </div>
+      </div>
+
+      {/* Upcoming bills */}
+      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-2">Upcoming Bills</p>
+      {bills.map((b) => (
+        <div key={b.name} className="flex items-center justify-between py-2.5 border-b border-white/5 text-sm">
+          <div>
+            <p className="text-white/85 font-medium">{b.name}</p>
+            <p className="text-[0.62rem] text-white/25">Due {b.due}</p>
           </div>
-        ))}
-      </div>
-      <div>
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Today&apos;s Events</p>
-        {events.map((e) => (
-          <div key={e.title} className="flex items-start gap-3 py-2.5 border-b border-white/5">
-            <span className="text-[0.6rem] uppercase tracking-wide text-white/30 mt-1 w-12 shrink-0">{typeLabel(e.event_type)}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white/85">{e.title}</p>
-              {e.description && <p className="text-[0.7rem] text-white/25 mt-0.5">{e.description}</p>}
-            </div>
+          <span className="font-semibold text-white/70">{fmt(b.amount)}</span>
+        </div>
+      ))}
+
+      {/* Goals progress */}
+      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mt-4 mb-2">Goal Progress</p>
+      {goals.map((g) => (
+        <div key={g.name} className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-white/80">{g.name}</span>
+            <span className="text-xs font-bold text-green-400">{g.pct}%</span>
           </div>
-        ))}
-      </div>
+          <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="absolute inset-y-0 left-0 rounded-full bg-green-500/60" style={{ width: `${g.pct}%` }} />
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span className="text-[0.6rem] text-white/25">{fmt(g.current)} saved</span>
+            <span className="text-[0.6rem] text-white/25">{fmt(g.target - g.current)} to go</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function NotesScreen() {
-  const pinned = [
-    { title: "Q2 Financial Goals",  date: "Apr 8", preview: "Review investment portfolio and rebalance..." },
+function ListsScreen() {
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const lists = [
+    { id: "d1", name: "Grocery",       color: "#f97316", items: ["Almond milk","Eggs","Greek yogurt","Sourdough bread","Avocados"], done: ["Olive oil","Coffee beans"] },
+    { id: "d2", name: "Goals",         color: "#3b82f6", items: ["Max out Roth IRA","Run a 5K under 25 min","Read 12 books this year"], done: ["Build emergency fund"] },
+    { id: "d3", name: "Books to Read", color: "#a855f7", items: ["The Psychology of Money","Atomic Habits","Die with Zero"], done: ["The Almanack of Naval Ravikant"] },
+    { id: "d4", name: "Travel Pack",   color: "#22c55e", items: ["Noise-cancelling headphones","Travel adapter"], done: ["Passport"] },
   ];
-  const notes = [
-    { title: "Meal prep ideas",       date: "Apr 6", preview: "Chicken, rice, vegetables for the week..." },
-    { title: "Book recommendations",  date: "Apr 3", preview: "The Psychology of Money, Die with Zero..." },
-  ];
-  const NoteRow = ({ title, date, preview }: { title: string; date: string; preview: string }) => (
-    <button className="w-full text-left py-3 border-b border-white/5">
-      <div className="flex items-baseline justify-between mb-0.5">
-        <p className="text-sm font-semibold text-white/85 truncate flex-1 pr-3">{title}</p>
-        <span className="text-[0.6rem] text-white/25 shrink-0">{date}</span>
+
+  const active = lists.find((l) => l.id === selected);
+
+  if (active) {
+    return (
+      <div>
+        {/* Detail header */}
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={() => setSelected(null)} className="text-white/35 hover:text-white/70 transition shrink-0">
+            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: active.color }} />
+            <p className="text-sm font-bold text-white/90 truncate">{active.name}</p>
+          </div>
+          <AddBtn />
+        </div>
+
+        {/* Open items */}
+        {active.items.map((item) => (
+          <div key={item} className="flex items-center gap-3 py-2.5 border-b border-white/5">
+            <div className="shrink-0 w-4 h-4 rounded-full border-2" style={{ borderColor: active.color + "99" }} />
+            <p className="text-sm text-white/85 flex-1 leading-snug">{item}</p>
+          </div>
+        ))}
+
+        {/* Done items */}
+        {active.done.length > 0 && (
+          <>
+            <p className="text-[0.6rem] uppercase tracking-widest text-white/20 mt-4 mb-1">Done</p>
+            {active.done.map((item) => (
+              <div key={item} className="flex items-center gap-3 py-2.5 border-b border-white/5 opacity-40">
+                <div className="shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center" style={{ borderColor: active.color + "80" }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active.color }} />
+                </div>
+                <p className="text-sm text-white/50 flex-1 leading-snug line-through">{item}</p>
+              </div>
+            ))}
+          </>
+        )}
       </div>
-      <p className="text-[0.78rem] text-white/35 truncate">{preview}</p>
-    </button>
-  );
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Notes</p>
+        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Lists</p>
         <AddBtn />
       </div>
-      <div className="mb-2">
-        <p className="text-[0.6rem] uppercase tracking-widest text-white/20 mb-1 px-0.5">Pinned</p>
-        {pinned.map((n) => <NoteRow key={n.title} {...n} />)}
-      </div>
-      <div>
-        <p className="text-[0.6rem] uppercase tracking-widest text-white/20 mb-1 mt-4 px-0.5">Notes</p>
-        {notes.map((n) => <NoteRow key={n.title} {...n} />)}
-      </div>
+      {lists.map((l) => (
+        <button
+          key={l.id}
+          onClick={() => setSelected(l.id)}
+          className="w-full flex items-center gap-3 py-3 border-b border-white/5 text-left group"
+        >
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+          <p className="text-sm font-semibold text-white/85 flex-1 truncate">{l.name}</p>
+          <span className="text-[0.65rem] text-white/30 shrink-0">{l.items.length + l.done.length}</span>
+          <ChevronRight className="h-3.5 w-3.5 text-white/20 group-hover:text-white/40 transition shrink-0" strokeWidth={1.5} />
+        </button>
+      ))}
     </div>
   );
 }
@@ -675,11 +760,11 @@ function BillsScreen() {
 }
 
 const APP_SCREENS = [
-  { key: "budget", label: "Budget",  Component: BudgetScreen },
-  { key: "goals",  label: "Goals",   Component: GoalsScreen },
-  { key: "today",  label: "Today",   Component: TodayScreen },
-  { key: "notes",  label: "Notes",   Component: NotesScreen },
-  { key: "bills",  label: "Bills",   Component: BillsScreen },
+  { key: "budget",   label: "Budget",   Component: BudgetScreen   },
+  { key: "goals",    label: "Goals",    Component: GoalsScreen    },
+  { key: "forecast", label: "Forecast", Component: ForecastScreen },
+  { key: "lists",    label: "Lists",    Component: ListsScreen    },
+  { key: "bills",    label: "Bills",    Component: BillsScreen    },
 ];
 
 function AppDemo() {
@@ -719,12 +804,14 @@ function AppDemo() {
         ))}
       </div>
 
-      {/* Screen frame */}
+      {/* Screen frame — fixed height so all screens are equal */}
       <div
-        className="rounded-2xl border border-white/8 bg-[#141414] px-4 pt-4 pb-5 min-h-[320px]"
-        style={{ transition: "opacity 0.28s ease", opacity: visible ? 1 : 0 }}
+        className="rounded-2xl border border-white/8 bg-[#141414] overflow-hidden"
+        style={{ height: 320, transition: "opacity 0.28s ease", opacity: visible ? 1 : 0 }}
       >
-        <Component key={key} />
+        <div className="h-full overflow-y-auto px-4 pt-4 pb-5" style={{ scrollbarWidth: "none" }}>
+          <Component key={key} />
+        </div>
       </div>
     </div>
   );
@@ -1172,42 +1259,108 @@ function AppTourDemo() {
           )}
         </div>
 
-        {/* ── Breathe panel (slides in from right, like the dashboard) ── */}
+        {/* ── Today panel (slides in from right after chat) ── */}
         <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
           style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl"
-            style={{ background: "linear-gradient(180deg, #0d2535 0%, #0e2a3a 50%, #0c2233 100%)" }}>
+          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
 
             {/* Panel header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-              <p className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>Today</p>
-              <button className="transition" style={{ color: "rgba(255,255,255,0.35)" }}>
-                <X className="h-4 w-4" strokeWidth={1.5} />
-              </button>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
+              <div>
+                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Today</p>
+                <p className="text-[0.55rem] text-white/25 mt-0.5">Sunday, April 12</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button className="flex items-center gap-1 text-[0.6rem] font-medium px-2 py-1 rounded-lg text-white/30">
+                  <SlidersHorizontal className="h-2.5 w-2.5" strokeWidth={1.5} />
+                  View
+                </button>
+                <button className="flex items-center justify-center w-5 h-5 rounded-full bg-white shrink-0">
+                  <Plus className="h-2.5 w-2.5 text-black" strokeWidth={2} />
+                </button>
+              </div>
             </div>
 
-            {/* Orb + copy */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-              <div
-                className="rounded-full mb-8"
-                style={{
-                  width: 96,
-                  height: 96,
-                  background: "linear-gradient(135deg, hsl(200,45%,68%) 0%, hsl(205,40%,52%) 50%, hsl(210,38%,38%) 100%)",
-                  animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
-                }}
-              />
-              <p style={{ color: "rgba(255,255,255,.60)", fontSize: "0.92rem", fontWeight: 600, marginBottom: "0.3rem" }}>
-                Take a breath
-              </p>
-              <p style={{ color: "rgba(255,255,255,.28)", fontSize: "0.62rem", letterSpacing: "0.07em", marginBottom: "0.85rem" }}>
-                Box Breathing · 4 – 4 – 4 – 4
-              </p>
-              <p style={{ color: "rgba(255,255,255,.18)", fontSize: "0.62rem", textAlign: "center", lineHeight: 1.65, maxWidth: 190 }}>
-                Pause everything and breathe — the orb expands as you inhale, contracts as you exhale.
-              </p>
+            {/* Item count */}
+            <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
+              <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center shrink-0">
+                <div className="w-1 h-1 rounded-full border border-white/30" />
+              </div>
+              <p className="text-[0.55rem] text-white/25">11 items today</p>
             </div>
 
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-5 pb-4" style={{ scrollbarWidth: "none" }}>
+
+              {/* Events — matches DEMO_EVENTS in nav-bar.tsx */}
+              {[
+                { title: "Team standup",        type: "meeting"     },
+                { title: "Lunch with Sarah",    type: "personal"    },
+                { title: "Dentist appointment", type: "appointment" },
+              ].map((e) => (
+                <div key={e.title} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
+                  <div className="shrink-0 w-4 h-4 rounded-full border border-white/15 flex items-center justify-center">
+                    <Calendar className="h-2 w-2 text-white/25" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-[0.78rem] text-white/70 flex-1 leading-snug">{e.title}</p>
+                  <span className="text-[0.5rem] uppercase tracking-widest text-white/20 shrink-0">{e.type}</span>
+                </div>
+              ))}
+
+              {/* Tasks — matches DEMO_TASKS in nav-bar.tsx (P1→red, P2→orange, P3→blue, P4→dim) */}
+              {[
+                { title: "Review Q2 budget report",        border: "#f87171" },
+                { title: "Call with accountant at 3pm",    border: "#f87171" },
+                { title: "Send weekly update to team",     border: "#fb923c" },
+                { title: "Book flight to NYC",             border: "#fb923c" },
+                { title: "Review gym membership renewal",  border: "#60a5fa" },
+                { title: "Pick up dry cleaning",           border: "rgba(255,255,255,0.2)" },
+              ].map((t) => (
+                <div key={t.title} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
+                  <button
+                    className="shrink-0 w-4 h-4 rounded-full border-2"
+                    style={{ borderColor: t.border }}
+                  />
+                  <p className="text-[0.78rem] text-white/85 flex-1 leading-snug">{t.title}</p>
+                </div>
+              ))}
+
+              {/* Bills — matches DEMO_BILLS in nav-bar.tsx */}
+              {[
+                { name: "Netflix", amount: 15.99 },
+                { name: "Spotify", amount: 9.99  },
+              ].map((b) => (
+                <div key={b.name} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
+                  <div className="shrink-0 w-4 h-4 rounded-full border border-red-400/30 flex items-center justify-center">
+                    <span className="text-red-400/50 text-[0.5rem] font-bold leading-none">$</span>
+                  </div>
+                  <p className="text-[0.78rem] text-white/70 flex-1 leading-snug">{b.name}</p>
+                  <span className="text-[0.72rem] font-semibold text-red-400/70 shrink-0 tabular-nums">
+                    ${b.amount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+
+              {/* Breathing widget teaser */}
+              <div className="mt-4 rounded-xl border border-white/[0.06] overflow-hidden"
+                style={{ background: "linear-gradient(180deg,#0d2535 0%,#0c2233 100%)" }}>
+                <div className="flex items-center gap-3 px-4 py-3.5">
+                  <div
+                    className="rounded-full shrink-0"
+                    style={{
+                      width: 35, height: 35,
+                      background: "linear-gradient(135deg,hsl(200,45%,68%) 0%,hsl(205,40%,52%) 50%,hsl(210,38%,38%) 100%)",
+                      animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[0.78rem] font-semibold text-white/70 leading-tight">Take a breath</p>
+                    <p className="text-[0.55rem] text-white/30 tracking-wide mt-0.5">Box Breathing · 4–4–4–4</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 

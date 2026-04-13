@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 
 interface CalEvent {
   id: string;
@@ -22,19 +23,6 @@ interface CalTask {
   category: string;
 }
 
-const DEMO_EVENTS: CalEvent[] = [
-  { id: "1", title: "Doctor appointment", event_date: "2026-04-14", event_type: "event",    description: "Annual checkup"        },
-  { id: "2", title: "Lunch with team",    event_date: "2026-04-16", event_type: "event",    description: "Noon at the usual spot" },
-  { id: "3", title: "Pay rent",           event_date: "2026-04-20", event_type: "bill_due", description: ""                       },
-  { id: "4", title: "Birthday party",     event_date: "2026-04-25", event_type: "event",    description: "Sarah's birthday"       },
-];
-
-const DEMO_TASKS: CalTask[] = [
-  { id: "1", title: "Pay credit card bill", priority: "high",   status: "open", due_date: "2026-04-12", category: "finance" },
-  { id: "2", title: "Call dentist",         priority: "medium", status: "open", due_date: "2026-04-15", category: "health"  },
-  { id: "3", title: "Review budget",        priority: "low",    status: "open", due_date: "2026-04-30", category: "finance" },
-];
-
 const EVENT_COLOR: Record<string, string> = {
   event:    "#60a5fa",
   bill_due: "#f87171",
@@ -51,10 +39,6 @@ const PRIORITY_COLOR: Record<string, string> = {
 };
 
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
 
 function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];

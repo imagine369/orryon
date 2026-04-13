@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
+import { isDemo, buildDemoYearly } from "./demo-data";
 
 interface MonthSummary {
   month: string;
@@ -12,28 +13,6 @@ interface MonthSummary {
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
-
-function buildDemoYearly(year: number): { months: MonthSummary[]; topCategories: { category: string; total: number }[] } {
-  const totals = [0, 0, 2950, 3100, 2862, 0, 0, 0, 0, 0, 0, 0];
-  const months: MonthSummary[] = Array.from({ length: 12 }, (_, i) => ({
-    month: `${year}-${String(i + 1).padStart(2, "0")}`,
-    label: new Date(year, i).toLocaleDateString("en-US", { month: "short" }),
-    total: totals[i] || 0,
-  }));
-  return {
-    months,
-    topCategories: [
-      { category: "Rent & Housing", total: 6600 },
-      { category: "Food & Dining",  total: 1158 },
-      { category: "Groceries",      total:  519 },
-      { category: "Transport",      total:  309 },
-    ],
-  };
 }
 
 export function YearlyTab() {

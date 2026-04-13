@@ -6,67 +6,144 @@ Your intelligent personal concierge. Track expenses, manage your schedule, set s
 
 ---
 
-## Deploy in one click
+## Architecture
 
-| Platform | Button |
-|---|---|
-| **Railway** | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/new?template=https://github.com/your-repo/orryon) |
-| **Render** | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/your-repo/orryon) |
+Orryon runs as a **Next.js frontend + FastAPI backend**. The legacy Streamlit UI is preserved for quick demos but is no longer the primary interface.
 
-> After deploying, set the `XAI_API_KEY` environment variable in your platform dashboard.
-> Render users: set `DB_PATH=/data/finance.db` and attach a persistent disk at `/data` to keep data between deploys.
+```
+┌─────────────────┐       REST + SSE        ┌──────────────────────┐
+│  Next.js 16     │ ◄───────────────────────►│  FastAPI (Python)    │
+│  React 19 + PWA │  http://localhost:8000   │  backend/main.py     │
+│  frontend/      │                          │  + routers/          │
+└─────────────────┘                          └──────┬───────────────┘
+                                                    │
+                                 ┌──────────────────┼───────────────┐
+                                 │                  │               │
+                            core/grok_agent.py   db.py         core/scheduler.py
+                            (xAI Grok SSE)     (SQLite)       (APScheduler)
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and migration roadmap.
 
 ---
 
 ## Features
 
-- **AI Chat** — powered by xAI Grok; just type naturally to add expenses, events, tasks, or goals
+- **AI Chat** — powered by xAI Grok; type naturally to add expenses, events, tasks, or goals
 - **Dashboard** — net balance, monthly spending, top categories, upcoming events
 - **Budget** — transaction history, category breakdown, quick-add expense form
 - **Forecast** — spending trends and projections
 - **Schedule** — calendar events, tasks, and grocery list
 - **Goals** — savings goals with progress tracking
 - **Notes** — personal notes and journal
-- **OTP Auth** — email-based sign-in (no passwords); demo mode requires no sign-in
-- **PWA** — installable as a mobile app (manifest + service worker included)
+- **Lists** — multi-list system (Todoist-style custom lists)
+- **OTP Auth** — email-based sign-in (no passwords); demo mode for local development
+- **PWA** — installable as a mobile app (manifest + service worker)
+- **Receipt Scanner** — snap a photo to auto-extract expense data (Grok Vision)
+- **CSV Import** — upload bank CSVs with auto-detected column mapping (Chase, Amex, generic)
 - **Data Export** — download all your data as a ZIP (SQLite DB + JSON)
-- **Share Links** — generate read-only links to your Dashboard
+- **Share Links** — generate read-only dashboard links
+- **Stripe Billing** — optional subscription management with trial support
 
 ---
 
 ## Quick Start
 
-### 1. Clone & install
+### Prerequisites
+
+- **Python 3.11+** and **Node.js 18+**
+- An xAI API key from [console.x.ai](https://console.x.ai)
+
+### 1. Install
 
 ```bash
-git clone <repo-url>
-cd orryon
+git clone <repo-url> && cd orryon
+
+# Backend
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r backend/requirements.txt
+
+# Frontend
+cd frontend && npm install && cd ..
 ```
 
 ### 2. Configure
 
 ```bash
 cp .env.example .env
+# Edit .env → set XAI_API_KEY (everything else is optional)
 ```
 
-Edit `.env` and add at minimum:
-
-```
-XAI_API_KEY=your_xai_api_key_here
-```
-
-Get an xAI API key at [console.x.ai](https://console.x.ai). All other settings are optional.
-
-### 3. Run
+### 3. Run (two terminals)
 
 ```bash
-streamlit run app.py
+# Terminal 1 — API server
+source .venv/bin/activate
+uvicorn backend.main:app --reload --port 8000
 ```
 
-Open [http://localhost:8501](http://localhost:8501). Click **Try the demo →** to skip sign-in.
+```bash
+# Terminal 2 — UI
+cd frontend
+npm run dev
+```
+
+Open **http://localhost:3000** — click **Try the demo** to skip sign-in.
+
+> **Tip:** API docs are at http://localhost:8000/docs (auto-generated Swagger UI).
+
+---
+
+## Bank Sync (Upcoming)
+
+Orryon takes a **tiered approach to transaction import**, progressing from maximum privacy to maximum convenience:
+
+| Tier | Method | Privacy | Status |
+|------|--------|---------|--------|
+| 1 | **Manual entry** via AI chat ("sushi $45 dining") | Full local control | Available |
+| 2 | **CSV import** — upload bank statements | File never leaves your device | Available |
+| 3 | **Email forwarding** — auto-parse transaction alert emails | Requires SMTP config | Planned |
+| 4 | **Plaid bank link** — real-time account sync | Third-party connection | Planned |
+
+**CSV import** is live in the Budget tab — click "Import CSV", select a bank statement (Chase, Amex, or generic), review the preview table, select/deselect rows, and confirm. Plaid integration config keys (`PLAID_CLIENT_ID`, `PLAID_SECRET`) are already in `.env.example` — implementation is next on the roadmap. See `backend/routers/connections.py` for the full plan.
+
+---
+
+## Legacy Streamlit UI
+
+The original Streamlit interface is still functional for quick demos:
+
+```bash
+pip install -r requirements.txt      # root requirements.txt (Streamlit deps)
+streamlit run app.py                  # opens http://localhost:8501
+```
+
+> **Note:** The Streamlit UI is in maintenance mode. New features target the Next.js + FastAPI stack exclusively.
+
+---
+
+## Deploy
+
+### Railway (recommended)
+
+1. Connect your repo to Railway
+2. Set the root directory to `.` (the Dockerfile copies from project root)
+3. Set environment variables: `XAI_API_KEY`, `JWT_SECRET`, `NODE_ENV=production`
+4. Deploy the frontend separately (Vercel, Railway static, etc.) with `NEXT_PUBLIC_API_URL` pointing to your Railway backend URL
+
+Uses `backend/railway.json` (Dockerfile builder) with health checks at `/api/health`.
+
+### Render
+
+`render.yaml` is pre-configured for Docker + FastAPI with a persistent disk at `/data`. Set `FRONTEND_URL` and secrets in the Render dashboard.
+
+### Docker (local)
+
+```bash
+docker build -f backend/Dockerfile -t orryon-backend .
+docker run -p 8000:8000 --env-file .env orryon-backend
+```
 
 ---
 
@@ -74,70 +151,121 @@ Open [http://localhost:8501](http://localhost:8501). Click **Try the demo →** 
 
 | Variable | Required | Description |
 |---|---|---|
-| `XAI_API_KEY` | Yes | xAI Grok API key — enables the AI chat |
+| `XAI_API_KEY` | **Yes** | xAI Grok API key — enables the AI chat |
+| `JWT_SECRET` | Prod | Secret for JWT signing (auto-generated in dev) |
 | `GROK_MODEL` | No | Model name (default: `grok-3-mini`) |
 | `SMTP_HOST` | No | SMTP server for OTP emails and reminders |
 | `SMTP_PORT` | No | SMTP port (default: `587`) |
 | `SMTP_USER` | No | SMTP username / sender address |
 | `SMTP_PASS` | No | SMTP password |
-| `APP_URL` | No | Public URL (used for share links, default: `http://localhost:8501`) |
+| `APP_URL` | No | Public URL (default: `http://localhost:3000`) |
+| `FRONTEND_URL` | No | Frontend origin for CORS (default: `http://localhost:3000`) |
+| `DB_PATH` | No | SQLite file path (default: `finance.db`) |
+| `PLAID_CLIENT_ID` | No | Plaid API credentials for bank sync (upcoming) |
+| `PLAID_SECRET` | No | Plaid API secret |
+| `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
+| `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
+| `NODE_ENV` | No | Set to `production` to disable demo mode |
 
-Without SMTP, OTP codes are shown on-screen (dev mode). Without `XAI_API_KEY`, AI chat is disabled.
+---
+
+## Email / OTP Authentication
+
+Orryon uses **passwordless sign-in** — a 6-digit OTP is sent via email when the user logs in. No passwords are stored.
+
+### Development (no SMTP)
+
+If `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are not set in `.env`, the OTP code is **displayed on-screen** automatically. This lets you develop and test without setting up an email provider.
+
+### Production (SMTP required)
+
+Set the four SMTP variables in `.env` to enable real email delivery:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-app-password       # NOT your regular password — use an App Password
+SMTP_FROM=you@gmail.com           # optional, defaults to SMTP_USER
+```
+
+**Gmail setup:**
+1. Enable 2-Step Verification on your Google account
+2. Go to [myaccount.google.com](https://myaccount.google.com) → Security → App Passwords
+3. Generate an App Password and paste it as `SMTP_PASS`
+
+**Other providers:** Outlook (`smtp-mail.outlook.com:587`), iCloud (`smtp.mail.me.com:587`), Yahoo (`smtp.mail.yahoo.com:587`).
+
+### Behavior summary
+
+| SMTP configured? | Production? | What happens |
+|---|---|---|
+| No | No | OTP shown on-screen (dev mode) |
+| No | Yes | Login fails — SMTP is required in production |
+| Yes (send OK) | Either | OTP sent via email |
+| Yes (send fails) | No | OTP shown on-screen as fallback |
+| Yes (send fails) | Yes | Login fails — user must retry |
 
 ---
 
 ## Project Structure
 
 ```
-app.py                  # Main Streamlit app (landing, auth, all views)
-db.py                   # SQLite schema and helpers
-config.py               # Environment config
-email_sender.py         # SMTP OTP / digest emails
-core/
-  grok_agent.py         # xAI Grok streaming agent
-  tools.py              # AI tool implementations (add expense, event, goal…)
-  scheduler.py          # APScheduler background jobs (reminders, digests)
-ui/
-  dashboard.py          # Dashboard tab
-  budget.py             # Budget tab
-  forecast.py           # Forecast tab
-  schedule.py           # Schedule tab
-  goals.py              # Goals tab
-  notes.py              # Notes tab
-pages/
-  Privacy_Policy.py     # Streamlit privacy policy page
-  Terms_of_Use.py       # Streamlit terms of use page
-static/
-  manifest.json         # PWA manifest
-  sw.js                 # Service worker
-  icon-192.png          # PWA icon
-  icon-512.png          # PWA icon
-  privacy.html          # Static privacy policy (linked from footer)
-  terms.html            # Static terms of use (linked from footer)
+orryon/
+├── backend/                    # FastAPI application (primary)
+│   ├── main.py                 #   App assembly, middleware, lifespan
+│   ├── auth.py                 #   JWT creation & verification
+│   ├── deps.py                 #   Shared dependencies (rate limiter, plan enforcement)
+│   ├── schemas.py              #   Pydantic request/response models
+│   ├── routers/
+│   │   ├── auth.py             #   OTP sign-in, demo, JWT issuance
+│   │   ├── chat.py             #   SSE streaming AI chat
+│   │   ├── finance.py          #   Dashboard, transactions, budget, bills, forecast
+│   │   ├── organize.py         #   Events, goals, notes, tasks, grocery, lists
+│   │   ├── account.py          #   Settings, billing, export, share, receipts
+│   │   └── connections.py      #   CSV import, Plaid bank link (upcoming)
+│   ├── Dockerfile
+│   ├── railway.json
+│   └── requirements.txt
+│
+├── frontend/                   # Next.js 16 application (primary UI)
+│   ├── src/
+│   │   ├── app/                #   Pages and layouts
+│   │   ├── components/         #   React components
+│   │   └── lib/                #   API client, auth context, utilities
+│   └── package.json
+│
+├── core/                       # Shared business logic
+│   ├── grok_agent.py           #   xAI Grok streaming agent + memory
+│   ├── tools.py                #   AI tool definitions and execution
+│   ├── system_prompt.py        #   System prompt construction
+│   ├── scheduler.py            #   APScheduler background jobs
+│   ├── csv_importer.py         #   Bank CSV parsing (Chase, Amex, generic)
+│   ├── export.py               #   User data export (shared)
+│   └── google_calendar.py      #   Google Calendar sync (scaffold)
+│
+├── app.py                      # Legacy Streamlit UI (maintenance mode)
+├── db.py                       # SQLite schema, migrations, CRUD helpers
+├── config.py                   # Environment variable loading
+├── email_sender.py             # SMTP email sending
+│
+├── ARCHITECTURE.md             # Detailed architecture documentation
+├── MIGRATION_ROADMAP.md        # Future migration plans
+├── PRIVACY.md / TERMS.md       # Legal
+└── .env.example                # Environment template
 ```
 
 ---
 
 ## Data & Privacy
 
-See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full authoritative policies.
+See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies.
 
-**Key Points:**
-- **Local-first by default** — All data stays in a single SQLite file (`finance.db`) on your device or self-hosted server.
-- Hosted SaaS option available with secure server storage and optional at-rest encryption (`ENCRYPTION_KEY`).
-- AI chat sends your messages + limited context summary to xAI's Grok (no full database is shared).
-- Stripe handles all payments (we never store card details).
-- Full data export (ZIP with SQLite + JSON) and account deletion are available.
-
-**Legal Protections:**
-Our [Terms of Service](TERMS.md) include clear disclaimers that Orryon is not financial, legal, medical, or mental health advice. This includes the Breathe and Meditation features, which are provided for general wellness only. The Terms also contain limitation of liability, indemnification, and dispute resolution provisions.
+- **Local-first** — all data stays in a single SQLite file on your device.
+- **AI chat** sends your messages + a context summary to xAI Grok. No full database is shared.
+- **Stripe** handles payments — we never store card details.
+- **Full data export** (ZIP) and **account deletion** are always available.
 
 ---
 
-> **⚠️ Important:** Orryon is provided "AS IS". Never make important financial, legal, or medical decisions based solely on the app or AI. The Breathe/Meditation features are for general wellness and not a substitute for professional care. Always consult qualified professionals. You use the service at your own risk.
-
-## Requirements
-
-- Python 3.11+
-- Streamlit 1.35+
-- See `requirements.txt` for full dependency list
+> **Disclaimer:** Orryon is provided "AS IS". Never make important financial, legal, or medical decisions based solely on the app or AI. Always consult qualified professionals. See [TERMS.md](TERMS.md).

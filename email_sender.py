@@ -103,13 +103,14 @@ def _build_email(to_email: str, code: str) -> MIMEMultipart:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def send_verification_code(to_email: str, code: str) -> bool:
+def send_verification_code(to_email: str, code: str) -> dict:
     """
     Send the OTP *code* to *to_email* via SMTP.
 
-    Returns:
-        True  — email sent successfully
-        False — SMTP not configured or send failed (code shown on-screen instead)
+    Returns a dict with:
+        sent (bool)   — True if email was delivered
+        reason (str)  — "sent", "not_configured", "auth_failed", "send_failed"
+        detail (str)  — human-readable explanation
     """
     if not SMTP_ENABLED:
         logger.warning(
@@ -117,7 +118,11 @@ def send_verification_code(to_email: str, code: str) -> bool:
             "(set SMTP_HOST / SMTP_USER / SMTP_PASS in .env to send real emails)",
             to_email, code,
         )
-        return False
+        return {
+            "sent": False,
+            "reason": "not_configured",
+            "detail": "SMTP not configured — set SMTP_HOST, SMTP_USER, SMTP_PASS in .env",
+        }
 
     try:
         msg = _build_email(to_email, code)
@@ -128,17 +133,25 @@ def send_verification_code(to_email: str, code: str) -> bool:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM or SMTP_USER, [to_email], msg.as_string())
         logger.info("Verification code sent to %s", to_email)
-        return True
+        return {"sent": True, "reason": "sent", "detail": f"Code sent to {to_email}"}
     except smtplib.SMTPAuthenticationError:
         logger.error(
             "SMTP authentication failed for %s — check SMTP_USER / SMTP_PASS in .env. "
             "Gmail users: use an App Password, not your regular password.",
             SMTP_USER,
         )
-        return False
+        return {
+            "sent": False,
+            "reason": "auth_failed",
+            "detail": "SMTP login failed — check SMTP_USER / SMTP_PASS. Gmail users need an App Password.",
+        }
     except Exception as exc:
         logger.error("Failed to send verification email to %s: %s", to_email, exc)
-        return False
+        return {
+            "sent": False,
+            "reason": "send_failed",
+            "detail": f"Email send failed: {exc}",
+        }
 
 
 # ── Shared SMTP sender ────────────────────────────────────────────────────────

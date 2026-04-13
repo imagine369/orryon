@@ -47,13 +47,24 @@ _DATE_FORMATS = [
 ]
 
 
-def parse_csv(file_bytes: bytes, user_id: str) -> dict:
+def parse_csv(
+    file_bytes: bytes,
+    user_id: str,
+    column_override: dict | None = None,
+) -> dict:
     """
     Parse a bank CSV file and return structured transaction data.
 
+    Args:
+        file_bytes: Raw CSV content.
+        user_id: Owner of the imported transactions.
+        column_override: Optional manual column mapping with keys
+            ``date_column``, ``amount_column``, ``description_column``.
+            When provided, auto-detection is skipped.
+
     Returns:
         {
-            "status": "ok" | "error",
+            "status": "ok" | "needs_mapping" | "error",
             "transactions": [...],
             "detected_format": str,
             "column_mapping": dict,
@@ -76,16 +87,32 @@ def parse_csv(file_bytes: bytes, user_id: str) -> dict:
         return {"status": "error", "error": "CSV has no data rows.", "transactions": []}
 
     headers = [h.strip() for h in rows[0]]
-    detected_format, col_map = _detect_format(headers)
 
-    if not col_map:
-        return {
-            "status": "needs_mapping",
-            "headers": headers,
-            "transactions": [],
-            "detected_format": "unknown",
-            "row_count": len(rows) - 1,
+    if column_override:
+        col_map = {
+            "date": [column_override["date_column"]],
+            "description": [column_override.get("description_column", "")],
+            "amount": [column_override["amount_column"]],
         }
+        detected_format = "manual"
+        for key in ("date", "amount"):
+            if col_map[key][0] not in headers:
+                return {
+                    "status": "error",
+                    "error": f"Column '{col_map[key][0]}' not found in CSV headers: {headers}",
+                    "transactions": [],
+                }
+    else:
+        detected_format, col_map = _detect_format(headers)
+
+        if not col_map:
+            return {
+                "status": "needs_mapping",
+                "headers": headers,
+                "transactions": [],
+                "detected_format": "unknown",
+                "row_count": len(rows) - 1,
+            }
 
     transactions = []
     seen_hashes = set()

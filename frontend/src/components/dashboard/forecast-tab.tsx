@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
+import { isDemo, DEMO_FORECAST } from "./demo-data";
 
 interface ForecastData {
   income: number;
@@ -19,29 +20,6 @@ interface ForecastData {
 function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
-
-const DEMO_FORECAST: ForecastData = {
-  income: 6500,
-  balance: 5500,
-  month_spent: 2862,
-  total_monthly_bills: 2258,
-  bills: [
-    { name: "Rent",    amount: 2200,  next_due: "2026-05-01", frequency: "monthly" },
-    { name: "Netflix", amount: 15.99, next_due: "2026-04-24", frequency: "monthly" },
-    { name: "Gym",     amount: 29.99, next_due: "2026-04-28", frequency: "monthly" },
-  ],
-  total_goal_remaining: 4680,
-  goals_summary: [
-    { name: "Vacation Fund",  target_amount: 4000, current_amount: 2720, target_date: "2026-12-01" },
-    { name: "Emergency Fund", target_amount: 5000, current_amount: 1600, target_date: "" },
-  ],
-  projected_remaining: 1560,
-  free_after_goals: 880,
-};
 
 export function ForecastTab() {
   const [data, setData] = useState<ForecastData | null>(null);

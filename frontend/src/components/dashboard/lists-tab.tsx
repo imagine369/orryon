@@ -6,6 +6,7 @@ import { AnimatePresence, motion, Reorder } from "framer-motion";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
+import { isDemo, DEMO_LISTS, DEMO_ITEMS } from "./demo-data";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,48 +30,6 @@ interface ListItem {
 }
 
 type ItemSort = "manual" | "name";
-
-// ── Demo data ────────────────────────────────────────────────────────────────
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
-
-const DEMO_LISTS: UserList[] = [
-  { id: "d1", name: "Grocery",      icon: "🛒", color: "#f97316", sort_order: 0, item_count: 5 },
-  { id: "d2", name: "Goals",        icon: "🎯", color: "#3b82f6", sort_order: 1, item_count: 3 },
-  { id: "d3", name: "Books to Read",icon: "📚", color: "#a855f7", sort_order: 2, item_count: 4 },
-  { id: "d4", name: "Travel Pack",  icon: "✈️", color: "#22c55e", sort_order: 3, item_count: 2 },
-];
-
-const DEMO_ITEMS: Record<string, ListItem[]> = {
-  d1: [
-    { id: "i1",  list_id: "d1", name: "Almond milk",    notes: "", is_checked: 0, sort_order: 0, added_at: "" },
-    { id: "i2",  list_id: "d1", name: "Eggs",           notes: "", is_checked: 0, sort_order: 1, added_at: "" },
-    { id: "i3",  list_id: "d1", name: "Greek yogurt",   notes: "", is_checked: 0, sort_order: 2, added_at: "" },
-    { id: "i4",  list_id: "d1", name: "Sourdough bread",notes: "", is_checked: 0, sort_order: 3, added_at: "" },
-    { id: "i5",  list_id: "d1", name: "Avocados",       notes: "", is_checked: 0, sort_order: 4, added_at: "" },
-    { id: "i6",  list_id: "d1", name: "Olive oil",      notes: "", is_checked: 1, sort_order: 5, added_at: "" },
-    { id: "i7",  list_id: "d1", name: "Coffee beans",   notes: "", is_checked: 1, sort_order: 6, added_at: "" },
-  ],
-  d2: [
-    { id: "i8",  list_id: "d2", name: "Max out Roth IRA",           notes: "", is_checked: 0, sort_order: 0, added_at: "" },
-    { id: "i9",  list_id: "d2", name: "Run a 5K under 25 minutes",  notes: "", is_checked: 0, sort_order: 1, added_at: "" },
-    { id: "i10", list_id: "d2", name: "Read 12 books this year",    notes: "", is_checked: 0, sort_order: 2, added_at: "" },
-    { id: "i11", list_id: "d2", name: "Build emergency fund",       notes: "", is_checked: 1, sort_order: 3, added_at: "" },
-  ],
-  d3: [
-    { id: "i12", list_id: "d3", name: "The Psychology of Money",          notes: "", is_checked: 0, sort_order: 0, added_at: "" },
-    { id: "i13", list_id: "d3", name: "Atomic Habits",                    notes: "", is_checked: 0, sort_order: 1, added_at: "" },
-    { id: "i14", list_id: "d3", name: "Die with Zero",                    notes: "", is_checked: 0, sort_order: 2, added_at: "" },
-    { id: "i15", list_id: "d3", name: "The Almanack of Naval Ravikant",   notes: "", is_checked: 1, sort_order: 3, added_at: "" },
-  ],
-  d4: [
-    { id: "i16", list_id: "d4", name: "Noise-cancelling headphones", notes: "", is_checked: 0, sort_order: 0, added_at: "" },
-    { id: "i17", list_id: "d4", name: "Travel adapter",              notes: "", is_checked: 0, sort_order: 1, added_at: "" },
-    { id: "i18", list_id: "d4", name: "Passport",                   notes: "", is_checked: 1, sort_order: 2, added_at: "" },
-  ],
-};
 
 // ── Icon & color palettes ────────────────────────────────────────────────────
 
