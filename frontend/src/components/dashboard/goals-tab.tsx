@@ -75,6 +75,17 @@ function GoalHistory({ goalId }: { goalId: string }) {
   );
 }
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_GOALS: Goal[] = [
+  { id: "1", name: "Vacation Fund",  target_amount: 4000, current_amount: 2720, target_date: "2026-12-01", category: "travel",   notes: "", is_completed: 0 },
+  { id: "2", name: "Emergency Fund", target_amount: 5000, current_amount: 1600, target_date: "",           category: "savings",  notes: "", is_completed: 0 },
+  { id: "3", name: "New Laptop",     target_amount: 1200, current_amount: 750,  target_date: "2026-06-01", category: "tech",     notes: "", is_completed: 0 },
+  { id: "4", name: "Costa Rica Trip",target_amount: 3000, current_amount: 3000, target_date: "2025-12-01", category: "travel",   notes: "", is_completed: 1 },
+];
+
 export function GoalsTab() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +95,7 @@ export function GoalsTab() {
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isDemo()) { setGoals(DEMO_GOALS); setLoading(false); return; }
     api.get<Goal[]>("/api/goals?include_completed=true")
       .then(setGoals).catch(() => {}).finally(() => setLoading(false));
   }, []);

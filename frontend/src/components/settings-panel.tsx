@@ -127,6 +127,26 @@ function SelectField({ value, onChange, options }: {
   );
 }
 
+const DEMO_SETTINGS: Settings = {
+  display_name: "Alex",
+  email: "demo@orryon.app",
+  currency: "USD",
+  budget_cycle_start: 1,
+  spending_alert_pct: 80,
+  bill_due_alert_days: 3,
+  default_reminder_minutes: 30,
+  daily_digest_enabled: 1,
+  daily_digest_time: "08:00",
+  weekly_report_enabled: 0,
+  smtp_enabled: false,
+  ai_connected: false,
+  grok_model: "grok-3-mini",
+};
+
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
 export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
@@ -159,9 +179,9 @@ export function SettingsPanel() {
   const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
-    }
+    if (!isOpen) return;
+    if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
+    api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
   }, [isOpen]);
 
   const patch = async (updates: Record<string, unknown>) => {

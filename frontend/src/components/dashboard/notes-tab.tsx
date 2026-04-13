@@ -31,6 +31,16 @@ function smartDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_NOTES: Note[] = [
+  { id: "1", title: "Q2 Financial Goals",      content: "Review investment portfolio and rebalance. Increase 401k contributions by 2%. Look into index funds.", tags: "finance", mood: "", is_pinned: 1, linked_goal: "", created_at: "2026-04-08T10:00:00Z", updated_at: "2026-04-08T10:00:00Z" },
+  { id: "2", title: "Meal prep ideas",          content: "Chicken, rice, vegetables for the week. Try the new Mediterranean bowl recipe.", tags: "", mood: "", is_pinned: 0, linked_goal: "", created_at: "2026-04-06T09:00:00Z", updated_at: "2026-04-06T09:00:00Z" },
+  { id: "3", title: "Book recommendations",     content: "The Psychology of Money, Die with Zero, The Almanack of Naval Ravikant, Atomic Habits.", tags: "books", mood: "", is_pinned: 0, linked_goal: "", created_at: "2026-04-03T14:00:00Z", updated_at: "2026-04-03T14:00:00Z" },
+];
+
 export function NotesTab() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +49,7 @@ export function NotesTab() {
   const [openNote, setOpenNote] = useState<Note | null>(null);
 
   useEffect(() => {
+    if (isDemo()) { setNotes(DEMO_NOTES); setLoading(false); return; }
     api.get<Note[]>("/api/notes").then(setNotes).catch(() => {}).finally(() => setLoading(false));
   }, []);
 

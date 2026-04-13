@@ -14,6 +14,28 @@ function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+function buildDemoYearly(year: number): { months: MonthSummary[]; topCategories: { category: string; total: number }[] } {
+  const totals = [0, 0, 2950, 3100, 2862, 0, 0, 0, 0, 0, 0, 0];
+  const months: MonthSummary[] = Array.from({ length: 12 }, (_, i) => ({
+    month: `${year}-${String(i + 1).padStart(2, "0")}`,
+    label: new Date(year, i).toLocaleDateString("en-US", { month: "short" }),
+    total: totals[i] || 0,
+  }));
+  return {
+    months,
+    topCategories: [
+      { category: "Rent & Housing", total: 6600 },
+      { category: "Food & Dining",  total: 1158 },
+      { category: "Groceries",      total:  519 },
+      { category: "Transport",      total:  309 },
+    ],
+  };
+}
+
 export function YearlyTab() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
@@ -22,6 +44,13 @@ export function YearlyTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDemo()) {
+      const demo = buildDemoYearly(year);
+      setMonths(demo.months);
+      setTopCategories(demo.topCategories);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const from = `${year}-01-01`;
     const to = `${year}-12-31`;

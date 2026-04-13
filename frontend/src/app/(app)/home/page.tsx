@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -26,12 +27,6 @@ function getGreeting() {
   return "Good evening";
 }
 
-const ONBOARDING_PROMPTS = [
-  "I spent $45 on groceries at Whole Foods today",
-  "Set a monthly budget of $500 for dining out",
-  "Show me my spending this month",
-  "Add a goal to save $5,000 for a vacation",
-];
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -41,7 +36,6 @@ export default function HomePage() {
   const [toolLabel, setToolLabel] = useState("");
   const [tasksDueToday, setTasksDueToday] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [upgradeBanner, setUpgradeBanner] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -65,8 +59,7 @@ export default function HomePage() {
           );
         }
       })
-      .catch(() => {})
-      .finally(() => setHistoryLoaded(true));
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -164,7 +157,13 @@ export default function HomePage() {
             Welcome to Pro! Your upgrade is active.
           </div>
         )}
-        <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover mb-6 ring-1 ring-white/10" />
+        <motion.div
+          className="mb-6"
+          animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+          transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
+        >
+          <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+        </motion.div>
         <p className="text-white/60 text-[15px] mb-4 max-w-[260px] text-center leading-tight">
           Hello{user?.display_name ? `, ${user.display_name}` : ""}.
         </p>
@@ -179,22 +178,7 @@ export default function HomePage() {
           </Link>
         )}
 
-        {historyLoaded && (
-          <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-lg">
-            {ONBOARDING_PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleSend(prompt)}
-                disabled={streaming}
-                className="px-3 py-1.5 text-xs text-white/40 border border-white/8 rounded-full hover:bg-white/5 hover:text-white/60 hover:border-white/15 transition-all disabled:opacity-30"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="w-full max-w-xl">
+        <div className="w-full max-w-xl mt-[100px]">
           <ChatInput onSend={handleSend} disabled={streaming} variant="center" />
         </div>
 

@@ -46,6 +46,19 @@ function freqLabel(f: string): string {
 
 const FREQUENCIES = ["monthly", "weekly", "yearly", "quarterly"];
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_BILLS: Bill[] = [
+  { id: "1", name: "Rent",        amount: 2200,  frequency: "monthly",   next_due: "2026-05-01", category: "housing",       is_active: 1 },
+  { id: "2", name: "Netflix",     amount: 15.99, frequency: "monthly",   next_due: "2026-04-24", category: "subscriptions", is_active: 1 },
+  { id: "3", name: "Spotify",     amount: 9.99,  frequency: "monthly",   next_due: "2026-04-14", category: "subscriptions", is_active: 1 },
+  { id: "4", name: "iCloud+",     amount: 2.99,  frequency: "monthly",   next_due: "2026-04-12", category: "subscriptions", is_active: 1 },
+  { id: "5", name: "Gym",         amount: 29.99, frequency: "monthly",   next_due: "2026-04-28", category: "health",        is_active: 1 },
+  { id: "6", name: "Car Insurance",amount: 180,  frequency: "quarterly", next_due: "2026-06-01", category: "insurance",     is_active: 1 },
+];
+
 export function BillsTab() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +69,7 @@ export function BillsTab() {
   const [nextDue, setNextDue] = useState("");
 
   const load = () => {
+    if (isDemo()) { setBills(DEMO_BILLS); setLoading(false); return; }
     api.get<Bill[]>("/api/bills").then(setBills).catch(() => {}).finally(() => setLoading(false));
   };
 

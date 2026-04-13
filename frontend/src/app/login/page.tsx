@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check } from "lucide-react";
+import { X, Check, Eye } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -14,20 +14,17 @@ const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
 const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
 
 const PRO_FEATURES = [
-  "Unlimited messages",
-  "Voice input",
+  "Unlimited access to your AI concierge",
+  "Easy voice input",
   "Full transaction history & search",
   "Budget tracking with custom categories",
   "Spending summaries, recaps & patterns",
-  "Net worth tracking",
-  "Subscription health analysis",
   "Recurring bills & income tracking",
   "Cash flow forecast",
   "Calendar events, reminders & errands",
-  "Today view — tasks + events at a glance",
-  "Grocery lists",
-  "Rich notes with pinning & mood tags",
-  "Shareable read-only finance link",
+  "Today — tasks & events at a glance",
+  "Lists — groceries, errands & more",
+  "Journal — private daily entries",
   "Full data export",
   "Daily digest & weekly email reports",
   "Bill due & event reminder alerts",
@@ -186,7 +183,7 @@ export default function LoginPage() {
                 <p className="text-xs text-white/40">
                   {selectedPlan === "monthly"
                     ? "Then $8/month. Cancel anytime."
-                    : "Then $72/year (save 25%). Cancel anytime."}
+                    : "Then $72/year (save 25%). Billed annually. Cancel to stop renewal."}
                 </p>
               </div>
             </div>
@@ -221,6 +218,20 @@ export default function LoginPage() {
                 Sign in
               </button>
             </p>
+
+            {/* Dev preview bypass */}
+            <div className="pt-4 border-t border-white/5">
+              <button
+                onClick={() => {
+                  localStorage.setItem("orryon_demo", "true");
+                  router.push("/home");
+                }}
+                className="w-full flex items-center justify-center gap-2 text-xs text-white/30 hover:text-white/60 transition-colors py-2"
+              >
+                <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
+                Preview the app (no account needed)
+              </button>
+            </div>
           </div>
         </div>
       )}

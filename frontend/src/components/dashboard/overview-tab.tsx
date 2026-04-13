@@ -45,6 +45,30 @@ function priorityColor(p: string) {
   return "bg-green-400";
 }
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_TRANSACTIONS: Transaction[] = [
+  { id: "1", merchant: "Rent",       amount: 2200,  date: "2026-04-01", category: "Rent & Housing" },
+  { id: "2", merchant: "Whole Foods",amount: 87.40, date: "2026-04-05", category: "Groceries"      },
+  { id: "3", merchant: "Chipotle",   amount: 14.50, date: "2026-04-06", category: "Food & Dining"  },
+  { id: "4", merchant: "Shell",      amount: 62.40, date: "2026-04-08", category: "Transport"      },
+  { id: "5", merchant: "Netflix",    amount: 15.99, date: "2026-04-10", category: "Entertainment"  },
+];
+
+const DEMO_TOP_CATS = [
+  { category: "Rent & Housing", total: 2200 },
+  { category: "Food & Dining",  total: 386  },
+  { category: "Groceries",      total: 173  },
+  { category: "Transport",      total: 103  },
+];
+
+const DEMO_TASKS_OV: Task[] = [
+  { id: "1", title: "Pay credit card bill", priority: "high",   due_date: "2026-04-12" },
+  { id: "2", title: "Call dentist",         priority: "medium", due_date: "2026-04-15" },
+];
+
 export function OverviewTab() {
   const [selectedMonth, setSelectedMonth] = useState(nowMonth);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -55,6 +79,13 @@ export function OverviewTab() {
   const isCurrentMonth = selectedMonth === nowMonth();
 
   useEffect(() => {
+    if (isDemo()) {
+      setTransactions(DEMO_TRANSACTIONS);
+      setTopCategories(DEMO_TOP_CATS);
+      setTasks(DEMO_TASKS_OV);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const [year, month] = selectedMonth.split("-");
     const from = `${year}-${month}-01`;

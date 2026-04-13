@@ -27,8 +27,42 @@ interface DashboardData {
   open_tasks: { id: string; title: string; priority: string; due_date: string }[];
 }
 
+const TODAY = new Date().toISOString().split("T")[0];
+
+const DEMO_DATA: DashboardData = {
+  balance: 5500,
+  month_spend: 2862,
+  top_categories: [
+    { category: "Rent & Housing", total: 2200 },
+    { category: "Food & Dining", total: 386 },
+    { category: "Groceries", total: 173 },
+    { category: "Transport", total: 103 },
+  ],
+  recent_transactions: [
+    { id: "1", merchant: "Whole Foods", amount: 45.20, date: TODAY, category: "Groceries" },
+    { id: "2", merchant: "Netflix",     amount: 15.99, date: TODAY, category: "Entertainment" },
+    { id: "3", merchant: "Shell",       amount: 62.40, date: TODAY, category: "Transport" },
+  ],
+  upcoming_events: [
+    { id: "1", title: "Doctor appointment", event_date: "2026-04-14", event_type: "event" },
+    { id: "2", title: "Pay rent",           event_date: "2026-04-20", event_type: "bill_due" },
+  ],
+  active_goals: [
+    { id: "1", name: "Vacation Fund",  target_amount: 4000, current_amount: 2720 },
+    { id: "2", name: "Emergency Fund", target_amount: 5000, current_amount: 1600 },
+  ],
+  open_tasks: [
+    { id: "1", title: "Pay credit card bill", priority: "high",   due_date: TODAY },
+    { id: "2", title: "Call dentist",         priority: "medium", due_date: TODAY },
+  ],
+};
+
 function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
 }
 
 export function DashboardPanel() {
@@ -37,9 +71,9 @@ export function DashboardPanel() {
   const [data, setData] = useState<DashboardData | null>(null);
 
   const load = useCallback(() => {
-    if (isOpen) {
-      api.get<DashboardData>("/api/dashboard/stats").then(setData).catch(() => {});
-    }
+    if (!isOpen) return;
+    if (isDemo()) { setData(DEMO_DATA); return; }
+    api.get<DashboardData>("/api/dashboard/stats").then(setData).catch(() => {});
   }, [isOpen]);
 
   useEffect(() => { load(); }, [load]);

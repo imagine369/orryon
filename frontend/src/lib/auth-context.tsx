@@ -23,11 +23,18 @@ const AuthContext = createContext<AuthState>({
   logout: () => {},
 });
 
+const DEMO_USER: User = { id: "demo", email: "demo@orryon.app", display_name: "Alex" };
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true") {
+      setUser(DEMO_USER);
+      setLoading(false);
+      return;
+    }
     if (!hasToken()) {
       setLoading(false);
       return;
@@ -46,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearToken();
+    if (typeof window !== "undefined") localStorage.removeItem("orryon_demo");
     setUser(null);
   }, []);
 

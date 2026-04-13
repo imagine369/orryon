@@ -35,12 +35,30 @@ function typeIcon(t: string) {
   return "📅";
 }
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_EVENTS: Event[] = [
+  { id: "1", title: "Doctor appointment",  event_date: "2026-04-14", event_type: "event",    description: "Annual checkup", reminder_minutes: 60 },
+  { id: "2", title: "Lunch with team",     event_date: "2026-04-16", event_type: "event",    description: "Noon at the usual spot", reminder_minutes: 30 },
+  { id: "3", title: "Pay rent",            event_date: "2026-04-20", event_type: "bill_due", description: "",                reminder_minutes: 1440 },
+  { id: "4", title: "Birthday party",      event_date: "2026-04-25", event_type: "event",    description: "Sarah's birthday", reminder_minutes: 60 },
+];
+
+const DEMO_TASKS: Task[] = [
+  { id: "1", title: "Pay credit card bill", priority: "high",   status: "open", due_date: "2026-04-12", category: "finance" },
+  { id: "2", title: "Call dentist",         priority: "medium", status: "open", due_date: "2026-04-15", category: "health" },
+  { id: "3", title: "Review budget",        priority: "low",    status: "open", due_date: "2026-04-30", category: "finance" },
+];
+
 export function ScheduleTab() {
   const [events, setEvents] = useState<Event[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDemo()) { setEvents(DEMO_EVENTS); setTasks(DEMO_TASKS); setLoading(false); return; }
     Promise.all([
       api.get<Event[]>("/api/events?upcoming=true&limit=20"),
       api.get<Task[]>("/api/tasks?status=open"),

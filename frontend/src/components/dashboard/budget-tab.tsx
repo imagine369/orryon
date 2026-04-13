@@ -47,6 +47,22 @@ const categories = [
   "Travel", "Subscriptions", "Personal Care", "Education", "Other",
 ];
 
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const DEMO_BUDGET = {
+  month: nowMonth(),
+  categories: [
+    { id: "1", category: "Rent & Housing",  planned: 2300, spent: 2200, remaining: 100,  pct_used: 96  },
+    { id: "2", category: "Food & Dining",   planned: 600,  spent: 386,  remaining: 214,  pct_used: 64  },
+    { id: "3", category: "Groceries",       planned: 400,  spent: 173,  remaining: 227,  pct_used: 43  },
+    { id: "4", category: "Health & Fitness",planned: 150,  spent: 42,   remaining: 108,  pct_used: 28  },
+    { id: "5", category: "Entertainment",   planned: 100,  spent: 0,    remaining: 100,  pct_used: 0   },
+    { id: "6", category: "Transport",       planned: 200,  spent: 103,  remaining: 97,   pct_used: 52  },
+  ],
+};
+
 export function BudgetTab() {
   const [selectedMonth, setSelectedMonth] = useState(nowMonth);
   const [data, setData] = useState<{ month: string; categories: BudgetCategory[] } | null>(null);
@@ -58,6 +74,7 @@ export function BudgetTab() {
   const isCurrentMonth = selectedMonth === nowMonth();
 
   const load = () => {
+    if (isDemo()) { setData(DEMO_BUDGET); return; }
     api.get<{ month: string; categories: BudgetCategory[] }>(`/api/budget?month=${selectedMonth}`).then(setData).catch(() => {});
   };
 

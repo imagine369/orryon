@@ -12,6 +12,7 @@ import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft,
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
+import { motion } from "framer-motion";
 import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
 
@@ -1313,14 +1314,20 @@ export default function LandingPage() {
       {/* Hero */}
       <FadeIn>
         <div className="flex flex-col items-center text-center pt-[100px] sm:pt-[160px] pb-16 px-6 border-b border-white/5">
-          <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={91} height={91} className="rounded-full object-cover mb-2.5 mt-[100px]" />
+          <motion.div
+            className="mt-[100px] mb-2.5"
+            animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+            transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
+          >
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+          </motion.div>
           <p className="text-[1rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
           </p>
-          <p className="text-[0.65rem] uppercase tracking-[4px] text-white/45 mb-[55px]">
+          <p className="text-[0.65rem] uppercase tracking-[2px] text-white/45 mb-[55px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[2.25rem] sm:text-[3rem] font-extrabold text-white/85 mb-8 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
+          <h1 className="text-[2.5rem] sm:text-[3rem] font-extrabold text-white/85 mb-8 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
             Talk to me.<br />I&rsquo;ll organize everything.
           </h1>
           <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
