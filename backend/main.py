@@ -18,7 +18,7 @@ import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -195,10 +195,40 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class ReorderReq(BaseModel):
+    ids: List[str]
 
 class GroceryItemReq(BaseModel):
     name: str
     quantity: Optional[str] = "1"
+
+
+class UserListReq(BaseModel):
+    name: str
+    icon: Optional[str] = "📋"
+    color: Optional[str] = "#ffffff"
+
+
+class UserListUpdate(BaseModel):
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class ListItemReq(BaseModel):
+    name: str
+    notes: Optional[str] = ""
+
+
+class ListItemUpdate(BaseModel):
+    name: Optional[str] = None
+    notes: Optional[str] = None
+    is_checked: Optional[int] = None
+    sort_order: Optional[int] = None
 
 class BudgetReq(BaseModel):
     category: str
@@ -691,6 +721,7 @@ async def delete_note(note_id: str, user: dict = Depends(get_current_user)):
 async def list_tasks(
     status: Optional[str] = None,
     limit: int = Query(50, le=200),
+    sort: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
     uid = user["user_id"]
@@ -700,11 +731,46 @@ async def list_tasks(
     if status:
         query += " AND status=?"
         params.append(status)
-    query += " ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, due_date ASC LIMIT ?"
+    if sort == "name":
+        query += " ORDER BY title ASC LIMIT ?"
+    elif sort == "date":
+        query += " ORDER BY CASE WHEN due_date IS NULL OR due_date='' THEN 1 ELSE 0 END, due_date ASC LIMIT ?"
+    elif sort == "manual":
+        query += " ORDER BY sort_order ASC, created_at ASC LIMIT ?"
+    else:
+        query += " ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END, due_date ASC LIMIT ?"
     params.append(limit)
     rows = conn.execute(query, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+@app.post("/api/tasks/reorder")
+async def reorder_tasks(body: ReorderReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    for i, task_id in enumerate(body.ids):
+        conn.execute(
+            "UPDATE action_items SET sort_order=? WHERE id=? AND user_id=?",
+            (i, task_id, uid),
+        )
+    conn.commit()
+    conn.close()
+    return {"reordered": True}
+
+
+@app.post("/api/grocery/reorder")
+async def reorder_grocery(body: ReorderReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    for i, item_id in enumerate(body.ids):
+        conn.execute(
+            "UPDATE grocery_items SET sort_order=? WHERE id=? AND user_id=?",
+            (i, item_id, uid),
+        )
+    conn.commit()
+    conn.close()
+    return {"reordered": True}
 
 
 @app.post("/api/tasks")
@@ -781,6 +847,127 @@ async def delete_grocery(item_id: str, user: dict = Depends(get_current_user)):
     from db import delete_row
     delete_row("grocery_items", {"id": item_id})
     return {"deleted": True}
+
+
+# ===========================================================================
+# USER LISTS  (multi-list system — Todoist-style)
+# ===========================================================================
+
+@app.get("/api/lists")
+async def get_lists(user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    lists = conn.execute(
+        "SELECT * FROM user_lists WHERE user_id=? ORDER BY sort_order ASC, created_at ASC",
+        (uid,),
+    ).fetchall()
+    result = []
+    for lst in lists:
+        d = dict(lst)
+        d["item_count"] = conn.execute(
+            "SELECT COUNT(*) FROM list_items WHERE list_id=? AND is_checked=0", (d["id"],)
+        ).fetchone()[0]
+        result.append(d)
+    conn.close()
+    return result
+
+
+@app.post("/api/lists")
+async def create_list(body: UserListReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    list_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) FROM user_lists WHERE user_id=?", (uid,)
+    ).fetchone()[0]
+    conn.close()
+    insert_row("user_lists", {
+        "id": list_id, "user_id": uid, "name": body.name,
+        "icon": body.icon, "color": body.color,
+        "sort_order": max_order + 1, "created_at": now,
+    })
+    return {"id": list_id}
+
+
+@app.patch("/api/lists/{list_id}")
+async def update_list(list_id: str, body: UserListUpdate, user: dict = Depends(get_current_user)):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if updates:
+        update_row("user_lists", updates, {"id": list_id, "user_id": user["user_id"]})
+    return {"updated": True}
+
+
+@app.delete("/api/lists/{list_id}")
+async def delete_list(list_id: str, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    conn.execute("DELETE FROM list_items WHERE list_id=? AND user_id=?", (list_id, uid))
+    conn.execute("DELETE FROM user_lists WHERE id=? AND user_id=?", (list_id, uid))
+    conn.commit()
+    conn.close()
+    return {"deleted": True}
+
+
+@app.get("/api/lists/{list_id}/items")
+async def get_list_items(list_id: str, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM list_items WHERE list_id=? AND user_id=? ORDER BY is_checked ASC, sort_order ASC, added_at ASC",
+        (list_id, uid),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/lists/{list_id}/items")
+async def add_list_item(list_id: str, body: ListItemReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    item_id = str(uuid.uuid4())
+    conn = get_connection()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) FROM list_items WHERE list_id=?", (list_id,)
+    ).fetchone()[0]
+    conn.close()
+    insert_row("list_items", {
+        "id": item_id, "list_id": list_id, "user_id": uid,
+        "name": body.name, "notes": body.notes or "",
+        "is_checked": 0, "sort_order": max_order + 1,
+        "added_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"id": item_id}
+
+
+@app.patch("/api/list-items/{item_id}")
+async def update_list_item(item_id: str, body: ListItemUpdate, user: dict = Depends(get_current_user)):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if updates:
+        update_row("list_items", updates, {"id": item_id, "user_id": user["user_id"]})
+    return {"updated": True}
+
+
+@app.delete("/api/list-items/{item_id}")
+async def delete_list_item(item_id: str, user: dict = Depends(get_current_user)):
+    conn = get_connection()
+    conn.execute("DELETE FROM list_items WHERE id=? AND user_id=?", (item_id, user["user_id"]))
+    conn.commit()
+    conn.close()
+    return {"deleted": True}
+
+
+@app.post("/api/lists/{list_id}/reorder")
+async def reorder_list_items(list_id: str, body: ReorderReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    conn = get_connection()
+    for i, item_id in enumerate(body.ids):
+        conn.execute(
+            "UPDATE list_items SET sort_order=? WHERE id=? AND user_id=?",
+            (i, item_id, uid),
+        )
+    conn.commit()
+    conn.close()
+    return {"reordered": True}
 
 
 # ===========================================================================

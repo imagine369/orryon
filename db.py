@@ -270,6 +270,27 @@ def init_db() -> None:
             added_at         TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS user_lists (
+            id         TEXT PRIMARY KEY,
+            user_id    TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            icon       TEXT DEFAULT '📋',
+            color      TEXT DEFAULT '#ffffff',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS list_items (
+            id         TEXT PRIMARY KEY,
+            list_id    TEXT NOT NULL,
+            user_id    TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            notes      TEXT DEFAULT '',
+            is_checked INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            added_at   TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS custom_categories (
             id          TEXT PRIMARY KEY,
             user_id     TEXT NOT NULL,
@@ -350,6 +371,7 @@ def init_db() -> None:
     _migrate_users_preferences(conn)
     _migrate_users_plan(conn)
     _migrate_user_api_spend(conn)
+    _migrate_sort_order(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -511,6 +533,20 @@ def _migrate_user_api_spend(conn: sqlite3.Connection) -> None:
             )
         """)
         conn.commit()
+
+
+def _migrate_sort_order(conn: sqlite3.Connection) -> None:
+    """Add sort_order column to action_items and grocery_items for manual drag ordering."""
+    try:
+        ai_cols = [r[1] for r in conn.execute("PRAGMA table_info(action_items)").fetchall()]
+        if "sort_order" not in ai_cols:
+            conn.execute("ALTER TABLE action_items ADD COLUMN sort_order INTEGER DEFAULT 0")
+        gi_cols = [r[1] for r in conn.execute("PRAGMA table_info(grocery_items)").fetchall()]
+        if "sort_order" not in gi_cols:
+            conn.execute("ALTER TABLE grocery_items ADD COLUMN sort_order INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_sort_order: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:

@@ -614,7 +614,7 @@ export function BreathingWidget() {
       >
         <motion.div
           className="shrink-0 rounded-full"
-          style={{ width: 44, height: 44, background: ORB_BG }}
+          style={{ width: 35, height: 35, background: ORB_BG }}
           animate={{
             scale: [1, 1.13, 1],
             boxShadow: [

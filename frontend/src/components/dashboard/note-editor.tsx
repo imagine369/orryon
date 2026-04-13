@@ -84,7 +84,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
           className="flex items-center gap-1.5 text-white/50 hover:text-white transition"
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-          <span className="text-sm">Notes</span>
+          <span className="text-sm">Journal</span>
         </button>
 
         <div className="flex items-center gap-3">

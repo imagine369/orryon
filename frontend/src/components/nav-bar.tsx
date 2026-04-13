@@ -1,16 +1,73 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { Settings, LayoutGrid, Bell, X, Search, Plus, Calendar } from "lucide-react";
+import {
+  Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical,
+} from "lucide-react";
 import { BreathingWidget } from "@/components/dashboard/breathing-widget";
 import { NotesTab } from "@/components/dashboard/notes-tab";
+import { ListsTab } from "@/components/dashboard/lists-tab";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { SearchPanel } from "@/components/search-panel";
 import { usePanels } from "@/lib/panel-context";
+
+// ── Priority system (Todoist-style) ─────────────────────────────────────────
+
+const PRIORITY_CONFIG = {
+  high:   { label: "P1", color: "#db4035", next: "medium" as const },
+  medium: { label: "P2", color: "#ff9a14", next: "low"    as const },
+  low:    { label: "P3", color: "#4073ff", next: "none"   as const },
+  none:   { label: "P4", color: "#555555", next: "high"   as const },
+} as const;
+type PriorityKey = keyof typeof PRIORITY_CONFIG;
+
+function PriorityBadge({ priority, onClick }: { priority: string; onClick?: () => void }) {
+  const p = PRIORITY_CONFIG[priority as PriorityKey] ?? PRIORITY_CONFIG.none;
+  return (
+    <button
+      onClick={onClick}
+      style={{ backgroundColor: p.color }}
+      className={cn(
+        "text-[0.58rem] font-bold text-white px-1.5 py-0.5 rounded shrink-0 leading-none tabular-nums",
+        onClick ? "cursor-pointer hover:opacity-80 active:scale-90 transition" : "cursor-default",
+      )}
+      title={onClick ? "Change priority" : p.label}
+    >
+      {p.label}
+    </button>
+  );
+}
+
+type TaskSort = "priority" | "date" | "name" | "manual";
+
+function SortPills<T extends string>({
+  sort, setSort, options,
+}: { sort: T; setSort: (s: T) => void; options: { key: T; label: string }[] }) {
+  return (
+    <div className="flex gap-1 flex-wrap mt-1 mb-3">
+      {options.map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => setSort(key)}
+          className={cn(
+            "text-[0.58rem] font-medium px-2 py-0.5 rounded-full border transition",
+            sort === key
+              ? "bg-white/10 border-white/20 text-white/80"
+              : "bg-transparent border-white/8 text-white/25 hover:border-white/20 hover:text-white/50",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
 
 interface Task {
   id: string;
@@ -18,6 +75,7 @@ interface Task {
   priority: string;
   due_date: string;
   status: string;
+  sort_order?: number;
 }
 
 interface Event {
@@ -25,14 +83,6 @@ interface Event {
   title: string;
   event_date: string;
   event_type: string;
-}
-
-interface GroceryItem {
-  id: string;
-  name: string;
-  quantity: string;
-  is_checked: number;
-  added_at: string;
 }
 
 interface Bill {
@@ -44,6 +94,8 @@ interface Bill {
 }
 
 type Tab = "today" | "lists" | "journal";
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function NavBar() {
   const { openPanel, toggle }           = usePanels();
@@ -57,25 +109,32 @@ export function NavBar() {
   const [bills, setBills]               = useState<Bill[]>([]);
   const [addingTask, setAddingTask]     = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<PriorityKey>("none");
+  const [taskSort, setTaskSort]         = useState<TaskSort>("priority");
   const [addingEvent, setAddingEvent]   = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const taskInputRef                    = useRef<HTMLInputElement>(null);
   const eventInputRef                   = useRef<HTMLInputElement>(null);
 
-  // Lists
-  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
-  const [addingItem, setAddingItem]     = useState(false);
-  const [newItemName, setNewItemName]   = useState("");
-  const groceryInputRef                 = useRef<HTMLInputElement>(null);
-
   const today      = new Date().toISOString().split("T")[0];
   const totalCount = tasks.length + events.length;
 
-  // ── Data loading ────────────────────────────────────────────────────────────
+  // ── Debounced reorder saves ──────────────────────────────────────────────
+
+  const taskReorderTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const saveTaskReorder = useCallback((ids: string[]) => {
+    clearTimeout(taskReorderTimer.current);
+    taskReorderTimer.current = setTimeout(() => {
+      api.post("/api/tasks/reorder", { ids }).catch(() => {});
+    }, 600);
+  }, []);
+
+  // ── Data loading ─────────────────────────────────────────────────────────
 
   const loadToday = () => {
     Promise.all([
-      api.get<Task[]>("/api/tasks?status=open"),
+      api.get<Task[]>("/api/tasks?status=open&sort=manual"),
       api.get<Event[]>("/api/events?upcoming=true&limit=50"),
       api.get<Bill[]>("/api/bills"),
     ]).then(([t, e, b]) => {
@@ -85,30 +144,59 @@ export function NavBar() {
     }).catch(() => {});
   };
 
-  const loadGrocery = () => {
-    api.get<GroceryItem[]>("/api/grocery").then(setGroceryItems).catch(() => {});
-  };
-
   useEffect(() => {
-    if (notifOpen) { loadToday(); loadGrocery(); }
+    if (notifOpen) { loadToday(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifOpen]);
 
-  // ── Task actions ─────────────────────────────────────────────────────────────
+  // ── Sorted views ─────────────────────────────────────────────────────────
+
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
+
+  const sortedTasks = useMemo(() => {
+    if (taskSort === "manual") return tasks;
+    const arr = [...tasks];
+    if (taskSort === "priority") {
+      arr.sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3));
+    } else if (taskSort === "date") {
+      arr.sort((a, b) => {
+        const da = a.due_date || "9999-99-99";
+        const db2 = b.due_date || "9999-99-99";
+        return da < db2 ? -1 : da > db2 ? 1 : 0;
+      });
+    } else if (taskSort === "name") {
+      arr.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    return arr;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, taskSort]);
+
+  // ── Task actions ─────────────────────────────────────────────────────────
+
+  const cyclePriority = () => {
+    setNewTaskPriority((p) => PRIORITY_CONFIG[p].next);
+  };
 
   const addTask = () => {
     const title = newTaskTitle.trim();
     if (!title) return;
     const optimistic: Task = {
-      id: `tmp-${Date.now()}`, title, priority: "medium",
+      id: `tmp-${Date.now()}`, title, priority: newTaskPriority,
       due_date: today, status: "open",
     };
     setTasks((prev) => [optimistic, ...prev]);
     setNewTaskTitle("");
+    setNewTaskPriority("none");
     setAddingTask(false);
-    api.post<{ id: string }>("/api/tasks", { title, due_date: today, priority: "medium" })
+    api.post<{ id: string }>("/api/tasks", { title, due_date: today, priority: newTaskPriority })
       .then((res) => setTasks((prev) => prev.map((t) => t.id === optimistic.id ? { ...optimistic, id: res.id } : t)))
       .catch(() => setTasks((prev) => prev.filter((t) => t.id !== optimistic.id)));
+  };
+
+  const changeTaskPriority = (task: Task) => {
+    const next = PRIORITY_CONFIG[task.priority as PriorityKey]?.next ?? "high";
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, priority: next } : t));
+    api.patch(`/api/tasks/${task.id}`, { priority: next }).catch(() => loadToday());
   };
 
   const completeTask = (task: Task) => {
@@ -141,40 +229,17 @@ export function NavBar() {
       .catch(() => setEvents((prev) => prev.filter((e) => e.id !== optimistic.id)));
   };
 
-  // ── Grocery actions ──────────────────────────────────────────────────────────
-
-  const addGroceryItem = () => {
-    const name = newItemName.trim();
-    if (!name) return;
-    const optimistic: GroceryItem = {
-      id: `tmp-${Date.now()}`, name, quantity: "",
-      is_checked: 0, added_at: new Date().toISOString(),
-    };
-    setGroceryItems((prev) => [optimistic, ...prev]);
-    setNewItemName("");
-    setAddingItem(false);
-    api.post<{ id: string }>("/api/grocery", { name })
-      .then((res) => setGroceryItems((prev) => prev.map((i) => i.id === optimistic.id ? { ...optimistic, id: res.id } : i)))
-      .catch(() => setGroceryItems((prev) => prev.filter((i) => i.id !== optimistic.id)));
-  };
-
-  const toggleGrocery = (item: GroceryItem) => {
-    setGroceryItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_checked: i.is_checked ? 0 : 1 } : i));
-    api.patch(`/api/grocery/${item.id}`, {}).catch(() => loadGrocery());
-  };
-
-  const deleteGrocery = (id: string) => {
-    setGroceryItems((prev) => prev.filter((i) => i.id !== id));
-    api.delete(`/api/grocery/${id}`).catch(() => loadGrocery());
-  };
-
-  const unchecked = groceryItems.filter((i) => !i.is_checked);
-  const checked   = groceryItems.filter((i) => i.is_checked);
-
   const TABS: { key: Tab; label: string }[] = [
     { key: "today",   label: "Today"   },
     { key: "lists",   label: "Lists"   },
     { key: "journal", label: "Journal" },
+  ];
+
+  const TASK_SORT_OPTIONS: { key: TaskSort; label: string }[] = [
+    { key: "priority", label: "Priority" },
+    { key: "date",     label: "Date"     },
+    { key: "name",     label: "Name"     },
+    { key: "manual",   label: "Custom"   },
   ];
 
   return (
@@ -265,8 +330,8 @@ export function NavBar() {
                   </button>
                 </div>
 
-                {/* Breathing widget — always pinned */}
-                <div className="px-5 pt-4 pb-2 shrink-0">
+                {/* Breathing widget */}
+                <div className="px-5 pt-0 pb-2 shrink-0">
                   <BreathingWidget />
                 </div>
 
@@ -301,7 +366,7 @@ export function NavBar() {
 
                       {/* Events */}
                       <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5 text-white/30" strokeWidth={1.5} />
                             <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Events</p>
@@ -348,7 +413,7 @@ export function NavBar() {
 
                       {/* Tasks */}
                       <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between mb-1">
                           <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Tasks</p>
                           <button
                             onClick={() => { setAddingTask((v) => !v); setTimeout(() => taskInputRef.current?.focus(), 50); }}
@@ -361,8 +426,21 @@ export function NavBar() {
                           </button>
                         </div>
 
+                        {/* Sort pills */}
+                        <SortPills sort={taskSort} setSort={setTaskSort} options={TASK_SORT_OPTIONS} />
+
+                        {/* Add task form */}
                         {addingTask && (
-                          <div className="flex gap-2 mb-3">
+                          <div className="flex gap-2 mb-3 items-center">
+                            {/* Priority cycle button */}
+                            <button
+                              onClick={cyclePriority}
+                              style={{ backgroundColor: PRIORITY_CONFIG[newTaskPriority].color }}
+                              className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[0.6rem] font-bold text-white hover:opacity-80 active:scale-90 transition"
+                              title="Cycle priority"
+                            >
+                              {PRIORITY_CONFIG[newTaskPriority].label}
+                            </button>
                             <input
                               ref={taskInputRef}
                               autoFocus
@@ -380,24 +458,56 @@ export function NavBar() {
                           <p className="text-white/25 text-sm py-2">No tasks due today.</p>
                         )}
 
-                        {tasks.map((t) => (
-                          <SwipeToDelete key={t.id} onDelete={() => deleteTask(t.id)}>
-                            <div className="flex items-center gap-3 py-2.5 border-b border-white/5">
-                              <button
-                                onClick={() => completeTask(t)}
-                                className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
-                              />
-                              <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
-                              <span className={cn(
-                                "w-1.5 h-1.5 rounded-full shrink-0",
-                                t.priority === "high" ? "bg-red-400" : t.priority === "medium" ? "bg-yellow-400" : "bg-green-400"
-                              )} />
-                            </div>
-                          </SwipeToDelete>
-                        ))}
+                        {/* Manual drag mode */}
+                        {taskSort === "manual" ? (
+                          <Reorder.Group
+                            axis="y"
+                            values={tasks}
+                            onReorder={(newOrder) => {
+                              setTasks(newOrder);
+                              saveTaskReorder(newOrder.map((t) => t.id));
+                            }}
+                            className="space-y-0"
+                          >
+                            {tasks.map((t) => (
+                              <Reorder.Item key={t.id} value={t} className="list-none">
+                                <div className="flex items-center gap-2 py-2.5 border-b border-white/5 cursor-grab active:cursor-grabbing">
+                                  <GripVertical className="h-4 w-4 text-white/20 shrink-0" strokeWidth={1.5} />
+                                  <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={() => completeTask(t)}
+                                    className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
+                                  />
+                                  <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+                                  <PriorityBadge priority={t.priority} onClick={() => changeTaskPriority(t)} />
+                                  <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={() => deleteTask(t.id)}
+                                    className="shrink-0 w-5 h-5 flex items-center justify-center text-white/20 hover:text-white/60 transition"
+                                  >
+                                    <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                  </button>
+                                </div>
+                              </Reorder.Item>
+                            ))}
+                          </Reorder.Group>
+                        ) : (
+                          sortedTasks.map((t) => (
+                            <SwipeToDelete key={t.id} onDelete={() => deleteTask(t.id)}>
+                              <div className="flex items-center gap-3 py-2.5 border-b border-white/5">
+                                <button
+                                  onClick={() => completeTask(t)}
+                                  className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
+                                />
+                                <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+                                <PriorityBadge priority={t.priority} onClick={() => changeTaskPriority(t)} />
+                              </div>
+                            </SwipeToDelete>
+                          ))
+                        )}
                       </div>
 
-                      {/* Bills due today — only shown if any */}
+                      {/* Bills due today */}
                       {bills.length > 0 && (
                         <div>
                           <div className="flex items-center gap-1.5 mb-3">
@@ -417,74 +527,7 @@ export function NavBar() {
                   )}
 
                   {/* ── Lists tab ── */}
-                  {activeTab === "lists" && (
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Grocery</p>
-                        <button
-                          onClick={() => { setAddingItem((v) => !v); setTimeout(() => groceryInputRef.current?.focus(), 50); }}
-                          className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition"
-                        >
-                          {addingItem
-                            ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-                            : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-                          }
-                        </button>
-                      </div>
-
-                      {addingItem && (
-                        <div className="flex gap-2 mb-4">
-                          <input
-                            ref={groceryInputRef}
-                            autoFocus
-                            value={newItemName}
-                            onChange={(e) => setNewItemName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && addGroceryItem()}
-                            placeholder="Add item…"
-                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
-                          />
-                          <button onClick={addGroceryItem} className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition">Add</button>
-                        </div>
-                      )}
-
-                      {groceryItems.length === 0 && !addingItem && (
-                        <p className="text-white/30 text-sm text-center py-8">
-                          Your list is empty — tap + or tell Orryon to add something.
-                        </p>
-                      )}
-
-                      {unchecked.map((item) => (
-                        <SwipeToDelete key={item.id} onDelete={() => deleteGrocery(item.id)}>
-                          <div className="flex items-center gap-3 py-3 border-b border-white/5">
-                            <button
-                              onClick={() => toggleGrocery(item)}
-                              className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
-                            />
-                            <p className="text-sm text-white/85 flex-1">{item.name}</p>
-                          </div>
-                        </SwipeToDelete>
-                      ))}
-
-                      {checked.length > 0 && (
-                        <div className="mt-5">
-                          <p className="text-[0.6rem] uppercase tracking-widest text-white/15 mb-1">Done</p>
-                          {checked.map((item) => (
-                            <SwipeToDelete key={item.id} onDelete={() => deleteGrocery(item.id)}>
-                              <div className="flex items-center gap-3 py-3 border-b border-white/5">
-                                <button
-                                  onClick={() => toggleGrocery(item)}
-                                  className="shrink-0 w-5 h-5 rounded-full bg-white/10 border border-white/15 flex items-center justify-center transition active:scale-90"
-                                >
-                                  <span className="text-white/40 text-[0.55rem] leading-none">✓</span>
-                                </button>
-                                <p className="text-sm text-white/30 flex-1 line-through">{item.name}</p>
-                              </div>
-                            </SwipeToDelete>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {activeTab === "lists" && <ListsTab />}
 
                   {/* ── Journal tab ── */}
                   {activeTab === "journal" && (
