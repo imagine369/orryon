@@ -53,4 +53,4 @@ We may update this Privacy Policy from time to time. We will notify users of mat
 
 ---
 
-**Questions?** Contact us at privacy@orryon.app
+**Questions?** Contact us at support@orryon.app

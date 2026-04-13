@@ -46,7 +46,7 @@ export default function TermsPage() {
             and the Breathe/Meditation feature.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            We genuinely want Orryon to be a helpful tool for you. These terms exist to protect both users and the project. This is not legal advice — consider consulting an attorney if needed.
+            Questions or concerns? Contact us at <a href="mailto:support@orryon.app" className="underline hover:text-white">support@orryon.app</a>.
           </p>
         </div>
       </div>

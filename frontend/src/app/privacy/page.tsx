@@ -57,8 +57,7 @@ export default function PrivacyPage() {
             We genuinely want Orryon to be a helpful, privacy-first tool for you. Your trust matters to us.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            This Privacy Policy works together with our <a href="/terms" className="underline">Terms of Service</a>. 
-            By using Orryon, you agree to both. This is not legal advice.
+            Questions or concerns? Contact us at <a href="mailto:support@orryon.app" className="underline hover:text-white">support@orryon.app</a>.
           </p>
         </div>
       </div>

@@ -98,18 +98,26 @@ SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
 SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
-
 # ── Stripe (billing) ──────────────────────────────────────────────────────────
 # Set up at https://dashboard.stripe.com
 # Test keys start with sk_test_ / pk_test_
 STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")   # e.g. price_xxx
-STRIPE_PRICE_ANNUAL: str = os.getenv("STRIPE_PRICE_ANNUAL", "")     # e.g. price_yyy
-STRIPE_ENABLED: bool = bool(STRIPE_SECRET_KEY)
 
-# Trial length for new users (days)
-TRIAL_DAYS: int = int(os.getenv("TRIAL_DAYS", "14"))
+# Price IDs from your Stripe dashboard (set via env vars — no defaults)
+STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")
+STRIPE_PRICE_ANNUAL: str = os.getenv("STRIPE_PRICE_ANNUAL", "")
+ALLOWED_STRIPE_PRICES: set[str] = {p for p in (STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL) if p}
+
+TRIAL_DAYS: int = 14
+
+def get_trial_days(price_id: str) -> int:
+    """Monthly gets 14-day trial. Annual gets no trial (immediate billing)."""
+    if price_id == STRIPE_PRICE_ANNUAL:
+        return 0
+    return TRIAL_DAYS
+
+STRIPE_ENABLED: bool = bool(STRIPE_SECRET_KEY)
 
 # ── Ensure directories exist ──────────────────────────────────────────────────
 os.makedirs(NOTES_DIR, exist_ok=True)

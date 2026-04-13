@@ -148,7 +148,7 @@ function isDemo() {
 }
 
 export function SettingsPanel() {
-  const { openPanel, close } = usePanels();
+  const { openPanel, close, openUpgrade } = usePanels();
   const { logout, login } = useAuth();
   const { sub, refresh: refreshSub } = useSubscription();
   const isOpen = openPanel === "settings";
@@ -551,7 +551,7 @@ export function SettingsPanel() {
                   </section>
 
                   {/* ── SUBSCRIPTION ── */}
-                  {sub && sub.plan !== "free" && (
+                  {sub && (
                     <>
                       <Separator className="bg-white/5" />
                       <section>
@@ -559,12 +559,16 @@ export function SettingsPanel() {
                         <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
                           <Row
                             label="Current plan"
-                            sublabel={sub.plan === "trial"
-                              ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
-                              : "Pro"}
+                            sublabel={
+                              sub.plan === "trial"
+                                ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
+                                : sub.plan === "pro"
+                                ? "Pro"
+                                : "Free — trial ended"
+                            }
                             right={
                               <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60 uppercase tracking-wider">
-                                {sub.plan === "trial" ? "Trial" : "Active"}
+                                {sub.plan === "trial" ? "Trial" : sub.plan === "pro" ? "Active" : "Expired"}
                               </span>
                             }
                           />
@@ -585,6 +589,16 @@ export function SettingsPanel() {
                               >
                                 <CreditCard className="h-4 w-4" strokeWidth={1.5} />
                                 {billingLoading ? "Opening…" : "Manage billing & cancel"}
+                              </button>
+                            </div>
+                          )}
+                          {sub.plan !== "pro" && (
+                            <div className="px-3 py-3">
+                              <button
+                                onClick={() => { close(); openUpgrade(); }}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition"
+                              >
+                                Upgrade to Pro
                               </button>
                             </div>
                           )}

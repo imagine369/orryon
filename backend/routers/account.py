@@ -284,9 +284,11 @@ async def get_subscription(user: dict = Depends(get_current_user)):
 
 @router.post("/api/subscription/checkout")
 async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_user)):
-    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, ALLOWED_STRIPE_PRICES, get_trial_days
     if not STRIPE_ENABLED:
         raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
+    if ALLOWED_STRIPE_PRICES and body.price_id not in ALLOWED_STRIPE_PRICES:
+        raise HTTPException(400, "Invalid price ID")
     try:
         import stripe as stripe_lib
         stripe_lib.api_key = STRIPE_SECRET_KEY
@@ -312,8 +314,8 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
         conn.commit()
         conn.close()
 
-    from config import TRIAL_DAYS
     current_plan = resolve_plan(row)
+    trial_days = get_trial_days(body.price_id)
     checkout_params: dict[str, Any] = {
         "customer": customer_id,
         "payment_method_types": ["card"],
@@ -323,12 +325,13 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
         "cancel_url": body.cancel_url,
         "metadata": {"user_id": row["id"]},
     }
-    if current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
-        checkout_params["subscription_data"] = {
-            "trial_period_days": max(current_plan.get("trial_days_remaining", 0), 1)
+    if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
+        effective_trial = (
+            max(current_plan.get("trial_days_remaining", 0), 1)
             if current_plan["plan"] == "trial"
-            else TRIAL_DAYS,
-        }
+            else trial_days
+        )
+        checkout_params["subscription_data"] = {"trial_period_days": effective_trial}
     session = stripe_lib.checkout.Session.create(**checkout_params)
     return {"checkout_url": session.url}
 
@@ -405,7 +408,7 @@ async def stripe_webhook(request: Request):
         sub_id = sub.get("id")
         status = sub.get("status")
         if sub_id and status:
-            new_plan = "pro" if status == "active" else "free"
+            new_plan = "pro" if status in ("active", "trialing", "past_due") else "free"
             conn = get_connection()
             conn.execute(
                 "UPDATE users SET plan=? WHERE stripe_subscription_id=?",
@@ -413,5 +416,11 @@ async def stripe_webhook(request: Request):
             )
             conn.commit()
             conn.close()
+
+    elif event["type"] == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer", "")
+        attempt = invoice.get("attempt_count", 0)
+        logger.warning("Payment failed for customer %s (attempt %d)", customer_id, attempt)
 
     return {"received": True}

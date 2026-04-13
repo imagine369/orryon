@@ -40,6 +40,6 @@ We may update this Privacy Policy. Material changes will be reflected by updatin
 
 **By using Orryon, you acknowledge that you have read and agree to both this Privacy Policy and the Terms of Service.**
 
-**Questions?** Contact us at privacy@orryon.app
+**Questions?** Contact us at support@orryon.app
 
 **© 2026 Orryon.**

@@ -216,7 +216,7 @@ function ListDetail({
   const [query, setQuery] = useState("");
   const addRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const reorderTimer = useRef<ReturnType<typeof setTimeout>>();
+  const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(() => {
     if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); return; }
@@ -226,7 +226,9 @@ function ListDetail({
   useEffect(() => { load(); }, [load]);
 
   const saveReorder = useCallback((ids: string[]) => {
-    clearTimeout(reorderTimer.current);
+    if (reorderTimer.current) {
+      clearTimeout(reorderTimer.current);
+    }
     reorderTimer.current = setTimeout(() => {
       api.post(`/api/lists/${list.id}/reorder`, { ids }).catch(() => {});
     }, 600);

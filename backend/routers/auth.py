@@ -82,9 +82,11 @@ async def auth_verify(body: VerifyReq):
 @router.post("/api/auth/signup-checkout")
 async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_current_user)):
     """Create a Stripe Checkout session with a trial as part of signup flow."""
-    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, TRIAL_DAYS
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, ALLOWED_STRIPE_PRICES, get_trial_days
     if not STRIPE_ENABLED:
         raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
+    if ALLOWED_STRIPE_PRICES and body.price_id not in ALLOWED_STRIPE_PRICES:
+        raise HTTPException(400, "Invalid price ID")
     try:
         import stripe as stripe_lib
         stripe_lib.api_key = STRIPE_SECRET_KEY
@@ -114,16 +116,19 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
         conn.commit()
         conn.close()
 
-    session = stripe_lib.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        line_items=[{"price": body.price_id, "quantity": 1}],
-        mode="subscription",
-        subscription_data={"trial_period_days": TRIAL_DAYS},
-        success_url=body.success_url,
-        cancel_url=body.cancel_url,
-        metadata={"user_id": row["id"]},
-    )
+    trial_days = get_trial_days(body.price_id)
+    checkout_params: dict = {
+        "customer": customer_id,
+        "payment_method_types": ["card"],
+        "line_items": [{"price": body.price_id, "quantity": 1}],
+        "mode": "subscription",
+        "success_url": body.success_url,
+        "cancel_url": body.cancel_url,
+        "metadata": {"user_id": row["id"]},
+    }
+    if trial_days:
+        checkout_params["subscription_data"] = {"trial_period_days": trial_days}
+    session = stripe_lib.checkout.Session.create(**checkout_params)
     return {"checkout_url": session.url}
 
 

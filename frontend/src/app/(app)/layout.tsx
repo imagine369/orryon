@@ -10,12 +10,13 @@ import { Footer } from "@/components/footer";
 import { DashboardPanel } from "@/components/dashboard-panel";
 import { SettingsPanel } from "@/components/settings-panel";
 import { TrialBanner } from "@/components/trial-banner";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import { useSubscription } from "@/lib/use-subscription";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { openPanel } = usePanels();
+  const { openPanel, upgradeOpen, closeUpgrade } = usePanels();
   const isPanelOpen = openPanel !== null;
   const { sub } = useSubscription();
 
@@ -54,6 +55,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Overlay panels */}
       <DashboardPanel />
       <SettingsPanel />
+      <UpgradeModal open={upgradeOpen} onClose={closeUpgrade} />
     </div>
   );
 }

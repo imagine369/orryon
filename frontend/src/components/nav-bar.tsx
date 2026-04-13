@@ -138,10 +138,12 @@ export function NavBar() {
 
   // ── Debounced reorder saves ──────────────────────────────────────────────
 
-  const taskReorderTimer = useRef<ReturnType<typeof setTimeout>>();
+  const taskReorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saveTaskReorder = useCallback((ids: string[]) => {
-    clearTimeout(taskReorderTimer.current);
+    if (taskReorderTimer.current) {
+      clearTimeout(taskReorderTimer.current);
+    }
     taskReorderTimer.current = setTimeout(() => {
       api.post("/api/tasks/reorder", { ids }).catch(() => {});
     }, 600);
