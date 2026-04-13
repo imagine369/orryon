@@ -9,9 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BudgetTab } from "@/components/dashboard/budget-tab";
 import { ForecastTab } from "@/components/dashboard/forecast-tab";
-import { ScheduleTab } from "@/components/dashboard/schedule-tab";
 import { GoalsTab } from "@/components/dashboard/goals-tab";
-import { NotesTab } from "@/components/dashboard/notes-tab";
 import { InsightsTab } from "@/components/dashboard/insights-tab";
 import { BillsTab } from "@/components/dashboard/bills-tab";
 import { YearlyTab } from "@/components/dashboard/yearly-tab";
@@ -146,9 +144,8 @@ export function DashboardPanel() {
                     </div>
 
                     {/* Tabs */}
-                    <Tabs defaultValue="notes">
+                    <Tabs defaultValue="insights">
                       <TabsList className="bg-[#111] border border-white/5 p-0.5 mb-4 h-auto w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
-                        <TabsTrigger value="notes" className="text-xs">Notes</TabsTrigger>
                         <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
                         <TabsTrigger value="budget" className="text-xs">Budget</TabsTrigger>
                         <TabsTrigger value="bills" className="text-xs">Bills</TabsTrigger>
@@ -156,7 +153,6 @@ export function DashboardPanel() {
                         <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                         <TabsTrigger value="forecast" className="text-xs">Forecast</TabsTrigger>
                         <TabsTrigger value="yearly" className="text-xs">Yearly</TabsTrigger>
-                        <TabsTrigger value="schedule" className="text-xs">Schedule</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="overview"><OverviewTab /></TabsContent>
@@ -166,9 +162,7 @@ export function DashboardPanel() {
                       <TabsContent value="budget"><BudgetTab /></TabsContent>
                       <TabsContent value="bills"><BillsTab /></TabsContent>
                       <TabsContent value="forecast"><ForecastTab /></TabsContent>
-                      <TabsContent value="schedule"><ScheduleTab /></TabsContent>
                       <TabsContent value="goals"><GoalsTab /></TabsContent>
-                      <TabsContent value="notes"><NotesTab /></TabsContent>
                     </Tabs>
                   </>
                 )}

@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
-  Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical,
+  Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical, SlidersHorizontal,
 } from "lucide-react";
 import { BreathingWidget } from "@/components/dashboard/breathing-widget";
 import { NotesTab } from "@/components/dashboard/notes-tab";
 import { ListsTab } from "@/components/dashboard/lists-tab";
+import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -25,21 +26,8 @@ const PRIORITY_CONFIG = {
 } as const;
 type PriorityKey = keyof typeof PRIORITY_CONFIG;
 
-function PriorityBadge({ priority, onClick }: { priority: string; onClick?: () => void }) {
-  const p = PRIORITY_CONFIG[priority as PriorityKey] ?? PRIORITY_CONFIG.none;
-  return (
-    <button
-      onClick={onClick}
-      style={{ backgroundColor: p.color }}
-      className={cn(
-        "text-[0.58rem] font-bold text-white px-1.5 py-0.5 rounded shrink-0 leading-none tabular-nums",
-        onClick ? "cursor-pointer hover:opacity-80 active:scale-90 transition" : "cursor-default",
-      )}
-      title={onClick ? "Change priority" : p.label}
-    >
-      {p.label}
-    </button>
-  );
+function priorityBorderColor(priority: string) {
+  return PRIORITY_CONFIG[priority as PriorityKey]?.color ?? PRIORITY_CONFIG.none.color;
 }
 
 type TaskSort = "priority" | "date" | "name" | "manual";
@@ -67,6 +55,34 @@ function SortPills<T extends string>({
   );
 }
 
+// ── Demo data ────────────────────────────────────────────────────────────────
+
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
+const TODAY = new Date().toISOString().split("T")[0];
+
+const DEMO_TASKS: Task[] = [
+  { id: "dt1", title: "Review Q2 budget report",         priority: "high",   due_date: TODAY, status: "open" },
+  { id: "dt2", title: "Call with accountant at 3pm",     priority: "high",   due_date: TODAY, status: "open" },
+  { id: "dt3", title: "Send weekly update to team",      priority: "medium", due_date: TODAY, status: "open" },
+  { id: "dt4", title: "Book flight to NYC",              priority: "medium", due_date: TODAY, status: "open" },
+  { id: "dt5", title: "Review gym membership renewal",   priority: "low",    due_date: TODAY, status: "open" },
+  { id: "dt6", title: "Pick up dry cleaning",            priority: "none",   due_date: TODAY, status: "open" },
+];
+
+const DEMO_EVENTS: Event[] = [
+  { id: "de1", title: "Team standup",           event_date: `${TODAY}T09:00:00Z`, event_type: "meeting"    },
+  { id: "de2", title: "Lunch with Sarah",       event_date: `${TODAY}T12:30:00Z`, event_type: "personal"   },
+  { id: "de3", title: "Dentist appointment",    event_date: `${TODAY}T15:00:00Z`, event_type: "appointment" },
+];
+
+const DEMO_BILLS: Bill[] = [
+  { id: "db1", name: "Netflix",   amount: 15.99,  frequency: "monthly", next_due: TODAY },
+  { id: "db2", name: "Spotify",   amount: 9.99,   frequency: "monthly", next_due: TODAY },
+];
+
 // ── Interfaces ───────────────────────────────────────────────────────────────
 
 interface Task {
@@ -93,7 +109,7 @@ interface Bill {
   next_due: string;
 }
 
-type Tab = "today" | "lists" | "journal";
+type Tab = "today" | "calendar" | "lists" | "journal";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -111,6 +127,7 @@ export function NavBar() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<PriorityKey>("none");
   const [taskSort, setTaskSort]         = useState<TaskSort>("priority");
+  const [sortOpen, setSortOpen]         = useState(false);
   const [addingEvent, setAddingEvent]   = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const taskInputRef                    = useRef<HTMLInputElement>(null);
@@ -133,6 +150,12 @@ export function NavBar() {
   // ── Data loading ─────────────────────────────────────────────────────────
 
   const loadToday = () => {
+    if (isDemo()) {
+      setTasks(DEMO_TASKS);
+      setEvents(DEMO_EVENTS);
+      setBills(DEMO_BILLS);
+      return;
+    }
     Promise.all([
       api.get<Task[]>("/api/tasks?status=open&sort=manual"),
       api.get<Event[]>("/api/events?upcoming=true&limit=50"),
@@ -188,6 +211,7 @@ export function NavBar() {
     setNewTaskTitle("");
     setNewTaskPriority("none");
     setAddingTask(false);
+    if (isDemo()) return;
     api.post<{ id: string }>("/api/tasks", { title, due_date: today, priority: newTaskPriority })
       .then((res) => setTasks((prev) => prev.map((t) => t.id === optimistic.id ? { ...optimistic, id: res.id } : t)))
       .catch(() => setTasks((prev) => prev.filter((t) => t.id !== optimistic.id)));
@@ -196,21 +220,25 @@ export function NavBar() {
   const changeTaskPriority = (task: Task) => {
     const next = PRIORITY_CONFIG[task.priority as PriorityKey]?.next ?? "high";
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, priority: next } : t));
+    if (isDemo()) return;
     api.patch(`/api/tasks/${task.id}`, { priority: next }).catch(() => loadToday());
   };
 
   const completeTask = (task: Task) => {
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    if (isDemo()) return;
     api.patch(`/api/tasks/${task.id}`, { status: "done" }).catch(() => loadToday());
   };
 
   const deleteTask = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    if (isDemo()) return;
     api.delete(`/api/tasks/${id}`).catch(() => loadToday());
   };
 
   const deleteEvent = (id: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    if (isDemo()) return;
     api.delete(`/api/events/${id}`).catch(() => loadToday());
   };
 
@@ -224,15 +252,17 @@ export function NavBar() {
     setEvents((prev) => [...prev, optimistic]);
     setNewEventTitle("");
     setAddingEvent(false);
+    if (isDemo()) return;
     api.post<{ id: string }>("/api/events", { title, date: today, event_type: "event" })
       .then((res) => setEvents((prev) => prev.map((e) => e.id === optimistic.id ? { ...optimistic, id: res.id } : e)))
       .catch(() => setEvents((prev) => prev.filter((e) => e.id !== optimistic.id)));
   };
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: "today",   label: "Today"   },
-    { key: "lists",   label: "Lists"   },
-    { key: "journal", label: "Journal" },
+    { key: "today",    label: "Today"    },
+    { key: "calendar", label: "Calendar" },
+    { key: "lists",    label: "Lists"    },
+    { key: "journal",  label: "Journal"  },
   ];
 
   const TASK_SORT_OPTIONS: { key: TaskSort; label: string }[] = [
@@ -360,61 +390,28 @@ export function NavBar() {
                   {/* ── Today tab ── */}
                   {activeTab === "today" && (
                     <div>
-                      <p className="text-[0.6rem] uppercase tracking-wide text-white/20 mb-5">
-                        {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                      </p>
 
-                      {/* Events */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-white/30" strokeWidth={1.5} />
-                            <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Events</p>
-                          </div>
-                          <button
-                            onClick={() => { setAddingEvent((v) => !v); setTimeout(() => eventInputRef.current?.focus(), 50); }}
-                            className="flex items-center justify-center w-6 h-6 rounded-full bg-white hover:bg-gray-200 transition"
-                          >
-                            {addingEvent
-                              ? <X className="h-3 w-3 text-black" strokeWidth={1.5} />
-                              : <Plus className="h-3 w-3 text-black" strokeWidth={1.5} />
-                            }
-                          </button>
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-1">
+                        <div>
+                          <p className="text-[1.05rem] font-bold text-white/90 leading-tight tracking-tight">Today</p>
+                          <p className="text-[0.6rem] text-white/25 mt-0.5">
+                            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                          </p>
                         </div>
-
-                        {addingEvent && (
-                          <div className="flex gap-2 mb-3">
-                            <input
-                              ref={eventInputRef}
-                              autoFocus
-                              value={newEventTitle}
-                              onChange={(e) => setNewEventTitle(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && addEvent()}
-                              placeholder="Event title…"
-                              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
-                            />
-                            <button onClick={addEvent} className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition">Add</button>
-                          </div>
-                        )}
-
-                        {events.length === 0 && !addingEvent && (
-                          <p className="text-white/25 text-sm py-2">Nothing scheduled today.</p>
-                        )}
-
-                        {events.map((e) => (
-                          <SwipeToDelete key={e.id} onDelete={() => deleteEvent(e.id)}>
-                            <div className="py-2.5 border-b border-white/5">
-                              <p className="text-sm text-white/80">{e.title}</p>
-                              <p className="text-[0.65rem] text-white/30 mt-0.5 capitalize">{e.event_type}</p>
-                            </div>
-                          </SwipeToDelete>
-                        ))}
-                      </div>
-
-                      {/* Tasks */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Tasks</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <button
+                            onClick={() => setSortOpen((v) => !v)}
+                            className={cn(
+                              "flex items-center gap-1 text-[0.65rem] font-medium px-2 py-1 rounded-lg transition",
+                              sortOpen
+                                ? "bg-white/10 text-white/70"
+                                : "text-white/30 hover:text-white/55 hover:bg-white/5",
+                            )}
+                          >
+                            <SlidersHorizontal className="h-3 w-3" strokeWidth={1.5} />
+                            View
+                          </button>
                           <button
                             onClick={() => { setAddingTask((v) => !v); setTimeout(() => taskInputRef.current?.focus(), 50); }}
                             className="flex items-center justify-center w-6 h-6 rounded-full bg-white hover:bg-gray-200 transition"
@@ -425,114 +422,201 @@ export function NavBar() {
                             }
                           </button>
                         </div>
-
-                        {/* Sort pills */}
-                        <SortPills sort={taskSort} setSort={setTaskSort} options={TASK_SORT_OPTIONS} />
-
-                        {/* Add task form */}
-                        {addingTask && (
-                          <div className="flex gap-2 mb-3 items-center">
-                            {/* Priority cycle button */}
-                            <button
-                              onClick={cyclePriority}
-                              style={{ backgroundColor: PRIORITY_CONFIG[newTaskPriority].color }}
-                              className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[0.6rem] font-bold text-white hover:opacity-80 active:scale-90 transition"
-                              title="Cycle priority"
-                            >
-                              {PRIORITY_CONFIG[newTaskPriority].label}
-                            </button>
-                            <input
-                              ref={taskInputRef}
-                              autoFocus
-                              value={newTaskTitle}
-                              onChange={(e) => setNewTaskTitle(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && addTask()}
-                              placeholder="New task…"
-                              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
-                            />
-                            <button onClick={addTask} className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition">Add</button>
-                          </div>
-                        )}
-
-                        {tasks.length === 0 && !addingTask && (
-                          <p className="text-white/25 text-sm py-2">No tasks due today.</p>
-                        )}
-
-                        {/* Manual drag mode */}
-                        {taskSort === "manual" ? (
-                          <Reorder.Group
-                            axis="y"
-                            values={tasks}
-                            onReorder={(newOrder) => {
-                              setTasks(newOrder);
-                              saveTaskReorder(newOrder.map((t) => t.id));
-                            }}
-                            className="space-y-0"
-                          >
-                            {tasks.map((t) => (
-                              <Reorder.Item key={t.id} value={t} className="list-none">
-                                <div className="flex items-center gap-2 py-2.5 border-b border-white/5 cursor-grab active:cursor-grabbing">
-                                  <GripVertical className="h-4 w-4 text-white/20 shrink-0" strokeWidth={1.5} />
-                                  <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={() => completeTask(t)}
-                                    className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
-                                  />
-                                  <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
-                                  <PriorityBadge priority={t.priority} onClick={() => changeTaskPriority(t)} />
-                                  <button
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={() => deleteTask(t.id)}
-                                    className="shrink-0 w-5 h-5 flex items-center justify-center text-white/20 hover:text-white/60 transition"
-                                  >
-                                    <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-                                  </button>
-                                </div>
-                              </Reorder.Item>
-                            ))}
-                          </Reorder.Group>
-                        ) : (
-                          sortedTasks.map((t) => (
-                            <SwipeToDelete key={t.id} onDelete={() => deleteTask(t.id)}>
-                              <div className="flex items-center gap-3 py-2.5 border-b border-white/5">
-                                <button
-                                  onClick={() => completeTask(t)}
-                                  className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center transition hover:border-white/60 active:scale-90"
-                                />
-                                <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
-                                <PriorityBadge priority={t.priority} onClick={() => changeTaskPriority(t)} />
-                              </div>
-                            </SwipeToDelete>
-                          ))
-                        )}
                       </div>
 
-                      {/* Bills due today */}
-                      {bills.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-3">
-                            <p className="text-[0.65rem] uppercase tracking-wide text-white/30">💳 Bills Due</p>
-                          </div>
-                          {bills.map((b) => (
-                            <div key={b.id} className="flex items-center justify-between py-2.5 border-b border-white/5">
-                              <p className="text-sm text-white/80">{b.name}</p>
-                              <span className="text-sm font-semibold text-red-400/80">
-                                ${Number(b.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
+                      {/* Sort dropdown */}
+                      <AnimatePresence>
+                        {sortOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="flex gap-1 flex-wrap pt-1 pb-3">
+                              {TASK_SORT_OPTIONS.map(({ key, label }) => (
+                                <button
+                                  key={key}
+                                  onClick={() => { setTaskSort(key); setSortOpen(false); }}
+                                  className={cn(
+                                    "text-[0.58rem] font-medium px-2 py-0.5 rounded-full border transition",
+                                    taskSort === key
+                                      ? "bg-white/10 border-white/20 text-white/80"
+                                      : "bg-transparent border-white/8 text-white/25 hover:border-white/20 hover:text-white/50",
+                                  )}
+                                >
+                                  {label}
+                                </button>
+                              ))}
                             </div>
-                          ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Item count */}
+                      {(tasks.length + events.length + bills.length) > 0 && (
+                        <div className="flex items-center gap-1.5 mb-4 mt-1">
+                          <div className="w-3.5 h-3.5 rounded-full border border-white/20 flex items-center justify-center shrink-0">
+                            <div className="w-1.5 h-1.5 rounded-full border border-white/30" />
+                          </div>
+                          <p className="text-[0.6rem] text-white/25">
+                            {tasks.length + events.length + bills.length} {tasks.length + events.length + bills.length === 1 ? "item" : "items"} today
+                          </p>
                         </div>
                       )}
+
+                      {/* Add task form */}
+                      {addingTask && (
+                        <div className="flex gap-2 mb-4 items-center">
+                          <button
+                            onClick={cyclePriority}
+                            style={{ borderColor: priorityBorderColor(newTaskPriority) }}
+                            className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
+                            title="Cycle priority"
+                          />
+                          <input
+                            ref={taskInputRef}
+                            autoFocus
+                            value={newTaskTitle}
+                            onChange={(e) => setNewTaskTitle(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && addTask()}
+                            placeholder="New task…"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
+                          />
+                          <button onClick={addTask} className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition">Add</button>
+                        </div>
+                      )}
+
+                      {/* Add event form */}
+                      {addingEvent && (
+                        <div className="flex gap-2 mb-4">
+                          <input
+                            ref={eventInputRef}
+                            autoFocus
+                            value={newEventTitle}
+                            onChange={(e) => setNewEventTitle(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && addEvent()}
+                            placeholder="Event title…"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
+                          />
+                          <button onClick={addEvent} className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition">Add</button>
+                        </div>
+                      )}
+
+                      {/* Empty state */}
+                      {tasks.length === 0 && events.length === 0 && bills.length === 0 && !addingTask && (
+                        <p className="text-white/25 text-sm py-6 text-center">All clear for today.</p>
+                      )}
+
+                      {/* ── Events ── */}
+                      {events.map((e) => (
+                        <SwipeToDelete key={e.id} onDelete={() => deleteEvent(e.id)}>
+                          <div className="flex items-center gap-3 py-3 border-b border-white/5 group">
+                            <div className="shrink-0 w-5 h-5 rounded-full border border-white/15 flex items-center justify-center">
+                              <Calendar className="h-2.5 w-2.5 text-white/25" strokeWidth={1.5} />
+                            </div>
+                            <p className="text-sm text-white/70 flex-1 leading-snug">{e.title}</p>
+                            <span className="text-[0.55rem] uppercase tracking-widest text-white/20 shrink-0">{e.event_type}</span>
+                          </div>
+                        </SwipeToDelete>
+                      ))}
+
+                      {/* ── Tasks (manual / drag) ── */}
+                      {taskSort === "manual" ? (
+                        <Reorder.Group
+                          axis="y"
+                          values={tasks}
+                          onReorder={(newOrder) => {
+                            setTasks(newOrder);
+                            saveTaskReorder(newOrder.map((t) => t.id));
+                          }}
+                          className="space-y-0"
+                        >
+                          {tasks.map((t) => (
+                            <Reorder.Item key={t.id} value={t} className="list-none">
+                              <div className="flex items-center gap-2.5 py-3 border-b border-white/5 cursor-grab active:cursor-grabbing">
+                                <GripVertical className="h-3.5 w-3.5 text-white/15 shrink-0" strokeWidth={1.5} />
+                                <button
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={() => completeTask(t)}
+                                  style={{ borderColor: priorityBorderColor(t.priority) }}
+                                  className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
+                                />
+                                <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+                                <button
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={() => changeTaskPriority(t)}
+                                  style={{ color: priorityBorderColor(t.priority) }}
+                                  className="shrink-0 text-[0.55rem] font-bold opacity-50 hover:opacity-90 transition w-5 text-center"
+                                  title="Change priority"
+                                >
+                                  {PRIORITY_CONFIG[t.priority as PriorityKey]?.label ?? "P4"}
+                                </button>
+                                <button
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={() => deleteTask(t.id)}
+                                  className="shrink-0 w-4 h-4 flex items-center justify-center text-white/15 hover:text-white/50 transition"
+                                >
+                                  <X className="h-3 w-3" strokeWidth={1.5} />
+                                </button>
+                              </div>
+                            </Reorder.Item>
+                          ))}
+                        </Reorder.Group>
+                      ) : (
+                        sortedTasks.map((t) => (
+                          <SwipeToDelete key={t.id} onDelete={() => deleteTask(t.id)}>
+                            <div className="flex items-center gap-3 py-3 border-b border-white/5">
+                              <button
+                                onClick={() => completeTask(t)}
+                                style={{ borderColor: priorityBorderColor(t.priority) }}
+                                className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
+                              />
+                              <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+                              <button
+                                onClick={() => changeTaskPriority(t)}
+                                style={{ color: priorityBorderColor(t.priority) }}
+                                className="shrink-0 text-[0.55rem] font-bold opacity-40 hover:opacity-80 transition"
+                                title="Change priority"
+                              >
+                                {PRIORITY_CONFIG[t.priority as PriorityKey]?.label ?? "P4"}
+                              </button>
+                            </div>
+                          </SwipeToDelete>
+                        ))
+                      )}
+
+                      {/* ── Bills due ── */}
+                      {bills.map((b) => (
+                        <div key={b.id} className="flex items-center gap-3 py-3 border-b border-white/5">
+                          <div className="shrink-0 w-5 h-5 rounded-full border border-red-400/30 flex items-center justify-center">
+                            <span className="text-red-400/50 text-[0.55rem] font-bold leading-none">$</span>
+                          </div>
+                          <p className="text-sm text-white/70 flex-1 leading-snug">{b.name}</p>
+                          <span className="text-[0.8rem] font-semibold text-red-400/70 shrink-0 tabular-nums">
+                            ${Number(b.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Add event inline action */}
+                      <button
+                        onClick={() => { setAddingEvent((v) => !v); setTimeout(() => eventInputRef.current?.focus(), 50); }}
+                        className="flex items-center gap-2 mt-4 text-[0.65rem] text-white/20 hover:text-white/45 transition"
+                      >
+                        <Plus className="h-3 w-3" strokeWidth={1.5} />
+                        Add event
+                      </button>
+
                     </div>
                   )}
+
+                  {/* ── Calendar tab ── */}
+                  {activeTab === "calendar" && <CalendarTab />}
 
                   {/* ── Lists tab ── */}
                   {activeTab === "lists" && <ListsTab />}
 
                   {/* ── Journal tab ── */}
-                  {activeTab === "journal" && (
-                    <NotesTab />
-                  )}
+                  {activeTab === "journal" && <NotesTab />}
 
                 </div>
 
