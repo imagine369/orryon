@@ -12,7 +12,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 
 from backend.auth import get_current_user
 from db import get_connection
@@ -30,6 +30,9 @@ RATE_LIMIT_DEFAULT = 120   # max general requests per window
 
 MONTHLY_SPEND_CAP_USD = 1.80
 
+RATE_LIMIT_OTP = 5             # max OTP requests per email per window
+RATE_LIMIT_OTP_IP = 10         # max OTP requests per IP per window
+
 
 def check_rate_limit(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
     """Raise HTTP 429 if the user has exceeded their per-minute request quota."""
@@ -39,6 +42,13 @@ def check_rate_limit(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
     if len(_rate_buckets[user_id]) >= limit:
         raise HTTPException(429, "Too many requests. Please wait a moment.")
     _rate_buckets[user_id].append(now)
+
+
+def check_otp_rate_limit(request: Request, email: str) -> None:
+    """Rate-limit OTP sends by both email and client IP to prevent abuse."""
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(f"otp:email:{email}", RATE_LIMIT_OTP)
+    check_rate_limit(f"otp:ip:{client_ip}", RATE_LIMIT_OTP_IP)
 
 
 # ── Subscription Plan Resolution ──────────────────────────────────────────────

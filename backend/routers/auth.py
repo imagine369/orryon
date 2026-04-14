@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.auth import create_token, get_current_user
-from backend.deps import IS_PRODUCTION
+from backend.deps import IS_PRODUCTION, check_otp_rate_limit
 from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
 from db import (
     create_verification_code,
@@ -31,7 +31,7 @@ router = APIRouter(tags=["auth"])
 
 
 @router.post("/api/auth/send-code")
-async def auth_send_code(body: SendCodeReq):
+async def auth_send_code(body: SendCodeReq, request: Request):
     """
     Send an OTP verification code to the given email address.
 
@@ -42,6 +42,8 @@ async def auth_send_code(body: SendCodeReq):
     email = body.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(400, "Invalid email address")
+
+    check_otp_rate_limit(request, email)
 
     code = create_verification_code(email)
     result = send_verification_code(email, code)

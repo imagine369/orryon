@@ -45,12 +45,21 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers import auth, chat, finance, organize, account, connections
 from config import XAI_API_KEY
 from core.scheduler import start_scheduler, stop_scheduler
+
+_sentry_dsn = os.getenv("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        environment=os.getenv("NODE_ENV", "development"),
+    )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,13 +88,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_is_prod = os.getenv("NODE_ENV", "").lower() == "production"
+_cors_origins: list[str] = []
+if not _is_prod:
+    _cors_origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
+_frontend_url = os.getenv("FRONTEND_URL", "")
+if _frontend_url:
+    _cors_origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        os.getenv("FRONTEND_URL", ""),
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

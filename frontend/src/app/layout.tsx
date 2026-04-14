@@ -10,8 +10,24 @@ const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["lati
 
 export const metadata: Metadata = {
   title: "orryon",
-  description: "Your intelligent personal concierge",
+  description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
   manifest: "/manifest.json",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://orryon.vercel.app"),
+  openGraph: {
+    title: "orryon",
+    description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
+    url: "/",
+    siteName: "orryon",
+    locale: "en_US",
+    type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "orryon — AI personal concierge" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "orryon",
+    description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
+    images: ["/og-image.png"],
+  },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "orryon" },
   icons: {
     icon: [

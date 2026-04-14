@@ -26,9 +26,13 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import os
+
 from config import SMTP_ENABLED, SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
 
 logger = logging.getLogger(__name__)
+
+_IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
 
 
 # ── Email templates ───────────────────────────────────────────────────────────
@@ -113,11 +117,14 @@ def send_verification_code(to_email: str, code: str) -> dict:
         detail (str)  — human-readable explanation
     """
     if not SMTP_ENABLED:
-        logger.warning(
-            "SMTP not configured — verification code for %s: %s  "
-            "(set SMTP_HOST / SMTP_USER / SMTP_PASS in .env to send real emails)",
-            to_email, code,
-        )
+        if _IS_PRODUCTION:
+            logger.error("SMTP not configured in production — OTP for %s cannot be delivered", to_email)
+        else:
+            logger.warning(
+                "SMTP not configured — verification code for %s: %s  "
+                "(set SMTP_HOST / SMTP_USER / SMTP_PASS in .env to send real emails)",
+                to_email, code,
+            )
         return {
             "sent": False,
             "reason": "not_configured",

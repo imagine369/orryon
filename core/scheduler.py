@@ -38,6 +38,7 @@ def start_scheduler() -> None:
     # Data jobs (always run — no SMTP needed)
     _scheduler.add_job(snapshot_all_net_worth, "interval", hours=6, id="snapshot_nw")
     _scheduler.add_job(advance_bill_dates, "interval", seconds=60, id="advance_bills")
+    _scheduler.add_job(run_daily_backup, "cron", hour=3, minute=0, id="daily_backup")
 
     # Email jobs (only if SMTP is configured)
     if SMTP_ENABLED:
@@ -330,3 +331,16 @@ def _parse_event_datetime(event_date: str) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def run_daily_backup() -> None:
+    """Take a daily SQLite backup (runs at 3 AM UTC via scheduler)."""
+    try:
+        from backend.backup import backup_database
+        result = backup_database()
+        if result:
+            logger.info("Daily backup completed: %s", result)
+        else:
+            logger.error("Daily backup failed")
+    except Exception as exc:
+        logger.error("run_daily_backup error: %s", exc)

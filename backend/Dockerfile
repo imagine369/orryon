@@ -11,6 +11,8 @@ COPY backend/ ./backend/
 
 RUN chmod +x backend/start.sh
 
+RUN mkdir -p /data
+
 EXPOSE 8000
 
 CMD ["sh", "backend/start.sh"]
