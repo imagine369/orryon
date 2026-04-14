@@ -8,7 +8,7 @@ const StarEight = ({ className }: { className?: string }) => (
   </svg>
 );
 import { useState, useEffect, useRef } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -17,9 +17,9 @@ import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
 
 const HOW_STEPS = [
-  { n: "01", title: "Tell me what you need",        desc: "Speak naturally. I understand context, amounts, dates, and intent." },
-  { n: "02", title: "I understand and act",          desc: "I log it, track it, and keep everything organized — no forms." },
-  { n: "03", title: "Ask me anything. I'll give you real answers.", desc: "Your data is always in sync. Just ask." },
+  { n: "01", title: "You don't set anything up.",     desc: "Just start talking. Type or speak — I handle the rest. No categories, no forms, no setup." },
+  { n: "02", title: "I remember so you don't have to.", desc: "Spending logged. Goals tracked. Bills remembered. Your day stays organized without you lifting a finger." },
+  { n: "03", title: "Just ask. I'm here to help.", desc: "Whether it's your budget, a reminder, or just a moment to breathe." },
 ];
 
 type HowPhase =
@@ -463,359 +463,6 @@ function ChatDemo() {
   );
 }
 
-function AddBtn() {
-  return (
-    <button className="flex items-center justify-center w-7 h-7 rounded-full bg-white shrink-0">
-      <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-    </button>
-  );
-}
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function BudgetScreen() {
-  const cats = [
-    { name: "Food & Dining",   spent: 320, planned: 400 },
-    { name: "Transport",       spent: 95,  planned: 150 },
-    { name: "Entertainment",   spent: 145, planned: 100 },
-    { name: "Health",          spent: 60,  planned: 120 },
-  ];
-  const totalPlanned = cats.reduce((s, c) => s + c.planned, 0);
-  const totalSpent   = cats.reduce((s, c) => s + c.spent, 0);
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · April</p>
-          <p className="text-lg font-bold">{fmt(totalPlanned)} <span className="text-sm font-normal text-white/30">/ {fmt(totalSpent)} spent</span></p>
-        </div>
-        <AddBtn />
-      </div>
-      {cats.map((c) => {
-        const pct = Math.round((c.spent / c.planned) * 100);
-        const bar = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-yellow-500" : "bg-green-500";
-        return (
-          <div key={c.name} className="py-3 border-b border-white/5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-semibold">{c.name}</span>
-              <span className="text-sm text-white/50">{fmt(c.spent)} / {fmt(c.planned)}</span>
-            </div>
-            <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
-              <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[0.65rem] text-white/25">{pct}% used</span>
-              <span className="text-[0.65rem] text-white/25">{fmt(Math.max(0, c.planned - c.spent))} left</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function GoalsScreen() {
-  const goals = [
-    { name: "Vacation Fund",  current: 2720, target: 4000, extra: "89d left" },
-    { name: "Emergency Fund", current: 1600, target: 5000, extra: "" },
-    { name: "New Laptop",     current: 750,  target: 1200, extra: "45d left" },
-  ];
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Goals</p>
-        <AddBtn />
-      </div>
-      <div>
-        {goals.map((g) => {
-          const pct = Math.min(100, Math.round((g.current / g.target) * 100));
-          const bar = pct >= 75 ? "bg-green-400" : pct >= 40 ? "bg-green-500/70" : "bg-green-600/50";
-          const remaining = Math.max(0, g.target - g.current);
-          return (
-            <div key={g.name} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-sm">{g.name}</span>
-                <span className="text-sm font-bold text-green-400">{pct}%</span>
-              </div>
-              <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-                <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${bar}`} style={{ width: `${pct}%` }} />
-              </div>
-              <div className="flex justify-between text-[0.7rem] text-white/30">
-                <span>{fmt(g.current)} saved of {fmt(g.target)}</span>
-                <span>{fmt(remaining)} to go{g.extra ? ` · ${g.extra}` : ""}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ForecastScreen() {
-  const income            = 6500;
-  const balance           = 5500;
-  const totalBills        = 2258;
-  const totalGoalContribs = 4680;
-  const projectedRem      = 1560;
-  const freeAfterGoals    = 880;
-
-  const bills = [
-    { name: "Rent",    amount: 2200,  due: "May 1"  },
-    { name: "Netflix", amount: 15.99, due: "Apr 24" },
-    { name: "Gym",     amount: 29.99, due: "Apr 28" },
-  ];
-
-  const goals = [
-    { name: "Vacation Fund",  current: 2720, target: 4000, pct: 68 },
-    { name: "Emergency Fund", current: 1600, target: 5000, pct: 32 },
-  ];
-
-  return (
-    <div>
-      {/* Top stat cards */}
-      <div className="grid grid-cols-2 gap-2.5 mb-4">
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
-          <p className="text-[0.58rem] uppercase tracking-wide text-white/30 mb-0.5">Monthly Income</p>
-          <p className="text-lg font-bold text-white/85">{fmt(income)}</p>
-        </div>
-        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
-          <p className="text-[0.58rem] uppercase tracking-wide text-white/30 mb-0.5">Free to Spend</p>
-          <p className="text-lg font-bold text-green-400">{fmt(freeAfterGoals)}</p>
-        </div>
-      </div>
-
-      {/* Cash flow waterfall */}
-      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-2">Monthly Cash Flow</p>
-      <div className="space-y-2 text-sm mb-4">
-        <div className="flex justify-between">
-          <span className="text-white/55">Current balance</span>
-          <span className="font-semibold text-white/85">{fmt(balance)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-green-400/80">+ Monthly income</span>
-          <span className="font-semibold text-green-400">{fmt(income)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-red-400/80">− Monthly bills</span>
-          <span className="font-semibold text-red-400">{fmt(totalBills)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-yellow-400/80">− Goal contributions</span>
-          <span className="font-semibold text-yellow-400">{fmt(totalGoalContribs)}</span>
-        </div>
-        <div className="flex justify-between border-t border-white/8 pt-2">
-          <span className="font-bold text-white/85">Projected remaining</span>
-          <span className="font-bold text-green-400">{fmt(projectedRem)}</span>
-        </div>
-      </div>
-
-      {/* Upcoming bills */}
-      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-2">Upcoming Bills</p>
-      {bills.map((b) => (
-        <div key={b.name} className="flex items-center justify-between py-2.5 border-b border-white/5 text-sm">
-          <div>
-            <p className="text-white/85 font-medium">{b.name}</p>
-            <p className="text-[0.62rem] text-white/25">Due {b.due}</p>
-          </div>
-          <span className="font-semibold text-white/70">{fmt(b.amount)}</span>
-        </div>
-      ))}
-
-      {/* Goals progress */}
-      <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mt-4 mb-2">Goal Progress</p>
-      {goals.map((g) => (
-        <div key={g.name} className="mb-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-white/80">{g.name}</span>
-            <span className="text-xs font-bold text-green-400">{g.pct}%</span>
-          </div>
-          <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="absolute inset-y-0 left-0 rounded-full bg-green-500/60" style={{ width: `${g.pct}%` }} />
-          </div>
-          <div className="flex justify-between mt-0.5">
-            <span className="text-[0.6rem] text-white/25">{fmt(g.current)} saved</span>
-            <span className="text-[0.6rem] text-white/25">{fmt(g.target - g.current)} to go</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ListsScreen() {
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const lists = [
-    { id: "d1", name: "Grocery",       color: "#f97316", items: ["Almond milk","Eggs","Greek yogurt","Sourdough bread","Avocados"], done: ["Olive oil","Coffee beans"] },
-    { id: "d2", name: "Goals",         color: "#3b82f6", items: ["Max out Roth IRA","Run a 5K under 25 min","Read 12 books this year"], done: ["Build emergency fund"] },
-    { id: "d3", name: "Books to Read", color: "#a855f7", items: ["The Psychology of Money","Atomic Habits","Die with Zero"], done: ["The Almanack of Naval Ravikant"] },
-    { id: "d4", name: "Travel Pack",   color: "#22c55e", items: ["Noise-cancelling headphones","Travel adapter"], done: ["Passport"] },
-  ];
-
-  const active = lists.find((l) => l.id === selected);
-
-  if (active) {
-    return (
-      <div>
-        {/* Detail header */}
-        <div className="flex items-center gap-2 mb-4">
-          <button onClick={() => setSelected(null)} className="text-white/35 hover:text-white/70 transition shrink-0">
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: active.color }} />
-            <p className="text-sm font-bold text-white/90 truncate">{active.name}</p>
-          </div>
-          <AddBtn />
-        </div>
-
-        {/* Open items */}
-        {active.items.map((item) => (
-          <div key={item} className="flex items-center gap-3 py-2.5 border-b border-white/5">
-            <div className="shrink-0 w-4 h-4 rounded-full border-2" style={{ borderColor: active.color + "99" }} />
-            <p className="text-sm text-white/85 flex-1 leading-snug">{item}</p>
-          </div>
-        ))}
-
-        {/* Done items */}
-        {active.done.length > 0 && (
-          <>
-            <p className="text-[0.6rem] uppercase tracking-widest text-white/20 mt-4 mb-1">Done</p>
-            {active.done.map((item) => (
-              <div key={item} className="flex items-center gap-3 py-2.5 border-b border-white/5 opacity-40">
-                <div className="shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center" style={{ borderColor: active.color + "80" }}>
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active.color }} />
-                </div>
-                <p className="text-sm text-white/50 flex-1 leading-snug line-through">{item}</p>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Lists</p>
-        <AddBtn />
-      </div>
-      {lists.map((l) => (
-        <button
-          key={l.id}
-          onClick={() => setSelected(l.id)}
-          className="w-full flex items-center gap-3 py-3 border-b border-white/5 text-left group"
-        >
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
-          <p className="text-sm font-semibold text-white/85 flex-1 truncate">{l.name}</p>
-          <span className="text-[0.65rem] text-white/30 shrink-0">{l.items.length + l.done.length}</span>
-          <ChevronRight className="h-3.5 w-3.5 text-white/20 group-hover:text-white/40 transition shrink-0" strokeWidth={1.5} />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function BillsScreen() {
-  const bills = [
-    { name: "Netflix", amount: 15.99, frequency: "monthly", daysUntil: 12 },
-    { name: "Spotify", amount: 9.99,  frequency: "monthly", daysUntil: 2 },
-    { name: "iCloud",  amount: 2.99,  frequency: "monthly", daysUntil: -1 },
-    { name: "Gym",     amount: 29.99, frequency: "monthly", daysUntil: 18 },
-  ];
-  const totalMonthly = bills.reduce((s, b) => s + b.amount, 0);
-  const dueLabel = (d: number) => d < 0 ? "Overdue" : d === 0 ? "Due today" : d === 1 ? "Tomorrow" : `In ${d} days`;
-  const dueClass = (d: number) => d < 0 ? "text-red-400" : d <= 3 ? "text-yellow-400" : "text-white/30";
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Recurring Bills</p>
-          <p className="text-lg font-bold text-white/85 mt-0.5">
-            {fmt(totalMonthly)} <span className="text-sm font-normal text-white/30">/ month</span>
-          </p>
-        </div>
-        <AddBtn />
-      </div>
-      {bills.map((b) => (
-        <div key={b.name} className="flex items-center gap-3 py-3 border-b border-white/5">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white/85 truncate">{b.name}</p>
-              <p className="text-sm font-semibold text-white/85 ml-3">{fmt(b.amount)}</p>
-            </div>
-            <div className="flex items-center justify-between mt-0.5">
-              <p className="text-[0.65rem] text-white/30">Monthly</p>
-              <p className={`text-[0.65rem] ${dueClass(b.daysUntil)}`}>{dueLabel(b.daysUntil)}</p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const APP_SCREENS = [
-  { key: "budget",   label: "Budget",   Component: BudgetScreen   },
-  { key: "goals",    label: "Goals",    Component: GoalsScreen    },
-  { key: "forecast", label: "Forecast", Component: ForecastScreen },
-  { key: "lists",    label: "Lists",    Component: ListsScreen    },
-  { key: "bills",    label: "Bills",    Component: BillsScreen    },
-];
-
-function AppDemo() {
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    timerRef.current = setTimeout(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx((i) => (i + 1) % APP_SCREENS.length);
-        setVisible(true);
-      }, 300);
-    }, 1000);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [idx]);
-
-  const { Component, key } = APP_SCREENS[idx];
-
-  return (
-    <div className="mx-auto max-w-[340px]">
-      {/* Tab bar — matches real dashboard TabsList */}
-      <div className="flex items-center rounded-full border border-white/5 bg-[#111] p-0.5 mb-4 overflow-x-auto">
-        {APP_SCREENS.map((s, i) => (
-          <button
-            key={s.key}
-            onClick={() => { setVisible(false); setTimeout(() => { setIdx(i); setVisible(true); }, 200); }}
-            className="flex-1 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200"
-            style={{
-              background: idx === i ? "rgba(255,255,255,0.1)" : "transparent",
-              color: idx === i ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
-            }}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Screen frame — fixed height so all screens are equal */}
-      <div
-        className="rounded-2xl border border-white/8 bg-[#141414] overflow-hidden"
-        style={{ height: 320, transition: "opacity 0.28s ease", opacity: visible ? 1 : 0 }}
-      >
-        <div className="h-full overflow-y-auto px-4 pt-4 pb-5" style={{ scrollbarWidth: "none" }}>
-          <Component key={key} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function getDemoGreeting() {
   const h = new Date().getHours();
@@ -830,19 +477,21 @@ type TourPhase =
   | "home" | "typing" | "sending" | "chat-bubble"
   | "thinking" | "responding" | "next-chat" | "clearing" | "pre-dash"
   | "tap-grid" | "panel-open"
-  | "tab-budget" | "tab-schedule" | "tab-goals"
+  | "tab-budget" | "tab-bills" | "tab-forecast" | "tab-goals"
   | "panel-close" | "bell-tap" | "today-open" | "today-close"
+  | "list-open" | "list-close"
+  | "journal-open" | "journal-close"
   | "breathe-open" | "breathe-close" | "reset";
 
 const TOUR_CHATS = [
   { prompt: "Add coffee and breakfast $12.50",                response: "Done — coffee & breakfast logged for $12.50." },
   { prompt: "Help me save $4,000 for a vacation by December", response: "Goal created. Save $444/mo to hit $4,000 by December." },
   { prompt: "How did I do with spending this month?",         response: "Great month — you're down 8% overall. Dining is your only category running a bit hot, everything else is under budget." },
-  { prompt: "Pull up my grocery list",                        response: "Here's your list:\n• Greek yogurt\n• Oat milk\n• Sourdough\n• Chicken thighs\n• Cherry tomatoes\n• Spinach\n• Avocados\n• Olive oil" },
+  { prompt: "Pull up my grocery list",                        response: "Here's your grocery list." },
   { prompt: "Am I on track for my vacation goal?",            response: "You're at $2,720 of $4,000 — 68% there. Keep it up and you'll hit it with 3 weeks to spare." },
 ];
 
-const TOUR_TABS = ["Insights","Budget","Schedule","Goals"] as const;
+const TOUR_TABS = ["Insights","Budget","Bills","Forecast","Goals"] as const;
 type TourTab = typeof TOUR_TABS[number];
 
 const INSIGHT_COLORS = ["#60a5fa","#2dd4bf","#c084fc","#fbbf24","#818cf8","#86efac"];
@@ -1043,6 +692,91 @@ function TourBudgetTab() {
   );
 }
 
+function TourBillsTab() {
+  const bills = [
+    { name: "Netflix",  amount: 15.99, due: "Apr 18", daysLeft: 5  },
+    { name: "Spotify",  amount:  9.99, due: "Apr 20", daysLeft: 7  },
+    { name: "iCloud",   amount:  2.99, due: "Apr 22", daysLeft: 9  },
+    { name: "Internet", amount: 65.00, due: "Apr 25", daysLeft: 12 },
+    { name: "Rent",     amount: 2200,  due: "May 1",  daysLeft: 18 },
+  ];
+  const total = bills.reduce((s, b) => s + b.amount, 0);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Upcoming Bills</p>
+          <p className="text-lg font-bold mt-0.5">
+            ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            <span className="text-sm font-normal text-white/30"> this month</span>
+          </p>
+        </div>
+      </div>
+      {bills.map((b) => (
+        <div key={b.name} className="flex items-center gap-3 py-2.5 border-b border-white/5">
+          <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0">
+            <span className="text-[0.6rem] font-bold text-white/40">$</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white/85">{b.name}</p>
+            <p className="text-[0.6rem] text-white/25">Due {b.due}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-sm font-semibold text-white/85">${b.amount.toFixed(2)}</p>
+            <p className={`text-[0.6rem] ${b.daysLeft <= 7 ? "text-red-400/70" : "text-white/25"}`}>{b.daysLeft}d left</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TourForecastTab() {
+  const months = [
+    { m: "Apr", income: 5200, out: 3800 },
+    { m: "May", income: 5200, out: 3600 },
+    { m: "Jun", income: 5200, out: 3900 },
+    { m: "Jul", income: 5500, out: 3400 },
+  ];
+  const max = 6000;
+  return (
+    <div>
+      <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-4">Cash Flow Forecast</p>
+      <div className="flex items-end justify-between gap-3 mb-3" style={{ height: 100 }}>
+        {months.map((m) => (
+          <div key={m.m} className="flex-1 flex flex-col items-center gap-1 h-full">
+            <div className="w-full flex gap-0.5 items-end h-full">
+              <div className="flex-1 rounded-t" style={{ height: `${(m.income / max) * 100}%`, background: "rgba(74,222,128,0.35)" }} />
+              <div className="flex-1 rounded-t" style={{ height: `${(m.out / max) * 100}%`, background: "rgba(248,113,113,0.35)" }} />
+            </div>
+            <p className="text-[0.6rem] text-white/30">{m.m}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-sm" style={{ background: "rgba(74,222,128,0.5)" }} />
+          <span className="text-[0.6rem] text-white/30">Income</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-sm" style={{ background: "rgba(248,113,113,0.5)" }} />
+          <span className="text-[0.6rem] text-white/30">Expenses</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
+          <p className="text-[0.6rem] text-white/25 uppercase tracking-wide">Avg In</p>
+          <p className="text-base font-bold text-green-400 mt-0.5">+$5,275</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
+          <p className="text-[0.6rem] text-white/25 uppercase tracking-wide">Avg Out</p>
+          <p className="text-base font-bold text-red-400/80 mt-0.5">−$3,675</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TourGoalsTab() {
   const goals=[
     {name:"Vacation Fund",  current:2720,target:4000,pct:68},
@@ -1088,6 +822,9 @@ function AppTourDemo() {
   const [bellLit, setBellLit]         = useState(false);
   const [breatheOpen, setBreatheOpen] = useState(false);
   const [todayOpen, setTodayOpen]     = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [listOpen, setListOpen]       = useState(false);
+  const [micActive, setMicActive]     = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [activeTab, setActiveTab]     = useState<TourTab>("Insights");
   const [visible, setVisible]         = useState(true);
@@ -1104,17 +841,28 @@ function AppTourDemo() {
     if (phase === "home") {
       setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
       setSending(false); setGridLit(false); setBellLit(false); setBreatheOpen(false);
-      setTodayOpen(false); setPanelOpen(false); setActiveTab("Insights");
+      setTodayOpen(false); setJournalOpen(false); setListOpen(false); setPanelOpen(false);
+      setMicActive(false); setActiveTab("Insights");
       setChatIdx(0); setVisible(true);
       go("typing", 900);
     }
     if (phase === "typing") {
-      let i = 0;
-      const type = () => {
-        if (i <= chat.prompt.length) { setInputText(chat.prompt.slice(0,i)); i++; tmr.current = setTimeout(type, 32); }
-        else go("sending", 200);
-      };
-      tmr.current = setTimeout(type, 150);
+      // Chat #3 (index 2) uses voice input — mic pulses, then text appears all at once
+      if (chatIdx === 2) {
+        setMicActive(true);
+        tmr.current = setTimeout(() => {
+          setInputText(chat.prompt);
+          setMicActive(false);
+          go("sending", 400);
+        }, 1400);
+      } else {
+        let i = 0;
+        const type = () => {
+          if (i <= chat.prompt.length) { setInputText(chat.prompt.slice(0,i)); i++; tmr.current = setTimeout(type, 32); }
+          else go("sending", 200);
+        };
+        tmr.current = setTimeout(type, 150);
+      }
     }
     if (phase === "sending") { setSending(true); go("chat-bubble", 180); }
     if (phase === "chat-bubble") {
@@ -1127,6 +875,7 @@ function AppTourDemo() {
       let i = 0;
       const type = () => {
         if (i <= chat.response.length) { setCurrentResponse(chat.response.slice(0,i)); i++; tmr.current = setTimeout(type, 22); }
+        else if (chatIdx === 3) go("list-open", 600);
         else go("next-chat", 700);
       };
       tmr.current = setTimeout(type, 50);
@@ -1140,18 +889,23 @@ function AppTourDemo() {
         go("pre-dash", 200);
       }
     }
-    if (phase === "clearing") { go("typing", 500); }
+    if (phase === "clearing")    { go("typing", 500); }
     if (phase === "pre-dash")    { go("tap-grid", 100); }
     if (phase === "tap-grid")    { setGridLit(true); go("panel-open", 200); }
-    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 1200); }
-    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-schedule", 800); }
-    if (phase === "tab-schedule"){ setActiveTab("Schedule"); go("tab-goals", 800); }
-    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 800); }
-    if (phase === "panel-close")  { setPanelOpen(false); go("today-open", 250); }
-    if (phase === "today-open")   { setTodayOpen(true); go("today-close", 1000); }
-    if (phase === "today-close")  { setTodayOpen(false); go("breathe-open", 250); }
-    if (phase === "breathe-open") { setBreatheOpen(true); go("breathe-close", 1500); }
-    if (phase === "breathe-close"){ setBreatheOpen(false); go("reset", 250); }
+    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 1500); }
+    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-bills", 1500); }
+    if (phase === "tab-bills")   { setActiveTab("Bills");    go("tab-forecast", 1800); }
+    if (phase === "tab-forecast"){ setActiveTab("Forecast"); go("tab-goals", 1800); }
+    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 1500); }
+    if (phase === "list-open")   { setListOpen(true);   go("list-close", 2200); }
+    if (phase === "list-close")  { setListOpen(false);  go("next-chat", 300); }
+    if (phase === "panel-close") { setPanelOpen(false); go("today-open", 300); }
+    if (phase === "today-open")  { setTodayOpen(true);  go("today-close", 2500); }
+    if (phase === "today-close") { setTodayOpen(false); go("journal-open", 300); }
+    if (phase === "journal-open"){ setJournalOpen(true);  go("journal-close", 2500); }
+    if (phase === "journal-close"){ setJournalOpen(false); go("breathe-open", 300); }
+    if (phase === "breathe-open") { setBreatheOpen(true);  go("breathe-close", 3500); }
+    if (phase === "breathe-close"){ setBreatheOpen(false); go("reset", 300); }
     if (phase === "reset") {
       setVisible(false);
       tmr.current = setTimeout(() => setPhase("home"), 450);
@@ -1177,7 +931,7 @@ function AppTourDemo() {
 
         {/* ── Main app content ── */}
         <div className="absolute inset-0 flex flex-col"
-          style={{ transform: (panelOpen || todayOpen || breatheOpen) ? "scale(0.93)" : "scale(1)", borderRadius: (panelOpen || todayOpen || breatheOpen) ? 36 : 0, opacity: (panelOpen || todayOpen || breatheOpen) ? 0.55 : 1, transition: "all 0.25s cubic-bezier(0.25,0.46,0.45,0.94)", transformOrigin: "center center" }}>
+          style={{ transform: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? "scale(0.93)" : "scale(1)", borderRadius: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? 36 : 0, opacity: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? 0.55 : 1, transition: "all 0.25s cubic-bezier(0.25,0.46,0.45,0.94)", transformOrigin: "center center" }}>
 
           {/* Nav bar — matches real app exactly */}
           <nav className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0">
@@ -1207,14 +961,26 @@ function AppTourDemo() {
                 <span className="text-xs text-white/50">{getDemoGreeting()}. You have 1 task due today.</span>
               </div>
               <div className="w-full max-w-xl">
-                <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-colors duration-200"
-                  style={{ borderColor: hasInput ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)" }}>
-                  <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
-                    {hasInput
-                      ? <span className="text-white/85">{inputText}{isTypingPhase && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
-                      : <span className="text-white/35">Ask me anything…</span>}
+                <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-all duration-300"
+                  style={{ borderColor: (micActive || isTypingPhase) ? "rgba(255,255,255,0.28)" : hasInput ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)", boxShadow: (micActive || isTypingPhase) ? "0 0 0 3px rgba(255,255,255,0.04)" : "none" }}>
+                  <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em] flex items-center">
+                    {micActive
+                      ? <span className="flex items-center gap-2">
+                          <span className="text-white/40 text-[13px] leading-none">Listening</span>
+                          <span className="flex items-end gap-[3px]" style={{ height: 16 }}>
+                            {[0, 0.15, 0.08, 0.22, 0.04].map((delay, i) => (
+                              <span key={i} style={{ display: "inline-block", width: 2.5, borderRadius: 2, background: "rgba(255,255,255,0.55)", animation: `wavebar 0.65s ease-in-out ${delay}s infinite` }} />
+                            ))}
+                          </span>
+                        </span>
+                      : hasInput
+                        ? <span className="text-white/85">{inputText}{isTypingPhase && <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />}</span>
+                        : <span className="text-white/35">Ask me anything…</span>}
                   </span>
-                  <Mic className="h-5 w-5 text-white/40 shrink-0" strokeWidth={1.5} />
+                  <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-all duration-300"
+                    style={(micActive || isTypingPhase) ? { background: "rgba(255,255,255,0.08)", animation: "micglow 1.2s ease-in-out infinite" } : {}}>
+                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/40"}`} strokeWidth={1.5} />
+                  </span>
                   <button className="shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all"
                     style={{ background: sending ? "rgb(229,229,229)" : hasInput ? "white" : "rgba(255,255,255,0.2)", transform: sending ? "scale(0.85)" : hasInput ? "scale(1)" : "scale(0.95)" }}>
                     <ArrowUp className="h-4 w-4" style={{ color: hasInput ? "black" : "rgba(255,255,255,0.4)" }} strokeWidth={1.5} />
@@ -1256,13 +1022,26 @@ function AppTourDemo() {
                 )}
               </div>
               <div className="shrink-0 px-4 pt-2 bg-gradient-to-t from-black via-black/90 to-transparent" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#1c1c1e] px-4 py-2">
-                  <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em]">
-                    {inputText
-                      ? <span className="text-white/85">{inputText}</span>
-                      : <span className="text-white/35">Ask me anything…</span>}
+                <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-all duration-300"
+                  style={{ borderColor: (micActive || isTypingPhase) ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.1)", boxShadow: (micActive || isTypingPhase) ? "0 0 0 3px rgba(255,255,255,0.04)" : "none" }}>
+                  <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em] flex items-center">
+                    {micActive
+                      ? <span className="flex items-center gap-2">
+                          <span className="text-white/40 text-[13px] leading-none">Listening</span>
+                          <span className="flex items-end gap-[3px]" style={{ height: 16 }}>
+                            {[0, 0.15, 0.08, 0.22, 0.04].map((delay, i) => (
+                              <span key={i} style={{ display: "inline-block", width: 2.5, borderRadius: 2, background: "rgba(255,255,255,0.55)", animation: `wavebar 0.65s ease-in-out ${delay}s infinite` }} />
+                            ))}
+                          </span>
+                        </span>
+                      : inputText
+                        ? <span className="text-white/85">{inputText}</span>
+                        : <span className="text-white/35">Ask me anything…</span>}
                   </span>
-                  <Mic className="h-5 w-5 text-white/40 shrink-0" strokeWidth={1.5} />
+                  <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-all duration-300"
+                    style={(micActive || isTypingPhase) ? { background: "rgba(255,255,255,0.08)", animation: "micglow 1.2s ease-in-out infinite" } : {}}>
+                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/40"}`} strokeWidth={1.5} />
+                  </span>
                   <button className={`shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all ${sending ? "bg-white scale-100" : "bg-white/20 scale-95"}`}>
                     <ArrowUp className={`h-4 w-4 ${sending ? "text-black" : "text-white/40"}`} strokeWidth={1.5} />
                   </button>
@@ -1347,6 +1126,80 @@ function AppTourDemo() {
           </div>
         </div>
 
+        {/* ── Grocery list panel ── */}
+        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
+          style={{ width: "95%", transform: listOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
+
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
+              <div>
+                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Grocery</p>
+                <p className="text-[0.55rem] text-white/25 mt-0.5">8 items</p>
+              </div>
+              <button className="flex items-center justify-center w-5 h-5 rounded-full bg-white shrink-0">
+                <Plus className="h-2.5 w-2.5 text-black" strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-3" style={{ scrollbarWidth: "none" }}>
+              {[
+                { name: "Greek yogurt",    done: false },
+                { name: "Oat milk",        done: false },
+                { name: "Sourdough",       done: false },
+                { name: "Chicken thighs",  done: false },
+                { name: "Cherry tomatoes", done: false },
+                { name: "Spinach",         done: false },
+                { name: "Avocados",        done: false },
+                { name: "Olive oil",       done: true  },
+              ].map((item) => (
+                <div key={item.name} className="flex items-center gap-3 py-2.5 border-b border-white/[0.05]">
+                  <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${item.done ? "border-orange-400/60 bg-orange-400/10" : "border-white/20"}`}>
+                    {item.done && <div className="w-1.5 h-1.5 rounded-full bg-orange-400/70" />}
+                  </div>
+                  <p className={`text-[0.82rem] flex-1 leading-snug ${item.done ? "line-through text-white/30" : "text-white/80"}`}>{item.name}</p>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── Journal panel ── */}
+        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
+          style={{ width: "95%", transform: journalOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
+
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
+              <div>
+                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Journal</p>
+                <p className="text-[0.55rem] text-white/25 mt-0.5">Private · Sunday, April 13</p>
+              </div>
+              <BookOpen className="h-3.5 w-3.5 text-white/20" strokeWidth={1.5} />
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4" style={{ scrollbarWidth: "none" }}>
+              <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-3">Today&rsquo;s entry</p>
+              <p className="text-[0.85rem] text-white/70 leading-relaxed">
+                Stayed within budget today. Logged coffee and breakfast — small win. Feeling more in control of spending lately.
+                <span className="inline-block w-[1.5px] h-[0.85em] bg-white/40 ml-0.5 align-middle animate-pulse" />
+              </p>
+              <div className="mt-6 pt-4 border-t border-white/[0.05]">
+                <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-2">Past entries</p>
+                {[
+                  { date: "Apr 12", preview: "Good day overall. Remembered to call the dentist..." },
+                  { date: "Apr 11", preview: "Grocery run felt manageable this week. Under budget..." },
+                ].map((e) => (
+                  <div key={e.date} className="py-2.5 border-b border-white/[0.04]">
+                    <p className="text-[0.62rem] text-white/30">{e.date}</p>
+                    <p className="text-[0.75rem] text-white/45 mt-0.5 leading-snug">{e.preview}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         {/* ── Breathe panel (slides in from right, like dashboard) ── */}
         <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
           style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
@@ -1406,10 +1259,10 @@ function AppTourDemo() {
 
             {/* Tab bar */}
             <div className="px-5 pt-4 shrink-0">
-              <div className="flex rounded-full border border-white/5 bg-[#111] p-0.5">
+              <div className="flex overflow-x-auto rounded-full border border-white/5 bg-[#111] p-0.5 gap-0.5" style={{ scrollbarWidth: "none" }}>
                 {TOUR_TABS.map((tab) => (
                   <button key={tab}
-                    className="flex-1 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200"
+                    className="shrink-0 rounded-full px-2.5 py-1.5 text-[0.62rem] font-medium whitespace-nowrap transition-all duration-200"
                     style={{ background: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent", color: activeTab === tab ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)" }}>
                     {tab}
                   </button>
@@ -1419,9 +1272,10 @@ function AppTourDemo() {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
-              {activeTab === "Insights"  && <TourInsightsTab />}
+              {activeTab === "Insights" && <TourInsightsTab />}
               {activeTab === "Budget"   && <TourBudgetTab />}
-              {activeTab === "Schedule" && <TourScheduleTab />}
+              {activeTab === "Bills"    && <TourBillsTab />}
+              {activeTab === "Forecast" && <TourForecastTab />}
               {activeTab === "Goals"    && <TourGoalsTab />}
             </div>
           </div>
@@ -1499,7 +1353,7 @@ export default function LandingPage() {
             Talk to me.<br />I&rsquo;ll organize your<br />money, tasks, and day.
           </h1>
           <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
-            And when you need it, I&rsquo;ll guide you through a calming breath — or simply give you space to reset.
+            I&rsquo;ll even guide you through a calming breath when you need one.
           </p>
 
           {/* See it in action — app tour */}
@@ -1522,7 +1376,6 @@ export default function LandingPage() {
       {/* How it works */}
       <div className="max-w-lg mx-auto px-6 text-center">
         <p className="text-[12px] uppercase tracking-[4px] text-white/40 mb-3">How I work</p>
-        <p className="text-[16px] text-white/60 leading-relaxed mb-10">Private daily journal, smart bill &amp;<br />event reminders, guided breathing,<br />and full data export — all with privacy.</p>
         <div className="space-y-0">
           {HOW_STEPS.map((s) => (
             <div key={s.n} className="py-6 border-b border-white/5 last:border-0">
@@ -1534,17 +1387,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 px-6 py-10">
-        <div className="flex-1 border-t border-white/5" />
-        <StarEight className="w-2.5 h-2.5 text-white/20 shrink-0" />
-        <div className="flex-1 border-t border-white/5" />
-      </div>
-
-      {/* What I can do — app demo */}
-      <div className="max-w-lg mx-auto px-6 text-center">
-        <p className="text-[0.65rem] uppercase tracking-[4px] text-white/40 mb-8">What I handle</p>
-        <AppDemo />
-      </div>
 
       <style>{`
         @keyframes bounce {
@@ -1565,11 +1407,26 @@ export default function LandingPage() {
             box-shadow: 0 0 44px rgba(90,163,216,.78), 0 0 20px rgba(90,163,216,.46);
           }
         }
+        @keyframes wavebar {
+          0%, 100% { height: 3px;  opacity: 0.35; }
+          50%       { height: 14px; opacity: 0.85; }
+        }
+        @keyframes micglow {
+          0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,0.12); }
+          50%       { box-shadow: 0 0 0 4px rgba(255,255,255,0.22), 0 0 12px rgba(255,255,255,0.10); }
+        }
       `}</style>
 
       {/* Closing CTA */}
-      <div className="max-w-lg mx-auto px-6 pt-12 pb-16 text-center">
-        <h2 className="text-2xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)]">Ready to free yourself of chaos?</h2>
+      <div className="max-w-lg mx-auto px-6 pt-16 pb-16 text-center flex flex-col items-center">
+        <motion.div
+          className="mb-6"
+          animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+          transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
+        >
+          <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+        </motion.div>
+        <h2 className="text-2xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
         <p className="text-sm text-white/50 mb-10">Nothing to configure. Just talk to me.</p>
         <div className="flex flex-col items-center gap-3">
           {closingCta}
