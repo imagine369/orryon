@@ -1499,7 +1499,7 @@ export default function LandingPage() {
             Talk to me.<br />I&rsquo;ll organize your<br />money, tasks, and day.
           </h1>
           <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
-            And when life gets heavy, I&rsquo;ll guide you through a breath — or just give you space to reset.
+            And when you need it, I&rsquo;ll guide you through a calming breath — or simply give you space to reset.
           </p>
 
           {/* See it in action — app tour */}
