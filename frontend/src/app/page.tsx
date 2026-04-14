@@ -817,6 +817,13 @@ function AppDemo() {
   );
 }
 
+function getDemoGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 // ─── App Tour Demo ────────────────────────────────────────────────────────────
 
 type TourPhase =
@@ -824,7 +831,8 @@ type TourPhase =
   | "thinking" | "responding" | "next-chat" | "clearing" | "pre-dash"
   | "tap-grid" | "panel-open"
   | "tab-budget" | "tab-schedule" | "tab-goals"
-  | "panel-close" | "bell-tap" | "breathe-open" | "breathe-close" | "reset";
+  | "panel-close" | "bell-tap" | "today-open" | "today-close"
+  | "breathe-open" | "breathe-close" | "reset";
 
 const TOUR_CHATS = [
   { prompt: "Add coffee and breakfast $12.50",                response: "Done — coffee & breakfast logged for $12.50." },
@@ -1079,6 +1087,7 @@ function AppTourDemo() {
   const [gridLit, setGridLit]         = useState(false);
   const [bellLit, setBellLit]         = useState(false);
   const [breatheOpen, setBreatheOpen] = useState(false);
+  const [todayOpen, setTodayOpen]     = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [activeTab, setActiveTab]     = useState<TourTab>("Insights");
   const [visible, setVisible]         = useState(true);
@@ -1095,7 +1104,7 @@ function AppTourDemo() {
     if (phase === "home") {
       setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
       setSending(false); setGridLit(false); setBellLit(false); setBreatheOpen(false);
-      setPanelOpen(false); setActiveTab("Insights");
+      setTodayOpen(false); setPanelOpen(false); setActiveTab("Insights");
       setChatIdx(0); setVisible(true);
       go("typing", 900);
     }
@@ -1138,9 +1147,10 @@ function AppTourDemo() {
     if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-schedule", 800); }
     if (phase === "tab-schedule"){ setActiveTab("Schedule"); go("tab-goals", 800); }
     if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 800); }
-    if (phase === "panel-close")  { setPanelOpen(false); go("bell-tap", 320); }
-    if (phase === "bell-tap")     { setBellLit(true); go("breathe-open", 300); }
-    if (phase === "breathe-open") { setBreatheOpen(true); setBellLit(false); go("breathe-close", 2500); }
+    if (phase === "panel-close")  { setPanelOpen(false); go("today-open", 250); }
+    if (phase === "today-open")   { setTodayOpen(true); go("today-close", 1000); }
+    if (phase === "today-close")  { setTodayOpen(false); go("breathe-open", 250); }
+    if (phase === "breathe-open") { setBreatheOpen(true); go("breathe-close", 1500); }
     if (phase === "breathe-close"){ setBreatheOpen(false); go("reset", 250); }
     if (phase === "reset") {
       setVisible(false);
@@ -1167,7 +1177,7 @@ function AppTourDemo() {
 
         {/* ── Main app content ── */}
         <div className="absolute inset-0 flex flex-col"
-          style={{ transform: panelOpen ? "scale(0.93)" : "scale(1)", borderRadius: panelOpen ? 36 : 0, opacity: panelOpen ? 0.55 : 1, transition: "all 0.25s cubic-bezier(0.25,0.46,0.45,0.94)", transformOrigin: "center center" }}>
+          style={{ transform: (panelOpen || todayOpen || breatheOpen) ? "scale(0.93)" : "scale(1)", borderRadius: (panelOpen || todayOpen || breatheOpen) ? 36 : 0, opacity: (panelOpen || todayOpen || breatheOpen) ? 0.55 : 1, transition: "all 0.25s cubic-bezier(0.25,0.46,0.45,0.94)", transformOrigin: "center center" }}>
 
           {/* Nav bar — matches real app exactly */}
           <nav className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0">
@@ -1190,11 +1200,11 @@ function AppTourDemo() {
             <div className="flex-1 flex flex-col items-center justify-center px-4" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
               <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover mb-5 ring-1 ring-white/10" />
               <p className="text-white/60 text-[14px] mb-6 max-w-[220px] text-center leading-tight">
-                Hello, Alex.<br />What shall we organize today?
+                Hello, Alex.
               </p>
               <div className="mb-6 flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/[0.03]">
                 <span className="text-white/30 text-sm">✦</span>
-                <span className="text-xs text-white/50">Good evening. You have 1 task due today.</span>
+                <span className="text-xs text-white/50">{getDemoGreeting()}. You have 1 task due today.</span>
               </div>
               <div className="w-full max-w-xl">
                 <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-colors duration-200"
@@ -1218,6 +1228,9 @@ function AppTourDemo() {
           {isChatMode && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={chatScrollRef} className="flex-1 px-4 py-4 space-y-2.5 flex flex-col overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                <div className="flex justify-center pt-2 pb-1">
+                  <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover ring-1 ring-white/10" />
+                </div>
                 <div className="flex-1" />
                 {currentBubble && (
                   <div className="flex justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
@@ -1259,12 +1272,11 @@ function AppTourDemo() {
           )}
         </div>
 
-        {/* ── Today panel (slides in from right after chat) ── */}
-        <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
-          style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+        {/* ── Today panel (slides in from right after bell tap) ── */}
+        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
+          style={{ width: "95%", transform: todayOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
           <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
 
-            {/* Panel header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
               <div>
                 <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Today</p>
@@ -1281,7 +1293,6 @@ function AppTourDemo() {
               </div>
             </div>
 
-            {/* Item count */}
             <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
               <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center shrink-0">
                 <div className="w-1 h-1 rounded-full border border-white/30" />
@@ -1289,10 +1300,7 @@ function AppTourDemo() {
               <p className="text-[0.55rem] text-white/25">11 items today</p>
             </div>
 
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-5 pb-4" style={{ scrollbarWidth: "none" }}>
-
-              {/* Events — matches DEMO_EVENTS in nav-bar.tsx */}
               {[
                 { title: "Team standup",        type: "meeting"     },
                 { title: "Lunch with Sarah",    type: "personal"    },
@@ -1307,7 +1315,6 @@ function AppTourDemo() {
                 </div>
               ))}
 
-              {/* Tasks — matches DEMO_TASKS in nav-bar.tsx (P1→red, P2→orange, P3→blue, P4→dim) */}
               {[
                 { title: "Review Q2 budget report",        border: "#f87171" },
                 { title: "Call with accountant at 3pm",    border: "#f87171" },
@@ -1317,15 +1324,11 @@ function AppTourDemo() {
                 { title: "Pick up dry cleaning",           border: "rgba(255,255,255,0.2)" },
               ].map((t) => (
                 <div key={t.title} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
-                  <button
-                    className="shrink-0 w-4 h-4 rounded-full border-2"
-                    style={{ borderColor: t.border }}
-                  />
+                  <button className="shrink-0 w-4 h-4 rounded-full border-2" style={{ borderColor: t.border }} />
                   <p className="text-[0.78rem] text-white/85 flex-1 leading-snug">{t.title}</p>
                 </div>
               ))}
 
-              {/* Bills — matches DEMO_BILLS in nav-bar.tsx */}
               {[
                 { name: "Netflix", amount: 15.99 },
                 { name: "Spotify", amount: 9.99  },
@@ -1340,32 +1343,44 @@ function AppTourDemo() {
                   </span>
                 </div>
               ))}
-
-              {/* Breathing widget teaser */}
-              <div className="mt-4 rounded-xl border border-white/[0.06] overflow-hidden"
-                style={{ background: "linear-gradient(180deg,#0d2535 0%,#0c2233 100%)" }}>
-                <div className="flex items-center gap-3 px-4 py-3.5">
-                  <div
-                    className="rounded-full shrink-0"
-                    style={{
-                      width: 35, height: 35,
-                      background: "linear-gradient(135deg,hsl(200,45%,68%) 0%,hsl(205,40%,52%) 50%,hsl(210,38%,38%) 100%)",
-                      animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[0.78rem] font-semibold text-white/70 leading-tight">Take a breath</p>
-                    <p className="text-[0.55rem] text-white/30 tracking-wide mt-0.5">Box Breathing · 4–4–4–4</p>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
 
+        {/* ── Breathe panel (slides in from right, like dashboard) ── */}
+        <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
+          style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl"
+            style={{ background: "linear-gradient(180deg,#0a1e2e 0%,#0c1a28 40%,#0f0f0f 100%)" }}>
+
+            <div className="flex-1 flex flex-col items-center justify-center px-8">
+              <div
+                className="rounded-full mb-6"
+                style={{
+                  width: 72, height: 72,
+                  background: "linear-gradient(135deg,hsl(200,45%,68%) 0%,hsl(205,40%,52%) 50%,hsl(210,38%,38%) 100%)",
+                  animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
+                  boxShadow: "0 0 40px rgba(100,170,220,0.25)",
+                }}
+              />
+              <p className="text-[1.1rem] font-semibold text-white/80 leading-tight tracking-tight">Take a breath</p>
+              <p className="text-[0.65rem] text-white/30 tracking-widest uppercase mt-2">Box Breathing · 4–4–4–4</p>
+              <div className="mt-6 flex items-center gap-4 text-[0.6rem] text-white/20">
+                <span>Inhale</span>
+                <span>·</span>
+                <span>Hold</span>
+                <span>·</span>
+                <span>Exhale</span>
+                <span>·</span>
+                <span>Hold</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         {/* ── Dashboard panel (slides in from right) ── */}
-        <div className="absolute top-0 right-0 h-full flex flex-col"
+        <div className="absolute top-0 right-0 h-full z-50 flex flex-col"
           style={{ width: "95%", transform: panelOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
           <div className="h-full bg-[#141414] rounded-l-2xl shadow-2xl flex flex-col overflow-hidden">
 
