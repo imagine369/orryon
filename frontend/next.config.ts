@@ -28,4 +28,15 @@ const pwaConfig = withPWA({
 export default withSentryConfig(pwaConfig, {
   silent: true,
   disableLogger: true,
+
+  // Sentry configuration
+  org: "orryon",
+  project: "orryon-frontend",
+
+  // Automatically upload source maps during `next build`
+  // Create token at: https://sentry.io/settings/account/api/auth-tokens/
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Hide source map warnings during development
+  hideSourceMaps: true,
 });

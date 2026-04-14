@@ -165,7 +165,25 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 | `PLAID_SECRET` | No | Plaid API secret |
 | `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
+| `SENTRY_DSN` | No | Backend error tracking (Railway) |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | Frontend error tracking (Vercel) |
 | `NODE_ENV` | No | Set to `production` to disable demo mode |
+
+---
+
+## Error Monitoring (Sentry)
+
+Sentry is now configured with two separate projects:
+- **orryon-frontend** (Next.js/React errors, session replays, performance)
+- **orryon-backend** (FastAPI/Python errors, API performance)
+
+### Environment Variables Added:
+- `SENTRY_DSN` (Railway)
+- `NEXT_PUBLIC_SENTRY_DSN` (Vercel)
+
+Sentry will automatically report errors, unhandled exceptions, and performance issues from both frontend and backend.
+
+See `.env.example` for the exact values.
 
 ---
 

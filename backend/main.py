@@ -46,6 +46,8 @@ import os
 from contextlib import asynccontextmanager
 
 import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -53,13 +55,21 @@ from backend.routers import auth, chat, finance, organize, account, connections
 from config import XAI_API_KEY
 from core.scheduler import start_scheduler, stop_scheduler
 
+# ── Sentry Setup ─────────────────────────────────────────────────────────────
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
 if _sentry_dsn:
     sentry_sdk.init(
         dsn=_sentry_dsn,
-        traces_sample_rate=0.1,
+        traces_sample_rate=0.2,
+        profiles_sample_rate=0.1,  # Requires traces_sample_rate > 0
         environment=os.getenv("NODE_ENV", "development"),
+        integrations=[
+            StarletteIntegration(transaction_style="endpoint"),
+            FastApiIntegration(transaction_style="endpoint"),
+        ],
+        send_default_pii=False,  # Set to True if you want user data
     )
+    print("✅ Sentry initialized for backend")
 
 logging.basicConfig(
     level=logging.INFO,
