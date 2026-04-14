@@ -1453,7 +1453,7 @@ export default function LandingPage() {
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
     <>
-      <PillLink href="/login" variant="primary" size="sm">Get started</PillLink>
+      <PillLink href="/login" variant="primary" size="sm">Try Orryon now</PillLink>
       <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
@@ -1463,7 +1463,7 @@ export default function LandingPage() {
   const closingCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/login" variant="primary" size="sm">Get started</PillLink>
+    <PillLink href="/login" variant="primary" size="sm">Try Orryon now</PillLink>
   );
 
   return (
@@ -1495,17 +1495,17 @@ export default function LandingPage() {
           <p className="text-[0.65rem] uppercase tracking-[2px] text-white/45 mb-[40px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[2.5rem] sm:text-[3rem] font-extrabold text-white/85 mb-[40px] font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
-            Talk to me.<br />I&rsquo;ll organize everything.
+          <h1 className="text-[2.5rem] sm:text-[3rem] font-extrabold text-white/85 mb-4 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
+            Talk to me.<br />I&rsquo;ll organize your<br />money, tasks, and day.
           </h1>
           <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
-            Budget, goals, schedule, notes, and bills —<br className="hidden sm:block" /> all through natural conversation. No forms.
+            And when life gets heavy, I&rsquo;ll guide you through a breath — or just give you space to reset.
           </p>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3 mb-10">
+            <div className="flex flex-col items-center gap-3 mb-10 mt-[10px]">
               {heroCta}
             </div>
 
@@ -1521,13 +1521,14 @@ export default function LandingPage() {
 
       {/* How it works */}
       <div className="max-w-lg mx-auto px-6 text-center">
-        <p className="text-[0.65rem] uppercase tracking-[4px] text-white/40 mb-10">How I work</p>
+        <p className="text-[12px] uppercase tracking-[4px] text-white/40 mb-3">How I work</p>
+        <p className="text-[16px] text-white/60 leading-relaxed mb-10">Private daily journal, smart bill &amp;<br />event reminders, guided breathing,<br />and full data export — all with privacy.</p>
         <div className="space-y-0">
           {HOW_STEPS.map((s) => (
             <div key={s.n} className="py-6 border-b border-white/5 last:border-0">
               <span className="block text-[0.65rem] text-white/40 tracking-widest mb-2">{s.n}</span>
-              <p className="text-sm font-semibold text-white/85 mb-1">{s.title}</p>
-              <p className="text-xs text-white/60 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
+              <p className="text-[16px] font-semibold text-white/85 mb-1">{s.title}</p>
+              <p className="text-[16px] text-white/60 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
             </div>
           ))}
         </div>
@@ -1569,7 +1570,7 @@ export default function LandingPage() {
       {/* Closing CTA */}
       <div className="max-w-lg mx-auto px-6 pt-12 pb-16 text-center">
         <h2 className="text-2xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)]">Ready to free yourself of chaos?</h2>
-        <p className="text-sm text-white/50 mb-10">Nothing to configure. Just talk.</p>
+        <p className="text-sm text-white/50 mb-10">Nothing to configure. Just talk to me.</p>
         <div className="flex flex-col items-center gap-3">
           {closingCta}
         </div>
