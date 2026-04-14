@@ -16,17 +16,18 @@ const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
 const PRO_FEATURES = [
   "Full access to your personal concierge",
   "Easy voice input",
-  "Full transaction history & search",
+  "Search across transactions, notes & tasks",
   "Budget tracking with custom categories",
   "Spending summaries, recaps & patterns",
+  "Savings & financial goals",
   "Recurring bills & income tracking",
   "Cash flow forecast",
   "Calendar events, reminders & errands",
   "Today — tasks & events at a glance",
   "Lists — groceries, errands & more",
   "Journal — private daily entries",
+  "Guided breathing & mindfulness",
   "Full data export",
-  "Daily digest & weekly email reports",
   "Bill due & event reminder alerts",
 ];
 

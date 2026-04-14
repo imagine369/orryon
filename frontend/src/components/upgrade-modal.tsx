@@ -9,24 +9,20 @@ const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
 const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
 
 const PRO_FEATURES = [
-  "Unlimited messages",
-  "Voice input",
-  "Full transaction history & search",
+  "Full access to your personal concierge",
+  "Easy voice input",
+  "Search across transactions, notes & tasks",
   "Budget tracking with custom categories",
-  "Receipt scanning — AI reads your receipts",
   "Spending summaries, recaps & patterns",
-  "Net worth tracking (assets & liabilities)",
-  "Subscription health analysis",
+  "Savings & financial goals",
   "Recurring bills & income tracking",
   "Cash flow forecast",
   "Calendar events, reminders & errands",
-  "Today view — tasks + events at a glance",
-  "Guided breathing sessions — box breathing & double inhale destress",
-  "Grocery lists",
-  "Rich notes with pinning & mood tags",
-  "Shareable read-only finance link",
-  "Full data export (ZIP)",
-  "Daily digest & weekly email reports",
+  "Today — tasks & events at a glance",
+  "Lists — groceries, errands & more",
+  "Journal — private daily entries",
+  "Guided breathing & mindfulness",
+  "Full data export",
   "Bill due & event reminder alerts",
 ];
 
