@@ -2046,7 +2046,7 @@ export default function LandingPage() {
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[40px]">
+            <div className="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[40px]">
               {heroCta}
             </div>
 
