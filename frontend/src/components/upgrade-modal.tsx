@@ -101,7 +101,7 @@ export function UpgradeModal({ open, onClose }: Props) {
                   <button
                     key={opt}
                     onClick={() => setSelected(opt)}
-                    className="flex-1 rounded-full py-2 text-xs font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                    className="flex-1 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap"
                     style={{
                       background: selected === opt ? "rgba(255,255,255,0.1)" : "transparent",
                       color: selected === opt ? "white" : "rgba(255,255,255,0.35)",
@@ -110,7 +110,7 @@ export function UpgradeModal({ open, onClose }: Props) {
                     {opt === "monthly" ? (
                       <>Monthly <span className="text-white/40">$8 / mo</span></>
                     ) : (
-                      <>Annual <span className="text-white/40">$72 / yr</span>
+                      <>Annual <span className="text-white/40">$6 / mo</span><span className="text-white/25 mx-1">·</span><span className="text-white/40">$72 / yr</span>
                         <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">Save 25%</span>
                       </>
                     )}

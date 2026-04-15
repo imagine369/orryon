@@ -51,7 +51,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import auth, chat, finance, organize, account, connections
+from backend.routers import auth, chat, finance, organize, account, connections, waitlist
 from config import XAI_API_KEY
 from core.scheduler import start_scheduler, stop_scheduler
 
@@ -123,6 +123,7 @@ app.include_router(finance.router)
 app.include_router(organize.router)
 app.include_router(account.router)
 app.include_router(connections.router)
+app.include_router(waitlist.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

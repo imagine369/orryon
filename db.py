@@ -353,6 +353,12 @@ def init_db() -> None:
             updated_at        TEXT NOT NULL,
             UNIQUE(user_id, month)
         );
+
+        CREATE TABLE IF NOT EXISTS waitlist (
+            id         TEXT PRIMARY KEY,
+            email      TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL
+        );
     """)
 
     conn.commit()

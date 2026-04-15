@@ -7,8 +7,8 @@ const StarEight = ({ className }: { className?: string }) => (
     <polygon points="12,2 13.5,8.3 19.1,4.9 15.7,10.5 22,12 15.7,13.5 19.1,19.1 13.5,15.7 12,22 10.5,15.7 4.9,19.1 8.3,13.5 2,12 8.3,10.5 4.9,4.9 10.5,8.3" />
   </svg>
 );
-import { useState, useEffect, useRef } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -189,7 +189,7 @@ function HowItWorksDemo() {
               <div className="px-4 pt-5 pb-3 space-y-3 min-h-[140px] flex flex-col justify-end">
                 {bubble1 && (
                   <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85">{bubble1}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85 text-left">{bubble1}</div>
                   </div>
                 )}
                 {thinking && (
@@ -203,7 +203,7 @@ function HowItWorksDemo() {
                 {response && (
                   <div className="flex items-start gap-2">
                     <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[85%]">
+                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[85%] text-left">
                       {response}
                       {phase === "s3-responding" && <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />}
                     </div>
@@ -211,7 +211,7 @@ function HowItWorksDemo() {
                 )}
                 {bubble2 && !thinking && !response && (
                   <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85">{bubble2}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85 text-left">{bubble2}</div>
                   </div>
                 )}
               </div>
@@ -395,7 +395,7 @@ function ChatDemo() {
       <div className="px-4 pt-5 pb-3 space-y-3 min-h-[110px] flex flex-col justify-end">
         {userBubble.length > 0 && (
           <div className="flex justify-end">
-            <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white/85">
+            <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white/85 text-left">
               {userBubble}
             </div>
           </div>
@@ -419,7 +419,7 @@ function ChatDemo() {
         {(phase === "typing-response" || phase === "waiting") && responseText.length > 0 && (
           <div className="flex items-start gap-2">
             <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-            <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[90%]">
+            <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[90%] text-left">
               {responseText}
               {phase === "typing-response" && (
                 <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />
@@ -925,9 +925,9 @@ function AppTourDemo() {
   const isTypingPhase = phase === "typing";
 
   return (
-    <div className="w-full max-w-[320px] mx-auto" style={{ transition: "opacity 0.4s", opacity: visible ? 1 : 0 }}>
+    <div className="w-full max-w-[320px] sm:max-w-[360px] mx-auto" style={{ transition: "opacity 0.4s", opacity: visible ? 1 : 0 }}>
       {/* Phone shell */}
-      <div className="relative rounded-[36px] overflow-hidden bg-black shadow-2xl" style={{ height: 600, border: "6px solid #1a1a1a", boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px rgba(0,0,0,0.7)" }}>
+      <div className="relative rounded-[36px] overflow-hidden bg-black shadow-2xl h-[600px] sm:h-[650px]" style={{ border: "6px solid #1a1a1a", boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px rgba(0,0,0,0.7)" }}>
 
         {/* ── Main app content ── */}
         <div className="absolute inset-0 flex flex-col"
@@ -1000,7 +1000,7 @@ function AppTourDemo() {
                 <div className="flex-1" />
                 {currentBubble && (
                   <div className="flex justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white/85">{currentBubble}</div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white/85 text-left">{currentBubble}</div>
                   </div>
                 )}
                 {thinking && (
@@ -1286,14 +1286,423 @@ function AppTourDemo() {
   );
 }
 
+// ─── Feature Section ──────────────────────────────────────────────────────────
+
+const FEATURE_TABS_LIST = ["Finance", "Organize", "Wellbeing"] as const;
+type FeatureTabKey = typeof FEATURE_TABS_LIST[number];
+
+type FeatureCardData = {
+  tag: string;
+  Icon: React.FC<{ className?: string; strokeWidth?: number }>;
+  highlighted: string;
+  rest: string;
+  from: string;
+  to: string;
+  glow: string;
+  photo?: string;
+};
+
+const FINANCE_CARDS: FeatureCardData[] = [
+  { tag: "BUDGET",   Icon: SlidersHorizontal, highlighted: "Always know",        rest: "where your money goes.",      from: "#060e1f", to: "#0d1f40", glow: "rgba(96,165,250,0.12)", photo: "/budget-card.jpg" },
+  { tag: "GOALS",    Icon: Target,            highlighted: "Save any amount.",    rest: "Meet your goals.",     from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"  },
+  { tag: "BILLS",    Icon: Receipt,           highlighted: "Never miss",          rest: "a payment again.",            from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"  },
+  { tag: "INSIGHTS", Icon: BarChart2,         highlighted: "Spot patterns,",      rest: "spend smarter.",              from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
+  { tag: "FORECAST", Icon: TrendingUp,        highlighted: "See where",           rest: "your money is headed.",       from: "#031a1a", to: "#063030", glow: "rgba(45,212,191,0.12)", photo: "/forecast-card.jpg"  },
+  { tag: "YEARLY",   Icon: Activity,          highlighted: "Your entire year,",   rest: "in one clear view.",          from: "#08081e", to: "#14143c", glow: "rgba(129,140,248,0.12)", photo: "/yearly-card.jpg" },
+];
+
+const ORGANIZE_CARDS: FeatureCardData[] = [
+  { tag: "TASKS",    Icon: Check,          highlighted: "From idea",            rest: "to done in seconds.",         from: "#060e1f", to: "#0d2040", glow: "rgba(96,165,250,0.10)"  },
+  { tag: "LISTS",    Icon: List,           highlighted: "Groceries, errands,",  rest: "anything. Just say it.",      from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)"  },
+  { tag: "CALENDAR", Icon: Calendar,       highlighted: "Your whole week,",     rest: "organized instantly.",        from: "#120900", to: "#221400", glow: "rgba(251,146,60,0.10)"  },
+  { tag: "JOURNAL",  Icon: BookOpen,       highlighted: "Capture thoughts,",    rest: "track what matters.",         from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.10)" },
+  { tag: "SEARCH",   Icon: Search,         highlighted: "Find anything",        rest: "across your entire life.",    from: "#031a1a", to: "#063028", glow: "rgba(45,212,191,0.10)"  },
+];
+
+const WELLBEING_CARDS: FeatureCardData[] = [
+  { tag: "BREATHING",   Icon: Wind,          highlighted: "A moment to reset,",  rest: "anytime you need it.",        from: "#04131e", to: "#08202e", glow: "rgba(96,165,250,0.12)"  },
+  { tag: "DAILY BRIEF", Icon: Sparkles,      highlighted: "Start every day",     rest: "with full clarity.",          from: "#110900", to: "#201500", glow: "rgba(251,191,36,0.12)"  },
+  { tag: "AI CHAT",     Icon: MessageCircle, highlighted: "Just talk.",           rest: "I handle everything else.",   from: "#0a0a0a", to: "#181820", glow: "rgba(255,255,255,0.06)" },
+];
+
+const FEATURE_DATA: Record<FeatureTabKey, FeatureCardData[]> = {
+  Finance:   FINANCE_CARDS,
+  Organize:  ORGANIZE_CARDS,
+  Wellbeing: WELLBEING_CARDS,
+};
+
+const CARD_GAP = 8;
+const CARD_W = 280;
+const CARD_H = 460;
+
+function FeatureSection() {
+  const [activeTab, setActiveTab] = useState<FeatureTabKey>("Finance");
+  const [cardsVisible, setCardsVisible] = useState(true);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [indicatorPct, setIndicatorPct] = useState(50);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const syncProgress = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setScrollProgress(max > 0 ? el.scrollLeft / max : 0);
+    setIndicatorPct((el.clientWidth / el.scrollWidth) * 100);
+  };
+
+  useEffect(() => {
+    syncProgress();
+    window.addEventListener("resize", syncProgress);
+    return () => window.removeEventListener("resize", syncProgress);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const switchTab = (tab: FeatureTabKey) => {
+    if (tab === activeTab) return;
+    setCardsVisible(false);
+    setTimeout(() => {
+      setActiveTab(tab);
+      setScrollProgress(0);
+      setCardsVisible(true);
+      if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+    }, 160);
+  };
+
+  const nudge = (dir: "prev" | "next") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const step = CARD_W + CARD_GAP;
+    el.scrollBy({ left: dir === "next" ? step : -step, behavior: "smooth" });
+  };
+
+  const cards = FEATURE_DATA[activeTab];
+  const atStart = scrollProgress <= 0.01;
+  const atEnd   = scrollProgress >= 0.99;
+
+  return (
+    <section className="pt-0 pb-20 border-b border-white/5">
+      {/* Header */}
+      <div className="text-center px-6 mb-10 pt-[60px]">
+        <h2 className="text-[2rem] sm:text-[2.5rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-4">
+          For people who want<br />less noise and more clarity.
+        </h2>
+        <p className="text-[15px] lg:text-base text-white/50 max-w-[340px] lg:max-w-[480px] mx-auto leading-relaxed">
+          I handle the managing. You do the living.
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex justify-center gap-2 px-6 mb-8 mt-[20px] flex-wrap">
+        {FEATURE_TABS_LIST.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => switchTab(tab)}
+            className="px-5 py-2 rounded-full text-[0.75rem] font-semibold tracking-wider transition-all duration-200"
+            style={{
+              background: activeTab === tab ? "white" : "transparent",
+              color: activeTab === tab ? "black" : "rgba(255,255,255,0.45)",
+              border: activeTab === tab ? "1px solid white" : "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            {tab.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* Carousel */}
+      <div className="relative">
+        {/* Scrollable track — edge to edge, no padding */}
+        <div
+          ref={scrollRef}
+          onScroll={syncProgress}
+          className="overflow-x-auto"
+          style={{
+            scrollbarWidth: "none",
+            scrollSnapType: "x mandatory",
+            scrollPaddingLeft: "clamp(24px, 12vw, 220px)",
+            transition: "opacity 0.16s ease",
+            opacity: cardsVisible ? 1 : 0,
+          }}
+        >
+          <div className="flex" style={{ gap: CARD_GAP, paddingLeft: "clamp(24px, 12vw, 220px)", paddingRight: 32 }}>
+            {cards.map((card) => {
+              const Icon = card.Icon;
+              return (
+                <div
+                  key={card.tag}
+                  className="relative overflow-hidden shrink-0 flex flex-col"
+                  style={{
+                    width: CARD_W,
+                    height: CARD_H,
+                    scrollSnapAlign: "start",
+                    background: card.photo ? "black" : `linear-gradient(155deg, ${card.from} 0%, ${card.to} 100%)`,
+                  }}
+                >
+                  {/* Photo background */}
+                  {card.photo && (
+                    <>
+                      <div className="absolute inset-0" style={{ backgroundImage: `url(${card.photo})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                      <div className="absolute inset-0 bg-black/30" />
+                    </>
+                  )}
+
+                  {/* Glow */}
+                  {!card.photo && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{ background: `radial-gradient(ellipse at 50% 15%, ${card.glow} 0%, transparent 60%)` }}
+                    />
+                  )}
+
+                  {/* Top row */}
+                  <div className="relative flex items-center justify-between p-4">
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/50 border border-white/10 px-3 py-1.5">
+                      <Icon className="h-3 w-3 text-white/55" strokeWidth={1.5} />
+                      <span className="text-[0.55rem] font-bold tracking-widest text-white/55">{card.tag}</span>
+                    </div>
+                  </div>
+
+                  {/* Center — watermark icon */}
+                  <div className="flex-1 flex items-center justify-center">
+                    {!card.photo && <Icon className="h-24 w-24 text-white/[0.04]" strokeWidth={0.4} />}
+                  </div>
+
+                  {/* Bottom copy */}
+                  <div
+                    className="relative h-[110px] flex flex-col justify-start p-5"
+                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 100%)" }}
+                  >
+                    <p className="text-[1rem] font-bold leading-snug">
+                      <span className="text-white">{card.highlighted}</span>{" "}
+                      <span className="text-white/45">{card.rest}</span>
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Left arrow — overlaid, hidden at start */}
+        {!atStart && (
+          <button
+            onClick={() => nudge("prev")}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
+            style={{ background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
+          >
+            <ChevronLeft className="h-5 w-5 text-white/80" strokeWidth={1.5} />
+          </button>
+        )}
+
+        {/* Right arrow — overlaid, hidden at end */}
+        {!atEnd && (
+          <button
+            onClick={() => nudge("next")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
+            style={{ background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
+          >
+            <ChevronRight className="h-5 w-5 text-white/80" strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
+
+      {/* Scroll progress line */}
+      <div
+        className="relative h-[2px] mt-4"
+        style={{ marginLeft: "clamp(24px, 12vw, 220px)", marginRight: "clamp(24px, 12vw, 220px)", background: "rgba(255,255,255,0.08)" }}
+      >
+        <div
+          className="absolute top-0 h-full rounded-full"
+          style={{
+            width: "15%",
+            left: `${scrollProgress * 85}%`,
+            background: "rgba(255,255,255,0.7)",
+            transition: "left 0.12s ease",
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─── Orbit Section ────────────────────────────────────────────────────────────
+
+const ORBIT_ITEMS = [
+  { label: "Money",     sub: "Budgets, bills & goals",   Icon: BarChart2, color: "#60a5fa", glow: "rgba(96,165,250,0.20)"  },
+  { label: "Tasks",     sub: "To-dos, lists & errands",  Icon: Check,     color: "#4ade80", glow: "rgba(74,222,128,0.20)"  },
+  { label: "Calendar",  sub: "Events & reminders",       Icon: Calendar,  color: "#fb923c", glow: "rgba(251,146,60,0.20)"  },
+  { label: "Notes",     sub: "Quick captures & ideas",   Icon: FileText,  color: "#fbbf24", glow: "rgba(251,191,36,0.20)"  },
+  { label: "Journal",   sub: "Thoughts & entries",       Icon: BookOpen,  color: "#c084fc", glow: "rgba(192,132,252,0.20)" },
+  { label: "Wellbeing", sub: "Breathing & clarity",      Icon: Wind,      color: "#2dd4bf", glow: "rgba(45,212,191,0.20)"  },
+];
+
+const ORBIT_R = 220;
+const AVATAR_R = 77;  // avatar edge (51.5px) + 25px gap
+const CIRCLE_R_INACTIVE = 61; // inactive circle edge + 25px gap
+const CIRCLE_R_ACTIVE = 69;   // active circle edge + 25px gap
+const CON_W = 660, CON_H = 580;
+const OCX = CON_W / 2, OCY = CON_H / 2;
+const ORBIT_DATA = [-90, -30, 30, 90, 150, 210].map((deg) => {
+  const a = (deg * Math.PI) / 180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  return { x: OCX + ORBIT_R * ux, y: OCY + ORBIT_R * uy, ux, uy };
+});
+
+function OrbitSection() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setActive((p) => (p + 1) % ORBIT_ITEMS.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <section className="border-b border-white/5">
+      <div className="text-center px-6 pt-[122px] pb-10">
+        <h2 className="text-[2rem] sm:text-[2.5rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
+          Your money, tasks, and wellbeing —<br />
+          <em>all in one place.</em>
+        </h2>
+      </div>
+
+      {/* Desktop: radial orbit */}
+      <div className="hidden sm:flex justify-center pb-16">
+        <div className="relative" style={{ width: CON_W, height: CON_H, overflow: "visible" }}>
+
+          {/* Connecting lines — from avatar edge to circle edge */}
+          <svg className="absolute inset-0" width={CON_W} height={CON_H} style={{ pointerEvents: "none" }}>
+            {ORBIT_DATA.map((d, i) => {
+              const isActive = active === i;
+              const endGap = isActive ? CIRCLE_R_ACTIVE : CIRCLE_R_INACTIVE;
+              return (
+                <line
+                  key={i}
+                  x1={OCX + AVATAR_R * d.ux}
+                  y1={OCY + AVATAR_R * d.uy}
+                  x2={d.x - endGap * d.ux}
+                  y2={d.y - endGap * d.uy}
+                  stroke={isActive ? ORBIT_ITEMS[i].color : "rgba(255,255,255,0.06)"}
+                  strokeWidth={isActive ? 1.5 : 1}
+                  strokeDasharray={isActive ? undefined : "3 6"}
+                  style={{ transition: "stroke 0.5s ease" }}
+                />
+              );
+            })}
+          </svg>
+
+          {/* Center avatar */}
+          <div className="absolute z-10" style={{ left: OCX, top: OCY, transform: "translate(-50%, -50%)" }}>
+            <motion.div
+              animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+              transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity }}
+            >
+              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+            </motion.div>
+          </div>
+
+          {/* Orbit nodes */}
+          {ORBIT_ITEMS.map((item, i) => {
+            const d = ORBIT_DATA[i];
+            const isActive = active === i;
+            const Icon = item.Icon;
+            const sz = isActive ? 80 : 64;
+            const iconSz = isActive ? 28 : 22;
+            return (
+              <div
+                key={item.label}
+                className="absolute flex flex-col items-center z-10"
+                style={{ left: d.x, top: d.y, transform: "translate(-50%, -50%)" }}
+              >
+                <div style={{
+                  width: sz, height: sz, borderRadius: "50%",
+                  border: `1.5px solid ${isActive ? item.color : "rgba(255,255,255,0.12)"}`,
+                  background: isActive ? item.glow : "rgba(255,255,255,0.03)",
+                  boxShadow: isActive ? `0 0 36px ${item.glow}` : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.5s cubic-bezier(0.34,1.2,0.64,1)",
+                }}>
+                  <Icon style={{ width: iconSz, height: iconSz, color: isActive ? item.color : "rgba(255,255,255,0.25)", transition: "all 0.5s ease" }} strokeWidth={1.5} />
+                </div>
+                <div className="mt-2.5 text-center" style={{ opacity: isActive ? 1 : 0.3, transition: "opacity 0.5s ease" }}>
+                  <p className="text-sm font-semibold text-white/85 leading-tight whitespace-nowrap">{item.label}</p>
+                  <p className="text-[0.65rem] text-white/40 whitespace-nowrap">{item.sub}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mobile: animated grid */}
+      <div className="sm:hidden px-6 pb-16">
+        <div className="flex justify-center mb-8">
+          <motion.div
+            animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+            transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity }}
+          >
+            <Image src="/avatar.png" alt="Orryon" width={64} height={64} className="rounded-full object-cover ring-1 ring-white/10" />
+          </motion.div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 max-w-[320px] mx-auto">
+          {ORBIT_ITEMS.map((item, i) => {
+            const isActive = active === i;
+            const Icon = item.Icon;
+            return (
+              <div
+                key={item.label}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-500${i === 4 ? " col-span-2 max-w-[calc(50%-6px)] mx-auto w-full" : ""}`}
+                style={{
+                  borderColor: isActive ? item.color : "rgba(255,255,255,0.08)",
+                  background: isActive ? item.glow : "rgba(255,255,255,0.02)",
+                }}
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
+                  border: `1.5px solid ${isActive ? item.color : "rgba(255,255,255,0.1)"}`,
+                  background: isActive ? item.glow : "transparent",
+                  transition: "all 0.5s ease",
+                }}>
+                  <Icon style={{ width: 16, height: 16, color: isActive ? item.color : "rgba(255,255,255,0.3)", transition: "color 0.5s ease" }} strokeWidth={1.5} />
+                </div>
+                <p className="text-xs font-semibold text-white/85">{item.label}</p>
+                <p className="text-[0.6rem] text-white/40 text-center">{item.sub}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Landing page ─────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistStatus, setWaitlistStatus] = useState<"idle" | "loading" | "success" | "duplicate" | "error">("idle");
 
   useEffect(() => {
     setLoggedIn(hasToken());
   }, []);
+
+  const handleWaitlist = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = waitlistEmail.trim();
+    if (!email) return;
+    setWaitlistStatus("loading");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error("request_failed");
+      const data = await res.json();
+      setWaitlistStatus(data.status === "already_on_waitlist" ? "duplicate" : "success");
+    } catch {
+      setWaitlistStatus("error");
+    }
+  }, [waitlistEmail]);
 
   const navActions = loggedIn ? (
     <PillLink href="/home" variant="primary" size="sm">Go to app</PillLink>
@@ -1305,26 +1714,58 @@ export default function LandingPage() {
 
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
+  ) : waitlistStatus === "success" || waitlistStatus === "duplicate" ? (
+    <>
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/[0.04]">
+          <StarEight className="w-4 h-4 text-white/60" />
+        </div>
+        <p className="text-sm font-semibold text-white/85">
+          {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
+        </p>
+        <p className="text-xs text-white/40">
+          {waitlistStatus === "duplicate" ? "We\u2019ll be in touch." : "We\u2019ll reach out when it\u2019s your turn."}
+        </p>
+      </div>
+      <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+        Already have an account? Sign in
+      </Link>
+    </>
   ) : (
     <>
-      <PillLink href="/login" variant="primary" size="sm">Try Orryon now</PillLink>
+      <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
+        <div className="w-full flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] pl-5 pr-1.5 py-1.5 focus-within:border-white/25 transition-colors duration-200">
+          <input
+            type="email"
+            required
+            placeholder="Enter your email"
+            value={waitlistEmail}
+            onChange={(e) => setWaitlistEmail(e.target.value)}
+            className="flex-1 bg-transparent text-[15px] text-white/85 placeholder:text-white/30 outline-none py-1.5 min-w-0"
+          />
+          <button
+            type="submit"
+            disabled={waitlistStatus === "loading"}
+            className="shrink-0 rounded-full bg-white text-black text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
+          </button>
+        </div>
+        {waitlistStatus === "error" && (
+          <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
+        )}
+      </form>
       <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
     </>
   );
 
-  const closingCta = loggedIn ? (
-    <PillLink href="/home" size="sm">Go to app</PillLink>
-  ) : (
-    <PillLink href="/login" variant="primary" size="sm">Try Orryon now</PillLink>
-  );
-
   return (
     <div className="min-h-screen bg-black text-white">
 
       {/* Nav */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 lg:px-16 py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
         <span className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
           ORRYON
         </span>
@@ -1335,57 +1776,46 @@ export default function LandingPage() {
 
       {/* Hero */}
       <FadeIn>
-        <div className="flex flex-col items-center text-center pt-[100px] sm:pt-[160px] pb-16 px-6 border-b border-white/5">
+        <div className="flex flex-col items-center text-center pt-[100px] sm:pt-[160px] lg:pt-[200px] pb-0 px-6 border-b border-white/5">
           <motion.div
-            className="mt-0 mb-2.5"
+            className="mt-0 mb-2.5 lg:mb-4"
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
           >
-            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
           </motion.div>
-          <p className="text-[1rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+          <p className="text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
           </p>
-          <p className="text-[0.65rem] uppercase tracking-[2px] text-white/45 mb-[40px] -mt-[3px]">
+          <p className="text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[40px] lg:mb-[52px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[2.5rem] sm:text-[3rem] font-extrabold text-white/85 mb-4 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px]">
-            Talk to me.<br />I&rsquo;ll organize your<br />money, tasks, and day.
+          <h1 className="text-[2.5rem] sm:text-[3rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px] sm:max-w-[580px] lg:max-w-[860px]">
+            Your guide to organized<br />money, tasks, and calmer days.
           </h1>
-          <p className="text-[15px] text-white/65 max-w-[340px] leading-relaxed mb-10 font-medium">
-            I&rsquo;ll even guide you through a calming breath when you need one.
-          </p>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3 mb-10 mt-[10px]">
+            <div className="flex flex-col items-center gap-3 mb-[60px] mt-[10px]">
               {heroCta}
             </div>
 
-            <AppTourDemo />
+            <div className="mt-[50px] w-full flex justify-center text-left">
+              <AppTourDemo />
+            </div>
 
             {/* Trust signal — after the demo, before they decide */}
-            <p className="text-xs text-white/40 mt-10">
+            <p className="text-xs lg:text-sm text-white/40 mt-[15px]">
               Orryon doesn&rsquo;t connect to your bank.<br />That&rsquo;s the point. Your data stays yours.
             </p>
           </div>
         </div>
       </FadeIn>
 
-      {/* How it works */}
-      <div className="max-w-lg mx-auto px-6 text-center">
-        <p className="text-[12px] uppercase tracking-[4px] text-white/40 mb-3">How I work</p>
-        <div className="space-y-0">
-          {HOW_STEPS.map((s) => (
-            <div key={s.n} className="py-6 border-b border-white/5 last:border-0">
-              <span className="block text-[0.65rem] text-white/40 tracking-widest mb-2">{s.n}</span>
-              <p className="text-[16px] font-semibold text-white/85 mb-1">{s.title}</p>
-              <p className="text-[16px] text-white/60 leading-relaxed max-w-xs mx-auto">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <OrbitSection />
+
+      <FeatureSection />
 
 
       <style>{`
@@ -1417,21 +1847,77 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* Closing CTA */}
-      <div className="max-w-lg mx-auto px-6 pt-16 pb-16 text-center flex flex-col items-center">
-        <motion.div
-          className="mb-6"
-          animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-          transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-        >
-          <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
-        </motion.div>
-        <h2 className="text-2xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
-        <p className="text-sm text-white/50 mb-10">Nothing to configure. Just talk to me.</p>
-        <div className="flex flex-col items-center gap-3">
-          {closingCta}
-        </div>
+      {/* Early Access / Waitlist */}
+      <section id="early-access" className="border-t border-white/5">
+      <div className="max-w-lg lg:max-w-2xl mx-auto px-6 pt-16 pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
+        {!loggedIn && (
+          <>
+            <p className="text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
+
+            <h2 className="text-2xl lg:text-4xl font-bold text-white/85 mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
+              Let&rsquo;s make your day a little easier.
+            </h2>
+            <p className="text-sm lg:text-base text-white/50 mb-10 lg:mb-12">
+              Orryon is in early access. Drop your email and you&rsquo;ll be first in.
+            </p>
+
+            {waitlistStatus === "success" || waitlistStatus === "duplicate" ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/[0.04] mb-1">
+                  <StarEight className="w-4 h-4 text-white/60" />
+                </div>
+                <p className="text-base font-semibold text-white/85">
+                  {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
+                </p>
+                <p className="text-sm text-white/40">
+                  {waitlistStatus === "duplicate"
+                    ? "We already have your email \u2014 we\u2019ll be in touch."
+                    : "We\u2019ll reach out when it\u2019s your turn."}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
+                <div className="w-full flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] pl-5 pr-1.5 py-1.5 focus-within:border-white/25 transition-colors duration-200">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your email"
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    className="flex-1 bg-transparent text-[15px] text-white/85 placeholder:text-white/30 outline-none py-1.5 min-w-0"
+                  />
+                  <button
+                    type="submit"
+                    disabled={waitlistStatus === "loading"}
+                    className="shrink-0 rounded-full bg-white text-black text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
+                  </button>
+                </div>
+                {waitlistStatus === "error" && (
+                  <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
+                )}
+              </form>
+            )}
+          </>
+        )}
+
+        {loggedIn && (
+          <>
+            <motion.div
+              className="mb-6 lg:mb-8"
+              animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+              transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
+            >
+              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+            </motion.div>
+            <h2 className="text-2xl lg:text-4xl font-bold text-white/85 mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
+            <p className="text-sm lg:text-base text-white/50 mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
+            <PillLink href="/home" size="sm">Go to app</PillLink>
+          </>
+        )}
       </div>
+      </section>
 
       <Footer />
     </div>
