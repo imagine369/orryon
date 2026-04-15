@@ -1635,10 +1635,10 @@ function FeatureSection() {
       {/* Header */}
       <div className="text-center px-4 sm:px-6 mb-8 sm:mb-10 pt-[48px] sm:pt-[60px]">
         <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">
-          For people who want<br />less noise and more clarity.
+          I handle the managing.<br />You do the living.
         </h2>
         <p className="text-sm sm:text-[15px] lg:text-base text-white/50 max-w-[300px] sm:max-w-[380px] lg:max-w-[480px] mx-auto leading-relaxed">
-          I handle the managing. You do the living.
+          For people who want less noise and more clarity.
         </p>
       </div>
 
@@ -1808,8 +1808,8 @@ function OrbitSection() {
     <section className="border-b border-white/5">
       <div className="text-center px-4 sm:px-6 pt-[80px] sm:pt-[100px] lg:pt-[122px] pb-8 sm:pb-10">
         <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
-          Your money, tasks, and wellbeing —<br />
-          <em>all in one place.</em>
+          Everything you need to run your day —<br />
+          <em>nothing you don&rsquo;t.</em>
         </h2>
       </div>
 
@@ -2036,17 +2036,17 @@ export default function LandingPage() {
           <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
           </p>
-          <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[32px] sm:mb-[40px] lg:mb-[52px] -mt-[3px]">
+          <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[28px] sm:mb-[36px] lg:mb-[48px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mt-[10px] mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
+          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mt-0 mb-[59px] sm:mb-[67px] lg:mb-[75px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
             Your guide to organized <span className="hidden sm:inline"><br /></span>money, tasks, and calmer days.
           </h1>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[40px]">
+            <div className="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-0">
               {heroCta}
             </div>
 
@@ -2104,10 +2104,10 @@ export default function LandingPage() {
             <p className="text-[0.6rem] sm:text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
 
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
-              Let&rsquo;s make your day a little easier.
+              Less noise. More you.
             </h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">
-              Orryon is in early access. Drop your email and you&rsquo;ll be first in.
+              Be first. No spam. Ever.
             </p>
 
             {waitlistStatus === "success" || waitlistStatus === "duplicate" ? (
@@ -2161,7 +2161,7 @@ export default function LandingPage() {
             >
               <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
             </motion.div>
-            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
+            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
             <PillLink href="/home" size="sm">Go to app</PillLink>
           </>
