@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             We genuinely want Orryon to be a helpful, privacy-first tool for you. Your trust matters to us.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            Questions or concerns? Contact us at <a href="mailto:support@orryon.app" className="underline hover:text-white">support@orryon.app</a>.
+            Questions or concerns? Contact us at <a href="mailto:support@orryon.com" className="underline hover:text-white">support@orryon.com</a>.
           </p>
         </div>
       </div>

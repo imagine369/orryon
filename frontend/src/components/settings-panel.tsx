@@ -274,9 +274,9 @@ export function SettingsPanel() {
             transition={{ type: "spring", stiffness: 300, damping: 32, mass: 0.9 }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={{ left: 0.2, right: 0 }}
+            dragElastic={{ left: 0, right: 0.2 }}
             onDragEnd={(_, info) => {
-              if (info.offset.x < -80 || info.velocity.x < -500) close();
+              if (info.offset.x > 80 || info.velocity.x > 500) close();
             }}
             className="fixed top-0 right-0 h-full z-50 flex flex-col"
             style={{ width: "95vw", maxWidth: 600 }}

@@ -29,7 +29,6 @@ export class ErrorBoundary extends React.Component<Props, State> {
         componentStack: errorInfo.componentStack,
       },
     });
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   render() {

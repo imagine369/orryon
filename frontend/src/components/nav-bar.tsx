@@ -32,28 +32,7 @@ function priorityBorderColor(priority: string) {
 
 type TaskSort = "priority" | "date" | "name" | "manual";
 
-function SortPills<T extends string>({
-  sort, setSort, options,
-}: { sort: T; setSort: (s: T) => void; options: { key: T; label: string }[] }) {
-  return (
-    <div className="flex gap-1 flex-wrap mt-1 mb-3">
-      {options.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => setSort(key)}
-          className={cn(
-            "text-[0.58rem] font-medium px-2 py-0.5 rounded-full border transition",
-            sort === key
-              ? "bg-white/10 border-white/20 text-white/80"
-              : "bg-transparent border-white/8 text-white/25 hover:border-white/20 hover:text-white/50",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
 
 // ── Demo data ────────────────────────────────────────────────────────────────
 
@@ -175,8 +154,6 @@ export function NavBar() {
   }, [notifOpen]);
 
   // ── Sorted views ─────────────────────────────────────────────────────────
-
-  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
 
   const sortedTasks = useMemo(() => {
     if (taskSort === "manual") return tasks;
@@ -345,9 +322,9 @@ export function NavBar() {
               transition={{ type: "spring", stiffness: 300, damping: 32, mass: 0.9 }}
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={{ left: 0.2, right: 0 }}
+              dragElastic={{ left: 0, right: 0.2 }}
               onDragEnd={(_, info) => {
-                if (info.offset.x < -80 || info.velocity.x < -500) setNotifOpen(false);
+                if (info.offset.x > 80 || info.velocity.x > 500) setNotifOpen(false);
               }}
               className="fixed top-0 right-0 h-full z-50 flex flex-col"
               style={{ width: "95vw", maxWidth: 600 }}

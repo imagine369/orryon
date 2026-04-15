@@ -46,7 +46,7 @@ export default function TermsPage() {
             and the Breathe/Meditation feature.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            Questions or concerns? Contact us at <a href="mailto:support@orryon.app" className="underline hover:text-white">support@orryon.app</a>.
+            Questions or concerns? Contact us at <a href="mailto:support@orryon.com" className="underline hover:text-white">support@orryon.com</a>.
           </p>
         </div>
       </div>

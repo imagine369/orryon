@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data files
+waitlist.json
+
+# AI assistant files
+AGENTS.md
+CLAUDE.md
+
+# Capacitor native build artifacts
+ios/App/Pods/
+ios/App/build/
+android/.gradle/
+android/app/build/
+android/build/

@@ -2,9 +2,7 @@
  * Centralized demo data for the Orryon dashboard.
  *
  * When isDemo() is true, components show this sample data instead of
- * fetching from the API. Keeps the dashboard looking rich during development.
- *
- * Cleanup before launch: delete this file and remove all isDemo() branches.
+ * fetching from the API — used for the "Preview the app" mode.
  */
 
 export function isDemo() {
