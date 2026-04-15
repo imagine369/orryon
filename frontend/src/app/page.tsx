@@ -1862,7 +1862,7 @@ function OrbitSection() {
                 <div style={{
                   width: sz, height: sz, borderRadius: "50%",
                   border: `1.5px solid ${isActive ? item.color : "rgba(255,255,255,0.12)"}`,
-                  background: isActive ? item.glow : "rgba(255,255,255,0.03)",
+                  background: "rgba(255,255,255,0.03)",
                   boxShadow: isActive ? `0 0 36px ${item.glow}` : "none",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.5s cubic-bezier(0.34,1.2,0.64,1)",
@@ -1899,12 +1899,12 @@ function OrbitSection() {
                 className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-500"
                 style={{
                   borderColor: isActive ? item.color : "rgba(255,255,255,0.08)",
-                  background: isActive ? item.glow : "rgba(255,255,255,0.02)",
+                  background: "rgba(255,255,255,0.02)",
                 }}
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
                   border: `1.5px solid ${isActive ? item.color : "rgba(255,255,255,0.1)"}`,
-                  background: isActive ? item.glow : "transparent",
+                  background: "transparent",
                   transition: "all 0.5s ease",
                 }}>
                   <Icon style={{ width: 16, height: 16, color: isActive ? item.color : "rgba(255,255,255,0.3)", transition: "color 0.5s ease" }} strokeWidth={1.5} />
@@ -2066,7 +2066,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <FadeIn>
-        <div className="flex flex-col items-center text-center pt-[80px] sm:pt-[140px] lg:pt-[200px] pb-0 px-4 sm:px-6 border-b border-white/5">
+        <div className="flex flex-col items-center text-center pt-[90px] sm:pt-[150px] lg:pt-[210px] pb-0 px-4 sm:px-6 border-b border-white/5">
           <motion.div
             className="mt-0 mb-2.5 lg:mb-4"
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
