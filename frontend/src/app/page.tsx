@@ -1569,15 +1569,29 @@ const FEATURE_DATA: Record<FeatureTabKey, FeatureCardData[]> = {
 };
 
 const CARD_GAP = 8;
-const CARD_W = 280;
 const CARD_H = 460;
+
+function getCardW() {
+  if (typeof window === "undefined") return 260;
+  if (window.innerWidth < 400) return 220;
+  if (window.innerWidth < 640) return 248;
+  return 280;
+}
 
 function FeatureSection() {
   const [activeTab, setActiveTab] = useState<FeatureTabKey>("Finance");
   const [cardsVisible, setCardsVisible] = useState(true);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [indicatorPct, setIndicatorPct] = useState(50);
+  const [cardW, setCardW] = useState(260);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const update = () => setCardW(getCardW());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const syncProgress = () => {
     const el = scrollRef.current;
@@ -1608,7 +1622,7 @@ function FeatureSection() {
   const nudge = (dir: "prev" | "next") => {
     const el = scrollRef.current;
     if (!el) return;
-    const step = CARD_W + CARD_GAP;
+    const step = cardW + CARD_GAP;
     el.scrollBy({ left: dir === "next" ? step : -step, behavior: "smooth" });
   };
 
@@ -1617,24 +1631,24 @@ function FeatureSection() {
   const atEnd   = scrollProgress >= 0.99;
 
   return (
-    <section className="pt-0 pb-20 border-b border-white/5">
+    <section className="pt-0 pb-16 sm:pb-20 border-b border-white/5">
       {/* Header */}
-      <div className="text-center px-6 mb-10 pt-[60px]">
-        <h2 className="text-[2rem] sm:text-[2.5rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-4">
+      <div className="text-center px-4 sm:px-6 mb-8 sm:mb-10 pt-[48px] sm:pt-[60px]">
+        <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">
           For people who want<br />less noise and more clarity.
         </h2>
-        <p className="text-[15px] lg:text-base text-white/50 max-w-[340px] lg:max-w-[480px] mx-auto leading-relaxed">
+        <p className="text-sm sm:text-[15px] lg:text-base text-white/50 max-w-[300px] sm:max-w-[380px] lg:max-w-[480px] mx-auto leading-relaxed">
           I handle the managing. You do the living.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex justify-center gap-2 px-6 mb-8 mt-[20px] flex-wrap">
+      <div className="flex justify-center gap-2 px-4 sm:px-6 mb-6 sm:mb-8 mt-[16px] sm:mt-[20px] flex-wrap">
         {FEATURE_TABS_LIST.map((tab) => (
           <button
             key={tab}
             onClick={() => switchTab(tab)}
-            className="px-5 py-2 rounded-full text-[0.75rem] font-semibold tracking-wider transition-all duration-200"
+            className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[0.7rem] sm:text-[0.75rem] font-semibold tracking-wider transition-all duration-200"
             style={{
               background: activeTab === tab ? "white" : "transparent",
               color: activeTab === tab ? "black" : "rgba(255,255,255,0.45)",
@@ -1656,12 +1670,12 @@ function FeatureSection() {
           style={{
             scrollbarWidth: "none",
             scrollSnapType: "x mandatory",
-            scrollPaddingLeft: "clamp(24px, 12vw, 220px)",
+            scrollPaddingLeft: "clamp(16px, 8vw, 220px)",
             transition: "opacity 0.16s ease",
             opacity: cardsVisible ? 1 : 0,
           }}
         >
-          <div className="flex" style={{ gap: CARD_GAP, paddingLeft: "clamp(24px, 12vw, 220px)", paddingRight: 32 }}>
+          <div className="flex" style={{ gap: CARD_GAP, paddingLeft: "clamp(16px, 8vw, 220px)", paddingRight: 24 }}>
             {cards.map((card) => {
               const Icon = card.Icon;
               return (
@@ -1669,9 +1683,10 @@ function FeatureSection() {
                   key={card.tag}
                   className="relative overflow-hidden shrink-0 flex flex-col"
                   style={{
-                    width: CARD_W,
+                    width: cardW,
                     height: CARD_H,
                     scrollSnapAlign: "start",
+                    borderRadius: "7px",
                     background: card.photo ? "black" : "#111111",
                   }}
                 >
@@ -1742,7 +1757,7 @@ function FeatureSection() {
       {/* Scroll progress line */}
       <div
         className="relative h-[2px] mt-4"
-        style={{ marginLeft: "clamp(24px, 12vw, 220px)", marginRight: "clamp(24px, 12vw, 220px)", background: "rgba(255,255,255,0.08)" }}
+        style={{ marginLeft: "clamp(16px, 8vw, 220px)", marginRight: "clamp(16px, 8vw, 220px)", background: "rgba(255,255,255,0.08)" }}
       >
         <div
           className="absolute top-0 h-full rounded-full"
@@ -1791,16 +1806,16 @@ function OrbitSection() {
 
   return (
     <section className="border-b border-white/5">
-      <div className="text-center px-6 pt-[122px] pb-10">
-        <h2 className="text-[2rem] sm:text-[2.5rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
+      <div className="text-center px-4 sm:px-6 pt-[80px] sm:pt-[100px] lg:pt-[122px] pb-8 sm:pb-10">
+        <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
           Your money, tasks, and wellbeing —<br />
           <em>all in one place.</em>
         </h2>
       </div>
 
       {/* Desktop: radial orbit */}
-      <div className="hidden sm:flex justify-center pb-16">
-        <div className="relative" style={{ width: CON_W, height: CON_H, overflow: "visible" }}>
+      <div className="hidden sm:flex justify-center pb-16 overflow-x-hidden">
+        <div className="relative scale-[0.72] sm:scale-[0.82] lg:scale-100 origin-top" style={{ width: CON_W, height: CON_H, overflow: "visible" }}>
 
           {/* Connecting lines — from avatar edge to circle edge */}
           <svg className="absolute inset-0" width={CON_W} height={CON_H} style={{ pointerEvents: "none" }}>
@@ -1867,7 +1882,7 @@ function OrbitSection() {
       </div>
 
       {/* Mobile: animated grid */}
-      <div className="sm:hidden px-6 pb-16">
+      <div className="sm:hidden px-4 pb-16">
         <div className="flex justify-center mb-8">
           <motion.div
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
@@ -1876,7 +1891,7 @@ function OrbitSection() {
             <Image src="/avatar.png" alt="Orryon" width={64} height={64} className="rounded-full object-cover ring-1 ring-white/10" />
           </motion.div>
         </div>
-        <div className="grid grid-cols-2 gap-3 max-w-[320px] mx-auto">
+        <div className="grid grid-cols-2 gap-3 max-w-[360px] mx-auto">
           {ORBIT_ITEMS.map((item, i) => {
             const isActive = active === i;
             const Icon = item.Icon;
@@ -1896,8 +1911,8 @@ function OrbitSection() {
                 }}>
                   <Icon style={{ width: 16, height: 16, color: isActive ? item.color : "rgba(255,255,255,0.3)", transition: "color 0.5s ease" }} strokeWidth={1.5} />
                 </div>
-                <p className="text-xs font-semibold text-white/85">{item.label}</p>
-                <p className="text-[0.6rem] text-white/40 text-center">{item.sub}</p>
+                <p className="text-[0.75rem] font-semibold text-white/85">{item.label}</p>
+                <p className="text-[0.62rem] text-white/40 text-center leading-snug">{item.sub}</p>
               </div>
             );
           })}
@@ -1967,19 +1982,19 @@ export default function LandingPage() {
   ) : (
     <>
       <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
-        <div className="w-full flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] pl-5 pr-1.5 py-1.5 focus-within:border-white/25 transition-colors duration-200">
+        <div className="w-full flex flex-col xs:flex-row items-stretch xs:items-center gap-2 rounded-2xl xs:rounded-full border border-white/12 bg-white/[0.04] p-2 xs:pl-5 xs:pr-1.5 xs:py-1.5 focus-within:border-white/25 transition-colors duration-200">
           <input
             type="email"
             required
             placeholder="Enter your email"
             value={waitlistEmail}
             onChange={(e) => setWaitlistEmail(e.target.value)}
-            className="flex-1 bg-transparent text-[15px] text-white/85 placeholder:text-white/30 outline-none py-1.5 min-w-0"
+            className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
           />
           <button
             type="submit"
             disabled={waitlistStatus === "loading"}
-            className="shrink-0 rounded-full bg-white text-black text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            className="shrink-0 rounded-xl xs:rounded-full bg-white text-black text-[0.7rem] sm:text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
           </button>
@@ -1988,7 +2003,7 @@ export default function LandingPage() {
           <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
         )}
       </form>
-      <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+      <Link href="/login" className="text-[0.72rem] sm:text-xs text-white/40 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
     </>
@@ -1998,8 +2013,8 @@ export default function LandingPage() {
     <div className="min-h-screen bg-black text-white">
 
       {/* Nav */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 lg:px-16 py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
-        <span className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-16 py-3.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
+        <span className="text-white font-extrabold tracking-widest uppercase text-[0.95rem] sm:text-[1.03rem] font-[family-name:var(--font-playfair)]">
           ORRYON
         </span>
         <div className="flex items-center gap-3">
@@ -2009,37 +2024,37 @@ export default function LandingPage() {
 
       {/* Hero */}
       <FadeIn>
-        <div className="flex flex-col items-center text-center pt-[100px] sm:pt-[160px] lg:pt-[200px] pb-0 px-6 border-b border-white/5">
+        <div className="flex flex-col items-center text-center pt-[80px] sm:pt-[140px] lg:pt-[200px] pb-0 px-4 sm:px-6 border-b border-white/5">
           <motion.div
             className="mt-0 mb-2.5 lg:mb-4"
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
           >
-            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[80px] h-[80px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover ring-1 ring-white/10" />
           </motion.div>
-          <p className="text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+          <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
           </p>
-          <p className="text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[40px] lg:mb-[52px] -mt-[3px]">
+          <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[32px] sm:mb-[40px] lg:mb-[52px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[2.5rem] sm:text-[3rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.3] max-w-[420px] sm:max-w-[580px] lg:max-w-[860px]">
-            Your guide to organized<br />money, tasks, and calmer days.
+          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
+            Your guide to organized <span className="hidden sm:inline"><br /></span>money, tasks, and calmer days.
           </h1>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3 mb-[60px] mt-[10px]">
+            <div className="flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[10px]">
               {heroCta}
             </div>
 
-            <div className="mt-[50px] w-full flex justify-center text-left">
+            <div className="mt-[40px] sm:mt-[50px] w-full flex justify-center text-left">
               <AppTourDemo />
             </div>
 
             {/* Trust signal — after the demo, before they decide */}
-            <p className="text-xs lg:text-sm text-white/40 mt-[15px]">
+            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/40 mt-[15px]">
               Orryon doesn&rsquo;t connect to your bank.<br />That&rsquo;s the point. Your data stays yours.
             </p>
           </div>
@@ -2082,15 +2097,15 @@ export default function LandingPage() {
 
       {/* Early Access / Waitlist */}
       <section id="early-access" className="border-t border-white/5">
-      <div className="max-w-lg lg:max-w-2xl mx-auto px-6 pt-16 pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
+      <div className="max-w-lg lg:max-w-2xl mx-auto px-4 sm:px-6 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
         {!loggedIn && (
           <>
-            <p className="text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
+            <p className="text-[0.6rem] sm:text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
 
-            <h2 className="text-2xl lg:text-4xl font-bold text-white/85 mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
+            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
               Let&rsquo;s make your day a little easier.
             </h2>
-            <p className="text-sm lg:text-base text-white/50 mb-10 lg:mb-12">
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">
               Orryon is in early access. Drop your email and you&rsquo;ll be first in.
             </p>
 
@@ -2110,19 +2125,19 @@ export default function LandingPage() {
               </div>
             ) : (
               <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
-                <div className="w-full flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] pl-5 pr-1.5 py-1.5 focus-within:border-white/25 transition-colors duration-200">
+                <div className="w-full flex flex-col xs:flex-row items-stretch xs:items-center gap-2 rounded-2xl xs:rounded-full border border-white/12 bg-white/[0.04] p-2 xs:pl-5 xs:pr-1.5 xs:py-1.5 focus-within:border-white/25 transition-colors duration-200">
                   <input
                     type="email"
                     required
                     placeholder="Enter your email"
                     value={waitlistEmail}
                     onChange={(e) => setWaitlistEmail(e.target.value)}
-                    className="flex-1 bg-transparent text-[15px] text-white/85 placeholder:text-white/30 outline-none py-1.5 min-w-0"
+                    className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
                   />
                   <button
                     type="submit"
                     disabled={waitlistStatus === "loading"}
-                    className="shrink-0 rounded-full bg-white text-black text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="shrink-0 rounded-xl xs:rounded-full bg-white text-black text-[0.7rem] sm:text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                   >
                     {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
                   </button>
@@ -2144,8 +2159,8 @@ export default function LandingPage() {
             >
               <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
             </motion.div>
-            <h2 className="text-2xl lg:text-4xl font-bold text-white/85 mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
-            <p className="text-sm lg:text-base text-white/50 mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
+            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Let&rsquo;s make your day a little easier.</h2>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
             <PillLink href="/home" size="sm">Go to app</PillLink>
           </>
         )}
