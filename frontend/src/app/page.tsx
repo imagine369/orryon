@@ -8,7 +8,7 @@ const StarEight = ({ className }: { className?: string }) => (
   </svg>
 );
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText } from "lucide-react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -1300,29 +1300,266 @@ type FeatureCardData = {
   to: string;
   glow: string;
   photo?: string;
+  preview?: React.ReactNode;
 };
 
 const FINANCE_CARDS: FeatureCardData[] = [
   { tag: "BUDGET",   Icon: SlidersHorizontal, highlighted: "Always know",        rest: "where your money goes.",      from: "#060e1f", to: "#0d1f40", glow: "rgba(96,165,250,0.12)", photo: "/budget-card.jpg" },
   { tag: "GOALS",    Icon: Target,            highlighted: "Save any amount.",    rest: "Meet your goals.",     from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"  },
-  { tag: "BILLS",    Icon: Receipt,           highlighted: "Never miss",          rest: "a payment again.",            from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"  },
+  { tag: "BILLS",    Icon: Receipt,           highlighted: "Stay on top",         rest: "of your expenses.",            from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"  },
   { tag: "INSIGHTS", Icon: BarChart2,         highlighted: "Spot patterns,",      rest: "spend smarter.",              from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
   { tag: "FORECAST", Icon: TrendingUp,        highlighted: "See where",           rest: "your money is headed.",       from: "#031a1a", to: "#063030", glow: "rgba(45,212,191,0.12)", photo: "/forecast-card.jpg"  },
   { tag: "YEARLY",   Icon: Activity,          highlighted: "Your entire year,",   rest: "in one clear view.",          from: "#08081e", to: "#14143c", glow: "rgba(129,140,248,0.12)", photo: "/yearly-card.jpg" },
 ];
 
+function TasksPreview() {
+  const items = [
+    { label: "Review Q2 budget report", done: false, color: "#f87171" },
+    { label: "Call dentist",            done: true,  color: "rgba(255,255,255,0.2)" },
+    { label: "Book flights to NYC",     done: false, color: "#fb923c" },
+    { label: "Pick up dry cleaning",    done: false, color: "rgba(255,255,255,0.2)" },
+  ];
+  return (
+    <div className="w-full px-1 space-y-2">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-2.5 py-1">
+          <div
+            className="shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all"
+            style={{ borderColor: item.done ? "rgba(255,255,255,0.25)" : item.color, background: item.done ? "rgba(255,255,255,0.06)" : "transparent" }}
+          >
+            {item.done && <div className="w-1.5 h-1.5 rounded-full bg-white/30" />}
+          </div>
+          <p className={`text-[0.72rem] leading-snug flex-1 ${item.done ? "line-through text-white/25" : "text-white/70"}`}>{item.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ListsPreview() {
+  const items = [
+    { name: "Oat milk",        done: false },
+    { name: "Sourdough",       done: false },
+    { name: "Cherry tomatoes", done: false },
+    { name: "Avocados",        done: false },
+    { name: "Olive oil",       done: true  },
+  ];
+  return (
+    <div className="w-full px-1 space-y-1.5">
+      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2">Grocery · 8 items</p>
+      {items.map((item) => (
+        <div key={item.name} className="flex items-center gap-2.5 py-0.5">
+          <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${item.done ? "border-green-400/50 bg-green-400/10" : "border-white/20"}`}>
+            {item.done && <div className="w-1.5 h-1.5 rounded-full bg-green-400/60" />}
+          </div>
+          <p className={`text-[0.72rem] flex-1 leading-snug ${item.done ? "line-through text-white/25" : "text-white/70"}`}>{item.name}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CalendarPreview() {
+  const events: { Icon: React.FC<{ className?: string; strokeWidth?: number }>; title: string; date: string; urgent: boolean }[] = [
+    { Icon: Bell,     title: "Doctor appointment", date: "Apr 14", urgent: true  },
+    { Icon: Calendar, title: "Lunch with Sarah",   date: "Apr 16", urgent: false },
+    { Icon: Receipt,  title: "Pay rent",            date: "Apr 20", urgent: false },
+    { Icon: Calendar, title: "Birthday party",      date: "Apr 25", urgent: false },
+  ];
+  return (
+    <div className="w-full px-1 space-y-1">
+      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2.5">Upcoming</p>
+      {events.map((e) => (
+        <div key={e.title} className="flex items-center gap-2.5 py-1.5 border-b border-white/[0.05]">
+          <div className="shrink-0 w-5 h-5 rounded-md border border-white/8 bg-white/[0.04] flex items-center justify-center">
+            <e.Icon className={`h-2.5 w-2.5 ${e.urgent ? "text-orange-400/70" : "text-white/30"}`} strokeWidth={1.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-[0.72rem] font-medium leading-tight truncate ${e.urgent ? "text-white/85" : "text-white/65"}`}>{e.title}</p>
+          </div>
+          <span className={`text-[0.58rem] shrink-0 ${e.urgent ? "text-orange-400/80" : "text-white/25"}`}>{e.date}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function JournalPreview() {
+  return (
+    <div className="w-full px-1">
+      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2.5">Today&rsquo;s entry · Apr 14</p>
+      <p className="text-[0.75rem] text-white/60 leading-relaxed mb-4">
+        Stayed within budget today. Logged coffee and breakfast — small win. Feeling more in control lately.
+        <span className="inline-block w-[1.5px] h-[0.8em] bg-white/35 ml-0.5 align-middle animate-pulse" />
+      </p>
+      <div className="border-t border-white/[0.06] pt-3 space-y-2">
+        {[
+          { date: "Apr 13", preview: "Good day overall. Remembered to call the dentist…" },
+          { date: "Apr 12", preview: "Grocery run felt manageable this week…" },
+        ].map((e) => (
+          <div key={e.date}>
+            <p className="text-[0.55rem] text-white/25">{e.date}</p>
+            <p className="text-[0.65rem] text-white/35 leading-snug mt-0.5">{e.preview}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SearchPreview() {
+  const results: { Icon: React.FC<{ className?: string; strokeWidth?: number }>; label: string; meta: string }[] = [
+    { Icon: Receipt,  label: "Coffee & breakfast",   meta: "Today · $9.50"      },
+    { Icon: Check,    label: "Book flights to NYC",   meta: "Task · Due Apr 20"  },
+    { Icon: FileText, label: "Vacation packing list", meta: "Note · Apr 10"      },
+    { Icon: Calendar, label: "Doctor appointment",    meta: "Calendar · Apr 14"  },
+  ];
+  return (
+    <div className="w-full px-1">
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 mb-3">
+        <Search className="h-3 w-3 text-white/30 shrink-0" strokeWidth={1.5} />
+        <span className="text-[0.7rem] text-white/40">coffee</span>
+        <span className="inline-block w-[1.5px] h-[0.75em] bg-white/40 align-middle animate-pulse" />
+      </div>
+      <div className="space-y-0.5">
+        {results.map((r) => (
+          <div key={r.label} className="flex items-center gap-2.5 py-1.5 border-b border-white/[0.05]">
+            <div className="shrink-0 w-5 h-5 rounded-md border border-white/8 bg-white/[0.04] flex items-center justify-center">
+              <r.Icon className="h-2.5 w-2.5 text-white/30" strokeWidth={1.5} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[0.72rem] text-white/75 truncate leading-tight">{r.label}</p>
+              <p className="text-[0.55rem] text-white/25 mt-0.5">{r.meta}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const ORGANIZE_CARDS: FeatureCardData[] = [
-  { tag: "TASKS",    Icon: Check,          highlighted: "From idea",            rest: "to done in seconds.",         from: "#060e1f", to: "#0d2040", glow: "rgba(96,165,250,0.10)"  },
-  { tag: "LISTS",    Icon: List,           highlighted: "Groceries, errands,",  rest: "anything. Just say it.",      from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)"  },
-  { tag: "CALENDAR", Icon: Calendar,       highlighted: "Your whole week,",     rest: "organized instantly.",        from: "#120900", to: "#221400", glow: "rgba(251,146,60,0.10)"  },
-  { tag: "JOURNAL",  Icon: BookOpen,       highlighted: "Capture thoughts,",    rest: "track what matters.",         from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.10)" },
-  { tag: "SEARCH",   Icon: Search,         highlighted: "Find anything",        rest: "across your entire life.",    from: "#031a1a", to: "#063028", glow: "rgba(45,212,191,0.10)"  },
+  { tag: "TASKS",    Icon: Check,    highlighted: "From idea",            rest: "to done in seconds.",      from: "#060e1f", to: "#0d2040", glow: "rgba(96,165,250,0.10)",  preview: <TasksPreview />    },
+  { tag: "LISTS",    Icon: List,     highlighted: "Groceries, errands,",  rest: "anything. Just say it.",   from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)",  preview: <ListsPreview />    },
+  { tag: "CALENDAR", Icon: Calendar, highlighted: "Your whole week,",     rest: "organized instantly.",     from: "#120900", to: "#221400", glow: "rgba(251,146,60,0.10)",  preview: <CalendarPreview /> },
+  { tag: "JOURNAL",  Icon: BookOpen, highlighted: "Capture thoughts,",    rest: "track what matters.",      from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.10)", preview: <JournalPreview />  },
+  { tag: "SEARCH",   Icon: Search,   highlighted: "Find anything",        rest: "across your entire life.", from: "#031a1a", to: "#063028", glow: "rgba(45,212,191,0.10)",  preview: <SearchPreview />   },
 ];
 
+function BreathingPreview() {
+  return (
+    <div className="w-full flex flex-col items-center gap-4">
+      <div
+        className="rounded-full"
+        style={{
+          width: 115, height: 115,
+          background: "linear-gradient(135deg,hsl(200,45%,68%) 0%,hsl(205,40%,52%) 50%,hsl(210,38%,38%) 100%)",
+          animation: "breatheOrb 4.2s ease-in-out infinite",
+          boxShadow: "0 0 40px rgba(100,170,220,0.25)",
+        }}
+      />
+      <div className="flex flex-col items-center gap-1">
+        <p className="text-[0.72rem] font-medium text-white/60 tracking-wide">Box Breathing</p>
+        <div className="flex items-center gap-2 text-[0.55rem] text-white/25 tracking-widest uppercase">
+          <span>Inhale</span><span>·</span><span>Hold</span><span>·</span><span>Exhale</span><span>·</span><span>Hold</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AIChatPreview() {
+  return (
+    <div className="w-full flex flex-col gap-2.5">
+      {/* User bubble */}
+      <div className="flex justify-end">
+        <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-[0.72rem] text-white/80 max-w-[85%] text-left leading-snug">
+          How did I do this month?
+        </div>
+      </div>
+
+      {/* Orryon response */}
+      <div className="flex items-start gap-2">
+        <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-0.5 shrink-0" />
+        <div className="bg-[#1a1a1a] border border-white/[0.06] rounded-2xl rounded-bl-sm px-3.5 py-2 text-[0.72rem] text-white/65 max-w-[88%] text-left leading-relaxed">
+          Great month — you&rsquo;re down 8% overall. Dining is the only category running a bit hot, everything else is under budget.
+          <span className="inline-block w-[1.5px] h-[0.8em] bg-white/35 ml-0.5 align-middle animate-pulse" />
+        </div>
+      </div>
+
+      {/* Input bar */}
+      <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 mt-1">
+        <span className="flex-1 text-[0.65rem] text-white/20">Ask me anything…</span>
+        <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+          <ArrowUp className="h-2.5 w-2.5 text-white/25" strokeWidth={1.5} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DailyBriefPreview() {
+  const items = [
+    { Icon: TrendingDown, text: "Down 8% this week — on track",       accent: "text-green-400/70"  },
+    { Icon: Bell,         text: "Doctor appointment today at 10am",    accent: "text-orange-400/70" },
+    { Icon: Receipt,      text: "Netflix due in 5 days · $15.99",      accent: "text-white/35"      },
+    { Icon: Target,       text: "Vacation fund at 68% — keep going",   accent: "text-blue-400/70"   },
+  ];
+  return (
+    <div className="w-full px-1">
+      <p className="text-[0.72rem] font-semibold text-white/70 mb-0.5">Good morning, Alex.</p>
+      <p className="text-[0.58rem] text-white/25 mb-4">Here&rsquo;s your day at a glance.</p>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div key={item.text} className="flex items-start gap-2.5">
+            <div className="shrink-0 w-5 h-5 rounded-md border border-white/8 bg-white/[0.04] flex items-center justify-center mt-px">
+              <item.Icon className={`h-2.5 w-2.5 ${item.accent}`} strokeWidth={1.5} />
+            </div>
+            <p className="text-[0.7rem] text-white/60 leading-snug">{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SilentBreakPreview() {
+  return (
+    <div className="w-full px-1 flex flex-col items-center gap-5">
+      {/* Timer ring */}
+      <div className="relative flex items-center justify-center">
+        <svg width="88" height="88" viewBox="0 0 88 88" className="rotate-[-90deg]">
+          <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="2" />
+          <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2"
+            strokeDasharray={`${2 * Math.PI * 36 * 0.72} ${2 * Math.PI * 36}`}
+            strokeLinecap="round" />
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-[1.35rem] font-bold text-white/80 tabular-nums leading-none">3:36</span>
+          <span className="text-[0.45rem] uppercase tracking-widest text-white/25 mt-0.5">remaining</span>
+        </div>
+      </div>
+      {/* Status */}
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <Moon className="h-2.5 w-2.5 text-white/30" strokeWidth={1.5} />
+          <span className="text-[0.6rem] text-white/40 tracking-wide">Silent · 5 min</span>
+        </div>
+        <div className="flex items-center gap-1 mt-0.5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className={`w-1 h-1 rounded-full ${i < 2 ? "bg-white/40" : "bg-white/10"}`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const WELLBEING_CARDS: FeatureCardData[] = [
-  { tag: "BREATHING",   Icon: Wind,          highlighted: "A moment to reset,",  rest: "anytime you need it.",        from: "#04131e", to: "#08202e", glow: "rgba(96,165,250,0.12)"  },
-  { tag: "DAILY BRIEF", Icon: Sparkles,      highlighted: "Start every day",     rest: "with full clarity.",          from: "#110900", to: "#201500", glow: "rgba(251,191,36,0.12)"  },
-  { tag: "AI CHAT",     Icon: MessageCircle, highlighted: "Just talk.",           rest: "I handle everything else.",   from: "#0a0a0a", to: "#181820", glow: "rgba(255,255,255,0.06)" },
+  { tag: "BREATHING",    Icon: Wind,          highlighted: "A moment to reset,",  rest: "anytime you need it.",        from: "#04131e", to: "#08202e", glow: "rgba(96,165,250,0.12)",  preview: <BreathingPreview /> },
+  { tag: "SILENT BREAK", Icon: Moon,          highlighted: "Step away.",          rest: "Come back clearer.",          from: "#08080f", to: "#10101e", glow: "rgba(148,130,255,0.10)", preview: <SilentBreakPreview /> },
+  { tag: "DAILY BRIEF",  Icon: Sparkles,      highlighted: "Start every day",     rest: "with full clarity.",          from: "#110900", to: "#201500", glow: "rgba(251,191,36,0.12)",  preview: <DailyBriefPreview /> },
+  { tag: "AI CHAT",      Icon: MessageCircle, highlighted: "Just talk.",           rest: "I handle everything else.",   from: "#0a0a0a", to: "#181820", glow: "rgba(255,255,255,0.06)", preview: <AIChatPreview /> },
 ];
 
 const FEATURE_DATA: Record<FeatureTabKey, FeatureCardData[]> = {
@@ -1435,7 +1672,7 @@ function FeatureSection() {
                     width: CARD_W,
                     height: CARD_H,
                     scrollSnapAlign: "start",
-                    background: card.photo ? "black" : `linear-gradient(155deg, ${card.from} 0%, ${card.to} 100%)`,
+                    background: card.photo ? "black" : "#111111",
                   }}
                 >
                   {/* Photo background */}
@@ -1446,13 +1683,6 @@ function FeatureSection() {
                     </>
                   )}
 
-                  {/* Glow */}
-                  {!card.photo && (
-                    <div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{ background: `radial-gradient(ellipse at 50% 15%, ${card.glow} 0%, transparent 60%)` }}
-                    />
-                  )}
 
                   {/* Top row */}
                   <div className="relative flex items-center justify-between p-4">
@@ -1462,9 +1692,12 @@ function FeatureSection() {
                     </div>
                   </div>
 
-                  {/* Center — watermark icon */}
-                  <div className="flex-1 flex items-center justify-center">
-                    {!card.photo && <Icon className="h-24 w-24 text-white/[0.04]" strokeWidth={0.4} />}
+                  {/* Center — product preview or watermark icon */}
+                  <div className="flex-1 flex items-center justify-center px-5">
+                    {card.preview
+                      ? <div className="w-full">{card.preview}</div>
+                      : !card.photo && <Icon className="h-24 w-24 text-white/[0.04]" strokeWidth={0.4} />
+                    }
                   </div>
 
                   {/* Bottom copy */}
