@@ -2038,14 +2038,14 @@ export default function LandingPage() {
           <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[32px] sm:mb-[40px] lg:mb-[52px] -mt-[3px]">
             Your AI personal concierge
           </p>
-          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
+          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mt-[10px] mb-4 lg:mb-6 font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
             Your guide to organized <span className="hidden sm:inline"><br /></span>money, tasks, and calmer days.
           </h1>
 
           {/* See it in action — app tour */}
           <div className="w-full flex flex-col items-center">
             {/* CTA */}
-            <div className="flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[10px]">
+            <div className="flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-[40px]">
               {heroCta}
             </div>
 
