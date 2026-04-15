@@ -14,6 +14,7 @@ interface PillLinkProps {
 
 interface PillButtonProps {
   onClick?: () => void;
+  type?: "button" | "submit" | "reset";
   children: React.ReactNode;
   variant?: Variant;
   size?: "sm" | "md" | "lg";
@@ -74,6 +75,7 @@ export function PillLink({
 
 export function PillButton({
   onClick,
+  type = "button",
   children,
   variant = "primary",
   size = "md",
@@ -83,6 +85,7 @@ export function PillButton({
   return (
     <button
       onClick={onClick}
+      type={type}
       disabled={disabled}
       className={`${base(size)} ${borderClass(variant)} ${bgClass(variant)} ${className} disabled:opacity-40 disabled:cursor-not-allowed`}
     >

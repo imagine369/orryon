@@ -14,7 +14,7 @@ import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
 import { motion } from "framer-motion";
 import { Footer } from "@/components/footer";
-import { PillLink } from "@/components/pill-cta";
+import { PillLink, PillButton } from "@/components/pill-cta";
 
 const HOW_STEPS = [
   { n: "01", title: "You don't set anything up.",     desc: "Just start talking. Type or speak — I handle the rest. No categories, no forms, no setup." },
@@ -1991,13 +1991,14 @@ export default function LandingPage() {
             onChange={(e) => setWaitlistEmail(e.target.value)}
             className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
           />
-          <button
+          <PillButton
             type="submit"
             disabled={waitlistStatus === "loading"}
-            className="shrink-0 rounded-xl xs:rounded-full bg-white text-black text-[0.7rem] sm:text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            size="sm"
+            className="shrink-0 whitespace-nowrap"
           >
             {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
-          </button>
+          </PillButton>
         </div>
         {waitlistStatus === "error" && (
           <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
@@ -2134,13 +2135,14 @@ export default function LandingPage() {
                     onChange={(e) => setWaitlistEmail(e.target.value)}
                     className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
                   />
-                  <button
+                  <PillButton
                     type="submit"
                     disabled={waitlistStatus === "loading"}
-                    className="shrink-0 rounded-xl xs:rounded-full bg-white text-black text-[0.7rem] sm:text-[0.72rem] font-semibold uppercase tracking-[2px] px-5 py-2.5 hover:bg-white/90 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                    size="sm"
+                    className="shrink-0 whitespace-nowrap"
                   >
                     {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
-                  </button>
+                  </PillButton>
                 </div>
                 {waitlistStatus === "error" && (
                   <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
