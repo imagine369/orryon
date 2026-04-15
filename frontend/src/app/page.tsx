@@ -1883,7 +1883,7 @@ function OrbitSection() {
             return (
               <div
                 key={item.label}
-                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-500${i === 4 ? " col-span-2 max-w-[calc(50%-6px)] mx-auto w-full" : ""}`}
+                className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-500"
                 style={{
                   borderColor: isActive ? item.color : "rgba(255,255,255,0.08)",
                   background: isActive ? item.glow : "rgba(255,255,255,0.02)",
