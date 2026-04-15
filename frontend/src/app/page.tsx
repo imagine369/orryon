@@ -2072,7 +2072,7 @@ export default function LandingPage() {
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
           >
-            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[80px] h-[80px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover ring-1 ring-white/10" />
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[100px] h-[100px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover ring-1 ring-white/10" />
           </motion.div>
           <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
