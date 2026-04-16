@@ -37,7 +37,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [step, setStep] = useState<Step>("email");
+  const initialStep = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("step") === "tiers" ? "tiers" : "email";
+  const [step, setStep] = useState<Step>(initialStep);
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("monthly");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
