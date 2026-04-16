@@ -27,7 +27,17 @@ from fastapi.responses import StreamingResponse
 from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan
 from backend.auth import get_current_user
 from backend.schemas import ChatReq
-from db import get_connection, get_monthly_spend, load_chat_history, record_token_spend, save_chat_message
+from db import (
+    create_chat_session,
+    delete_chat_session,
+    get_connection,
+    get_monthly_spend,
+    list_chat_sessions,
+    load_chat_history,
+    record_token_spend,
+    save_chat_message,
+    update_chat_session_title,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +59,16 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
     if not message:
         raise HTTPException(400, "Empty message")
 
+    session_id = getattr(body, "session_id", "") or ""
+
     conn = get_connection()
     user_row = conn.execute("SELECT display_name FROM users WHERE id=?", (uid,)).fetchone()
     conn.close()
     display_name = user_row["display_name"] if user_row else "there"
 
-    history = load_chat_history(uid)
+    history = load_chat_history(uid, session_id=session_id) if session_id else load_chat_history(uid)
     user_msg = {"role": "user", "content": message, "created_at": datetime.now(timezone.utc).isoformat()}
-    save_chat_message(uid, user_msg)
+    save_chat_message(uid, user_msg, session_id=session_id)
 
     async def event_generator():
         current_spend = get_monthly_spend(uid)
@@ -87,7 +99,7 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
                         "content": final_text,
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     }
-                    save_chat_message(uid, ai_msg)
+                    save_chat_message(uid, ai_msg, session_id=session_id)
                     usage = event.get("usage") or {}
                     if usage.get("prompt_tokens") or usage.get("completion_tokens"):
                         record_token_spend(
@@ -107,6 +119,43 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
 
 
 @router.get("/api/chat/history")
-async def chat_history(limit: int = Query(100, le=500), user: dict = Depends(get_current_user)):
-    """Return the user's recent chat messages."""
-    return load_chat_history(user["user_id"], limit=limit)
+async def chat_history(
+    limit: int = Query(100, le=500),
+    session_id: str = Query(""),
+    user: dict = Depends(get_current_user),
+):
+    """Return the user's recent chat messages, optionally filtered by session."""
+    return load_chat_history(user["user_id"], limit=limit, session_id=session_id)
+
+
+# ── Chat sessions ─────────────────────────────────────────────────────────────
+
+@router.post("/api/chat/sessions")
+async def create_session(user: dict = Depends(get_current_user)):
+    """Create a new empty chat session."""
+    session = create_chat_session(user["user_id"])
+    return session
+
+
+@router.get("/api/chat/sessions")
+async def get_sessions(
+    limit: int = Query(50, le=200),
+    user: dict = Depends(get_current_user),
+):
+    """List the user's chat sessions, most recent first."""
+    return list_chat_sessions(user["user_id"], limit=limit)
+
+
+@router.delete("/api/chat/sessions/{session_id}")
+async def remove_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Delete a chat session and all its messages."""
+    ok = delete_chat_session(user["user_id"], session_id)
+    if not ok:
+        raise HTTPException(404, "Session not found")
+    return {"deleted": True}
+
+
+@router.patch("/api/chat/sessions/{session_id}")
+async def rename_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Update a chat session title (currently a no-op placeholder)."""
+    return {"updated": True}

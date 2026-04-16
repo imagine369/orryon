@@ -413,14 +413,23 @@ def _build_messages(
 # CONTEXT HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+_context_cache: dict[str, tuple[float, str]] = {}
+_CONTEXT_TTL = 60  # reuse snapshot for 60 seconds
+
 def _get_context_snapshot(user_id: str) -> str:
-    """Full context snapshot injected into the system prompt so the AI sees everything."""
+    """Context snapshot injected into the system prompt. Cached per-user for 60s."""
+    import time
+    now = time.monotonic()
+    cached = _context_cache.get(user_id)
+    if cached and (now - cached[0]) < _CONTEXT_TTL:
+        return cached[1]
+
     try:
         from core.tools import (
-            _get_net_worth, _get_spending_summary, _get_budget_status,
+            _get_spending_summary, _get_budget_status,
             _get_goals, _get_upcoming_schedule, _get_balance,
         )
-        from db import get_total_monthly_income, get_balance as db_get_balance
+        from db import get_total_monthly_income
 
         bal_data = _get_balance({}, user_id)
         spend = _get_spending_summary({"period": "this_month"}, user_id)
@@ -437,15 +446,15 @@ def _get_context_snapshot(user_id: str) -> str:
             f"- Monthly bills: ${bal_data['monthly_bills']:,.0f}",
             f"- This month's spending: ${spend['total']:,.0f} ({spend['transaction_count']} transactions)",
         ]
-        for cat in spend.get("by_category", [])[:5]:
+        for cat in spend.get("by_category", [])[:3]:
             lines.append(f"  · {cat['category']}: ${cat['total']:,.0f}")
-        for b in budget.get("categories", [])[:5]:
+        for b in budget.get("categories", [])[:3]:
             lines.append(
                 f"  · Budget {b['category']}: ${b['spent']:,.0f}/${b['planned']:,.0f} ({b['pct_used']}%)"
             )
         if goals.get("goals"):
             lines.append("- Goals:")
-            for g in goals["goals"][:5]:
+            for g in goals["goals"][:3]:
                 lines.append(
                     f"  · {g['name']}: ${g['current_amount']:,.0f}/${g['target_amount']:,.0f} ({g['pct_complete']}%)"
                 )
@@ -459,8 +468,8 @@ def _get_context_snapshot(user_id: str) -> str:
             from db import get_connection
             conn = get_connection()
             recent_notes = conn.execute(
-                "SELECT id, title, tags, mood, is_pinned, linked_goal FROM notes "
-                "WHERE user_id=? ORDER BY is_pinned DESC, updated_at DESC LIMIT 10",
+                "SELECT id, title, mood, is_pinned FROM notes "
+                "WHERE user_id=? ORDER BY is_pinned DESC, updated_at DESC LIMIT 5",
                 (user_id,),
             ).fetchall()
             conn.close()
@@ -468,29 +477,15 @@ def _get_context_snapshot(user_id: str) -> str:
                 lines.append("- Recent notes:")
                 for n in recent_notes:
                     n = dict(n)
-                    pin = " 📌" if n.get("is_pinned") else ""
+                    pin = " pinned" if n.get("is_pinned") else ""
                     mood = f" ({n['mood']})" if n.get("mood") else ""
-                    goal = f" -> {n['linked_goal']}" if n.get("linked_goal") else ""
-                    lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}{goal}")
+                    lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}")
         except Exception:
             pass
 
-        # Proactively surface dormant subscriptions
-        try:
-            from core.tools import _get_subscription_health
-            sub_health = _get_subscription_health({}, user_id)
-            if sub_health.get("dormant_count", 0) > 0:
-                dormant = sub_health["dormant_subscriptions"]
-                lines.append(
-                    f"- ⚠️ Potentially unused subscriptions ({sub_health['dormant_count']} found, "
-                    f"${sub_health['dormant_monthly_cost']:.0f}/mo):"
-                )
-                for d in dormant[:4]:
-                    lines.append(f"  · {d['name']} — ${d['amount']:.2f}/{d['frequency']} [id:{d['id'][:8]}]")
-        except Exception:
-            pass
-
-        return "\n".join(lines)
+        result = "\n".join(lines)
+        _context_cache[user_id] = (now, result)
+        return result
     except Exception as exc:
         logger.warning("Context snapshot failed: %s", exc)
         return "(context unavailable)"

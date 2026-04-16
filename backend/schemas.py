@@ -36,6 +36,7 @@ class AuthRes(BaseModel):
 
 class ChatReq(BaseModel):
     message: str
+    session_id: str = ""
 
 
 # ── Transactions ──────────────────────────────────────────────────────────────

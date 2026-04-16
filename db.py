@@ -76,9 +76,18 @@ def init_db() -> None:
             created_at  TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            title       TEXT DEFAULT '',
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS chat_messages (
             id          TEXT PRIMARY KEY,
             user_id     TEXT NOT NULL,
+            session_id  TEXT DEFAULT '',
             role        TEXT NOT NULL,
             content     TEXT NOT NULL,
             agent       TEXT,
@@ -362,6 +371,35 @@ def init_db() -> None:
         );
     """)
 
+    cur.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user
+            ON chat_sessions(user_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_user_created
+            ON chat_messages(user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_transactions_user_date
+            ON transactions(user_id, date);
+        CREATE INDEX IF NOT EXISTS idx_events_user_date
+            ON events(user_id, event_date);
+        CREATE INDEX IF NOT EXISTS idx_goals_user
+            ON goals(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notes_user_updated
+            ON notes(user_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user
+            ON subscriptions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_verification_codes_email
+            ON verification_codes(email, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_user_lists_user
+            ON user_lists(user_id);
+        CREATE INDEX IF NOT EXISTS idx_list_items_list
+            ON list_items(list_id);
+        CREATE INDEX IF NOT EXISTS idx_budget_categories_user_month
+            ON budget_categories(user_id, month);
+        CREATE INDEX IF NOT EXISTS idx_user_memory_user
+            ON user_memory(user_id);
+        CREATE INDEX IF NOT EXISTS idx_accounts_user
+            ON accounts(user_id);
+    """)
+
     conn.commit()
 
     # ── Migrations ────────────────────────────────────────────────────────────
@@ -380,6 +418,7 @@ def init_db() -> None:
     _migrate_user_api_spend(conn)
     _migrate_sort_order(conn)
     _migrate_waitlist_approved(conn)
+    _migrate_chat_sessions(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -568,6 +607,21 @@ def _migrate_waitlist_approved(conn: sqlite3.Connection) -> None:
             conn.commit()
     except Exception as exc:
         logger.warning("_migrate_waitlist_approved: %s (non-fatal)", exc)
+
+
+def _migrate_chat_sessions(conn: sqlite3.Connection) -> None:
+    """Add session_id to chat_messages if missing, then create index."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_messages)").fetchall()]
+        if "session_id" not in cols:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN session_id TEXT DEFAULT ''")
+            conn.commit()
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at)"
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_chat_sessions: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:
@@ -804,11 +858,13 @@ def verify_code(email: str, code: str) -> bool:
 
 # ── Chat persistence ──────────────────────────────────────────────────────────
 
-def save_chat_message(user_id: str, msg: dict) -> bool:
+def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
     """Persist a single chat message (user or assistant) for *user_id*."""
+    now = datetime.now(timezone.utc).isoformat()
     row = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
+        "session_id": session_id,
         "role": msg.get("role", "user"),
         "content": msg.get("content", ""),
         "agent": msg.get("agent", ""),
@@ -817,29 +873,51 @@ def save_chat_message(user_id: str, msg: dict) -> bool:
         "confidence": msg.get("confidence", 0),
         "evidence": msg.get("evidence", ""),
         "next_steps": msg.get("next_steps_or_question", ""),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now,
     }
-    return insert_row("chat_messages", row)
+    ok = insert_row("chat_messages", row)
+    if ok and session_id:
+        try:
+            conn = get_connection()
+            conn.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?", (now, session_id))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    return ok
 
 
-def load_chat_history(user_id: str, limit: int = 100) -> list[dict]:
+def load_chat_history(user_id: str, limit: int = 100, session_id: str = "") -> list[dict]:
     """
-    Load the most recent *limit* messages for *user_id*, oldest-first so they
-    render in correct chronological order.
+    Load the most recent *limit* messages for *user_id*, oldest-first.
+    If session_id is provided, only load messages from that session.
     """
     try:
         conn = get_connection()
-        rows = conn.execute(
-            """
-            SELECT * FROM (
-                SELECT * FROM chat_messages
-                WHERE user_id = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-            ) ORDER BY created_at ASC
-            """,
-            (user_id, limit),
-        ).fetchall()
+        if session_id:
+            rows = conn.execute(
+                """
+                SELECT * FROM (
+                    SELECT * FROM chat_messages
+                    WHERE user_id = ? AND session_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                ) ORDER BY created_at ASC
+                """,
+                (user_id, session_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM (
+                    SELECT * FROM chat_messages
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                ) ORDER BY created_at ASC
+                """,
+                (user_id, limit),
+            ).fetchall()
         conn.close()
         msgs = []
         for r in rows:
@@ -850,6 +928,80 @@ def load_chat_history(user_id: str, limit: int = 100) -> list[dict]:
     except Exception as exc:
         logger.error("load_chat_history error: %s", exc)
         return []
+
+
+# ── Chat session helpers ──────────────────────────────────────────────────────
+
+def create_chat_session(user_id: str, title: str = "") -> dict:
+    """Create a new chat session and return it."""
+    now = datetime.now(timezone.utc).isoformat()
+    session_id = str(uuid.uuid4())
+    insert_row("chat_sessions", {
+        "id": session_id,
+        "user_id": user_id,
+        "title": title,
+        "created_at": now,
+        "updated_at": now,
+    })
+    return {"id": session_id, "title": title, "created_at": now, "updated_at": now}
+
+
+def list_chat_sessions(user_id: str, limit: int = 50) -> list[dict]:
+    """Return user's chat sessions, most recent first."""
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM chat_sessions WHERE user_id=? ORDER BY updated_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            first_msg = conn.execute(
+                "SELECT content FROM chat_messages WHERE session_id=? AND role='user' ORDER BY created_at ASC LIMIT 1",
+                (d["id"],),
+            ).fetchone()
+            d["preview"] = (first_msg["content"][:80] if first_msg else "") if first_msg else ""
+            msg_count = conn.execute(
+                "SELECT COUNT(*) FROM chat_messages WHERE session_id=?", (d["id"],)
+            ).fetchone()[0]
+            d["message_count"] = msg_count
+            result.append(d)
+        conn.close()
+        return result
+    except Exception as exc:
+        logger.error("list_chat_sessions error: %s", exc)
+        return []
+
+
+def delete_chat_session(user_id: str, session_id: str) -> bool:
+    """Delete a chat session and all its messages."""
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM chat_messages WHERE session_id=? AND user_id=?", (session_id, user_id))
+        conn.execute("DELETE FROM chat_sessions WHERE id=? AND user_id=?", (session_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_chat_session error: %s", exc)
+        return False
+
+
+def update_chat_session_title(user_id: str, session_id: str, title: str) -> bool:
+    """Update the title of a chat session."""
+    try:
+        conn = get_connection()
+        conn.execute(
+            "UPDATE chat_sessions SET title=? WHERE id=? AND user_id=?",
+            (title, session_id, user_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("update_chat_session_title error: %s", exc)
+        return False
 
 
 # ── Ensure directories exist ──────────────────────────────────────────────────

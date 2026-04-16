@@ -99,7 +99,7 @@ export interface ChatEvent {
   undo_info?: { table: string; id: string; tool: string; label: string } | null;
 }
 
-export async function* streamChat(message: string): AsyncGenerator<ChatEvent> {
+export async function* streamChat(message: string, sessionId?: string): AsyncGenerator<ChatEvent> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
@@ -107,7 +107,7 @@ export async function* streamChat(message: string): AsyncGenerator<ChatEvent> {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, session_id: sessionId || "" }),
   });
 
   if (!res.ok || !res.body) {

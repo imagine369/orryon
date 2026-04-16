@@ -8,7 +8,9 @@ protected API routes.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from functools import partial
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -66,7 +68,8 @@ async def auth_send_code(body: SendCodeReq, request: Request):
     check_otp_rate_limit(request, email)
 
     code = create_verification_code(email)
-    result = send_verification_code(email, code)
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, partial(send_verification_code, email, code))
     sent = result["sent"]
     reason = result["reason"]
 
@@ -121,12 +124,18 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
     if row.get("stripe_subscription_id"):
         raise HTTPException(400, "You already have an active subscription")
 
+    loop = asyncio.get_running_loop()
+
     customer_id = row.get("stripe_customer_id") or ""
     if not customer_id:
-        customer = stripe_lib.Customer.create(
-            email=row["email"],
-            name=row.get("display_name") or "",
-            metadata={"user_id": row["id"]},
+        customer = await loop.run_in_executor(
+            None,
+            partial(
+                stripe_lib.Customer.create,
+                email=row["email"],
+                name=row.get("display_name") or "",
+                metadata={"user_id": row["id"]},
+            ),
         )
         customer_id = customer.id
         conn = get_connection()
@@ -146,7 +155,9 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
     }
     if trial_days:
         checkout_params["subscription_data"] = {"trial_period_days": trial_days}
-    session = stripe_lib.checkout.Session.create(**checkout_params)
+    session = await loop.run_in_executor(
+        None, partial(stripe_lib.checkout.Session.create, **checkout_params)
+    )
     return {"checkout_url": session.url}
 
 

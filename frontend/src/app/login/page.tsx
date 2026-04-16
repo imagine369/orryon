@@ -127,7 +127,7 @@ export default function LoginPage() {
     try {
       login(authToken, { ...authUser!, display_name: name });
       if (name !== authUser?.display_name) {
-        await api.patch("/api/settings", { display_name: name }).catch(() => {});
+        api.patch("/api/settings", { display_name: name }).catch(() => {});
       }
       router.push("/home");
     } catch (e: unknown) {

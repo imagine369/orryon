@@ -760,9 +760,11 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "create_list",
             "description": (
-                "Create a new named list. Use when the user wants to create any kind of list "
+                "Create a new named list, optionally pre-populated with items. "
+                "Use when the user wants to create any kind of list "
                 "(grocery list, packing list, to-do list, bucket list, shopping list, etc). "
-                "Returns the list ID — follow up with add_list_items to populate it."
+                "ALWAYS include initial items here if the user mentions them — "
+                "do NOT call add_list_items separately in the same turn."
             ),
             "parameters": {
                 "type": "object",
@@ -778,6 +780,11 @@ TOOL_SCHEMAS = [
                             "#ef4444 red, #f97316 orange, #eab308 yellow, #22c55e green, "
                             "#3b82f6 blue, #a855f7 purple, #ec4899 pink, #ffffff white"
                         ),
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional initial items to add to the list right away",
                     },
                 },
                 "required": ["name"],
@@ -2239,7 +2246,9 @@ def _get_mood_spending_report(args: dict, user_id: str) -> dict:
 def _create_list(args: dict, user_id: str) -> dict:
     name = args["name"]
     color = args.get("color", "#ffffff")
+    initial_items = args.get("items", [])
     list_id = _uid()
+    now = _now_iso()
     conn = get_connection()
     max_order = conn.execute(
         "SELECT COALESCE(MAX(sort_order),0) FROM user_lists WHERE user_id=?",
@@ -2253,9 +2262,26 @@ def _create_list(args: dict, user_id: str) -> dict:
         "icon": "",
         "color": color,
         "sort_order": max_order + 1,
-        "created_at": _now_iso(),
+        "created_at": now,
     })
-    return {"status": "ok", "id": list_id, "name": name, "color": color}
+    added = []
+    for i, item_name in enumerate(initial_items):
+        insert_row("list_items", {
+            "id": _uid(),
+            "list_id": list_id,
+            "user_id": user_id,
+            "name": item_name,
+            "notes": "",
+            "is_checked": 0,
+            "sort_order": i + 1,
+            "added_at": now,
+        })
+        added.append(item_name)
+    result = {"status": "ok", "id": list_id, "name": name, "color": color}
+    if added:
+        result["items_added"] = added
+        result["item_count"] = len(added)
+    return result
 
 
 def _add_list_items(args: dict, user_id: str) -> dict:
