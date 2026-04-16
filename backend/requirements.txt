@@ -22,3 +22,6 @@ stripe>=8.0.0
 # ── Google Calendar (optional) ────────────────────────────────────────────────
 google-auth-oauthlib>=1.2.0
 google-api-python-client>=2.100.0
+
+# ── Calendar ICS import ────────────────────────────────────────────────────────
+icalendar>=5.0.0

@@ -408,13 +408,15 @@ def _migrate_goals_table(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_events_reminders(conn: sqlite3.Connection) -> None:
-    """Add reminder_minutes + reminder_sent columns to events table."""
+    """Add reminder_minutes, reminder_sent, and external_uid columns to events table."""
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()]
         if "reminder_minutes" not in cols:
             conn.execute("ALTER TABLE events ADD COLUMN reminder_minutes INTEGER DEFAULT 30")
         if "reminder_sent" not in cols:
             conn.execute("ALTER TABLE events ADD COLUMN reminder_sent INTEGER DEFAULT 0")
+        if "external_uid" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN external_uid TEXT DEFAULT NULL")
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_events_reminders: %s (non-fatal)", exc)
