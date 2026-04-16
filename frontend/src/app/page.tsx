@@ -15,6 +15,11 @@ import { FadeIn } from "@/components/motion";
 import { motion } from "framer-motion";
 import { Footer } from "@/components/footer";
 import { PillLink, PillButton } from "@/components/pill-cta";
+import {
+  CHAT_ASSISTANT_BUBBLE_CLASS,
+  CHAT_USER_BUBBLE_CLASS,
+  ThinkingIndicator,
+} from "@/components/chat-bubble-primitives";
 
 const HOW_STEPS = [
   { n: "01", title: "You don't set anything up.",     desc: "Just start talking. Type or speak — I handle the rest. No categories, no forms, no setup." },
@@ -186,32 +191,50 @@ function HowItWorksDemo() {
           {/* Chat view (step 01 + 03) */}
           {view === "chat" && (
             <>
-              <div className="px-4 pt-5 pb-3 space-y-3 min-h-[140px] flex flex-col justify-end">
+              <div className="flex min-h-[140px] flex-col justify-end gap-3 px-4 pt-5 pb-3">
                 {bubble1 && (
-                  <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85 text-left">{bubble1}</div>
+                  <div className="flex w-full justify-end">
+                    <div className={CHAT_USER_BUBBLE_CLASS}>{bubble1}</div>
                   </div>
                 )}
                 {thinking && (
-                  <div className="flex items-start gap-2">
-                    <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 flex gap-1 items-center">
-                      {[0,1,2].map((i) => <span key={i} className="w-1 h-1 rounded-full bg-white/40" style={{ animation: `bounce 1s ease-in-out ${i*0.18}s infinite` }} />)}
+                  <div className="flex w-full min-w-0 gap-3">
+                    <Image
+                      src="/avatar.png"
+                      alt="Orryon"
+                      width={28}
+                      height={28}
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
+                        <ThinkingIndicator />
+                      </div>
                     </div>
                   </div>
                 )}
                 {response && (
-                  <div className="flex items-start gap-2">
-                    <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[85%] text-left">
-                      {response}
-                      {phase === "s3-responding" && <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />}
+                  <div className="flex w-full min-w-0 gap-3">
+                    <Image
+                      src="/avatar.png"
+                      alt="Orryon"
+                      width={28}
+                      height={28}
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
+                        {response}
+                        {phase === "s3-responding" && (
+                          <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
                 {bubble2 && !thinking && !response && (
-                  <div className="flex justify-end">
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] text-white/85 text-left">{bubble2}</div>
+                  <div className="flex w-full justify-end">
+                    <div className={CHAT_USER_BUBBLE_CLASS}>{bubble2}</div>
                   </div>
                 )}
               </div>
@@ -392,38 +415,46 @@ function ChatDemo() {
       style={{ transition: "opacity 0.4s", opacity: visible ? 1 : 0 }}
     >
       {/* Messages area */}
-      <div className="px-4 pt-5 pb-3 space-y-3 min-h-[110px] flex flex-col justify-end">
+      <div className="flex min-h-[110px] flex-col justify-end gap-3 px-4 pt-5 pb-3">
         {userBubble.length > 0 && (
-          <div className="flex justify-end">
-            <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white/85 text-left">
-              {userBubble}
-            </div>
+          <div className="flex w-full justify-end">
+            <div className={CHAT_USER_BUBBLE_CLASS}>{userBubble}</div>
           </div>
         )}
 
         {phase === "thinking" && (
-          <div className="flex items-start gap-2">
-            <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-            <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 flex gap-1 items-center">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-1 h-1 rounded-full bg-white/40"
-                  style={{ animation: `bounce 1s ease-in-out ${i * 0.18}s infinite` }}
-                />
-              ))}
+          <div className="flex w-full min-w-0 gap-3">
+            <Image
+              src="/avatar.png"
+              alt="Orryon"
+              width={28}
+              height={28}
+              className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+            />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
+                <ThinkingIndicator />
+              </div>
             </div>
           </div>
         )}
 
         {(phase === "typing-response" || phase === "waiting") && responseText.length > 0 && (
-          <div className="flex items-start gap-2">
-            <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-0.5 shrink-0" />
-            <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed text-gray-200 max-w-[90%] text-left">
-              {responseText}
-              {phase === "typing-response" && (
-                <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />
-              )}
+          <div className="flex w-full min-w-0 gap-3">
+            <Image
+              src="/avatar.png"
+              alt="Orryon"
+              width={28}
+              height={28}
+              className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+            />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
+                {responseText}
+                {phase === "typing-response" && (
+                  <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -911,7 +942,6 @@ function AppTourDemo() {
       tmr.current = setTimeout(() => setPhase("home"), 450);
     }
     return () => { if (tmr.current) clearTimeout(tmr.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, chatIdx]);
 
   useEffect(() => {
@@ -993,30 +1023,52 @@ function AppTourDemo() {
           {/* Chat screen */}
           {isChatMode && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div ref={chatScrollRef} className="flex-1 px-4 py-4 space-y-2.5 flex flex-col overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-                <div className="flex justify-center pt-2 pb-1">
+              <div
+                ref={chatScrollRef}
+                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+                style={{ scrollbarWidth: "none" }}
+              >
+                <div className="flex justify-center pb-1 pt-2">
                   <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover ring-1 ring-white/10" />
                 </div>
-                <div className="flex-1" />
+                <div className="min-h-0 flex-1" />
                 {currentBubble && (
-                  <div className="flex justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-3.5 py-2 text-sm max-w-[80%] text-white/85 text-left">{currentBubble}</div>
+                  <div className="flex w-full justify-end" style={{ animation: "msgIn 0.22s ease-out both" }}>
+                    <div className={CHAT_USER_BUBBLE_CLASS}>{currentBubble}</div>
                   </div>
                 )}
                 {thinking && (
-                  <div className="flex items-start gap-2" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-1 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 flex gap-1 items-center">
-                      {[0,1,2].map((i)=><span key={i} className="w-1 h-1 rounded-full bg-white/40" style={{animation:`bounce 1s ease-in-out ${i*0.18}s infinite`}} />)}
+                  <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
+                    <Image
+                      src="/avatar.png"
+                      alt="Orryon"
+                      width={28}
+                      height={28}
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
+                        <ThinkingIndicator />
+                      </div>
                     </div>
                   </div>
                 )}
                 {currentResponse && (
-                  <div className="flex items-start gap-2" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-1 shrink-0" />
-                    <div className="bg-[#111] border border-white/5 rounded-2xl rounded-bl-sm px-3.5 py-2 text-sm leading-relaxed text-gray-200 max-w-[85%] whitespace-pre-line text-left">
-                      {currentResponse}
-                      {phase === "responding" && <span className="inline-block w-[1px] h-[0.8em] bg-white/40 ml-0.5 align-middle animate-pulse" />}
+                  <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
+                    <Image
+                      src="/avatar.png"
+                      alt="Orryon"
+                      width={28}
+                      height={28}
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className={`${CHAT_ASSISTANT_BUBBLE_CLASS} whitespace-pre-line`}>
+                        {currentResponse}
+                        {phase === "responding" && (
+                          <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1600,10 +1652,10 @@ function FeatureSection() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync indicator to scroll width on mount / tab change
     syncProgress();
     window.addEventListener("resize", syncProgress);
     return () => window.removeEventListener("resize", syncProgress);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const switchTab = (tab: FeatureTabKey) => {

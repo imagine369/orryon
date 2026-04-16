@@ -133,3 +133,33 @@
     scroll-behavior: smooth;
   }
 }
+
+/* Chat thread: thinking / streaming motion (used by chat-thread.tsx) */
+@keyframes chat-thinking-dot {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+@keyframes chat-thinking-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+.chat-thinking-dot {
+  animation: chat-thinking-dot 1.05s ease-in-out infinite;
+}
+
+.chat-thinking-shimmer {
+  animation: chat-thinking-shimmer 1.45s ease-in-out infinite;
+}

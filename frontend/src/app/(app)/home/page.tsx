@@ -5,12 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Copy, Check, RefreshCw, Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
+import { Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
 import { ChatInput } from "@/components/chat-input";
+import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Message {
@@ -96,7 +95,7 @@ export default function HomePage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming, thinking]);
+  }, [messages, streaming, thinking, toolLabel]);
 
   const loadSessions = useCallback(() => {
     setSessionsLoading(true);
@@ -418,83 +417,17 @@ export default function HomePage() {
             </button>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="max-w-xl mx-auto px-4 py-6">
-              {messages.map((msg, i) => (
-                <div key={i} className={`mb-3 ${msg.role === "user" ? "flex justify-end" : ""}`}>
-                  {msg.role === "user" ? (
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] text-white">
-                      {msg.content}
-                    </div>
-                  ) : (
-                    <div className="max-w-[90%] flex items-start gap-2 group">
-                      <Image src="/avatar.png" alt="Orryon" width={24} height={24} className="rounded-full object-cover mt-1 shrink-0" />
-                      <div className="flex-1">
-                        {i === messages.length - 1 && toolLabel && (
-                          <p className="text-xs text-white/30 mb-1">✦ {toolLabel}…</p>
-                        )}
-                        <div className={`border rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed ${
-                          msg.isError
-                            ? "bg-[#111] border-red-500/20 text-red-400/80"
-                            : "bg-[#111] border-white/5 text-gray-200"
-                        }`}>
-                          {i === messages.length - 1 && thinking && !msg.content ? (
-                            <div className="flex items-center gap-1.5 py-0.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_infinite]" />
-                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_0.2s_infinite]" />
-                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_0.4s_infinite]" />
-                            </div>
-                          ) : msg.content ? (
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
-                                li: ({ children }) => <li className="text-sm">{children}</li>,
-                                strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-                                code: ({ children }) => <code className="bg-white/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
-                              }}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
-                          ) : (
-                            i === messages.length - 1 && streaming && (
-                              <span className="inline-block w-2 h-4 bg-white/40 animate-pulse ml-0.5" />
-                            )
-                          )}
-                          {i === messages.length - 1 && streaming && !thinking && msg.content && (
-                            <span className="text-white/40">▍</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-3 mt-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          {!streaming && msg.content && (
-                            <button
-                              onClick={() => handleCopy(msg.content, i)}
-                              className="flex items-center gap-1 text-[0.65rem] text-white/30 hover:text-white/60 transition-colors"
-                            >
-                              {copiedIndex === i
-                                ? <><Check className="h-3 w-3" strokeWidth={1.5} />Copied</>
-                                : <><Copy className="h-3 w-3" strokeWidth={1.5} />Copy</>
-                              }
-                            </button>
-                          )}
-                          {msg.isError && !streaming && (
-                            <button
-                              onClick={handleRetry}
-                              className="flex items-center gap-1 text-[0.65rem] text-white/30 hover:text-white/60 transition-colors"
-                            >
-                              <RefreshCw className="h-3 w-3" strokeWidth={1.5} />
-                              Retry
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+          <ScrollArea className="min-h-0 min-w-0 flex-1">
+            <div className="mx-auto max-w-xl px-4 py-6">
+              <ChatThread
+                messages={messages}
+                streaming={streaming}
+                thinking={thinking}
+                toolLabel={toolLabel}
+                copiedIndex={copiedIndex}
+                onCopy={handleCopy}
+                onRetry={handleRetry}
+              />
               <div ref={bottomRef} />
             </div>
           </ScrollArea>
