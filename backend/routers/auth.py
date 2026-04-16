@@ -84,7 +84,7 @@ async def auth_send_code(body: SendCodeReq, request: Request):
 
 @router.post("/api/auth/verify", response_model=AuthRes)
 async def auth_verify(body: VerifyReq):
-    """Verify OTP code, create/fetch user, issue JWT. Seeds demo data for new users."""
+    """Verify OTP code, create/fetch user, issue JWT."""
     email = body.email.strip().lower()
     if not verify_code(email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
@@ -93,10 +93,6 @@ async def auth_verify(body: VerifyReq):
     if display_name and user.get("display_name") != display_name:
         update_row("users", {"display_name": display_name}, {"id": user["id"]})
         user["display_name"] = display_name
-    existing_txns = fetch_rows("transactions", {"user_id": user["id"]})
-    if not existing_txns:
-        from core.tools import seed_sample_data
-        seed_sample_data(user["id"])
     token = create_token(user["id"], email)
     return {"token": token, "user": user}
 
