@@ -37,7 +37,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [step, setStep] = useState<Step>("tiers");
+  const [step, setStep] = useState<Step>("email");
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("monthly");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -124,27 +124,11 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const priceId = selectedPlan === "monthly" ? MONTHLY_PRICE_ID : ANNUAL_PRICE_ID;
-
-      if (!priceId) {
-        login(authToken, { ...authUser!, display_name: name });
-        router.push("/home");
-        return;
-      }
-
       login(authToken, { ...authUser!, display_name: name });
-
       if (name !== authUser?.display_name) {
         await api.patch("/api/settings", { display_name: name }).catch(() => {});
       }
-
-      const origin = window.location.origin;
-      const res = await api.post<{ checkout_url: string }>("/api/auth/signup-checkout", {
-        price_id: priceId,
-        success_url: `${origin}/home?upgraded=1`,
-        cancel_url: `${origin}/login`,
-      });
-      window.location.href = res.checkout_url;
+      router.push("/home");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
@@ -277,12 +261,12 @@ export default function LoginPage() {
           <PillButton onClick={handleSendCode} disabled={loading} className="w-full">
             {loading ? "Sending…" : "Send code"}
           </PillButton>
-          <button
-            onClick={() => { setStep("tiers"); setError(""); }}
-            className="mt-3 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200"
+          <Link
+            href="/"
+            className="mt-3 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200 text-center block"
           >
-            &larr; Back
-          </button>
+            &larr; Back to home
+          </Link>
         </div>
       )}
 
@@ -345,7 +329,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* ── Step 4: Name + confirm trial ── */}
+      {/* ── Step 4: Name ── */}
       {step === "name" && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
           <h1 className="text-2xl font-bold text-white mb-1">What should we call you?</h1>
@@ -361,31 +345,10 @@ export default function LoginPage() {
             className="mb-4 bg-[#111] border-white/10 text-white"
             autoFocus
           />
-
-          <div className="w-full rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 mb-5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Plan</span>
-              <span className="text-white font-medium">
-                {selectedPlan === "monthly" ? "$8 / month" : "$72 / year"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm mt-1">
-              <span className="text-white/60">Due today</span>
-              <span className="text-green-400 font-semibold">$0.00</span>
-            </div>
-            <div className="flex items-center justify-between text-xs mt-1">
-              <span className="text-white/30">First charge</span>
-              <span className="text-white/30">After 14-day trial</span>
-            </div>
-          </div>
-
           {error && <p className="text-red-400 text-sm mb-3 w-full">{error}</p>}
           <PillButton onClick={handleStartTrial} disabled={loading} className="w-full">
-            {loading ? "Setting up…" : "Continue to payment"}
+            {loading ? "Setting up…" : "Get started"}
           </PillButton>
-          <p className="text-center text-xs text-white/25 mt-3">
-            You won&apos;t be charged for 14 days. Cancel anytime in Settings.
-          </p>
         </div>
       )}
 
