@@ -247,13 +247,29 @@ async def import_status(user: dict = Depends(get_current_user)):
 # ── Google Calendar OAuth ─────────────────────────────────────────────────────
 
 @router.get("/api/calendar/google/auth")
-async def google_auth(request: Request, user: dict = Depends(get_current_user)):
-    """Redirect the user to Google's OAuth 2.0 consent screen."""
+async def google_auth(request: Request, token: str = ""):
+    """
+    Redirect the user to Google's OAuth 2.0 consent screen.
+    Accepts the JWT as a ?token= query param because this is a browser redirect
+    (cannot send Authorization headers from a link click).
+    """
     if not GOOGLE_ENABLED:
         raise HTTPException(
             status_code=503,
             detail="Google Calendar integration is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your .env.",
         )
+
+    # Validate the JWT and extract user_id
+    import jwt as pyjwt
+    jwt_secret = os.getenv("JWT_SECRET", "")
+    if not token or not jwt_secret:
+        raise HTTPException(status_code=401, detail="Missing or invalid token.")
+    try:
+        payload = pyjwt.decode(token, jwt_secret, algorithms=["HS256"])
+        uid = payload.get("user_id") or payload.get("sub", "")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
     try:
         from google_auth_oauthlib.flow import Flow
     except ImportError:
@@ -272,11 +288,11 @@ async def google_auth(request: Request, user: dict = Depends(get_current_user)):
         scopes=GOOGLE_SCOPES,
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
-    auth_url, state = flow.authorization_url(
+    auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=user["user_id"],
+        state=uid,
     )
     return RedirectResponse(auth_url)
 

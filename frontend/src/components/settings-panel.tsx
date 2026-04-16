@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, ChevronRight, Download, CreditCard } from "lucide-react";
+import { X, Check, ChevronRight, Download, CreditCard, CalendarDays, RefreshCw, Unlink } from "lucide-react";
 import { api, setToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
@@ -177,11 +177,18 @@ export function SettingsPanel() {
 
   // export
   const [exportLoading, setExportLoading] = useState(false);
+  const [calConnected, setCalConnected]   = useState(false);
+  const [calSynced, setCalSynced]         = useState(0);
+  const [calLoading, setCalLoading]       = useState(false);
+  const [calMsg, setCalMsg]               = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
     if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
     api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
+    api.get<{ connected: boolean; synced_count: number }>("/api/calendar/google/status")
+      .then((d) => { setCalConnected(d.connected); setCalSynced(d.synced_count); })
+      .catch(() => {});
   }, [isOpen]);
 
   const patch = async (updates: Record<string, unknown>) => {
@@ -606,6 +613,76 @@ export function SettingsPanel() {
                       </section>
                     </>
                   )}
+
+                  <Separator className="bg-white/5" />
+
+                  {/* ── CONNECTIONS ── */}
+                  <section>
+                    <SectionLabel>Connections</SectionLabel>
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+                        <CalendarDays className="w-4 h-4 text-white/50" strokeWidth={1.5} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white/80 font-medium">Google Calendar</p>
+                        <p className="text-xs text-white/30 mt-0.5">
+                          {calConnected
+                            ? `Connected · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`
+                            : "Sync your Google Calendar events"}
+                        </p>
+                        {calMsg && <p className="text-xs text-green-400 mt-1">{calMsg}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {calConnected ? (
+                          <>
+                            <button
+                              onClick={async () => {
+                                setCalLoading(true); setCalMsg("");
+                                try {
+                                  const res = await api.post<{ synced: number; message: string }>("/api/calendar/google/sync", {});
+                                  setCalSynced((p) => p + res.synced);
+                                  setCalMsg(res.message);
+                                } catch { setCalMsg("Sync failed. Try again."); }
+                                finally { setCalLoading(false); }
+                              }}
+                              disabled={calLoading}
+                              className="p-1.5 text-white/30 hover:text-white/70 transition disabled:opacity-40"
+                              title="Sync now"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${calLoading ? "animate-spin" : ""}`} strokeWidth={1.5} />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setCalLoading(true);
+                                try {
+                                  await api.delete("/api/calendar/google/disconnect");
+                                  setCalConnected(false); setCalSynced(0); setCalMsg("");
+                                } catch { }
+                                finally { setCalLoading(false); }
+                              }}
+                              disabled={calLoading}
+                              className="p-1.5 text-white/20 hover:text-red-400 transition disabled:opacity-40"
+                              title="Disconnect"
+                            >
+                              <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                              const token = localStorage.getItem("orryon_token") ?? "";
+                              window.location.href = `${base}/api/calendar/google/auth?token=${token}`;
+                            }}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
+                          >
+                            <ChevronRight className="w-3 h-3" strokeWidth={2} />
+                            Connect
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </section>
 
                   <Separator className="bg-white/5" />
 
