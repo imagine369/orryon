@@ -34,14 +34,34 @@ router = APIRouter(tags=["auth"])
 async def auth_send_code(body: SendCodeReq, request: Request):
     """
     Send an OTP verification code to the given email address.
-
-    In development (SMTP not configured), the code is returned in `dev_code`
-    so the frontend can display it on-screen. In production, `dev_code` is
-    always empty for security.
+    Blocks unapproved emails during beta (invite-only).
     """
     email = body.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(400, "Invalid email address")
+
+    from config import CONTACT_EMAIL
+    admin_email = (CONTACT_EMAIL or "").strip().lower()
+    is_admin = admin_email and email == admin_email
+
+    if not is_admin:
+        conn = get_connection()
+        wl = conn.execute(
+            "SELECT approved FROM waitlist WHERE email = ?", (email,)
+        ).fetchone()
+        conn.close()
+
+        if not wl:
+            raise HTTPException(
+                403,
+                "This email isn't on the waitlist yet. "
+                "Join at www.orryon.com to request early access.",
+            )
+        if not wl["approved"]:
+            raise HTTPException(
+                403,
+                "You're on the waitlist! We'll email you when your access is ready.",
+            )
 
     check_otp_rate_limit(request, email)
 

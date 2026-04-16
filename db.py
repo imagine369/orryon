@@ -357,6 +357,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS waitlist (
             id         TEXT PRIMARY KEY,
             email      TEXT UNIQUE NOT NULL,
+            approved   INTEGER DEFAULT 0,
             created_at TEXT NOT NULL
         );
     """)
@@ -378,6 +379,7 @@ def init_db() -> None:
     _migrate_users_plan(conn)
     _migrate_user_api_spend(conn)
     _migrate_sort_order(conn)
+    _migrate_waitlist_approved(conn)
 
     conn.close()
     logger.info("Database initialised at: %s", DB_PATH)
@@ -555,6 +557,17 @@ def _migrate_sort_order(conn: sqlite3.Connection) -> None:
         conn.commit()
     except Exception as exc:
         logger.warning("_migrate_sort_order: %s (non-fatal)", exc)
+
+
+def _migrate_waitlist_approved(conn: sqlite3.Connection) -> None:
+    """Add approved column to waitlist table."""
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(waitlist)").fetchall()]
+        if "approved" not in cols:
+            conn.execute("ALTER TABLE waitlist ADD COLUMN approved INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_waitlist_approved: %s (non-fatal)", exc)
 
 
 def _migrate_user_memory(conn: sqlite3.Connection) -> None:
