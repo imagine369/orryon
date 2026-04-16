@@ -62,7 +62,8 @@ async def join_waitlist(body: WaitlistRequest):
     )
     conn.commit()
 
-    total = cur.execute("SELECT COUNT(*) FROM waitlist").fetchone()[0]
+    row = cur.execute("SELECT COUNT(*) as cnt FROM waitlist").fetchone()
+    total = row["cnt"] if isinstance(row, dict) else row[0]
     _notify_admin(email, now, total)
 
     return {"status": "added"}

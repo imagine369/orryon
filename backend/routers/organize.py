@@ -392,9 +392,10 @@ async def get_lists(user: dict = Depends(get_current_user)):
     result = []
     for lst in lists:
         d = dict(lst)
-        d["item_count"] = conn.execute(
-            "SELECT COUNT(*) FROM list_items WHERE list_id=? AND is_checked=0", (d["id"],)
-        ).fetchone()[0]
+        _cnt_row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM list_items WHERE list_id=? AND is_checked=0", (d["id"],)
+        ).fetchone()
+        d["item_count"] = _cnt_row["cnt"] if isinstance(_cnt_row, dict) else _cnt_row[0]
         result.append(d)
     conn.close()
     return result
@@ -406,9 +407,10 @@ async def create_list(body: UserListReq, user: dict = Depends(get_current_user))
     list_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     conn = get_connection()
-    max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM user_lists WHERE user_id=?", (uid,)
-    ).fetchone()[0]
+    _mo_row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) as val FROM user_lists WHERE user_id=?", (uid,)
+    ).fetchone()
+    max_order = _mo_row["val"] if isinstance(_mo_row, dict) else _mo_row[0]
     conn.close()
     insert_row("user_lists", {
         "id": list_id, "user_id": uid, "name": body.name,
@@ -454,9 +456,10 @@ async def add_list_item(list_id: str, body: ListItemReq, user: dict = Depends(ge
     uid = user["user_id"]
     item_id = str(uuid.uuid4())
     conn = get_connection()
-    max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM list_items WHERE list_id=?", (list_id,)
-    ).fetchone()[0]
+    _mo_row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) as val FROM list_items WHERE list_id=?", (list_id,)
+    ).fetchone()
+    max_order = _mo_row["val"] if isinstance(_mo_row, dict) else _mo_row[0]
     conn.close()
     insert_row("list_items", {
         "id": item_id, "list_id": list_id, "user_id": uid,

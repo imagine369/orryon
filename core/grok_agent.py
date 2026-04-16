@@ -1,22 +1,13 @@
 """
-core/grok_agent.py — xAI Grok agent with streaming, chain-of-thought, and memory.
+core/grok_agent.py — xAI Grok agent with async streaming, tool use, and memory.
 
-Architecture (v2):
-  - Streaming SSE responses for real-time token display
-  - Full tool-message history (no stripping) for multi-turn accuracy
-  - Persistent user memory extracted via Grok (no other LLMs)
-  - 50-message context window (up from 20)
-  - Undo tracking for write actions
-
-Usage:
-    # Streaming (preferred):
-    from core.grok_agent import run_orryon_stream
-    for event in run_orryon_stream("sushi $312 dining", user_id="abc"):
-        if event["type"] == "token": print(event["content"], end="")
-
-    # Non-streaming (backward compat):
-    from core.grok_agent import run_orryon
-    result = run_orryon("sushi $312 dining", user_id="abc")
+Architecture (v4 — speed-optimized):
+  - Async streaming via httpx with HTTP/2 + keep-alive
+  - xAI prompt caching via x-grok-conv-id header (reuses KV cache across turns)
+  - API key round-robin for multi-key load distribution
+  - Append-only message history (never reorder — required for cache hits)
+  - Persistent user memory extracted via Grok
+  - 20-message context window
 """
 
 from __future__ import annotations
@@ -25,12 +16,13 @@ import json
 import logging
 import re
 import threading
+import itertools
 from datetime import datetime
-from typing import Any, Generator
+from typing import Any, AsyncGenerator
 
-import requests
+import httpx
 
-from config import XAI_API_KEY, GROK_MODEL
+from config import XAI_API_KEY, XAI_API_KEYS, GROK_MODEL
 from core.system_prompt import get_system_prompt
 from core.tools import TOOL_SCHEMAS, execute_tool
 from db import fetch_rows
@@ -40,6 +32,43 @@ logger = logging.getLogger(__name__)
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MAX_TOOL_ROUNDS = 8
 HISTORY_WINDOW = 20
+
+CHAT_TEMPERATURE = 0.7
+CHAT_MAX_TOKENS = 2048
+
+# ── API key round-robin ───────────────────────────────────────────────────────
+_all_keys = [k for k in XAI_API_KEYS if k] if XAI_API_KEYS else ([XAI_API_KEY] if XAI_API_KEY else [])
+_key_cycle = itertools.cycle(_all_keys) if _all_keys else None
+
+
+def _next_api_key() -> str:
+    if _key_cycle:
+        return next(_key_cycle)
+    return XAI_API_KEY
+
+
+# ── Shared async client (created once, reused across requests) ────────────────
+# Aggressive connect timeout (5s) to fail fast; generous read timeout for long
+# streaming responses. Keep-alive reuses TCP connections across requests.
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(90.0, connect=5.0),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+        )
+    return _http_client
+
+
+async def close_http_client() -> None:
+    global _http_client
+    if _http_client and not _http_client.is_closed:
+        await _http_client.aclose()
+        _http_client = None
+
 
 _TOOL_LABELS = {
     "set_balance": "Setting balance",
@@ -103,19 +132,18 @@ _UNDO_TABLE_MAP = {
 # PUBLIC API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_orryon(
+async def run_orryon(
     user_message: str,
     user_id: str,
     chat_history: list[dict] | None = None,
     user_name: str = "there",
+    session_id: str = "",
 ) -> dict:
-    """Non-streaming entrypoint — collects the full response from the stream."""
-    if not XAI_API_KEY:
+    """Non-streaming entrypoint — collects the full response from the async stream."""
+    if not _all_keys:
         return {
             "message": (
-                "⚠️ **orryon needs a Grok API key to think.**\n\n"
-                "Add `XAI_API_KEY=your_key` to your `.env` file, then restart.\n"
-                "Get a key at [console.x.ai](https://console.x.ai) — takes 2 minutes."
+                "Grok API key not set. Add `XAI_API_KEY=your_key` to `.env`."
             ),
             "actions_taken": [],
             "tabs_to_refresh": [],
@@ -124,12 +152,12 @@ def run_orryon(
         }
 
     full_text = ""
-    result = {
+    result: dict = {
         "message": "", "actions_taken": [], "tabs_to_refresh": [],
         "error": None, "undo_info": None,
     }
 
-    for event in run_orryon_stream(user_message, user_id, chat_history, user_name):
+    async for event in run_orryon_stream(user_message, user_id, chat_history, user_name, session_id):
         if event["type"] == "token":
             full_text += event["content"]
         elif event["type"] == "done":
@@ -143,35 +171,35 @@ def run_orryon(
         elif event["type"] == "error":
             result = {
                 "message": event["message"],
-                "actions_taken": [],
-                "tabs_to_refresh": [],
-                "error": event["message"],
-                "undo_info": None,
+                "actions_taken": [], "tabs_to_refresh": [],
+                "error": event["message"], "undo_info": None,
             }
 
     if not result["message"] and full_text:
         result["message"] = full_text
-
     return result
 
 
-def run_orryon_stream(
+async def run_orryon_stream(
     user_message: str,
     user_id: str,
     chat_history: list[dict] | None = None,
     user_name: str = "there",
-) -> Generator[dict, None, None]:
+    session_id: str = "",
+) -> AsyncGenerator[dict, None]:
     """
-    Streaming generator that yields events as orryon processes a message.
+    Async streaming generator that yields events as orryon processes a message.
 
     Event types:
         {"type": "token",  "content": "partial text..."}
         {"type": "tool",   "name": "add_expense", "label": "Logging expense"}
-        {"type": "done",   "message": "...", "actions": [...], "tabs": [...], "undo_info": ...}
+        {"type": "done",   "message": "...", "actions": [...], "tabs": [...]}
         {"type": "error",  "message": "..."}
+
+    session_id is forwarded as x-grok-conv-id for xAI prompt caching.
     """
-    if not XAI_API_KEY:
-        yield {"type": "error", "message": "⚠️ Grok API key not set."}
+    if not _all_keys:
+        yield {"type": "error", "message": "Grok API key not set."}
         return
 
     system_prompt = get_system_prompt(user_name=user_name)
@@ -188,11 +216,10 @@ def run_orryon_stream(
             content_parts: list[str] = []
             tool_calls_buf: list[dict] = []
 
-            for chunk in _call_grok_stream(messages):
-                # Accumulate real token counts returned by the API
+            async for chunk in _call_grok_stream(messages, session_id=session_id):
                 if chunk.get("usage"):
                     u = chunk["usage"]
-                    accumulated_usage["prompt_tokens"]     += u.get("prompt_tokens", 0)
+                    accumulated_usage["prompt_tokens"] += u.get("prompt_tokens", 0)
                     accumulated_usage["completion_tokens"] += u.get("completion_tokens", 0)
 
                 choices = chunk.get("choices")
@@ -200,19 +227,16 @@ def run_orryon_stream(
                     continue
                 delta = choices[0].get("delta", {})
 
-                # Stream text tokens to the UI
                 if delta.get("content"):
                     content_parts.append(delta["content"])
                     yield {"type": "token", "content": delta["content"]}
 
-                # Buffer tool-call deltas
                 if "tool_calls" in delta:
                     for tc_delta in delta["tool_calls"]:
                         idx = tc_delta.get("index", 0)
                         while len(tool_calls_buf) <= idx:
                             tool_calls_buf.append({
-                                "id": "",
-                                "type": "function",
+                                "id": "", "type": "function",
                                 "function": {"name": "", "arguments": ""},
                             })
                         if tc_delta.get("id"):
@@ -223,27 +247,22 @@ def run_orryon_stream(
                         if fn.get("arguments"):
                             tool_calls_buf[idx]["function"]["arguments"] += fn["arguments"]
 
-            # Assemble the full assistant message for history
             full_content = "".join(content_parts)
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": full_content or None}
             if tool_calls_buf:
                 assistant_msg["tool_calls"] = tool_calls_buf
             messages.append(assistant_msg)
 
-            # No tool calls -> final text response
             if not tool_calls_buf:
                 _try_extract_memories(user_message, full_content, user_id)
+                schedule_context_refresh(user_id)
                 yield {
-                    "type": "done",
-                    "message": full_content,
-                    "actions": actions_taken,
-                    "tabs": list(all_tabs),
-                    "undo_info": last_undo_info,
-                    "usage": accumulated_usage,
+                    "type": "done", "message": full_content,
+                    "actions": actions_taken, "tabs": list(all_tabs),
+                    "undo_info": last_undo_info, "usage": accumulated_usage,
                 }
                 return
 
-            # Execute each tool call
             for tc in tool_calls_buf:
                 fn_name = tc["function"]["name"]
                 label = _TOOL_LABELS.get(fn_name, fn_name.replace("_", " ").title())
@@ -258,40 +277,36 @@ def run_orryon_stream(
                 all_tabs.update(tabs)
                 actions_taken.append({"tool": fn_name, "args": tool_args, "result": result})
 
-                # Track undo info for write actions
                 if result.get("id") and fn_name in _UNDO_TABLE_MAP:
                     last_undo_info = {
                         "table": _UNDO_TABLE_MAP[fn_name],
-                        "id": result["id"],
-                        "tool": fn_name,
-                        "label": label,
+                        "id": result["id"], "tool": fn_name, "label": label,
                     }
 
                 messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
+                    "role": "tool", "tool_call_id": tc["id"],
                     "content": json.dumps(result),
                 })
 
-        # Exhausted all rounds without a final text response
+        schedule_context_refresh(user_id)
         yield {
             "type": "done",
             "message": "Done! Let me know if you need anything else.",
-            "actions": actions_taken,
-            "tabs": list(all_tabs),
-            "undo_info": last_undo_info,
-            "usage": accumulated_usage,
+            "actions": actions_taken, "tabs": list(all_tabs),
+            "undo_info": last_undo_info, "usage": accumulated_usage,
         }
 
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         logger.error("Grok API timeout")
-        yield {"type": "error", "message": "orryon is taking too long. Check your internet and try again."}
-    except requests.exceptions.HTTPError as exc:
-        status = exc.response.status_code if exc.response else 0
+        yield {"type": "error", "message": "Orryon is taking too long — please try again."}
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
         if status == 401:
             msg = "Invalid API key. Check `XAI_API_KEY` in your `.env` file."
         elif status == 429:
-            msg = "Rate limit hit. Wait a moment and try again."
+            msg = "I'm getting a lot of requests right now. Give me a sec and try again."
+        elif status >= 500:
+            msg = "xAI's servers are having a moment. Try again in a few seconds."
         else:
             msg = f"Grok API error {status}. Try again shortly."
         logger.error("Grok HTTP error %s: %s", status, exc)
@@ -302,48 +317,78 @@ def run_orryon_stream(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API CALLS
+# API CALLS (async httpx)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _call_grok_stream(messages: list[dict]) -> Generator[dict, None, None]:
-    """SSE streaming call to xAI Grok API. Yields parsed JSON chunks."""
-    headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+async def _call_grok_stream(
+    messages: list[dict],
+    session_id: str = "",
+) -> AsyncGenerator[dict, None]:
+    """Async SSE streaming call to xAI Grok API. Yields parsed JSON chunks.
+
+    Prompt caching: when session_id is provided, it's sent as x-grok-conv-id.
+    xAI reuses the KV cache for the conversation prefix, cutting TTFT on
+    follow-up turns by 50-80%. The only requirement is that prior messages
+    in the array are never reordered or mutated — only appended to.
+    """
+    api_key = _next_api_key()
+    headers: dict[str, str] = {
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json; charset=utf-8",
     }
+    if session_id:
+        headers["x-grok-conv-id"] = session_id
+
     payload: dict[str, Any] = {
         "model": GROK_MODEL,
         "messages": messages,
-        "temperature": 0.15,
-        "max_tokens": 1024,
+        "temperature": CHAT_TEMPERATURE,
+        "max_tokens": CHAT_MAX_TOKENS,
         "tools": TOOL_SCHEMAS,
         "tool_choice": "auto",
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-    resp = requests.post(XAI_API_URL, headers=headers, data=body, timeout=60, stream=True)
-    resp.raise_for_status()
 
-    for line in resp.iter_lines():
-        if not line:
-            continue
-        text = line.decode("utf-8")
-        if not text.startswith("data: "):
-            continue
-        data = text[6:]
-        if data.strip() == "[DONE]":
-            break
-        try:
-            yield json.loads(data)
-        except json.JSONDecodeError:
-            continue
+    client = get_http_client()
+    async with client.stream("POST", XAI_API_URL, json=payload, headers=headers) as resp:
+        resp.raise_for_status()
+        async for line in resp.aiter_lines():
+            if not line or not line.startswith("data: "):
+                continue
+            data = line[6:]
+            if data.strip() == "[DONE]":
+                break
+            try:
+                yield json.loads(data)
+            except json.JSONDecodeError:
+                continue
+
+
+async def _call_grok_async(messages: list[dict]) -> dict:
+    """Single non-streaming async call to Grok."""
+    api_key = _next_api_key()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json; charset=utf-8",
+    }
+    payload: dict[str, Any] = {
+        "model": GROK_MODEL,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": 256,
+    }
+    client = get_http_client()
+    resp = await client.post(XAI_API_URL, json=payload, headers=headers, timeout=15.0)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def _call_grok(messages: list[dict]) -> dict:
-    """Single non-streaming call to Grok (used for memory extraction)."""
+    """Sync non-streaming call to Grok (used in background threads for memory extraction)."""
+    api_key = _next_api_key()
     headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json; charset=utf-8",
     }
     payload: dict[str, Any] = {
@@ -353,9 +398,10 @@ def _call_grok(messages: list[dict]) -> dict:
         "max_tokens": 256,
     }
     body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-    resp = requests.post(XAI_API_URL, headers=headers, data=body, timeout=15)
-    resp.raise_for_status()
-    return resp.json()
+    with httpx.Client(timeout=15.0) as sync_client:
+        resp = sync_client.post(XAI_API_URL, headers=headers, content=body)
+        resp.raise_for_status()
+        return resp.json()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -369,14 +415,6 @@ def _build_messages(
     user_id: str,
     memories: list[str] | None = None,
 ) -> list[dict]:
-    """
-    Build the messages array for the API call.
-
-    Key improvements over v1:
-      - Full history window (50 msgs) including user + assistant messages
-      - Memory injection for long-term personalization
-      - Richer context snapshot
-    """
     context_snip = _get_context_snapshot(user_id)
     memory_block = ""
     if memories:
@@ -398,9 +436,6 @@ def _build_messages(
         }
     ]
 
-    # Keep last HISTORY_WINDOW messages — include user + assistant (tool msgs
-    # from *this* session are built live, but prior-session tool msgs aren't in
-    # chat_history so this is safe)
     recent = [m for m in chat_history if m.get("role") in ("user", "assistant")][-HISTORY_WINDOW:]
     for m in recent:
         messages.append({"role": m["role"], "content": m.get("content") or ""})
@@ -410,20 +445,63 @@ def _build_messages(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CONTEXT HELPERS
+# CONTEXT HELPERS (stale-while-revalidate)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _context_cache: dict[str, tuple[float, str]] = {}
-_CONTEXT_TTL = 60  # reuse snapshot for 60 seconds
+_CONTEXT_TTL_FRESH = 300
+_CONTEXT_TTL_STALE = 900
+_context_refreshing: set[str] = set()
+
 
 def _get_context_snapshot(user_id: str) -> str:
-    """Context snapshot injected into the system prompt. Cached per-user for 60s."""
+    """Return the user's financial context for the system prompt.
+
+    Uses a stale-while-revalidate strategy:
+      - <5 min old  → return immediately (fresh)
+      - 5–15 min old → return immediately, refresh in background (stale)
+      - >15 min old  → compute synchronously (cold miss, rare)
+    """
     import time
     now = time.monotonic()
     cached = _context_cache.get(user_id)
-    if cached and (now - cached[0]) < _CONTEXT_TTL:
-        return cached[1]
 
+    if cached:
+        age = now - cached[0]
+        if age < _CONTEXT_TTL_FRESH:
+            return cached[1]
+        if age < _CONTEXT_TTL_STALE:
+            schedule_context_refresh(user_id)
+            return cached[1]
+
+    return _compute_context_snapshot(user_id)
+
+
+def schedule_context_refresh(user_id: str) -> None:
+    """Trigger a non-blocking background refresh of the context cache."""
+    if user_id in _context_refreshing:
+        return
+    _context_refreshing.add(user_id)
+    try:
+        t = threading.Thread(
+            target=_context_refresh_worker, args=(user_id,), daemon=True,
+        )
+        t.start()
+    except Exception:
+        _context_refreshing.discard(user_id)
+
+
+def _context_refresh_worker(user_id: str) -> None:
+    try:
+        _compute_context_snapshot(user_id)
+    except Exception as exc:
+        logger.debug("Background context refresh failed: %s", exc)
+    finally:
+        _context_refreshing.discard(user_id)
+
+
+def _compute_context_snapshot(user_id: str) -> str:
+    import time
     try:
         from core.tools import (
             _get_spending_summary, _get_budget_status,
@@ -447,22 +525,22 @@ def _get_context_snapshot(user_id: str) -> str:
             f"- This month's spending: ${spend['total']:,.0f} ({spend['transaction_count']} transactions)",
         ]
         for cat in spend.get("by_category", [])[:3]:
-            lines.append(f"  · {cat['category']}: ${cat['total']:,.0f}")
+            lines.append(f"  . {cat['category']}: ${cat['total']:,.0f}")
         for b in budget.get("categories", [])[:3]:
             lines.append(
-                f"  · Budget {b['category']}: ${b['spent']:,.0f}/${b['planned']:,.0f} ({b['pct_used']}%)"
+                f"  . Budget {b['category']}: ${b['spent']:,.0f}/${b['planned']:,.0f} ({b['pct_used']}%)"
             )
         if goals.get("goals"):
             lines.append("- Goals:")
             for g in goals["goals"][:3]:
                 lines.append(
-                    f"  · {g['name']}: ${g['current_amount']:,.0f}/${g['target_amount']:,.0f} ({g['pct_complete']}%)"
+                    f"  . {g['name']}: ${g['current_amount']:,.0f}/${g['target_amount']:,.0f} ({g['pct_complete']}%)"
                 )
         if schedule.get("items"):
             lines.append("- Upcoming (7 days):")
             for item in schedule["items"][:5]:
                 amt = f" ${item['amount']:,.0f}" if item.get("amount") else ""
-                lines.append(f"  · [{item['type']}] {item['title']} — {item.get('date', '')}{amt}")
+                lines.append(f"  . [{item['type']}] {item['title']} — {item.get('date', '')}{amt}")
 
         try:
             from db import get_connection
@@ -479,12 +557,12 @@ def _get_context_snapshot(user_id: str) -> str:
                     n = dict(n)
                     pin = " pinned" if n.get("is_pinned") else ""
                     mood = f" ({n['mood']})" if n.get("mood") else ""
-                    lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}")
+                    lines.append(f"  . [{n['id'][:8]}] {n['title']}{pin}{mood}")
         except Exception:
             pass
 
         result = "\n".join(lines)
-        _context_cache[user_id] = (now, result)
+        _context_cache[user_id] = (time.monotonic(), result)
         return result
     except Exception as exc:
         logger.warning("Context snapshot failed: %s", exc)
@@ -492,11 +570,10 @@ def _get_context_snapshot(user_id: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PERSISTENT MEMORY (Grok-powered fact extraction)
+# PERSISTENT MEMORY
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _get_user_memories(user_id: str) -> list[str]:
-    """Load stored facts about the user from the database."""
     try:
         from db import get_user_memories
         rows = get_user_memories(user_id, limit=30)
@@ -506,8 +583,7 @@ def _get_user_memories(user_id: str) -> list[str]:
 
 
 def _try_extract_memories(user_message: str, assistant_response: str, user_id: str) -> None:
-    """Non-blocking background extraction of memorable facts via Grok."""
-    if not XAI_API_KEY or len(user_message) < 15:
+    if not _all_keys or len(user_message) < 15:
         return
     try:
         t = threading.Thread(
@@ -521,7 +597,6 @@ def _try_extract_memories(user_message: str, assistant_response: str, user_id: s
 
 
 def _extract_memories_worker(user_message: str, assistant_response: str, user_id: str) -> None:
-    """Background thread: ask Grok to extract notable personal facts."""
     try:
         existing = _get_user_memories(user_id)
         if len(existing) > 100:
@@ -557,7 +632,6 @@ def _extract_memories_worker(user_message: str, assistant_response: str, user_id
 
 
 def _parse_json_array(text: str) -> list:
-    """Best-effort parse of a JSON array from potentially messy LLM output."""
     text = text.strip()
     if text.startswith("["):
         try:

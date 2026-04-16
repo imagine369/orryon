@@ -9,7 +9,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check, RefreshCw, Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { streamChat, api } from "@/lib/api";
+import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
 import { ChatInput } from "@/components/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -54,7 +54,9 @@ export default function HomePage() {
   const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [toolLabel, setToolLabel] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   const [tasksDueToday, setTasksDueToday] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [upgradeBanner, setUpgradeBanner] = useState(false);
@@ -75,6 +77,12 @@ export default function HomePage() {
   }, [searchParams]);
 
   useEffect(() => {
+    warmConnection();
+    connectChatWs();
+    return () => disconnectChatWs();
+  }, []);
+
+  useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
     api.get<{ open_tasks: { due_date: string }[] }>("/api/dashboard/stats")
       .then((stats) => {
@@ -88,7 +96,7 @@ export default function HomePage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
+  }, [messages, streaming, thinking]);
 
   const loadSessions = useCallback(() => {
     setSessionsLoading(true);
@@ -141,25 +149,22 @@ export default function HomePage() {
   }, [loadSessions]);
 
   const runAI = async (text: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setStreaming(true);
+    setThinking(true);
     setToolLabel("");
     let aiText = "";
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-    let activeSessionId = sessionId;
-    if (!activeSessionId) {
-      try {
-        const session = await api.post<{ id: string }>("/api/chat/sessions");
-        activeSessionId = session.id;
-        setSessionId(activeSessionId);
-      } catch {
-        // Fall back to no session
-      }
-    }
-
     try {
-      for await (const event of streamChat(text, activeSessionId)) {
-        if (event.type === "token") {
+      for await (const event of streamChatAuto(text, sessionId, controller.signal)) {
+        if (event.type === "session") {
+          setSessionId(event.session_id || "");
+        } else if (event.type === "token") {
+          setThinking(false);
           aiText += event.content || "";
           setMessages((prev) => {
             const updated = [...prev];
@@ -167,6 +172,7 @@ export default function HomePage() {
             return updated;
           });
         } else if (event.type === "tool") {
+          setThinking(false);
           setToolLabel(event.label || event.name || "Working…");
         } else if (event.type === "done") {
           const final = event.message || aiText;
@@ -188,7 +194,8 @@ export default function HomePage() {
           });
         }
       }
-    } catch {
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return;
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
@@ -200,7 +207,9 @@ export default function HomePage() {
       });
     } finally {
       setStreaming(false);
+      setThinking(false);
       setToolLabel("");
+      abortRef.current = null;
     }
   };
 
@@ -429,7 +438,13 @@ export default function HomePage() {
                             ? "bg-[#111] border-red-500/20 text-red-400/80"
                             : "bg-[#111] border-white/5 text-gray-200"
                         }`}>
-                          {msg.content ? (
+                          {i === messages.length - 1 && thinking && !msg.content ? (
+                            <div className="flex items-center gap-1.5 py-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_infinite]" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_0.2s_infinite]" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-[pulse_1s_ease-in-out_0.4s_infinite]" />
+                            </div>
+                          ) : msg.content ? (
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               components={{
@@ -448,7 +463,7 @@ export default function HomePage() {
                               <span className="inline-block w-2 h-4 bg-white/40 animate-pulse ml-0.5" />
                             )
                           )}
-                          {i === messages.length - 1 && streaming && msg.content && (
+                          {i === messages.length - 1 && streaming && !thinking && msg.content && (
                             <span className="text-white/40">▍</span>
                           )}
                         </div>

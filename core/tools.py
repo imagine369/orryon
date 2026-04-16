@@ -2250,10 +2250,11 @@ def _create_list(args: dict, user_id: str) -> dict:
     list_id = _uid()
     now = _now_iso()
     conn = get_connection()
-    max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM user_lists WHERE user_id=?",
+    row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) as val FROM user_lists WHERE user_id=?",
         (user_id,),
-    ).fetchone()[0]
+    ).fetchone()
+    max_order = row["val"] if isinstance(row, dict) else row[0]
     conn.close()
     insert_row("user_lists", {
         "id": list_id,
@@ -2289,10 +2290,11 @@ def _add_list_items(args: dict, user_id: str) -> dict:
     items = args.get("items", [])
     added = []
     conn = get_connection()
-    max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM list_items WHERE list_id=?",
+    row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) as val FROM list_items WHERE list_id=?",
         (list_id,),
-    ).fetchone()[0]
+    ).fetchone()
+    max_order = row["val"] if isinstance(row, dict) else row[0]
     conn.close()
     for i, name in enumerate(items):
         insert_row("list_items", {
@@ -2323,10 +2325,11 @@ def _get_user_lists(args: dict, user_id: str) -> dict:
     result = []
     for lst in lists:
         d = dict(lst)
-        item_count = conn.execute(
-            "SELECT COUNT(*) FROM list_items WHERE list_id=? AND is_checked=0",
+        ic_row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM list_items WHERE list_id=? AND is_checked=0",
             (d["id"],),
-        ).fetchone()[0]
+        ).fetchone()
+        item_count = ic_row["cnt"] if isinstance(ic_row, dict) else ic_row[0]
         result.append({"id": d["id"], "name": d["name"], "item_count": item_count})
     conn.close()
     return {"status": "ok", "lists": result, "count": len(result)}

@@ -29,11 +29,15 @@ LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "grok")
 # ── Grok (xAI) — direct API, OpenAI-compatible ──────────────────────────────
 # Get your key at https://console.x.ai
 # Recommended models (set GROK_MODEL in .env):
-#   grok-3-mini        — fast + cheap, great for most tasks
-#   grok-3             — smarter, slower, better for complex queries
-#   grok-3-mini-fast   — fastest, cheapest (for high-volume use)
+#   grok-4-fast-non-reasoning-latest  — lowest TTFT, ideal for consumer chat
+#   grok-3-mini-fast                  — budget fallback, still fast
+#   grok-3-mini                       — balanced (previous default)
+#   grok-3                            — smarter, slower, complex queries only
 XAI_API_KEY: str = os.getenv("XAI_API_KEY", "")
-GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-3-mini")
+XAI_API_KEYS: list[str] = [
+    k.strip() for k in os.getenv("XAI_API_KEYS", "").split(",") if k.strip()
+]
+GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-4-fast-non-reasoning-latest")
 
 # Ollama (local fallback — not used in v1 rebuild but kept for compatibility)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -60,8 +64,15 @@ GOOGLE_CALENDAR_TOKEN: str = os.getenv("GOOGLE_CALENDAR_TOKEN", "token.json")
 GOOGLE_CALENDAR_ID: str = os.getenv("GOOGLE_CALENDAR_ID", "primary")
 USE_GOOGLE_CALENDAR: bool = os.path.exists(GOOGLE_CALENDAR_CREDENTIALS)
 
-# ── Local Storage ─────────────────────────────────────────────────────────────
+# ── Database ──────────────────────────────────────────────────────────────────
+# Set DATABASE_URL for Postgres (Supabase). Falls back to SQLite if not set.
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 DB_PATH: str = os.getenv("DB_PATH", "finance.db")
+
+# ── Redis (Upstash) ──────────────────────────────────────────────────────────
+REDIS_URL: str = os.getenv("REDIS_URL", "")
+
+# ── Local Storage ─────────────────────────────────────────────────────────────
 NOTES_DIR: str = os.getenv("NOTES_DIR", "notes")
 ICS_CALENDAR_PATH: str = os.getenv("ICS_CALENDAR_PATH", "calendar.ics")
 

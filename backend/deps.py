@@ -7,6 +7,7 @@ concerns used by multiple routers.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections import defaultdict
@@ -21,17 +22,17 @@ from db import get_connection
 
 IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
 
-# ── Rate Limiter (in-memory, per-user) ────────────────────────────────────────
+# ── Rate Limiter (in-memory fallback — Redis version in cache.py) ─────────────
 
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
-_RATE_WINDOW = 60          # seconds
-RATE_LIMIT_CHAT = 20       # max chat requests per window
-RATE_LIMIT_DEFAULT = 120   # max general requests per window
+_RATE_WINDOW = 60
+RATE_LIMIT_CHAT = 20
+RATE_LIMIT_DEFAULT = 120
 
 MONTHLY_SPEND_CAP_USD = 1.80
 
-RATE_LIMIT_OTP = 5             # max OTP requests per email per window
-RATE_LIMIT_OTP_IP = 10         # max OTP requests per IP per window
+RATE_LIMIT_OTP = 5
+RATE_LIMIT_OTP_IP = 10
 
 
 def check_rate_limit(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
@@ -42,6 +43,14 @@ def check_rate_limit(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
     if len(_rate_buckets[user_id]) >= limit:
         raise HTTPException(429, "Too many requests. Please wait a moment.")
     _rate_buckets[user_id].append(now)
+
+
+async def check_rate_limit_redis(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
+    """Async rate limiter that uses Redis when available, in-memory otherwise."""
+    from backend.cache import check_rate_limit_async
+    allowed = await check_rate_limit_async(user_id, limit, _RATE_WINDOW)
+    if not allowed:
+        raise HTTPException(429, "Too many requests. Please wait a moment.")
 
 
 def check_otp_rate_limit(request: Request, email: str) -> None:

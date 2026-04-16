@@ -14,5 +14,10 @@ except Exception as e:
     traceback.print_exc()
     exit(1)
 "
-echo "Starting uvicorn..."
-exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
+
+# Workers: use WEB_CONCURRENCY env var, default to 4 in production, 1 in dev
+WORKERS=${WEB_CONCURRENCY:-${NODE_ENV:+4}}
+WORKERS=${WORKERS:-1}
+
+echo "Starting uvicorn (workers=${WORKERS})..."
+exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS}

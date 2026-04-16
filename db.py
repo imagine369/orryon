@@ -1,30 +1,13 @@
 """
-db.py — SQLite database setup and helpers for orryon.
+db.py — Database setup and helpers for orryon.
 
-All financial state is persisted locally in a single SQLite file (finance.db).
-No cloud sync by default — privacy first.
+Supports two backends:
+  - PostgreSQL (Supabase) when DATABASE_URL is set — for production
+  - SQLite fallback when DATABASE_URL is not set — for local dev
 
-Tables:
-  users               - registered user accounts (email-based, no passwords)
-  verification_codes  - one-time 6-digit codes for email OTP auth
-  chat_messages       - persistent chat history per user
-  accounts            - bank, investment, credit, loan, and manual asset accounts
-  transactions        - income and expense line items
-  holdings            - investment portfolio positions
-  goals               - savings goals with progress tracking
-  notes               - financial journal entries
-  events              - calendar events and bill reminders
-  subscriptions       - auto-detected or manually added recurring charges
-  credit_scores       - credit score history snapshots
-  action_items        - orryon's task/action-item tracker
-  links               - user's saved links (Linktree-style)
-  inspo_images        - user's inspiration image board
-  link_pages          - public Linktree-style page settings and share tokens
-
-Usage:
-  from db import insert_row, fetch_rows, update_row, get_connection
-  from db import get_or_create_user_by_email, create_verification_code, verify_code
-  from db import save_chat_message, load_chat_history
+All callers use the same API: get_connection(), insert_row(), fetch_rows(), etc.
+The _DbConn wrapper normalises SQL dialect differences (? vs %s, INSERT OR REPLACE
+vs ON CONFLICT) so no caller code needs to know which backend is active.
 """
 
 from __future__ import annotations
@@ -36,667 +19,586 @@ import sqlite3
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from config import DB_PATH
+
+from config import DB_PATH, DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
+# ── Backend detection ──────────────────────────────────────────────────────────
 
-# ── Connection ────────────────────────────────────────────────────────────────
+_USE_PG = bool(DATABASE_URL)
+_pg_pool = None  # Initialised by init_pool() at app startup
 
-def get_connection() -> sqlite3.Connection:
-    """Return a thread-local SQLite connection with Row factory enabled."""
+
+def init_pool() -> None:
+    """Create the Postgres connection pool. Called from FastAPI lifespan."""
+    global _pg_pool
+    if not _USE_PG:
+        return
+    from psycopg_pool import ConnectionPool
+    from psycopg.rows import dict_row
+    _pg_pool = ConnectionPool(
+        conninfo=DATABASE_URL,
+        min_size=2,
+        max_size=20,
+        kwargs={"row_factory": dict_row, "autocommit": False},
+    )
+    logger.info("Postgres connection pool created (min=2, max=20)")
+
+
+def close_pool() -> None:
+    """Shut down the Postgres pool. Called from FastAPI lifespan."""
+    global _pg_pool
+    if _pg_pool:
+        _pg_pool.close()
+        _pg_pool = None
+
+
+# ── Connection wrapper ─────────────────────────────────────────────────────────
+
+class _PgCursor:
+    """Wraps a psycopg cursor, converting ? to %s and normalising results."""
+    __slots__ = ("_cur",)
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql: str, params=None):
+        sql = sql.replace("?", "%s")
+        self._cur.execute(sql, params or ())
+        return self
+
+    def executescript(self, sql: str):
+        for stmt in sql.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                self._cur.execute(stmt)
+        return self
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
+class _DbConn:
+    """
+    Unified connection wrapper. Converts ? to %s for Postgres, returns pooled
+    connections on close(), and makes rows behave like dicts for both backends.
+    """
+    __slots__ = ("_conn", "_is_pg")
+
+    def __init__(self, conn, is_pg: bool):
+        self._conn = conn
+        self._is_pg = is_pg
+
+    def execute(self, sql: str, params=None):
+        if self._is_pg:
+            sql = sql.replace("?", "%s")
+            result = self._conn.execute(sql, params or ())
+            return _PgCursor(result)
+        return self._conn.execute(sql, params or ())
+
+    def cursor(self):
+        if self._is_pg:
+            return _PgCursor(self._conn.cursor())
+        return self._conn.cursor()
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        if self._is_pg and _pg_pool:
+            _pg_pool.putconn(self._conn)
+        else:
+            self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+def get_connection() -> _DbConn:
+    """Return a database connection (Postgres pool or SQLite)."""
+    if _USE_PG and _pg_pool:
+        conn = _pg_pool.getconn()
+        return _DbConn(conn, is_pg=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")   # better concurrency for Streamlit
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    return _DbConn(conn, is_pg=False)
 
 
-# ── Schema ────────────────────────────────────────────────────────────────────
+# ── Schema ─────────────────────────────────────────────────────────────────────
+
+_SCHEMA_TABLES = """
+CREATE TABLE IF NOT EXISTS users (
+    id            TEXT PRIMARY KEY,
+    email         TEXT UNIQUE NOT NULL,
+    display_name  TEXT,
+    created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS verification_codes (
+    id          TEXT PRIMARY KEY,
+    email       TEXT NOT NULL,
+    code_hash   TEXT NOT NULL,
+    expires_at  TEXT NOT NULL,
+    used        INTEGER DEFAULT 0,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    title       TEXT DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    session_id  TEXT DEFAULT '',
+    role        TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    agent       TEXT,
+    status      TEXT,
+    summary     TEXT,
+    confidence  INTEGER,
+    evidence    TEXT,
+    next_steps  TEXT,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    type          TEXT NOT NULL,
+    institution   TEXT,
+    balance       REAL DEFAULT 0,
+    currency      TEXT DEFAULT 'USD',
+    last_updated  TEXT,
+    metadata      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+    id           TEXT PRIMARY KEY,
+    account_id   TEXT,
+    user_id      TEXT NOT NULL,
+    date         TEXT NOT NULL,
+    amount       REAL NOT NULL,
+    description  TEXT,
+    category     TEXT,
+    subcategory  TEXT,
+    is_recurring INTEGER DEFAULT 0,
+    merchant     TEXT,
+    metadata     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS holdings (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    account_id   TEXT,
+    symbol       TEXT NOT NULL,
+    name         TEXT,
+    quantity     REAL DEFAULT 0,
+    cost_basis   REAL DEFAULT 0,
+    asset_type   TEXT,
+    last_updated TEXT
+);
+
+CREATE TABLE IF NOT EXISTS goals (
+    id                     TEXT PRIMARY KEY,
+    user_id                TEXT NOT NULL,
+    name                   TEXT NOT NULL,
+    target_amount          REAL NOT NULL,
+    current_amount         REAL DEFAULT 0,
+    target_date            TEXT,
+    category               TEXT,
+    linked_budget_category TEXT DEFAULT '',
+    notes                  TEXT,
+    created_at             TEXT,
+    is_completed           INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS goal_contributions (
+    id         TEXT PRIMARY KEY,
+    goal_id    TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    amount     REAL NOT NULL,
+    note       TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    content         TEXT,
+    tags            TEXT,
+    linked_account  TEXT,
+    linked_goal     TEXT,
+    is_pinned       INTEGER DEFAULT 0,
+    mood            TEXT DEFAULT '',
+    created_at      TEXT,
+    updated_at      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id                    TEXT PRIMARY KEY,
+    user_id               TEXT NOT NULL,
+    title                 TEXT NOT NULL,
+    description           TEXT,
+    event_date            TEXT NOT NULL,
+    event_type            TEXT,
+    amount                REAL DEFAULT 0,
+    account_id            TEXT,
+    is_recurring          INTEGER DEFAULT 0,
+    recurrence            TEXT,
+    is_synced_to_google   INTEGER DEFAULT 0,
+    reminder_minutes      INTEGER DEFAULT 30,
+    reminder_sent         INTEGER DEFAULT 0,
+    external_uid          TEXT,
+    created_at            TEXT
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    amount          REAL DEFAULT 0,
+    frequency       TEXT DEFAULT 'monthly',
+    next_due        TEXT,
+    category        TEXT,
+    account_id      TEXT,
+    is_active       INTEGER DEFAULT 1,
+    detected_at     TEXT,
+    previous_amount REAL DEFAULT 0,
+    last_changed    TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS credit_scores (
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL,
+    score    INTEGER NOT NULL,
+    provider TEXT,
+    date     TEXT NOT NULL,
+    factors  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS action_items (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    description TEXT,
+    priority    TEXT DEFAULT 'medium',
+    status      TEXT DEFAULT 'open',
+    due_date    TEXT,
+    category    TEXT,
+    created_by  TEXT DEFAULT 'edward',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT,
+    sort_order  INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS links (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    url         TEXT NOT NULL,
+    description TEXT,
+    tags        TEXT,
+    favicon_url TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS inspo_images (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    title       TEXT,
+    file_path   TEXT NOT NULL,
+    description TEXT,
+    tags        TEXT,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS link_pages (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT UNIQUE NOT NULL,
+    share_token  TEXT UNIQUE NOT NULL,
+    page_title   TEXT DEFAULT '',
+    bio          TEXT DEFAULT '',
+    is_public    INTEGER DEFAULT 0,
+    theme        TEXT DEFAULT 'dark',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS budget_categories (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    planned     REAL DEFAULT 0,
+    month       TEXT NOT NULL,
+    created_at  TEXT,
+    rollover    INTEGER DEFAULT 0,
+    UNIQUE(user_id, category, month)
+);
+
+CREATE TABLE IF NOT EXISTS grocery_items (
+    id               TEXT PRIMARY KEY,
+    user_id          TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    quantity         TEXT DEFAULT '1',
+    estimated_price  REAL DEFAULT 0,
+    is_checked       INTEGER DEFAULT 0,
+    sort_order       INTEGER DEFAULT 0,
+    added_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_lists (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    icon       TEXT DEFAULT '',
+    color      TEXT DEFAULT '#ffffff',
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS list_items (
+    id         TEXT PRIMARY KEY,
+    list_id    TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    notes      TEXT DEFAULT '',
+    is_checked INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    added_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS custom_categories (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    color       TEXT DEFAULT '#6366f1',
+    icon        TEXT DEFAULT '',
+    is_active   INTEGER DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    UNIQUE(user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS share_tokens (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    token       TEXT UNIQUE NOT NULL,
+    view_type   TEXT DEFAULT 'finance_readonly',
+    is_active   INTEGER DEFAULT 1,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_memory (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    fact        TEXT NOT NULL,
+    category    TEXT DEFAULT 'general',
+    source      TEXT DEFAULT 'conversation',
+    created_at  TEXT NOT NULL,
+    UNIQUE(user_id, fact)
+);
+
+CREATE TABLE IF NOT EXISTS recurring_income (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    amount      REAL NOT NULL,
+    frequency   TEXT DEFAULT 'monthly',
+    source      TEXT DEFAULT '',
+    next_date   TEXT,
+    is_active   INTEGER DEFAULT 1,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    total_assets    REAL DEFAULT 0,
+    total_liabilities REAL DEFAULT 0,
+    net_worth       REAL DEFAULT 0,
+    snapshot_date   TEXT NOT NULL,
+    UNIQUE(user_id, snapshot_date)
+);
+
+CREATE TABLE IF NOT EXISTS user_api_spend (
+    id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL,
+    month             TEXT NOT NULL,
+    prompt_tokens     INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    cost_usd          REAL DEFAULT 0,
+    updated_at        TEXT NOT NULL,
+    UNIQUE(user_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS waitlist (
+    id         TEXT PRIMARY KEY,
+    email      TEXT UNIQUE NOT NULL,
+    approved   INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+"""
+
+_SCHEMA_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_created ON chat_messages(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_events_user_date ON events(user_id, event_date);
+CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_user_updated ON notes(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email, expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_lists_user ON user_lists(user_id);
+CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id);
+CREATE INDEX IF NOT EXISTS idx_budget_categories_user_month ON budget_categories(user_id, month);
+CREATE INDEX IF NOT EXISTS idx_user_memory_user ON user_memory(user_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+"""
+
+# Additional columns that may be missing on older databases.
+# For Postgres these are included in the CREATE TABLE; for SQLite we ALTER.
+_USERS_EXTRA_COLS = {
+    "default_reminder_minutes": "INTEGER DEFAULT 30",
+    "daily_digest_enabled": "INTEGER DEFAULT 1",
+    "daily_digest_time": "TEXT DEFAULT '08:00'",
+    "last_digest_sent": "TEXT DEFAULT ''",
+    "weekly_report_enabled": "INTEGER DEFAULT 1",
+    "last_weekly_report": "TEXT DEFAULT ''",
+    "currency": "TEXT DEFAULT 'USD'",
+    "budget_cycle_start": "INTEGER DEFAULT 1",
+    "spending_alert_pct": "INTEGER DEFAULT 80",
+    "bill_due_alert_days": "INTEGER DEFAULT 3",
+    "plan": "TEXT DEFAULT 'free'",
+    "trial_ends_at": "TEXT DEFAULT ''",
+    "stripe_customer_id": "TEXT DEFAULT ''",
+    "stripe_subscription_id": "TEXT DEFAULT ''",
+}
+
+_TRANSACTIONS_EXTRA_COLS = {
+    "currency": "TEXT DEFAULT 'USD'",
+    "attachment_path": "TEXT DEFAULT ''",
+}
+
 
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call multiple times."""
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id            TEXT PRIMARY KEY,
-            email         TEXT UNIQUE NOT NULL,
-            display_name  TEXT,
-            created_at    TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS verification_codes (
-            id          TEXT PRIMARY KEY,
-            email       TEXT NOT NULL,
-            code_hash   TEXT NOT NULL,
-            expires_at  TEXT NOT NULL,
-            used        INTEGER DEFAULT 0,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS chat_sessions (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            title       TEXT DEFAULT '',
-            created_at  TEXT NOT NULL,
-            updated_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            session_id  TEXT DEFAULT '',
-            role        TEXT NOT NULL,
-            content     TEXT NOT NULL,
-            agent       TEXT,
-            status      TEXT,
-            summary     TEXT,
-            confidence  INTEGER,
-            evidence    TEXT,
-            next_steps  TEXT,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS accounts (
-            id            TEXT PRIMARY KEY,
-            user_id       TEXT NOT NULL,
-            name          TEXT NOT NULL,
-            type          TEXT NOT NULL,   -- checking | savings | investment | credit | loan | asset
-            institution   TEXT,
-            balance       REAL DEFAULT 0,
-            currency      TEXT DEFAULT 'USD',
-            last_updated  TEXT,
-            metadata      TEXT            -- JSON blob for extra fields
-        );
-
-        CREATE TABLE IF NOT EXISTS transactions (
-            id           TEXT PRIMARY KEY,
-            account_id   TEXT,
-            user_id      TEXT NOT NULL,
-            date         TEXT NOT NULL,
-            amount       REAL NOT NULL,   -- positive = expense, negative = income
-            description  TEXT,
-            category     TEXT,
-            subcategory  TEXT,
-            is_recurring INTEGER DEFAULT 0,
-            merchant     TEXT,
-            metadata     TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS holdings (
-            id           TEXT PRIMARY KEY,
-            user_id      TEXT NOT NULL,
-            account_id   TEXT,
-            symbol       TEXT NOT NULL,
-            name         TEXT,
-            quantity     REAL DEFAULT 0,
-            cost_basis   REAL DEFAULT 0,
-            asset_type   TEXT,           -- stock | etf | crypto | bond | mutual_fund
-            last_updated TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS goals (
-            id                     TEXT PRIMARY KEY,
-            user_id                TEXT NOT NULL,
-            name                   TEXT NOT NULL,
-            target_amount          REAL NOT NULL,
-            current_amount         REAL DEFAULT 0,
-            target_date            TEXT,
-            category               TEXT,
-            linked_budget_category TEXT DEFAULT '',
-            notes                  TEXT,
-            created_at             TEXT,
-            is_completed           INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS goal_contributions (
-            id         TEXT PRIMARY KEY,
-            goal_id    TEXT NOT NULL,
-            user_id    TEXT NOT NULL,
-            amount     REAL NOT NULL,
-            note       TEXT,
-            created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS notes (
-            id              TEXT PRIMARY KEY,
-            user_id         TEXT NOT NULL,
-            title           TEXT NOT NULL,
-            content         TEXT,
-            tags            TEXT,        -- comma-separated
-            linked_account  TEXT,
-            linked_goal     TEXT,
-            created_at      TEXT,
-            updated_at      TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS events (
-            id                    TEXT PRIMARY KEY,
-            user_id               TEXT NOT NULL,
-            title                 TEXT NOT NULL,
-            description           TEXT,
-            event_date            TEXT NOT NULL,
-            event_type            TEXT,        -- bill_due | review | reminder | goal_deadline
-            amount                REAL DEFAULT 0,
-            account_id            TEXT,
-            is_recurring          INTEGER DEFAULT 0,
-            recurrence            TEXT,        -- monthly | weekly | yearly
-            is_synced_to_google   INTEGER DEFAULT 0,
-            reminder_minutes      INTEGER DEFAULT 30,  -- 0=none, 10, 30, 60, 360, 1440
-            reminder_sent         INTEGER DEFAULT 0,
-            created_at            TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            id           TEXT PRIMARY KEY,
-            user_id      TEXT NOT NULL,
-            name         TEXT NOT NULL,
-            amount       REAL DEFAULT 0,
-            frequency    TEXT DEFAULT 'monthly',
-            next_due     TEXT,
-            category     TEXT,
-            account_id   TEXT,
-            is_active    INTEGER DEFAULT 1,
-            detected_at  TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS credit_scores (
-            id       TEXT PRIMARY KEY,
-            user_id  TEXT NOT NULL,
-            score    INTEGER NOT NULL,
-            provider TEXT,
-            date     TEXT NOT NULL,
-            factors  TEXT             -- JSON
-        );
-
-        CREATE TABLE IF NOT EXISTS action_items (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            title       TEXT NOT NULL,
-            description TEXT,
-            priority    TEXT DEFAULT 'medium',  -- high | medium | low
-            status      TEXT DEFAULT 'open',    -- open | in_progress | done | cancelled
-            due_date    TEXT,
-            category    TEXT,                   -- work | personal | finance | travel | health | other
-            created_by  TEXT DEFAULT 'edward',  -- which agent created it
-            created_at  TEXT NOT NULL,
-            updated_at  TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS links (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            title       TEXT NOT NULL,
-            url         TEXT NOT NULL,
-            description TEXT,
-            tags        TEXT,           -- comma-separated
-            favicon_url TEXT,           -- optional cached favicon
-            created_at  TEXT NOT NULL,
-            updated_at  TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS inspo_images (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            title       TEXT,
-            file_path   TEXT NOT NULL,  -- local path under inspo/
-            description TEXT,
-            tags        TEXT,           -- comma-separated
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS link_pages (
-            id           TEXT PRIMARY KEY,
-            user_id      TEXT UNIQUE NOT NULL,
-            share_token  TEXT UNIQUE NOT NULL,  -- random slug used in public URL
-            page_title   TEXT DEFAULT '',       -- e.g. "Jane's Links"
-            bio          TEXT DEFAULT '',       -- short bio shown on public page
-            is_public    INTEGER DEFAULT 0,     -- 0 = private, 1 = publicly accessible
-            theme        TEXT DEFAULT 'dark',   -- dark | light | gradient
-            created_at   TEXT NOT NULL,
-            updated_at   TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS budget_categories (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            category    TEXT NOT NULL,
-            planned     REAL DEFAULT 0,
-            month       TEXT NOT NULL,           -- YYYY-MM
-            created_at  TEXT,
-            UNIQUE(user_id, category, month)
-        );
-
-        CREATE TABLE IF NOT EXISTS grocery_items (
-            id               TEXT PRIMARY KEY,
-            user_id          TEXT NOT NULL,
-            name             TEXT NOT NULL,
-            quantity         TEXT DEFAULT '1',
-            estimated_price  REAL DEFAULT 0,
-            is_checked       INTEGER DEFAULT 0,
-            added_at         TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS user_lists (
-            id         TEXT PRIMARY KEY,
-            user_id    TEXT NOT NULL,
-            name       TEXT NOT NULL,
-            icon       TEXT DEFAULT '📋',
-            color      TEXT DEFAULT '#ffffff',
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS list_items (
-            id         TEXT PRIMARY KEY,
-            list_id    TEXT NOT NULL,
-            user_id    TEXT NOT NULL,
-            name       TEXT NOT NULL,
-            notes      TEXT DEFAULT '',
-            is_checked INTEGER DEFAULT 0,
-            sort_order INTEGER DEFAULT 0,
-            added_at   TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS custom_categories (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            name        TEXT NOT NULL,
-            color       TEXT DEFAULT '#6366f1',
-            icon        TEXT DEFAULT '🏷️',
-            is_active   INTEGER DEFAULT 1,
-            created_at  TEXT NOT NULL,
-            UNIQUE(user_id, name)
-        );
-
-        CREATE TABLE IF NOT EXISTS share_tokens (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            token       TEXT UNIQUE NOT NULL,
-            view_type   TEXT DEFAULT 'finance_readonly',
-            is_active   INTEGER DEFAULT 1,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS user_memory (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            fact        TEXT NOT NULL,
-            category    TEXT DEFAULT 'general',
-            source      TEXT DEFAULT 'conversation',
-            created_at  TEXT NOT NULL,
-            UNIQUE(user_id, fact)
-        );
-
-        CREATE TABLE IF NOT EXISTS recurring_income (
-            id          TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL,
-            name        TEXT NOT NULL,
-            amount      REAL NOT NULL,
-            frequency   TEXT DEFAULT 'monthly',
-            source      TEXT DEFAULT '',
-            next_date   TEXT,
-            is_active   INTEGER DEFAULT 1,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS net_worth_snapshots (
-            id              TEXT PRIMARY KEY,
-            user_id         TEXT NOT NULL,
-            total_assets    REAL DEFAULT 0,
-            total_liabilities REAL DEFAULT 0,
-            net_worth       REAL DEFAULT 0,
-            snapshot_date   TEXT NOT NULL,
-            UNIQUE(user_id, snapshot_date)
-        );
-
-        CREATE TABLE IF NOT EXISTS user_api_spend (
-            id                TEXT PRIMARY KEY,
-            user_id           TEXT NOT NULL,
-            month             TEXT NOT NULL,
-            prompt_tokens     INTEGER DEFAULT 0,
-            completion_tokens INTEGER DEFAULT 0,
-            cost_usd          REAL DEFAULT 0,
-            updated_at        TEXT NOT NULL,
-            UNIQUE(user_id, month)
-        );
-
-        CREATE TABLE IF NOT EXISTS waitlist (
-            id         TEXT PRIMARY KEY,
-            email      TEXT UNIQUE NOT NULL,
-            approved   INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL
-        );
-    """)
-
-    cur.executescript("""
-        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user
-            ON chat_sessions(user_id, updated_at);
-        CREATE INDEX IF NOT EXISTS idx_chat_messages_user_created
-            ON chat_messages(user_id, created_at);
-        CREATE INDEX IF NOT EXISTS idx_transactions_user_date
-            ON transactions(user_id, date);
-        CREATE INDEX IF NOT EXISTS idx_events_user_date
-            ON events(user_id, event_date);
-        CREATE INDEX IF NOT EXISTS idx_goals_user
-            ON goals(user_id);
-        CREATE INDEX IF NOT EXISTS idx_notes_user_updated
-            ON notes(user_id, updated_at);
-        CREATE INDEX IF NOT EXISTS idx_subscriptions_user
-            ON subscriptions(user_id);
-        CREATE INDEX IF NOT EXISTS idx_verification_codes_email
-            ON verification_codes(email, expires_at);
-        CREATE INDEX IF NOT EXISTS idx_user_lists_user
-            ON user_lists(user_id);
-        CREATE INDEX IF NOT EXISTS idx_list_items_list
-            ON list_items(list_id);
-        CREATE INDEX IF NOT EXISTS idx_budget_categories_user_month
-            ON budget_categories(user_id, month);
-        CREATE INDEX IF NOT EXISTS idx_user_memory_user
-            ON user_memory(user_id);
-        CREATE INDEX IF NOT EXISTS idx_accounts_user
-            ON accounts(user_id);
-    """)
-
-    conn.commit()
-
-    # ── Migrations ────────────────────────────────────────────────────────────
-    _migrate_users_table(conn)
-    _migrate_goals_table(conn)
-    _migrate_subscriptions_table(conn)
-    _migrate_events_reminders(conn)
-    _migrate_users_notifications(conn)
-    _migrate_user_memory(conn)
-    _migrate_budget_rollover(conn)
-    _migrate_transactions_currency(conn)
-    _migrate_users_weekly_report(conn)
-    _migrate_notes_rich(conn)
-    _migrate_users_preferences(conn)
-    _migrate_users_plan(conn)
-    _migrate_user_api_spend(conn)
-    _migrate_sort_order(conn)
-    _migrate_waitlist_approved(conn)
-    _migrate_chat_sessions(conn)
-
-    conn.close()
-    logger.info("Database initialised at: %s", DB_PATH)
-
-
-def _migrate_subscriptions_table(conn: sqlite3.Connection) -> None:
-    """Add previous_amount + last_changed columns to subscriptions (v1 migration)."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(subscriptions)").fetchall()]
-        if "previous_amount" not in cols:
-            conn.execute("ALTER TABLE subscriptions ADD COLUMN previous_amount REAL DEFAULT 0")
-        if "last_changed" not in cols:
-            conn.execute("ALTER TABLE subscriptions ADD COLUMN last_changed TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_subscriptions_table: %s (non-fatal)", exc)
-
-
-def _migrate_goals_table(conn: sqlite3.Connection) -> None:
-    """Add linked_budget_category column to goals table if it doesn't exist (v1 migration)."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(goals)").fetchall()]
-        if "linked_budget_category" not in cols:
-            conn.execute("ALTER TABLE goals ADD COLUMN linked_budget_category TEXT DEFAULT ''")
-            conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_goals_table: %s (non-fatal)", exc)
-
-
-def _migrate_events_reminders(conn: sqlite3.Connection) -> None:
-    """Add reminder_minutes, reminder_sent, and external_uid columns to events table."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()]
-        if "reminder_minutes" not in cols:
-            conn.execute("ALTER TABLE events ADD COLUMN reminder_minutes INTEGER DEFAULT 30")
-        if "reminder_sent" not in cols:
-            conn.execute("ALTER TABLE events ADD COLUMN reminder_sent INTEGER DEFAULT 0")
-        if "external_uid" not in cols:
-            conn.execute("ALTER TABLE events ADD COLUMN external_uid TEXT DEFAULT NULL")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_events_reminders: %s (non-fatal)", exc)
-
-
-def _migrate_users_notifications(conn: sqlite3.Connection) -> None:
-    """Add notification preference columns to users table."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "default_reminder_minutes" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN default_reminder_minutes INTEGER DEFAULT 30")
-        if "daily_digest_enabled" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN daily_digest_enabled INTEGER DEFAULT 1")
-        if "daily_digest_time" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN daily_digest_time TEXT DEFAULT '08:00'")
-        if "last_digest_sent" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN last_digest_sent TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_users_notifications: %s (non-fatal)", exc)
-
-
-def _migrate_budget_rollover(conn: sqlite3.Connection) -> None:
-    """Add rollover column to budget_categories."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(budget_categories)").fetchall()]
-        if "rollover" not in cols:
-            conn.execute("ALTER TABLE budget_categories ADD COLUMN rollover INTEGER DEFAULT 0")
-            conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_budget_rollover: %s (non-fatal)", exc)
-
-
-def _migrate_transactions_currency(conn: sqlite3.Connection) -> None:
-    """Add currency and attachment_path columns to transactions."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(transactions)").fetchall()]
-        if "currency" not in cols:
-            conn.execute("ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT 'USD'")
-        if "attachment_path" not in cols:
-            conn.execute("ALTER TABLE transactions ADD COLUMN attachment_path TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_transactions_currency: %s (non-fatal)", exc)
-
-
-def _migrate_users_weekly_report(conn: sqlite3.Connection) -> None:
-    """Add weekly_report_enabled column to users."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "weekly_report_enabled" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN weekly_report_enabled INTEGER DEFAULT 1")
-        if "last_weekly_report" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN last_weekly_report TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_users_weekly_report: %s (non-fatal)", exc)
-
-
-def _migrate_notes_rich(conn: sqlite3.Connection) -> None:
-    """Add is_pinned and mood columns to notes table."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(notes)").fetchall()]
-        if "is_pinned" not in cols:
-            conn.execute("ALTER TABLE notes ADD COLUMN is_pinned INTEGER DEFAULT 0")
-        if "mood" not in cols:
-            conn.execute("ALTER TABLE notes ADD COLUMN mood TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_notes_rich: %s (non-fatal)", exc)
-
-
-def _migrate_users_preferences(conn: sqlite3.Connection) -> None:
-    """Add user preference columns: currency, budget_cycle_start, spending_alert_pct, bill_due_alert_days."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "currency" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN currency TEXT DEFAULT 'USD'")
-        if "budget_cycle_start" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN budget_cycle_start INTEGER DEFAULT 1")
-        if "spending_alert_pct" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN spending_alert_pct INTEGER DEFAULT 80")
-        if "bill_due_alert_days" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN bill_due_alert_days INTEGER DEFAULT 3")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_users_preferences: %s (non-fatal)", exc)
-
-
-def _migrate_users_plan(conn: sqlite3.Connection) -> None:
-    """Add billing plan columns to users (plan, trial_ends_at, stripe_customer_id, stripe_subscription_id)."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-        if "plan" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'")
-        if "trial_ends_at" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN trial_ends_at TEXT DEFAULT ''")
-        if "stripe_customer_id" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT DEFAULT ''")
-        if "stripe_subscription_id" not in cols:
-            conn.execute("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT DEFAULT ''")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_users_plan: %s (non-fatal)", exc)
-
-
-def _migrate_user_api_spend(conn: sqlite3.Connection) -> None:
-    """Ensure user_api_spend table exists (added for per-user cost capping)."""
-    try:
-        conn.execute("SELECT 1 FROM user_api_spend LIMIT 1")
-    except sqlite3.OperationalError:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_api_spend (
-                id                TEXT PRIMARY KEY,
-                user_id           TEXT NOT NULL,
-                month             TEXT NOT NULL,
-                prompt_tokens     INTEGER DEFAULT 0,
-                completion_tokens INTEGER DEFAULT 0,
-                cost_usd          REAL DEFAULT 0,
-                updated_at        TEXT NOT NULL,
-                UNIQUE(user_id, month)
-            )
-        """)
-        conn.commit()
-
-
-def _migrate_sort_order(conn: sqlite3.Connection) -> None:
-    """Add sort_order column to action_items and grocery_items for manual drag ordering."""
-    try:
-        ai_cols = [r[1] for r in conn.execute("PRAGMA table_info(action_items)").fetchall()]
-        if "sort_order" not in ai_cols:
-            conn.execute("ALTER TABLE action_items ADD COLUMN sort_order INTEGER DEFAULT 0")
-        gi_cols = [r[1] for r in conn.execute("PRAGMA table_info(grocery_items)").fetchall()]
-        if "sort_order" not in gi_cols:
-            conn.execute("ALTER TABLE grocery_items ADD COLUMN sort_order INTEGER DEFAULT 0")
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_sort_order: %s (non-fatal)", exc)
-
-
-def _migrate_waitlist_approved(conn: sqlite3.Connection) -> None:
-    """Add approved column to waitlist table."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(waitlist)").fetchall()]
-        if "approved" not in cols:
-            conn.execute("ALTER TABLE waitlist ADD COLUMN approved INTEGER DEFAULT 0")
-            conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_waitlist_approved: %s (non-fatal)", exc)
-
-
-def _migrate_chat_sessions(conn: sqlite3.Connection) -> None:
-    """Add session_id to chat_messages if missing, then create index."""
-    try:
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_messages)").fetchall()]
-        if "session_id" not in cols:
-            conn.execute("ALTER TABLE chat_messages ADD COLUMN session_id TEXT DEFAULT ''")
-            conn.commit()
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at)"
-        )
-        conn.commit()
-    except Exception as exc:
-        logger.warning("_migrate_chat_sessions: %s (non-fatal)", exc)
-
-
-def _migrate_user_memory(conn: sqlite3.Connection) -> None:
-    """Ensure user_memory table exists (added in v2)."""
-    try:
-        conn.execute("SELECT 1 FROM user_memory LIMIT 1")
-    except sqlite3.OperationalError:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_memory (
-                id          TEXT PRIMARY KEY,
-                user_id     TEXT NOT NULL,
-                fact        TEXT NOT NULL,
-                category    TEXT DEFAULT 'general',
-                source      TEXT DEFAULT 'conversation',
-                created_at  TEXT NOT NULL,
-                UNIQUE(user_id, fact)
-            )
-        """)
-        conn.commit()
-
-
-def _migrate_users_table(conn: sqlite3.Connection) -> None:
-    """
-    One-time migration: if the old `users` table still has password_hash / salt
-    columns (legacy username+password auth), replace it with the lean email-only
-    schema required by OTP auth.
-
-    Existing rows are migrated by email where available; rows with no email are
-    dropped (they cannot be recovered via OTP anyway).
-    """
+    if _USE_PG and _pg_pool:
+        _init_db_pg()
+    else:
+        _init_db_sqlite()
+
+
+def _init_db_pg() -> None:
+    """Postgres schema initialisation."""
+    conn = _pg_pool.getconn()
     try:
         cur = conn.cursor()
-        cols = {
-            row[1]
-            for row in cur.execute("PRAGMA table_info(users)").fetchall()
-        }
-        if "password_hash" not in cols and "salt" not in cols:
-            return  # already migrated
-
-        logger.info("Migrating users table: removing legacy password columns…")
-        cur.executescript("""
-            CREATE TABLE IF NOT EXISTS users_otp_new (
-                id            TEXT PRIMARY KEY,
-                email         TEXT UNIQUE NOT NULL,
-                display_name  TEXT,
-                created_at    TEXT NOT NULL
-            );
-
-            INSERT OR IGNORE INTO users_otp_new (id, email, display_name, created_at)
-            SELECT id, email, display_name, created_at
-            FROM users
-            WHERE email IS NOT NULL AND email != '';
-
-            DROP TABLE users;
-
-            ALTER TABLE users_otp_new RENAME TO users;
-        """)
+        for stmt in _SCHEMA_TABLES.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                cur.execute(stmt)
+        for stmt in _SCHEMA_INDEXES.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                cur.execute(stmt)
+        _migrate_extra_cols_pg(cur, "users", _USERS_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "transactions", _TRANSACTIONS_EXTRA_COLS)
         conn.commit()
-        logger.info("users table migration complete.")
+        logger.info("Postgres schema initialised")
     except Exception as exc:
-        logger.error("_migrate_users_table error: %s", exc)
+        conn.rollback()
+        logger.error("Postgres init_db failed: %s", exc)
+    finally:
+        _pg_pool.putconn(conn)
+
+
+def _migrate_extra_cols_pg(cur, table: str, cols: dict) -> None:
+    """Add missing columns to a Postgres table (safe, uses IF NOT EXISTS pattern)."""
+    for col_name, col_def in cols.items():
+        try:
+            cur.execute(
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col_name} {col_def}"
+            )
+        except Exception:
+            pass
+
+
+def _init_db_sqlite() -> None:
+    """SQLite schema initialisation (legacy path)."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    cur = conn.cursor()
+    cur.executescript(_SCHEMA_TABLES)
+    cur.executescript(_SCHEMA_INDEXES)
+    conn.commit()
+    _migrate_sqlite_cols(conn, "users", _USERS_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "transactions", _TRANSACTIONS_EXTRA_COLS)
+    conn.commit()
+    conn.close()
+    logger.info("SQLite database initialised at: %s", DB_PATH)
+
+
+def _migrate_sqlite_cols(conn, table: str, cols: dict) -> None:
+    """Add missing columns to a SQLite table."""
+    try:
+        existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for col_name, col_def in cols.items():
+            if col_name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_migrate_sqlite_cols(%s): %s", table, exc)
 
 
 # ── Generic CRUD helpers ──────────────────────────────────────────────────────
 
+def _ph(n: int) -> str:
+    """Return n placeholders for the current backend."""
+    p = "%s" if _USE_PG else "?"
+    return ", ".join(p for _ in range(n))
+
+
 def insert_row(table: str, data: dict) -> bool:
-    """Insert or replace a row into *table* using *data* dict."""
+    """Insert a row. Uses ON CONFLICT for Postgres, INSERT OR REPLACE for SQLite."""
     try:
         cols = ", ".join(data.keys())
-        placeholders = ", ".join("?" for _ in data)
+        placeholders = _ph(len(data))
+        values = list(data.values())
         conn = get_connection()
-        conn.execute(
-            f"INSERT OR REPLACE INTO {table} ({cols}) VALUES ({placeholders})",
-            list(data.values()),
-        )
+        if _USE_PG:
+            set_clause = ", ".join(f"{k} = EXCLUDED.{k}" for k in data if k != "id")
+            conn.execute(
+                f"INSERT INTO {table} ({cols}) VALUES ({placeholders}) "
+                f"ON CONFLICT (id) DO UPDATE SET {set_clause}",
+                values,
+            )
+        else:
+            conn.execute(
+                f"INSERT OR REPLACE INTO {table} ({cols}) VALUES ({placeholders})",
+                values,
+            )
         conn.commit()
         conn.close()
         return True
@@ -706,18 +608,14 @@ def insert_row(table: str, data: dict) -> bool:
 
 
 def fetch_rows(table: str, where: dict | None = None, limit: int = 500) -> list[dict]:
-    """
-    Fetch rows from *table* with optional equality filters.
-
-    Example:
-        fetch_rows("transactions", {"user_id": "default_user"}, limit=100)
-    """
+    """Fetch rows from *table* with optional equality filters."""
     try:
         conn = get_connection()
+        ph = "%s" if _USE_PG else "?"
         query = f"SELECT * FROM {table}"
         params: list = []
         if where:
-            conditions = " AND ".join(f"{k} = ?" for k in where)
+            conditions = " AND ".join(f"{k} = {ph}" for k in where)
             query += f" WHERE {conditions}"
             params = list(where.values())
         query += f" LIMIT {limit}"
@@ -732,8 +630,9 @@ def fetch_rows(table: str, where: dict | None = None, limit: int = 500) -> list[
 def update_row(table: str, data: dict, where: dict) -> bool:
     """Update rows in *table* matching *where* conditions with *data* values."""
     try:
-        set_clause = ", ".join(f"{k} = ?" for k in data)
-        where_clause = " AND ".join(f"{k} = ?" for k in where)
+        ph = "%s" if _USE_PG else "?"
+        set_clause = ", ".join(f"{k} = {ph}" for k in data)
+        where_clause = " AND ".join(f"{k} = {ph}" for k in where)
         params = list(data.values()) + list(where.values())
         conn = get_connection()
         conn.execute(f"UPDATE {table} SET {set_clause} WHERE {where_clause}", params)
@@ -748,7 +647,8 @@ def update_row(table: str, data: dict, where: dict) -> bool:
 def delete_row(table: str, where: dict) -> bool:
     """Delete rows from *table* matching *where* conditions."""
     try:
-        where_clause = " AND ".join(f"{k} = ?" for k in where)
+        ph = "%s" if _USE_PG else "?"
+        where_clause = " AND ".join(f"{k} = {ph}" for k in where)
         conn = get_connection()
         conn.execute(f"DELETE FROM {table} WHERE {where_clause}", list(where.values()))
         conn.commit()
@@ -762,17 +662,13 @@ def delete_row(table: str, where: dict) -> bool:
 # ── OTP helpers ───────────────────────────────────────────────────────────────
 
 def _hash_code(code: str) -> str:
-    """SHA-256 hash of the plaintext OTP code for safe storage."""
     return hashlib.sha256(code.encode()).hexdigest()
 
 
 # ── User auth (email OTP — no passwords stored) ───────────────────────────────
 
 def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
-    """
-    Return the existing user for *email*, or create a new one.
-    Email is the sole identifier — no username or password.
-    """
+    """Return the existing user for *email*, or create a new one."""
     email = email.strip().lower()
     try:
         conn = get_connection()
@@ -785,7 +681,6 @@ def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
     except Exception as exc:
         logger.error("get_or_create_user_by_email lookup error: %s", exc)
 
-    # New user — start on a 14-day Pro trial
     from config import TRIAL_DAYS
     name = display_name.strip() or email.split("@")[0]
     trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
@@ -803,11 +698,7 @@ def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
 
 
 def create_verification_code(email: str) -> str:
-    """
-    Generate a cryptographically random 6-digit OTP for *email*.
-    Stores the SHA-256 hash (not plaintext) with a 10-minute expiry.
-    Returns the plaintext code to be emailed to the user.
-    """
+    """Generate a 6-digit OTP. Stores SHA-256 hash with 10-minute expiry."""
     email = email.strip().lower()
     code = f"{random.SystemRandom().randint(0, 999999):06d}"
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
@@ -819,35 +710,26 @@ def create_verification_code(email: str) -> str:
         "used": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
-    logger.info("Verification code created for: %s (expires %s)", email, expires_at)
     return code
 
 
 def verify_code(email: str, code: str) -> bool:
-    """
-    Check that *code* is valid for *email*: correct hash, not expired, not used.
-    Marks the code as used on success (single-use).
-    Returns True on success, False on any failure.
-    """
+    """Check OTP validity. Marks as used on success."""
     email = email.strip().lower()
     code_hash = _hash_code(code.strip())
     now = datetime.now(timezone.utc).isoformat()
     try:
         conn = get_connection()
         row = conn.execute(
-            """
-            SELECT id FROM verification_codes
-            WHERE email = ? AND code_hash = ? AND used = 0 AND expires_at > ?
-            ORDER BY created_at DESC LIMIT 1
-            """,
+            "SELECT id FROM verification_codes "
+            "WHERE email = ? AND code_hash = ? AND used = 0 AND expires_at > ? "
+            "ORDER BY created_at DESC LIMIT 1",
             (email, code_hash, now),
         ).fetchone()
         if not row:
             conn.close()
             return False
-        conn.execute(
-            "UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],)
-        )
+        conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
         conn.commit()
         conn.close()
         return True
@@ -859,7 +741,6 @@ def verify_code(email: str, code: str) -> bool:
 # ── Chat persistence ──────────────────────────────────────────────────────────
 
 def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
-    """Persist a single chat message (user or assistant) for *user_id*."""
     now = datetime.now(timezone.utc).isoformat()
     row = {
         "id": str(uuid.uuid4()),
@@ -888,34 +769,24 @@ def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
 
 
 def load_chat_history(user_id: str, limit: int = 100, session_id: str = "") -> list[dict]:
-    """
-    Load the most recent *limit* messages for *user_id*, oldest-first.
-    If session_id is provided, only load messages from that session.
-    """
     try:
         conn = get_connection()
         if session_id:
             rows = conn.execute(
-                """
-                SELECT * FROM (
-                    SELECT * FROM chat_messages
-                    WHERE user_id = ? AND session_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                ) ORDER BY created_at ASC
-                """,
+                "SELECT * FROM ("
+                "  SELECT * FROM chat_messages"
+                "  WHERE user_id = ? AND session_id = ?"
+                "  ORDER BY created_at DESC LIMIT ?"
+                ") sub ORDER BY created_at ASC",
                 (user_id, session_id, limit),
             ).fetchall()
         else:
             rows = conn.execute(
-                """
-                SELECT * FROM (
-                    SELECT * FROM chat_messages
-                    WHERE user_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                ) ORDER BY created_at ASC
-                """,
+                "SELECT * FROM ("
+                "  SELECT * FROM chat_messages"
+                "  WHERE user_id = ?"
+                "  ORDER BY created_at DESC LIMIT ?"
+                ") sub ORDER BY created_at ASC",
                 (user_id, limit),
             ).fetchall()
         conn.close()
@@ -933,21 +804,16 @@ def load_chat_history(user_id: str, limit: int = 100, session_id: str = "") -> l
 # ── Chat session helpers ──────────────────────────────────────────────────────
 
 def create_chat_session(user_id: str, title: str = "") -> dict:
-    """Create a new chat session and return it."""
     now = datetime.now(timezone.utc).isoformat()
     session_id = str(uuid.uuid4())
     insert_row("chat_sessions", {
-        "id": session_id,
-        "user_id": user_id,
-        "title": title,
-        "created_at": now,
-        "updated_at": now,
+        "id": session_id, "user_id": user_id, "title": title,
+        "created_at": now, "updated_at": now,
     })
     return {"id": session_id, "title": title, "created_at": now, "updated_at": now}
 
 
 def list_chat_sessions(user_id: str, limit: int = 50) -> list[dict]:
-    """Return user's chat sessions, most recent first."""
     try:
         conn = get_connection()
         rows = conn.execute(
@@ -963,9 +829,9 @@ def list_chat_sessions(user_id: str, limit: int = 50) -> list[dict]:
             ).fetchone()
             d["preview"] = (first_msg["content"][:80] if first_msg else "") if first_msg else ""
             msg_count = conn.execute(
-                "SELECT COUNT(*) FROM chat_messages WHERE session_id=?", (d["id"],)
-            ).fetchone()[0]
-            d["message_count"] = msg_count
+                "SELECT COUNT(*) as cnt FROM chat_messages WHERE session_id=?", (d["id"],)
+            ).fetchone()
+            d["message_count"] = msg_count["cnt"] if isinstance(msg_count, dict) else msg_count[0]
             result.append(d)
         conn.close()
         return result
@@ -975,7 +841,6 @@ def list_chat_sessions(user_id: str, limit: int = 50) -> list[dict]:
 
 
 def delete_chat_session(user_id: str, session_id: str) -> bool:
-    """Delete a chat session and all its messages."""
     try:
         conn = get_connection()
         conn.execute("DELETE FROM chat_messages WHERE session_id=? AND user_id=?", (session_id, user_id))
@@ -989,7 +854,6 @@ def delete_chat_session(user_id: str, session_id: str) -> bool:
 
 
 def update_chat_session_title(user_id: str, session_id: str, title: str) -> bool:
-    """Update the title of a chat session."""
     try:
         conn = get_connection()
         conn.execute(
@@ -1012,10 +876,6 @@ os.makedirs(INSPO_DIR, exist_ok=True)
 # ── Link page helpers ─────────────────────────────────────────────────────────
 
 def get_or_create_link_page(user_id: str) -> dict:
-    """
-    Return the link page record for *user_id*, creating one with a fresh
-    share_token if it doesn't exist yet.
-    """
     try:
         conn = get_connection()
         row = conn.execute(
@@ -1030,22 +890,15 @@ def get_or_create_link_page(user_id: str) -> dict:
     token = uuid.uuid4().hex[:16]
     now = datetime.now(timezone.utc).isoformat()
     record = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "share_token": token,
-        "page_title": "",
-        "bio": "",
-        "is_public": 0,
-        "theme": "dark",
-        "created_at": now,
-        "updated_at": now,
+        "id": str(uuid.uuid4()), "user_id": user_id, "share_token": token,
+        "page_title": "", "bio": "", "is_public": 0, "theme": "dark",
+        "created_at": now, "updated_at": now,
     }
     insert_row("link_pages", record)
     return record
 
 
 def get_link_page_by_token(token: str) -> dict | None:
-    """Look up a link page by its public share_token. Returns None if not found."""
     try:
         conn = get_connection()
         row = conn.execute(
@@ -1064,19 +917,14 @@ def get_link_page_by_token(token: str) -> dict | None:
 # ── User memory helpers ────────────────────────────────────────────────────────
 
 def save_user_memory(user_id: str, fact: str, category: str = "general") -> bool:
-    """Store a learned fact about the user. Duplicates are silently ignored."""
     return insert_row("user_memory", {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "fact": fact.strip(),
-        "category": category,
-        "source": "conversation",
+        "id": str(uuid.uuid4()), "user_id": user_id, "fact": fact.strip(),
+        "category": category, "source": "conversation",
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
 
 def get_user_memories(user_id: str, limit: int = 50) -> list[dict]:
-    """Retrieve stored facts/preferences for a user, newest first."""
     try:
         conn = get_connection()
         rows = conn.execute(
@@ -1093,7 +941,6 @@ def get_user_memories(user_id: str, limit: int = 50) -> list[dict]:
 # ── Balance account helpers ────────────────────────────────────────────────
 
 def get_or_create_balance_account(user_id: str) -> dict:
-    """Return the single balance account for a user, creating it if needed."""
     try:
         conn = get_connection()
         row = conn.execute(
@@ -1107,14 +954,9 @@ def get_or_create_balance_account(user_id: str) -> dict:
         logger.error("get_or_create_balance_account lookup: %s", exc)
 
     account = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "name": "Balance",
-        "type": "checking",
-        "institution": "",
-        "balance": 0.0,
-        "currency": "USD",
-        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "id": str(uuid.uuid4()), "user_id": user_id, "name": "Balance",
+        "type": "checking", "institution": "", "balance": 0.0,
+        "currency": "USD", "last_updated": datetime.now(timezone.utc).isoformat(),
         "metadata": "",
     }
     insert_row("accounts", account)
@@ -1122,13 +964,11 @@ def get_or_create_balance_account(user_id: str) -> dict:
 
 
 def get_balance(user_id: str) -> float:
-    """Return the user's current balance."""
     acct = get_or_create_balance_account(user_id)
     return float(acct.get("balance", 0))
 
 
 def update_balance(user_id: str, new_balance: float) -> bool:
-    """Set the user's balance to an exact amount."""
     acct = get_or_create_balance_account(user_id)
     return update_row(
         "accounts",
@@ -1138,7 +978,6 @@ def update_balance(user_id: str, new_balance: float) -> bool:
 
 
 def adjust_balance(user_id: str, delta: float) -> float:
-    """Add (positive) or subtract (negative) from the balance. Returns the new balance."""
     acct = get_or_create_balance_account(user_id)
     new_bal = float(acct["balance"]) + delta
     update_row(
@@ -1152,7 +991,6 @@ def adjust_balance(user_id: str, delta: float) -> float:
 # ── Recurring income helpers ───────────────────────────────────────────────
 
 def get_recurring_income(user_id: str) -> list[dict]:
-    """Get all active recurring income sources for a user."""
     try:
         conn = get_connection()
         rows = conn.execute(
@@ -1167,7 +1005,6 @@ def get_recurring_income(user_id: str) -> list[dict]:
 
 
 def get_total_monthly_income(user_id: str) -> float:
-    """Sum all active recurring income, normalised to monthly."""
     sources = get_recurring_income(user_id)
     total = 0.0
     for s in sources:
@@ -1187,7 +1024,6 @@ def get_total_monthly_income(user_id: str) -> float:
 # ── Net worth snapshot helpers ────────────────────────────────────────────
 
 def snapshot_net_worth(user_id: str) -> bool:
-    """Take a daily net worth snapshot. No-ops if already taken today."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         conn = get_connection()
@@ -1214,12 +1050,9 @@ def snapshot_net_worth(user_id: str) -> bool:
         nw = total_assets - total_liabs
 
         return insert_row("net_worth_snapshots", {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "total_assets": total_assets,
-            "total_liabilities": total_liabs,
-            "net_worth": nw,
-            "snapshot_date": today,
+            "id": str(uuid.uuid4()), "user_id": user_id,
+            "total_assets": total_assets, "total_liabilities": total_liabs,
+            "net_worth": nw, "snapshot_date": today,
         })
     except Exception as exc:
         logger.error("snapshot_net_worth error: %s", exc)
@@ -1227,7 +1060,6 @@ def snapshot_net_worth(user_id: str) -> bool:
 
 
 def get_nw_history(user_id: str, limit: int = 90) -> list[dict]:
-    """Retrieve net worth snapshots for sparkline, oldest-first."""
     try:
         conn = get_connection()
         rows = conn.execute(
@@ -1243,29 +1075,38 @@ def get_nw_history(user_id: str, limit: int = 90) -> list[dict]:
 
 # ── API spend tracking ────────────────────────────────────────────────────────
 
-_COST_PER_INPUT_TOKEN  = 0.30 / 1_000_000   # $0.30 / 1M input tokens  (grok-3-mini)
-_COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000   # $0.50 / 1M output tokens
+_COST_PER_INPUT_TOKEN  = 0.30 / 1_000_000
+_COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000
 
 
 def record_token_spend(user_id: str, prompt_tokens: int, completion_tokens: int) -> None:
-    """Add the cost of one API call to the user's running monthly total."""
     cost = prompt_tokens * _COST_PER_INPUT_TOKEN + completion_tokens * _COST_PER_OUTPUT_TOKEN
     now   = datetime.now(timezone.utc).isoformat()
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     try:
         conn = get_connection()
-        conn.execute(
-            """
-            INSERT INTO user_api_spend (id, user_id, month, prompt_tokens, completion_tokens, cost_usd, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id, month) DO UPDATE SET
-                prompt_tokens     = prompt_tokens     + excluded.prompt_tokens,
-                completion_tokens = completion_tokens + excluded.completion_tokens,
-                cost_usd          = cost_usd          + excluded.cost_usd,
-                updated_at        = excluded.updated_at
-            """,
-            (str(uuid.uuid4()), user_id, month, prompt_tokens, completion_tokens, cost, now),
-        )
+        if _USE_PG:
+            conn.execute(
+                "INSERT INTO user_api_spend (id, user_id, month, prompt_tokens, completion_tokens, cost_usd, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET "
+                "  prompt_tokens = user_api_spend.prompt_tokens + EXCLUDED.prompt_tokens, "
+                "  completion_tokens = user_api_spend.completion_tokens + EXCLUDED.completion_tokens, "
+                "  cost_usd = user_api_spend.cost_usd + EXCLUDED.cost_usd, "
+                "  updated_at = EXCLUDED.updated_at",
+                (str(uuid.uuid4()), user_id, month, prompt_tokens, completion_tokens, cost, now),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO user_api_spend (id, user_id, month, prompt_tokens, completion_tokens, cost_usd, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET "
+                "  prompt_tokens = prompt_tokens + excluded.prompt_tokens, "
+                "  completion_tokens = completion_tokens + excluded.completion_tokens, "
+                "  cost_usd = cost_usd + excluded.cost_usd, "
+                "  updated_at = excluded.updated_at",
+                (str(uuid.uuid4()), user_id, month, prompt_tokens, completion_tokens, cost, now),
+            )
         conn.commit()
         conn.close()
     except Exception as exc:
@@ -1273,7 +1114,6 @@ def record_token_spend(user_id: str, prompt_tokens: int, completion_tokens: int)
 
 
 def get_monthly_spend(user_id: str) -> float:
-    """Return the user's total API spend (USD) for the current calendar month."""
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     try:
         conn = get_connection()
@@ -1288,5 +1128,6 @@ def get_monthly_spend(user_id: str) -> float:
         return 0.0
 
 
-# Auto-initialise on import
-init_db()
+# ── Auto-initialise (SQLite only — Postgres init is done in FastAPI lifespan) ─
+if not _USE_PG:
+    init_db()

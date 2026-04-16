@@ -10,35 +10,6 @@ Run from project root:
 
 The Next.js frontend (frontend/) connects to this server via the
 NEXT_PUBLIC_API_URL environment variable (default: http://localhost:8000).
-
-Router layout:
-    /api/auth/*           -> routers/auth.py       (OTP sign-in, demo, JWT)
-    /api/chat             -> routers/chat.py        (SSE streaming AI chat)
-    /api/dashboard/*      -> routers/finance.py     (dashboard, transactions, budget, bills, forecast)
-    /api/transactions/*   -> routers/finance.py
-    /api/budget/*         -> routers/finance.py
-    /api/bills/*          -> routers/finance.py
-    /api/income           -> routers/finance.py
-    /api/net-worth        -> routers/finance.py
-    /api/forecast         -> routers/finance.py
-    /api/events/*         -> routers/organize.py    (events, goals, notes, tasks, lists, grocery)
-    /api/goals/*          -> routers/organize.py
-    /api/notes/*          -> routers/organize.py
-    /api/tasks/*          -> routers/organize.py
-    /api/grocery/*        -> routers/organize.py
-    /api/lists/*          -> routers/organize.py
-    /api/settings/*       -> routers/account.py     (settings, billing, export, share)
-    /api/account          -> routers/account.py
-    /api/export           -> routers/account.py
-    /api/share/*          -> routers/account.py
-    /api/subscription/*   -> routers/account.py
-    /api/stripe/*         -> routers/account.py
-    /api/receipts/*       -> routers/account.py
-    /api/connections/*    -> routers/connections.py  (CSV import, Plaid bank link)
-    /api/import/*         -> routers/connections.py
-    /api/contact          -> routers/contact.py      (contact form email)
-    /api/calendar/*       -> routers/calendar_sync.py (ICS import + Google OAuth)
-    /api/health           -> (below)
 """
 
 from __future__ import annotations
@@ -55,7 +26,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers import auth, chat, finance, organize, account, connections, waitlist, contact, calendar_sync
 from config import XAI_API_KEY
-from core.scheduler import start_scheduler, stop_scheduler
 
 # ── Sentry Setup ─────────────────────────────────────────────────────────────
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
@@ -63,15 +33,15 @@ if _sentry_dsn:
     sentry_sdk.init(
         dsn=_sentry_dsn,
         traces_sample_rate=0.2,
-        profiles_sample_rate=0.1,  # Requires traces_sample_rate > 0
+        profiles_sample_rate=0.1,
         environment=os.getenv("NODE_ENV", "development"),
         integrations=[
             StarletteIntegration(transaction_style="endpoint"),
             FastApiIntegration(transaction_style="endpoint"),
         ],
-        send_default_pii=False,  # Set to True if you want user data
+        send_default_pii=False,
     )
-    print("✅ Sentry initialized for backend")
+    print("Sentry initialized for backend")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,10 +54,44 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start the APScheduler background jobs on startup, stop on shutdown."""
+    """
+    Startup:
+      1. Postgres connection pool (if DATABASE_URL is set)
+      2. Redis connection (if REDIS_URL is set)
+      3. Database schema migration
+      4. APScheduler background jobs
+
+    Shutdown:
+      1. Close httpx client
+      2. Close Redis
+      3. Close Postgres pool
+      4. Stop scheduler
+    """
+    from db import init_pool, close_pool, init_db
+    from backend.cache import init_redis, close_redis
+    from core.grok_agent import close_http_client
+    from core.scheduler import start_scheduler, stop_scheduler
+
+    init_pool()
+    await init_redis()
+    init_db()
     start_scheduler()
     logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
+
+    if XAI_API_KEY:
+        try:
+            from core.grok_agent import get_http_client
+            client = get_http_client()
+            await client.head("https://api.x.ai/v1/models", timeout=5.0)
+            logger.info("xAI connection prewarmed")
+        except Exception:
+            pass
+
     yield
+
+    await close_http_client()
+    await close_redis()
+    close_pool()
     stop_scheduler()
 
 
@@ -95,7 +99,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="orryon",
-    version="2.0",
+    version="3.0",
     description="Intelligent personal finance concierge — REST + SSE API",
     lifespan=lifespan,
 )
@@ -135,4 +139,11 @@ app.include_router(calendar_sync.router)
 @app.get("/api/health", tags=["health"])
 async def health():
     """Liveness probe for Railway / Render / Docker health checks."""
-    return {"status": "ok", "version": "2.0", "ai": bool(XAI_API_KEY)}
+    from config import DATABASE_URL, REDIS_URL
+    return {
+        "status": "ok",
+        "version": "3.0",
+        "ai": bool(XAI_API_KEY),
+        "postgres": bool(DATABASE_URL),
+        "redis": bool(REDIS_URL),
+    }

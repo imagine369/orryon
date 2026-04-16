@@ -217,7 +217,7 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(get_cu
     """Use Grok Vision to extract structured data from a receipt image."""
     import base64
     import re as re_module
-    import requests as req_lib
+    import httpx
 
     contents = await file.read()
     b64 = base64.b64encode(contents).decode("utf-8")
@@ -253,9 +253,10 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(get_cu
         "Content-Type": "application/json",
     }
 
-    resp = req_lib.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload, timeout=30)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload)
 
-    if not resp.ok:
+    if resp.status_code >= 400:
         raise HTTPException(500, f"Vision API error: {resp.text}")
 
     raw = resp.json()["choices"][0]["message"]["content"].strip()
