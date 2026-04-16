@@ -10,6 +10,7 @@ import { NotesTab } from "@/components/dashboard/notes-tab";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
@@ -364,7 +365,13 @@ export function NavBar() {
                 </div>
 
                 {/* Tab content */}
-                <div className="flex-1 overflow-y-auto px-5 pb-4">
+                <div className="flex-1 overflow-y-auto px-5 pb-4" data-scroll-container>
+                 <ErrorBoundary fallback={
+                   <div className="flex flex-col items-center justify-center py-12 text-center">
+                     <p className="text-white/40 text-sm mb-3">Something went wrong loading this tab.</p>
+                     <button onClick={() => window.location.reload()} className="text-xs text-white/30 hover:text-white/60 underline transition">Reload</button>
+                   </div>
+                 }>
 
                   {/* ── Today tab ── */}
                   {activeTab === "today" && (
@@ -597,6 +604,7 @@ export function NavBar() {
                   {/* ── Journal tab ── */}
                   {activeTab === "journal" && <NotesTab />}
 
+                 </ErrorBoundary>
                 </div>
 
                 {/* Footer */}

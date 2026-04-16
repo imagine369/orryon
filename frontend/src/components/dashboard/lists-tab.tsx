@@ -216,6 +216,7 @@ function ListDetail({
   const [query, setQuery] = useState("");
   const addRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(() => {
@@ -224,6 +225,10 @@ function ListDetail({
   }, [list.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    scrollRef.current?.closest("[data-scroll-container]")?.scrollTo({ top: 0 });
+  }, []);
 
   const saveReorder = useCallback((ids: string[]) => {
     if (reorderTimer.current) {
@@ -273,32 +278,35 @@ function ListDetail({
 
   return (
     <motion.div
+      ref={scrollRef}
       initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
       exit={{ x: 30, opacity: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 35 }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-1">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-white/40 hover:text-white/70 transition shrink-0"
-        >
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-        </button>
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: list.color === "#ffffff" ? "rgba(255,255,255,0.25)" : list.color }}
-        />
-        <p className="text-sm font-semibold text-white/85 flex-1 truncate">{list.name}</p>
-        <button
-          onClick={() => { setAdding((v) => !v); setTimeout(() => addRef.current?.focus(), 50); }}
-          className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition shrink-0"
-        >
-          {adding
-            ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-            : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-          }
-        </button>
+      {/* Sticky header — stays visible when content scrolls */}
+      <div className="sticky top-0 z-10 bg-[#080808] pb-2 -mx-5 px-5 pt-1">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-white/40 hover:text-white/70 transition shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: list.color === "#ffffff" ? "rgba(255,255,255,0.25)" : list.color }}
+          />
+          <p className="text-sm font-semibold text-white/85 flex-1 truncate">{list.name}</p>
+          <button
+            onClick={() => { setAdding((v) => !v); setTimeout(() => addRef.current?.focus(), 50); }}
+            className="flex items-center justify-center w-7 h-7 rounded-full bg-white hover:bg-gray-200 transition shrink-0"
+          >
+            {adding
+              ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
+              : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
+            }
+          </button>
+        </div>
       </div>
 
       {/* Sort pills */}

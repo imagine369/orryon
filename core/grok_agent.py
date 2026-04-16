@@ -81,6 +81,9 @@ _TOOL_LABELS = {
     "get_spending_patterns": "Analysing patterns",
     "search_transactions": "Searching transactions",
     "get_subscription_health": "Checking subscriptions",
+    "create_list": "Creating list",
+    "add_list_items": "Adding to list",
+    "get_user_lists": "Loading lists",
     "get_mood_spending_report": "Analysing mood patterns",
 }
 
@@ -312,7 +315,7 @@ def _call_grok_stream(messages: list[dict]) -> Generator[dict, None, None]:
         "model": GROK_MODEL,
         "messages": messages,
         "temperature": 0.15,
-        "max_tokens": 600,
+        "max_tokens": 1024,
         "tools": TOOL_SCHEMAS,
         "tool_choice": "auto",
         "stream": True,

@@ -755,6 +755,71 @@ TOOL_SCHEMAS = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_list",
+            "description": (
+                "Create a new named list. Use when the user wants to create any kind of list "
+                "(grocery list, packing list, to-do list, bucket list, shopping list, etc). "
+                "Returns the list ID — follow up with add_list_items to populate it."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name for the list (e.g. 'Grocery', 'Packing List', 'Books to Read')",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": (
+                            "Hex color for the list. Pick one that fits the theme: "
+                            "#ef4444 red, #f97316 orange, #eab308 yellow, #22c55e green, "
+                            "#3b82f6 blue, #a855f7 purple, #ec4899 pink, #ffffff white"
+                        ),
+                    },
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_list_items",
+            "description": (
+                "Add one or more items to an existing user list. Requires the list_id "
+                "from create_list or get_user_lists."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {
+                        "type": "string",
+                        "description": "ID of the list to add items to",
+                    },
+                    "items": {
+                        "type": "array",
+                        "description": "Item names to add to the list",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["list_id", "items"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_user_lists",
+            "description": (
+                "Get all of the user's lists with their IDs, names, and item counts. "
+                "Use to find a list_id before adding items to an existing list."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -2168,6 +2233,79 @@ def _get_mood_spending_report(args: dict, user_id: str) -> dict:
     }
 
 
+# ── User Lists ────────────────────────────────────────────────────────────────
+
+
+def _create_list(args: dict, user_id: str) -> dict:
+    name = args["name"]
+    color = args.get("color", "#ffffff")
+    list_id = _uid()
+    conn = get_connection()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) FROM user_lists WHERE user_id=?",
+        (user_id,),
+    ).fetchone()[0]
+    conn.close()
+    insert_row("user_lists", {
+        "id": list_id,
+        "user_id": user_id,
+        "name": name,
+        "icon": "",
+        "color": color,
+        "sort_order": max_order + 1,
+        "created_at": _now_iso(),
+    })
+    return {"status": "ok", "id": list_id, "name": name, "color": color}
+
+
+def _add_list_items(args: dict, user_id: str) -> dict:
+    list_id = args["list_id"]
+    items = args.get("items", [])
+    added = []
+    conn = get_connection()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) FROM list_items WHERE list_id=?",
+        (list_id,),
+    ).fetchone()[0]
+    conn.close()
+    for i, name in enumerate(items):
+        insert_row("list_items", {
+            "id": _uid(),
+            "list_id": list_id,
+            "user_id": user_id,
+            "name": name,
+            "notes": "",
+            "is_checked": 0,
+            "sort_order": max_order + 1 + i,
+            "added_at": _now_iso(),
+        })
+        added.append(name)
+    return {
+        "status": "ok",
+        "list_id": list_id,
+        "added": added,
+        "count_added": len(added),
+    }
+
+
+def _get_user_lists(args: dict, user_id: str) -> dict:
+    conn = get_connection()
+    lists = conn.execute(
+        "SELECT * FROM user_lists WHERE user_id=? ORDER BY sort_order ASC, created_at ASC",
+        (user_id,),
+    ).fetchall()
+    result = []
+    for lst in lists:
+        d = dict(lst)
+        item_count = conn.execute(
+            "SELECT COUNT(*) FROM list_items WHERE list_id=? AND is_checked=0",
+            (d["id"],),
+        ).fetchone()[0]
+        result.append({"id": d["id"], "name": d["name"], "item_count": item_count})
+    conn.close()
+    return {"status": "ok", "lists": result, "count": len(result)}
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 _TOOL_MAP = {
@@ -2212,6 +2350,9 @@ _TOOL_MAP = {
     "search_transactions": _search_transactions,
     "get_subscription_health": _get_subscription_health,
     "get_mood_spending_report": _get_mood_spending_report,
+    "create_list": _create_list,
+    "add_list_items": _add_list_items,
+    "get_user_lists": _get_user_lists,
 }
 
 _TAB_REFRESH_MAP = {
@@ -2255,6 +2396,9 @@ _TAB_REFRESH_MAP = {
     "search_transactions": [],
     "get_subscription_health": [],
     "get_mood_spending_report": [],
+    "create_list": ["lists"],
+    "add_list_items": ["lists"],
+    "get_user_lists": [],
 }
 
 
