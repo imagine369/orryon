@@ -97,6 +97,9 @@ SMTP_PASS: str = os.getenv("SMTP_PASS", "")
 SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
 SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
+# Recipient for contact form submissions (defaults to SMTP_USER if not set)
+CONTACT_EMAIL: str = os.getenv("CONTACT_EMAIL", "") or SMTP_USER
+
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
 # ── Stripe (billing) ──────────────────────────────────────────────────────────
 # Set up at https://dashboard.stripe.com

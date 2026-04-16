@@ -36,6 +36,7 @@ Router layout:
     /api/receipts/*       → routers/account.py
     /api/connections/*    → routers/connections.py  (CSV import, Plaid bank link)
     /api/import/*         → routers/connections.py
+    /api/contact          → routers/contact.py   (contact form email)
     /api/health           → (below)
 """
 
@@ -51,7 +52,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import auth, chat, finance, organize, account, connections, waitlist
+from backend.routers import auth, chat, finance, organize, account, connections, waitlist, contact
 from config import XAI_API_KEY
 from core.scheduler import start_scheduler, stop_scheduler
 
@@ -124,6 +125,7 @@ app.include_router(organize.router)
 app.include_router(account.router)
 app.include_router(connections.router)
 app.include_router(waitlist.router)
+app.include_router(contact.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

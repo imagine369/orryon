@@ -10,9 +10,9 @@ export function Footer() {
         <Link href="/terms" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
           Terms of Use
         </Link>
-        <a href="mailto:support@orryon.com" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
+        <Link href="/contact" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
           Contact
-        </a>
+        </Link>
       </div>
       <p className="text-[0.65rem] text-white/15">© 2026 Orryon</p>
     </footer>
