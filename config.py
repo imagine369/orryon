@@ -82,7 +82,7 @@ APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
 #
 # Gmail setup:
 #   1. Enable 2FA on your Google account
-#   2. Go to myaccount.google.com → Security → App Passwords
+#   2. Go to myaccount.google.com -> Security -> App Passwords
 #   3. Generate an App Password and paste it as SMTP_PASS
 #
 # Provider reference:

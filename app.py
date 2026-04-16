@@ -16,7 +16,7 @@ Architecture:
   Landing page  : Grok-style hero, OTP sign-in/sign-up
   Post-login    : 6 tabs (Dashboard · Budget · Forecast · Schedule · Goals · Notes)
                   + persistent "Ask orryon" floating chat input
-  AI brain      : core/grok_agent.py → direct xAI Grok API with tool calling
+  AI brain      : core/grok_agent.py -> direct xAI Grok API with tool calling
   Data          : SQLite via db.py — fully local, zero cloud
 """
 
@@ -358,7 +358,7 @@ if not st.session_state.data_loaded:
             if st.session_state.auth_error:
                 st.error(st.session_state.auth_error)
             st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-            if st.button("Send code →", use_container_width=True, key="otp_send"):
+            if st.button("Send code ->", use_container_width=True, key="otp_send"):
                 _email_val = otp_email.strip().lower()
                 if not _email_val or "@" not in _email_val:
                     st.session_state.auth_error = "Please enter a valid email address."
@@ -416,7 +416,7 @@ if not st.session_state.data_loaded:
             if st.session_state.auth_error:
                 st.error(st.session_state.auth_error)
             st.markdown('<div class="auth-btn auth-btn-white">', unsafe_allow_html=True)
-            if st.button("Verify →", use_container_width=True, key="otp_verify"):
+            if st.button("Verify ->", use_container_width=True, key="otp_verify"):
                 _code_val = otp_code.strip()
                 if not _code_val or len(_code_val) != 6:
                     st.session_state.auth_error = "Please enter the 6-digit code."
@@ -444,7 +444,7 @@ if not st.session_state.data_loaded:
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('<div class="auth-btn auth-btn-outline" style="margin-top:0.5rem">', unsafe_allow_html=True)
-            if st.button("← Resend / use different email", use_container_width=True, key="otp_back"):
+            if st.button("<- Resend / use different email", use_container_width=True, key="otp_back"):
                 st.session_state.auth_step = "email"
                 st.session_state.auth_error = ""
                 st.session_state.auth_dev_code = ""
@@ -689,14 +689,14 @@ if not st.session_state.data_loaded:
             st.markdown('</div>', unsafe_allow_html=True)
         with _acol2:
             st.markdown('<div class="review-btn">', unsafe_allow_html=True)
-            with st.popover("Review →"):
+            with st.popover("Review ->"):
                 st.markdown(
                     f'<div style="background:#1c1c1e;border:1px solid rgba(255,255,255,0.1);'
                     f'border-radius:12px;padding:1rem 1.1rem;font-size:0.95rem;color:#e2e8f0;'
                     f'line-height:1.55;margin-bottom:0.8rem;">{_lp_current}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button("Send →", key="lp_review_confirm", use_container_width=True):
+                if st.button("Send ->", key="lp_review_confirm", use_container_width=True):
                     st.session_state.lp_sending = True
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -824,7 +824,7 @@ if not st.session_state.data_loaded:
 
     st.markdown("<div style='height:1.8rem'></div>", unsafe_allow_html=True)
     st.markdown('<div class="lp-cta">', unsafe_allow_html=True)
-    if st.button("Create free account →", use_container_width=True, key="lp_final_cta"):
+    if st.button("Create free account ->", use_container_width=True, key="lp_final_cta"):
         st.session_state.screen = "signin"
         st.session_state.auth_step = "email"
         st.rerun()
@@ -837,7 +837,7 @@ if not st.session_state.data_loaded:
         unsafe_allow_html=True,
     )
     st.markdown('<div class="lp-cta-demo" style="margin-top:0.5rem">', unsafe_allow_html=True)
-    if st.button("Try the demo →", use_container_width=True, key="lp_demo"):
+    if st.button("Try the demo ->", use_container_width=True, key="lp_demo"):
         _demo_email = "demo@orryon.app"
         _demo_user = get_or_create_user_by_email(_demo_email)
         st.session_state.user_id = _demo_user["id"]
@@ -1498,12 +1498,12 @@ elif _app_view == "dash_panel":
     _pn_back, _pn_gap, _pn_full = st.columns([1.4, 5, 3.2])
     with _pn_back:
         st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-        if st.button("← Back", key="dash_back"):
+        if st.button("<- Back", key="dash_back"):
             st.session_state.app_view = "home"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     with _pn_full:
-        if st.button("Open full Dashboard →", type="primary", key="dash_open_full"):
+        if st.button("Open full Dashboard ->", type="primary", key="dash_open_full"):
             st.session_state.app_view = "full_dash"
             st.rerun()
 
@@ -1627,7 +1627,7 @@ elif _app_view == "settings_panel":
     _sp_back, _sp_gap = st.columns([1.4, 8])
     with _sp_back:
         st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-        if st.button("← Back", key="settings_back"):
+        if st.button("<- Back", key="settings_back"):
             st.session_state.app_view = "home"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1742,7 +1742,7 @@ elif _app_view == "settings_panel":
 
     st.markdown("---")
     st.caption(f"Model: `{os.getenv('GROK_MODEL', 'grok-3-mini')}` · All data in `finance.db`")
-    if st.button("← Sign out", use_container_width=True, key="sign_out"):
+    if st.button("<- Sign out", use_container_width=True, key="sign_out"):
         for _k in ["data_loaded","user_id","display_name","chat_history",
                    "orryon_last_message","orryon_actions","app_view"]:
             if _k in st.session_state:
@@ -1762,7 +1762,7 @@ elif _app_view == "full_dash":
     _fd_back, _fd_gap, _fd_dash, _fd_set = st.columns([1, 6, 1.5, 1.3])
     with _fd_back:
         st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-        if st.button("←", key="full_back"):
+        if st.button("<-", key="full_back"):
             st.session_state.app_view = "home"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)

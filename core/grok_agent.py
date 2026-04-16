@@ -227,7 +227,7 @@ def run_orryon_stream(
                 assistant_msg["tool_calls"] = tool_calls_buf
             messages.append(assistant_msg)
 
-            # No tool calls → final text response
+            # No tool calls -> final text response
             if not tool_calls_buf:
                 _try_extract_memories(user_message, full_content, user_id)
                 yield {
@@ -465,7 +465,7 @@ def _get_context_snapshot(user_id: str) -> str:
                     n = dict(n)
                     pin = " 📌" if n.get("is_pinned") else ""
                     mood = f" ({n['mood']})" if n.get("mood") else ""
-                    goal = f" → {n['linked_goal']}" if n.get("linked_goal") else ""
+                    goal = f" -> {n['linked_goal']}" if n.get("linked_goal") else ""
                     lines.append(f"  · [{n['id'][:8]}] {n['title']}{pin}{mood}{goal}")
         except Exception:
             pass

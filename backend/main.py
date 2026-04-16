@@ -12,33 +12,33 @@ The Next.js frontend (frontend/) connects to this server via the
 NEXT_PUBLIC_API_URL environment variable (default: http://localhost:8000).
 
 Router layout:
-    /api/auth/*           → routers/auth.py       (OTP sign-in, demo, JWT)
-    /api/chat             → routers/chat.py        (SSE streaming AI chat)
-    /api/dashboard/*      → routers/finance.py     (dashboard, transactions, budget, bills, forecast)
-    /api/transactions/*   → routers/finance.py
-    /api/budget/*         → routers/finance.py
-    /api/bills/*          → routers/finance.py
-    /api/income           → routers/finance.py
-    /api/net-worth        → routers/finance.py
-    /api/forecast         → routers/finance.py
-    /api/events/*         → routers/organize.py    (events, goals, notes, tasks, lists, grocery)
-    /api/goals/*          → routers/organize.py
-    /api/notes/*          → routers/organize.py
-    /api/tasks/*          → routers/organize.py
-    /api/grocery/*        → routers/organize.py
-    /api/lists/*          → routers/organize.py
-    /api/settings/*       → routers/account.py     (settings, billing, export, share)
-    /api/account          → routers/account.py
-    /api/export           → routers/account.py
-    /api/share/*          → routers/account.py
-    /api/subscription/*   → routers/account.py
-    /api/stripe/*         → routers/account.py
-    /api/receipts/*       → routers/account.py
-    /api/connections/*    → routers/connections.py  (CSV import, Plaid bank link)
-    /api/import/*         → routers/connections.py
-    /api/contact          → routers/contact.py      (contact form email)
-    /api/calendar/*       → routers/calendar_sync.py (ICS import + Google OAuth)
-    /api/health           → (below)
+    /api/auth/*           -> routers/auth.py       (OTP sign-in, demo, JWT)
+    /api/chat             -> routers/chat.py        (SSE streaming AI chat)
+    /api/dashboard/*      -> routers/finance.py     (dashboard, transactions, budget, bills, forecast)
+    /api/transactions/*   -> routers/finance.py
+    /api/budget/*         -> routers/finance.py
+    /api/bills/*          -> routers/finance.py
+    /api/income           -> routers/finance.py
+    /api/net-worth        -> routers/finance.py
+    /api/forecast         -> routers/finance.py
+    /api/events/*         -> routers/organize.py    (events, goals, notes, tasks, lists, grocery)
+    /api/goals/*          -> routers/organize.py
+    /api/notes/*          -> routers/organize.py
+    /api/tasks/*          -> routers/organize.py
+    /api/grocery/*        -> routers/organize.py
+    /api/lists/*          -> routers/organize.py
+    /api/settings/*       -> routers/account.py     (settings, billing, export, share)
+    /api/account          -> routers/account.py
+    /api/export           -> routers/account.py
+    /api/share/*          -> routers/account.py
+    /api/subscription/*   -> routers/account.py
+    /api/stripe/*         -> routers/account.py
+    /api/receipts/*       -> routers/account.py
+    /api/connections/*    -> routers/connections.py  (CSV import, Plaid bank link)
+    /api/import/*         -> routers/connections.py
+    /api/contact          -> routers/contact.py      (contact form email)
+    /api/calendar/*       -> routers/calendar_sync.py (ICS import + Google OAuth)
+    /api/health           -> (below)
 """
 
 from __future__ import annotations

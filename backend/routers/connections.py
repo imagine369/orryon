@@ -295,7 +295,7 @@ async def exchange_plaid_token(user: dict = Depends(get_current_user)):
     if not PLAID_ENABLED:
         raise HTTPException(503, "Plaid is not configured.")
 
-    # Implementation will exchange public_token → access_token and
+    # Implementation will exchange public_token -> access_token and
     # store it in the users table (encrypted if ENCRYPTION_KEY is set).
 
     raise HTTPException(501, "Plaid token exchange is not yet implemented.")
