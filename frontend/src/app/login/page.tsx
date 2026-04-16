@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Eye, RotateCw } from "lucide-react";
+import { X, Check, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -222,19 +222,6 @@ export default function LoginPage() {
               </button>
             </p>
 
-            {/* Dev preview bypass */}
-            <div className="pt-4 border-t border-white/5">
-              <button
-                onClick={() => {
-                  localStorage.setItem("orryon_demo", "true");
-                  router.push("/home");
-                }}
-                className="w-full flex items-center justify-center gap-2 text-xs text-white/30 hover:text-white/60 transition-colors py-2"
-              >
-                <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Preview the app (no account needed)
-              </button>
-            </div>
           </div>
         </div>
       )}
