@@ -318,7 +318,8 @@ def _call_grok_stream(messages: list[dict]) -> Generator[dict, None, None]:
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    resp = requests.post(XAI_API_URL, headers=headers, data=json.dumps(payload).encode("utf-8"), timeout=60, stream=True)
+    body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+    resp = requests.post(XAI_API_URL, headers=headers, data=body, timeout=60, stream=True)
     resp.raise_for_status()
 
     for line in resp.iter_lines():
@@ -348,7 +349,8 @@ def _call_grok(messages: list[dict]) -> dict:
         "temperature": 0,
         "max_tokens": 256,
     }
-    resp = requests.post(XAI_API_URL, headers=headers, data=json.dumps(payload).encode("utf-8"), timeout=15)
+    body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+    resp = requests.post(XAI_API_URL, headers=headers, data=body, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
