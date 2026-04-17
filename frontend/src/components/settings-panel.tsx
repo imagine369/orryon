@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ChevronRight, Download, CreditCard, CalendarDays, RefreshCw, Unlink } from "lucide-react";
-import { api, setToken } from "@/lib/api";
+import { api, getApiBase, setToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
@@ -148,7 +148,7 @@ function isDemo() {
 }
 
 export function SettingsPanel() {
-  const { openPanel, close, openUpgrade } = usePanels();
+  const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
   const { sub, refresh: refreshSub } = useSubscription();
   const isOpen = openPanel === "settings";
@@ -670,9 +670,8 @@ export function SettingsPanel() {
                         ) : (
                           <button
                             onClick={() => {
-                              const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
                               const token = localStorage.getItem("orryon_token") ?? "";
-                              window.location.href = `${base}/api/calendar/google/auth?token=${token}`;
+                              window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
                             }}
                             className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
                           >
@@ -694,8 +693,7 @@ export function SettingsPanel() {
                         setExportLoading(true);
                         try {
                           const token = localStorage.getItem("orryon_token");
-                          const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                          const res = await fetch(`${base}/api/export`, {
+                          const res = await fetch(`${getApiBase()}/api/export`, {
                             headers: token ? { Authorization: `Bearer ${token}` } : {},
                           });
                           if (!res.ok) throw new Error("Export failed");

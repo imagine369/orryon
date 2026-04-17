@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { X } from "lucide-react";
 import { Subscription } from "@/lib/use-subscription";
-import { usePanels } from "@/lib/panel-context";
 
 interface Props {
   sub: Subscription;
@@ -11,7 +11,6 @@ interface Props {
 
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
-  const { openUpgrade } = usePanels();
 
   if (sub.plan === "pro" || dismissed) return null;
 
@@ -36,12 +35,12 @@ export function TrialBanner({ sub }: Props) {
     >
       <span className="text-white/50 flex-1">{message}</span>
 
-      <button
-        onClick={openUpgrade}
+      <Link
+        href="/login?step=tiers"
         className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors"
       >
         Upgrade
-      </button>
+      </Link>
 
       {!isExpired && !urgency && (
         <button

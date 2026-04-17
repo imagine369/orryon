@@ -1,4 +1,15 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/**
+ * API origin for HTTP requests.
+ * - If `NEXT_PUBLIC_API_URL` is set: browser talks to that host directly (optional; use for WebSocket + direct API).
+ * - Otherwise in the browser: `""` (same origin; `next.config.ts` rewrites `/api/*` → `BACKEND_URL`).
+ * - On the server (SSR): `BACKEND_URL` or localhost (rewrites do not apply to server-side fetch).
+ */
+export function getApiBase(): string {
+  const explicit = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (explicit) return explicit;
+  if (typeof window !== "undefined") return "";
+  return (process.env.BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+}
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -17,6 +28,27 @@ export function hasToken(): boolean {
   return !!getToken();
 }
 
+function networkErrorMessage(): string {
+  const isBrowser = typeof window !== "undefined";
+  const onLocalhost =
+    isBrowser &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const base = getApiBase();
+  const apiLooksLocal = base.includes("localhost") || base.includes("127.0.0.1");
+  if (isBrowser && apiLooksLocal && !onLocalhost) {
+    return (
+      "Can't reach the API: this build points at localhost, but you're not on localhost. " +
+      "Unset NEXT_PUBLIC_API_URL to use the built-in proxy, or set it to your backend's public URL."
+    );
+  }
+  if (isBrowser && onLocalhost) {
+    return (
+      "Can't reach the API. Start the backend (e.g. uvicorn on port 8000) or set NEXT_PUBLIC_API_URL."
+    );
+  }
+  return "Can't reach the API. Check that the backend is running and CORS allows this site (FRONTEND_URL on the server).";
+}
+
 async function request<T = unknown>(
   path: string,
   opts: RequestInit = {},
@@ -28,7 +60,16 @@ async function request<T = unknown>(
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${getApiBase()}${path}`, { ...opts, headers });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (e instanceof TypeError && (msg === "Failed to fetch" || msg === "Load failed")) {
+      throw new Error(networkErrorMessage());
+    }
+    throw e;
+  }
   if (res.status === 401) {
     clearToken();
     if (typeof window !== "undefined") window.location.href = "/login";
@@ -59,11 +100,20 @@ async function uploadFile<T = unknown>(
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers,
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${getApiBase()}${path}`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (e instanceof TypeError && (msg === "Failed to fetch" || msg === "Load failed")) {
+      throw new Error(networkErrorMessage());
+    }
+    throw e;
+  }
   if (res.status === 401) {
     clearToken();
     if (typeof window !== "undefined") window.location.href = "/login";
@@ -106,7 +156,7 @@ export interface ChatEvent {
 export function warmConnection(): void {
   const token = getToken();
   if (!token) return;
-  fetch(`${API_BASE}/api/chat/warm`, {
+  fetch(`${getApiBase()}/api/chat/warm`, {
     headers: { Authorization: `Bearer ${token}` },
   }).catch(() => {});
 }
@@ -120,7 +170,7 @@ export async function* streamChat(
   signal?: AbortSignal,
 ): AsyncGenerator<ChatEvent> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}/api/chat`, {
+  const res = await fetch(`${getApiBase()}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -171,8 +221,7 @@ export async function* streamChat(
 
 
 // ── WebSocket transport (primary, lower latency) ─────────────────────────────
-
-const WS_BASE = API_BASE.replace(/^http/, "ws");
+// Next.js HTTP rewrites do not tunnel WebSocket; connect only when NEXT_PUBLIC_API_URL is set.
 
 let _chatWs: WebSocket | null = null;
 let _wsConnected = false;
@@ -181,9 +230,12 @@ let _wsConnecting = false;
 export function connectChatWs(): void {
   const token = getToken();
   if (!token || _wsConnected || _wsConnecting) return;
-  _wsConnecting = true;
+  const publicUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!publicUrl) return;
 
-  const ws = new WebSocket(`${WS_BASE}/ws/chat?token=${encodeURIComponent(token)}`);
+  _wsConnecting = true;
+  const wsBase = publicUrl.replace(/^http/, "ws");
+  const ws = new WebSocket(`${wsBase}/ws/chat?token=${encodeURIComponent(token)}`);
 
   ws.onopen = () => {
     _chatWs = ws;

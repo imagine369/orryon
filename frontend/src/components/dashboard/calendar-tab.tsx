@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
+import { api, getApiBase } from "@/lib/api";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 
 interface CalEvent {
@@ -91,7 +91,7 @@ export function CalendarTab() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/calendar/import/ics`, {
+      const res = await fetch(`${getApiBase()}/api/calendar/import/ics`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("orryon_token") ?? ""}` },
         body: form,

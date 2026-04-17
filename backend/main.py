@@ -108,9 +108,18 @@ _is_prod = os.getenv("NODE_ENV", "").lower() == "production"
 _cors_origins: list[str] = []
 if not _is_prod:
     _cors_origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
-_frontend_url = os.getenv("FRONTEND_URL", "")
-if _frontend_url:
-    _cors_origins.append(_frontend_url)
+
+
+def _append_origins_from_env(value: str) -> None:
+    for part in value.split(","):
+        o = part.strip()
+        if o and o not in _cors_origins:
+            _cors_origins.append(o)
+
+
+# Comma-separated allowed; APP_URL often matches the Next.js origin when FRONTEND_URL was forgotten.
+_append_origins_from_env(os.getenv("FRONTEND_URL", ""))
+_append_origins_from_env(os.getenv("APP_URL", ""))
 
 app.add_middleware(
     CORSMiddleware,

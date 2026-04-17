@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, X, Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
+import { api, getApiBase } from "@/lib/api";
 
 interface ReceiptData {
   merchant: string | null;
@@ -48,7 +48,7 @@ export function ReceiptScanner({ onSaved }: ReceiptScannerProps) {
 
     try {
       const token = localStorage.getItem("orryon_token");
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiBase = getApiBase();
       const res = await fetch(`${apiBase}/api/receipts/scan`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
