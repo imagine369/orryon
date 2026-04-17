@@ -108,8 +108,8 @@ export function ChatInput({
         placeholder={listening ? "Listening…" : placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 placeholder:text-white/30 outline-none py-1 leading-relaxed overflow-y-auto"
-        style={{ maxHeight: "200px" }}
+        className="flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 placeholder:text-white/30 outline-none py-1 leading-relaxed overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden"
+        style={{ maxHeight: "200px", scrollbarWidth: "none" }}
       />
 
       {/* Mic button */}
