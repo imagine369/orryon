@@ -140,13 +140,13 @@ export function ChatInput({
         disabled={disabled || !value.trim()}
         aria-label="Send message"
         className={cn(
-          "shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all duration-150",
+          "shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-150",
           value.trim()
             ? "bg-white text-black hover:bg-white/90 active:scale-95"
             : "bg-white/[0.08] text-white/25 cursor-not-allowed"
         )}
       >
-        <ArrowUp className="h-4 w-4" strokeWidth={2} />
+        <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2} />
       </button>
     </div>
   );
