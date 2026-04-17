@@ -437,7 +437,7 @@ export default function HomePage() {
               </motion.div>
 
               <p className="mb-5 max-w-[220px] text-center text-[15px] leading-tight text-white/50">
-                Hello{user?.display_name ? `, ${user.display_name}` : ""}.
+                {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
               </p>
 
               {tasksDueToday !== null && tasksDueToday > 0 && (
