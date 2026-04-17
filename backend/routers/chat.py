@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
-from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan
+from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan, resolve_plan_for_user
 from backend.auth import get_current_user, decode_token
 from backend.schemas import ChatReq
 from db import (
@@ -150,6 +150,20 @@ async def chat_ws(ws: WebSocket):
         return
 
     await ws.accept()
+
+    # Enforce subscription gate — same policy as the SSE /api/chat endpoint
+    try:
+        plan_info = resolve_plan_for_user(uid)
+    except HTTPException:
+        plan_info = {"is_active_pro": False}
+
+    if not plan_info["is_active_pro"]:
+        await ws.send_json({
+            "type": "error",
+            "message": "Your Pro trial has ended. Upgrade to continue using Orryon.",
+        })
+        await ws.close(code=4003)
+        return
 
     try:
         while True:

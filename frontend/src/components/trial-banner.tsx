@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { X } from "lucide-react";
+import { api } from "@/lib/api";
 import { Subscription } from "@/lib/use-subscription";
 
 interface Props {
@@ -11,6 +11,27 @@ interface Props {
 
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
+      if (!priceId) {
+        window.location.href = "/login?step=tiers";
+        return;
+      }
+      const origin = window.location.origin;
+      const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
+        price_id: priceId,
+        success_url: `${origin}/home?upgraded=1`,
+        cancel_url: `${origin}/home`,
+      });
+      window.location.href = res.checkout_url;
+    } catch {
+      setUpgrading(false);
+    }
+  };
 
   if (sub.plan === "pro" || dismissed) return null;
 
@@ -35,12 +56,13 @@ export function TrialBanner({ sub }: Props) {
     >
       <span className="text-white/50 flex-1">{message}</span>
 
-      <Link
-        href="/login?step=tiers"
-        className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors"
+      <button
+        onClick={handleUpgrade}
+        disabled={upgrading}
+        className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors disabled:opacity-50"
       >
-        Upgrade
-      </Link>
+        {upgrading ? "Opening…" : "Upgrade"}
+      </button>
 
       {!isExpired && !urgency && (
         <button

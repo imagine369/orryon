@@ -129,6 +129,19 @@ export default function LoginPage() {
       if (name !== authUser?.display_name) {
         api.patch("/api/settings", { display_name: name }).catch(() => {});
       }
+
+      const priceId = selectedPlan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
+      if (priceId) {
+        const origin = window.location.origin;
+        const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
+          price_id: priceId,
+          success_url: `${origin}/home?upgraded=1`,
+          cancel_url: `${origin}/login?step=tiers`,
+        });
+        window.location.href = res.checkout_url;
+        return;
+      }
+
       router.push("/home");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -211,7 +224,9 @@ export default function LoginPage() {
               Start 14-day free trial
             </PillButton>
             <p className="text-center text-xs text-white/25">
-              You&apos;ll enter your card next. You won&apos;t be charged for 14 days.
+              {MONTHLY_PRICE_ID
+                ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
+                : "No credit card required. Cancel anytime during your trial."}
             </p>
             <p className="text-center text-xs text-white/30 mt-2">
               Already have an account?{" "}

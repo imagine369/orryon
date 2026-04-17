@@ -601,12 +601,32 @@ export function SettingsPanel() {
                           )}
                           {sub.plan !== "pro" && (
                             <div className="px-3 py-3">
-                              <a
-                                href="/login?step=tiers"
-                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition"
+                              <button
+                                onClick={async () => {
+                                  setBillingLoading(true);
+                                  try {
+                                    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
+                                    if (!priceId) {
+                                      window.location.href = "/login?step=tiers";
+                                      return;
+                                    }
+                                    const origin = window.location.origin;
+                                    const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
+                                      price_id: priceId,
+                                      success_url: `${origin}/home?upgraded=1`,
+                                      cancel_url: `${origin}/home`,
+                                    });
+                                    window.location.href = res.checkout_url;
+                                  } catch {
+                                    setBillingLoading(false);
+                                  }
+                                }}
+                                disabled={billingLoading}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition disabled:opacity-40"
                               >
-                                Upgrade to Pro
-                              </a>
+                                <CreditCard className="h-4 w-4" strokeWidth={1.5} />
+                                {billingLoading ? "Opening…" : "Upgrade to Pro"}
+                              </button>
                             </div>
                           )}
                         </div>
