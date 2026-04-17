@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { PanelProvider, usePanels } from "@/lib/panel-context";
 import { NavBar } from "@/components/nav-bar";
-import { Footer } from "@/components/footer";
 import { DashboardPanel } from "@/components/dashboard-panel";
 import { SettingsPanel } from "@/components/settings-panel";
 import { TrialBanner } from "@/components/trial-banner";
@@ -36,7 +35,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     <div className="relative min-h-screen overflow-hidden">
       {/* Main content scales down when a panel is open */}
       <motion.div
-        className="flex flex-col min-h-screen"
+        className="flex flex-col h-screen"
         animate={{
           scale: isPanelOpen ? 0.93 : 1,
           borderRadius: isPanelOpen ? 16 : 0,
@@ -47,8 +46,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       >
         <NavBar />
         {sub && <TrialBanner sub={sub} />}
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <main className="flex-1 min-h-0">{children}</main>
       </motion.div>
 
       {/* Overlay panels */}

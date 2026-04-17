@@ -12,6 +12,10 @@ import { ChatInput } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -26,6 +30,10 @@ interface ChatSession {
   created_at: string;
   updated_at: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -48,9 +56,17 @@ function formatSessionDate(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// Shared max-width token used by every horizontal section
+const CONTAINER = "mx-auto w-full max-w-3xl px-4";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function HomePage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -65,6 +81,8 @@ export default function HomePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // ── Side-effects ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (searchParams.get("upgraded") === "1") {
@@ -83,7 +101,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
-    api.get<{ open_tasks: { due_date: string }[] }>("/api/dashboard/stats")
+    api
+      .get<{ open_tasks: { due_date: string }[] }>("/api/dashboard/stats")
       .then((stats) => {
         if (stats?.open_tasks) {
           const count = stats.open_tasks.filter((t) => t.due_date === today).length;
@@ -97,22 +116,31 @@ export default function HomePage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming, thinking, toolLabel]);
 
+  // ── Session management ──────────────────────────────────────────────────────
+
   const loadSessions = useCallback(() => {
     setSessionsLoading(true);
-    api.get<ChatSession[]>("/api/chat/sessions")
+    api
+      .get<ChatSession[]>("/api/chat/sessions")
       .then(setSessions)
       .catch(() => {})
       .finally(() => setSessionsLoading(false));
   }, []);
 
   const loadSessionMessages = useCallback((sid: string) => {
-    api.get<{ role: string; content: string }[]>(`/api/chat/history?session_id=${sid}&limit=100`)
+    api
+      .get<{ role: string; content: string }[]>(
+        `/api/chat/history?session_id=${sid}&limit=100`
+      )
       .then((history) => {
         if (history?.length) {
           setMessages(
             history
               .filter((m) => m.role === "user" || m.role === "assistant")
-              .map((m) => ({ role: m.role as "user" | "assistant", content: m.content || "" }))
+              .map((m) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content || "",
+              }))
           );
         } else {
           setMessages([]);
@@ -127,25 +155,33 @@ export default function HomePage() {
     setHistoryOpen(false);
   }, []);
 
-  const handleSelectSession = useCallback((session: ChatSession) => {
-    setSessionId(session.id);
-    loadSessionMessages(session.id);
-    setHistoryOpen(false);
-  }, [loadSessionMessages]);
+  const handleSelectSession = useCallback(
+    (session: ChatSession) => {
+      setSessionId(session.id);
+      loadSessionMessages(session.id);
+      setHistoryOpen(false);
+    },
+    [loadSessionMessages]
+  );
 
-  const handleDeleteSession = useCallback((sid: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== sid));
-    api.delete(`/api/chat/sessions/${sid}`).catch(() => {});
-    if (sessionId === sid) {
-      setSessionId("");
-      setMessages([]);
-    }
-  }, [sessionId]);
+  const handleDeleteSession = useCallback(
+    (sid: string) => {
+      setSessions((prev) => prev.filter((s) => s.id !== sid));
+      api.delete(`/api/chat/sessions/${sid}`).catch(() => {});
+      if (sessionId === sid) {
+        setSessionId("");
+        setMessages([]);
+      }
+    },
+    [sessionId]
+  );
 
   const handleOpenHistory = useCallback(() => {
     setHistoryOpen(true);
     loadSessions();
   }, [loadSessions]);
+
+  // ── AI streaming ────────────────────────────────────────────────────────────
 
   const runAI = async (text: string) => {
     abortRef.current?.abort();
@@ -234,43 +270,48 @@ export default function HomePage() {
 
   const hasMessages = messages.length > 0;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <>
-      {/* ── History sidebar ── */}
+      {/* ── History sidebar ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {historyOpen && (
           <>
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/60 z-40"
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-40 bg-black/55"
               onClick={() => setHistoryOpen(false)}
             />
+
+            {/* Sidebar panel */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 400, damping: 38 }}
-              className="fixed right-0 top-0 bottom-0 w-[320px] max-w-[85vw] bg-[#0a0a0a] border-l border-white/8 z-50 flex flex-col"
+              transition={{ type: "spring", stiffness: 380, damping: 36 }}
+              className="fixed right-0 top-0 bottom-0 z-50 flex w-[300px] max-w-[82vw] flex-col border-l border-white/[0.07] bg-[#0a0a0a]"
             >
               {/* Sidebar header */}
-              <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <p className="text-sm font-semibold text-white/80">Chat History</p>
+              <div className="flex items-center justify-between px-5 pb-2 pt-5">
+                <p className="text-sm font-semibold text-white/70">Chat History</p>
                 <button
                   onClick={() => setHistoryOpen(false)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition"
+                  className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
                 >
-                  <X className="h-4 w-4 text-white/50" strokeWidth={1.5} />
+                  <X className="h-4 w-4 text-white/45" strokeWidth={1.5} />
                 </button>
               </div>
 
-              {/* New chat button inside sidebar */}
+              {/* New chat */}
               <div className="px-4 pb-3">
                 <button
                   onClick={handleNewChat}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/8 transition text-sm text-white/70 hover:text-white"
+                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.04] px-3 py-2.5 text-sm text-white/60 transition hover:bg-white/[0.08] hover:text-white/85"
                 >
                   <SquarePen className="h-4 w-4" strokeWidth={1.5} />
                   New chat
@@ -281,38 +322,39 @@ export default function HomePage() {
               <div className="flex-1 overflow-y-auto px-3 pb-4">
                 {sessionsLoading && sessions.length === 0 && (
                   <div className="flex items-center justify-center py-10">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/50" />
                   </div>
                 )}
-
                 {!sessionsLoading && sessions.length === 0 && (
-                  <p className="text-white/25 text-sm text-center py-10">
+                  <p className="py-10 text-center text-sm text-white/20">
                     No conversations yet.
                   </p>
                 )}
-
                 {sessions.map((s) => (
                   <div key={s.id} className="group relative">
                     <button
                       onClick={() => handleSelectSession(s)}
-                      className={`w-full text-left px-3 py-3 rounded-xl transition mb-0.5 ${
+                      className={`mb-0.5 w-full rounded-xl border px-3 py-3 text-left transition ${
                         sessionId === s.id
-                          ? "bg-white/10 border border-white/10"
-                          : "hover:bg-white/[0.04] border border-transparent"
+                          ? "border-white/10 bg-white/[0.08]"
+                          : "border-transparent hover:bg-white/[0.04]"
                       }`}
                     >
                       <div className="flex items-start gap-2.5">
-                        <MessageSquare className="h-4 w-4 text-white/25 mt-0.5 shrink-0" strokeWidth={1.5} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white/75 truncate leading-snug">
+                        <MessageSquare
+                          className="mt-0.5 h-4 w-4 shrink-0 text-white/22"
+                          strokeWidth={1.5}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13.5px] leading-snug text-white/70">
                             {s.preview || s.title || "New chat"}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[0.6rem] text-white/25">
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="text-[0.6rem] text-white/22">
                               {formatSessionDate(s.updated_at)}
                             </span>
                             {s.message_count > 0 && (
-                              <span className="text-[0.6rem] text-white/20">
+                              <span className="text-[0.6rem] text-white/18">
                                 {s.message_count} msg{s.message_count !== 1 ? "s" : ""}
                               </span>
                             )}
@@ -321,10 +363,16 @@ export default function HomePage() {
                       </div>
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 hover:bg-white/10 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(s.id);
+                      }}
+                      className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition hover:bg-white/[0.08] group-hover:opacity-100"
                     >
-                      <Trash2 className="h-3 w-3 text-white/30 hover:text-red-400" strokeWidth={1.5} />
+                      <Trash2
+                        className="h-3 w-3 text-white/28 hover:text-red-400/80"
+                        strokeWidth={1.5}
+                      />
                     </button>
                   </div>
                 ))}
@@ -334,91 +382,129 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Empty state (no messages) ── */}
+      {/* ── Empty state (no messages) ─────────────────────────────────────── */}
       {!hasMessages ? (
-        <div className="flex flex-col items-center px-4 min-h-[calc(100vh-93px)]">
-          {/* Top bar with icons */}
-          <div className="w-full flex items-center justify-end py-2 shrink-0">
+        <div className="flex min-h-full flex-col">
+          {/* Top action bar — aligned with chat container */}
+          <div className={`${CONTAINER} flex shrink-0 items-center justify-end py-3`}>
             <button
               onClick={handleOpenHistory}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition"
+              className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
               title="Chat history"
             >
-              <Clock className="h-[18px] w-[18px] text-white/50" strokeWidth={1.5} />
+              <Clock className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
             </button>
             <button
               onClick={handleNewChat}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition"
+              className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
               title="New chat"
             >
-              <SquarePen className="h-[18px] w-[18px] text-white/50" strokeWidth={1.5} />
+              <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
             </button>
           </div>
 
+          {/* Upgrade success banner */}
           {upgradeBanner && (
-            <div className="mb-6 px-4 py-2.5 rounded-full border border-green-500/20 bg-green-500/10 text-green-400 text-sm animate-in fade-in">
-              Welcome to Pro! Your upgrade is active.
+            <div className={`${CONTAINER} mb-2`}>
+              <div className="rounded-full border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-center text-sm text-green-400 animate-in fade-in">
+                Welcome to Pro! Your upgrade is active.
+              </div>
             </div>
           )}
 
-          <div className="flex-1 flex flex-col items-center justify-center">
-          <motion.div
-            className="mb-6"
-            animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-            transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-          >
-            <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
-          </motion.div>
-          <p className="text-white/60 text-[15px] mb-4 max-w-[260px] text-center leading-tight">
-            Hello{user?.display_name ? `, ${user.display_name}` : ""}.
-          </p>
+          {/* Flex-1 body: greeting centered, input pinned to bottom */}
+          <div className="flex flex-1 flex-col">
 
-          {tasksDueToday !== null && tasksDueToday > 0 && (
-            <Link
-              href="/dashboard"
-              className="mb-6 flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition text-sm text-white/50 hover:text-white/80"
+            {/* Avatar + greeting — centered in the remaining space */}
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <motion.div
+                className="mb-5"
+                animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
+                transition={{
+                  duration: 3.8,
+                  ease: "easeInOut",
+                  repeat: Infinity,
+                  repeatType: "loop",
+                }}
+              >
+                <Image
+                  src="/avatar.png"
+                  alt="Orryon"
+                  width={96}
+                  height={96}
+                  className="rounded-full object-cover ring-1 ring-white/[0.09]"
+                />
+              </motion.div>
+
+              <p className="mb-5 max-w-[220px] text-center text-[15px] leading-tight text-white/50">
+                Hello{user?.display_name ? `, ${user.display_name}` : ""}.
+              </p>
+
+              {tasksDueToday !== null && tasksDueToday > 0 && (
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.03] px-4 py-2.5 text-sm text-white/45 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white/75"
+                >
+                  <span className="text-white/25" aria-hidden>✦</span>
+                  <span>
+                    {getGreeting()}. You have {tasksDueToday} task
+                    {tasksDueToday !== 1 ? "s" : ""} due today.
+                  </span>
+                </Link>
+              )}
+            </div>
+
+            {/* Input — pinned to bottom, identical structure to chat view footer */}
+            <div
+              className="shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-3"
+              style={{
+                paddingBottom: "max(1.25rem, calc(0.75rem + env(safe-area-inset-bottom)))",
+              }}
             >
-              <span className="text-white/30">✦</span>
-              <span>{getGreeting()}. You have {tasksDueToday} task{tasksDueToday !== 1 ? "s" : ""} due today.</span>
-            </Link>
-          )}
+              <div className={CONTAINER}>
+                <ChatInput onSend={handleSend} disabled={streaming} />
+              </div>
+            </div>
 
-          <div className="w-full max-w-xl mt-[100px]">
-            <ChatInput onSend={handleSend} disabled={streaming} variant="center" />
-          </div>
           </div>
         </div>
       ) : (
-        /* ── Chat view (has messages) ── */
-        <div className="flex flex-col h-[calc(100vh-93px)]">
+        /* ── Chat view (has messages) ─────────────────────────────────────── */
+        <div className="flex h-full flex-col">
+          {/* Upgrade banner */}
           {upgradeBanner && (
-            <div className="mx-4 mt-2 px-4 py-2.5 rounded-xl border border-green-500/20 bg-green-500/10 text-green-400 text-sm text-center animate-in fade-in">
-              Welcome to Pro! Your upgrade is active.
+            <div className={`${CONTAINER} mt-2`}>
+              <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-center text-sm text-green-400 animate-in fade-in">
+                Welcome to Pro! Your upgrade is active.
+              </div>
             </div>
           )}
 
-          {/* Chat header bar */}
-          <div className="flex items-center justify-end px-4 py-2 border-b border-white/5 shrink-0 gap-1">
-            <button
-              onClick={handleOpenHistory}
-              disabled={streaming}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition disabled:opacity-30"
-              title="Chat history"
-            >
-              <Clock className="h-[18px] w-[18px] text-white/50" strokeWidth={1.5} />
-            </button>
-            <button
-              onClick={handleNewChat}
-              disabled={streaming}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition disabled:opacity-30"
-              title="New chat"
-            >
-              <SquarePen className="h-[18px] w-[18px] text-white/50" strokeWidth={1.5} />
-            </button>
+          {/* Chat header bar — border spans full width, buttons align to container */}
+          <div className="shrink-0 border-b border-white/[0.06]">
+            <div className={`${CONTAINER} flex items-center justify-end gap-1 py-2`}>
+              <button
+                onClick={handleOpenHistory}
+                disabled={streaming}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
+                title="Chat history"
+              >
+                <Clock className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={handleNewChat}
+                disabled={streaming}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
+                title="New chat"
+              >
+                <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
+              </button>
+            </div>
           </div>
 
-          <ScrollArea className="min-h-0 min-w-0 flex-1">
-            <div className="mx-auto max-w-xl px-4 py-6">
+          {/* Scrollable messages — container width consistent with input */}
+          <ScrollArea className="min-h-0 flex-1">
+            <div className={`${CONTAINER} py-8`}>
               <ChatThread
                 messages={messages}
                 streaming={streaming}
@@ -428,12 +514,20 @@ export default function HomePage() {
                 onCopy={handleCopy}
                 onRetry={handleRetry}
               />
-              <div ref={bottomRef} />
+              <div ref={bottomRef} className="h-4" />
             </div>
           </ScrollArea>
 
-          <div className="shrink-0 px-4 pt-2 bg-gradient-to-t from-black via-black/90 to-transparent" style={{ paddingBottom: 'max(50px, calc(20px + env(safe-area-inset-bottom)))' }}>
-            <ChatInput onSend={handleSend} disabled={streaming} variant="bottom" />
+          {/* Sticky input footer — same max-w as messages */}
+          <div
+            className="shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-3"
+            style={{
+              paddingBottom: "max(1.25rem, calc(0.75rem + env(safe-area-inset-bottom)))",
+            }}
+          >
+            <div className={CONTAINER}>
+              <ChatInput onSend={handleSend} disabled={streaming} />
+            </div>
           </div>
         </div>
       )}

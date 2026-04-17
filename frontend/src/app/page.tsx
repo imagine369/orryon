@@ -265,7 +265,7 @@ function HowItWorksDemo() {
                 </button>
               </div>
               {goalLabel && (
-                <p className="text-[0.65rem] text-white/40 mb-3">{goalLabel}</p>
+                <p className="text-[0.65rem] text-white/60 mb-3">{goalLabel}</p>
               )}
               <div style={{ transition: "opacity 0.4s ease, transform 0.4s ease", opacity: goalIn ? 1 : 0, transform: goalIn ? "translateY(0)" : "translateY(-8px)" }}>
                 <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-3">
@@ -746,7 +746,7 @@ function TourBillsTab() {
       {bills.map((b) => (
         <div key={b.name} className="flex items-center gap-3 py-2.5 border-b border-white/5">
           <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0">
-            <span className="text-[0.6rem] font-bold text-white/40">$</span>
+            <span className="text-[0.6rem] font-bold text-white/60">$</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white/85">{b.name}</p>
@@ -996,7 +996,7 @@ function AppTourDemo() {
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em] flex items-center">
                     {micActive
                       ? <span className="flex items-center gap-2">
-                          <span className="text-white/40 text-[13px] leading-none">Listening</span>
+                          <span className="text-white/60 text-[13px] leading-none">Listening</span>
                           <span className="flex items-end gap-[3px]" style={{ height: 16 }}>
                             {[0, 0.15, 0.08, 0.22, 0.04].map((delay, i) => (
                               <span key={i} style={{ display: "inline-block", width: 2.5, borderRadius: 2, background: "rgba(255,255,255,0.55)", animation: `wavebar 0.65s ease-in-out ${delay}s infinite` }} />
@@ -1009,7 +1009,7 @@ function AppTourDemo() {
                   </span>
                   <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-all duration-300"
                     style={(micActive || isTypingPhase) ? { background: "rgba(255,255,255,0.08)", animation: "micglow 1.2s ease-in-out infinite" } : {}}>
-                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/40"}`} strokeWidth={1.5} />
+                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/60"}`} strokeWidth={1.5} />
                   </span>
                   <button className="shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all"
                     style={{ background: sending ? "rgb(229,229,229)" : hasInput ? "white" : "rgba(255,255,255,0.2)", transform: sending ? "scale(0.85)" : hasInput ? "scale(1)" : "scale(0.95)" }}>
@@ -1079,7 +1079,7 @@ function AppTourDemo() {
                   <span className="flex-1 text-[15px] py-1.5 min-h-[1.5em] flex items-center">
                     {micActive
                       ? <span className="flex items-center gap-2">
-                          <span className="text-white/40 text-[13px] leading-none">Listening</span>
+                          <span className="text-white/60 text-[13px] leading-none">Listening</span>
                           <span className="flex items-end gap-[3px]" style={{ height: 16 }}>
                             {[0, 0.15, 0.08, 0.22, 0.04].map((delay, i) => (
                               <span key={i} style={{ display: "inline-block", width: 2.5, borderRadius: 2, background: "rgba(255,255,255,0.55)", animation: `wavebar 0.65s ease-in-out ${delay}s infinite` }} />
@@ -1092,10 +1092,10 @@ function AppTourDemo() {
                   </span>
                   <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-all duration-300"
                     style={(micActive || isTypingPhase) ? { background: "rgba(255,255,255,0.08)", animation: "micglow 1.2s ease-in-out infinite" } : {}}>
-                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/40"}`} strokeWidth={1.5} />
+                    <Mic className={`h-5 w-5 transition-colors ${(micActive || isTypingPhase) ? "text-white" : "text-white/60"}`} strokeWidth={1.5} />
                   </span>
                   <button className={`shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all ${sending ? "bg-white scale-100" : "bg-white/20 scale-95"}`}>
-                    <ArrowUp className={`h-4 w-4 ${sending ? "text-black" : "text-white/40"}`} strokeWidth={1.5} />
+                    <ArrowUp className={`h-4 w-4 ${sending ? "text-black" : "text-white/60"}`} strokeWidth={1.5} />
                   </button>
                 </div>
               </div>
@@ -1243,7 +1243,7 @@ function AppTourDemo() {
                 ].map((e) => (
                   <div key={e.date} className="py-2.5 border-b border-white/[0.04]">
                     <p className="text-[0.62rem] text-white/30">{e.date}</p>
-                    <p className="text-[0.75rem] text-white/45 mt-0.5 leading-snug">{e.preview}</p>
+                    <p className="text-[0.75rem] text-white/65 mt-0.5 leading-snug">{e.preview}</p>
                   </div>
                 ))}
               </div>
@@ -1293,7 +1293,7 @@ function AppTourDemo() {
             <div className="px-5 pt-6 pb-4 border-b border-white/5 shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <h1 className="text-2xl font-extrabold">Dashboard</h1>
-                <button className="text-white/40 hover:text-white transition"><X className="h-4 w-4" strokeWidth={1.5} /></button>
+                <button className="text-white/60 hover:text-white transition"><X className="h-4 w-4" strokeWidth={1.5} /></button>
               </div>
               {/* Stat cards */}
               <div className="grid grid-cols-2 gap-3">
@@ -1470,7 +1470,7 @@ function SearchPreview() {
     <div className="w-full px-1">
       <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 mb-3">
         <Search className="h-3 w-3 text-white/30 shrink-0" strokeWidth={1.5} />
-        <span className="text-[0.7rem] text-white/40">coffee</span>
+        <span className="text-[0.7rem] text-white/60">coffee</span>
         <span className="inline-block w-[1.5px] h-[0.75em] bg-white/40 align-middle animate-pulse" />
       </div>
       <div className="space-y-0.5">
@@ -1595,7 +1595,7 @@ function SilentBreakPreview() {
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-1.5">
           <Moon className="h-2.5 w-2.5 text-white/30" strokeWidth={1.5} />
-          <span className="text-[0.6rem] text-white/40 tracking-wide">Silent · 5 min</span>
+          <span className="text-[0.6rem] text-white/60 tracking-wide">Silent · 5 min</span>
         </div>
         <div className="flex items-center gap-1 mt-0.5">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -1772,7 +1772,7 @@ function FeatureSection() {
                   >
                     <p className="text-[1rem] font-bold leading-snug">
                       <span className="text-white">{card.highlighted}</span>{" "}
-                      <span className="text-white/45">{card.rest}</span>
+                      <span className="text-white/65">{card.rest}</span>
                     </p>
                   </div>
                 </div>
@@ -1923,7 +1923,7 @@ function OrbitSection() {
                 </div>
                 <div className="mt-2.5 text-center" style={{ opacity: isActive ? 1 : 0.3, transition: "opacity 0.5s ease" }}>
                   <p className="text-sm font-semibold text-white/85 leading-tight whitespace-nowrap">{item.label}</p>
-                  <p className="text-[0.65rem] text-white/40 whitespace-nowrap">{item.sub}</p>
+                  <p className="text-[0.65rem] text-white/60 whitespace-nowrap">{item.sub}</p>
                 </div>
               </div>
             );
@@ -1962,7 +1962,7 @@ function OrbitSection() {
                   <Icon style={{ width: 16, height: 16, color: isActive ? item.color : "rgba(255,255,255,0.3)", transition: "color 0.5s ease" }} strokeWidth={1.5} />
                 </div>
                 <p className="text-[0.75rem] font-semibold text-white/85">{item.label}</p>
-                <p className="text-[0.62rem] text-white/40 text-center leading-snug">{item.sub}</p>
+                <p className="text-[0.62rem] text-white/60 text-center leading-snug">{item.sub}</p>
               </div>
             );
           })}
@@ -1996,7 +1996,7 @@ function StoreBadges({ className = "" }: { className?: string }) {
       >
         <AppleLogo className="w-[18px] h-[18px] text-white/80 group-hover:text-white transition-colors" />
         <div className="flex flex-col items-start leading-none">
-          <span className="text-[0.5rem] text-white/40 group-hover:text-white/55 transition-colors">Download on the</span>
+          <span className="text-[0.5rem] text-white/60 group-hover:text-white/55 transition-colors">Download on the</span>
           <span className="text-[0.78rem] font-semibold text-white/80 group-hover:text-white transition-colors -mt-[1px]">App Store</span>
         </div>
       </a>
@@ -2007,7 +2007,7 @@ function StoreBadges({ className = "" }: { className?: string }) {
       >
         <PlayLogo className="w-[16px] h-[16px] text-white/80 group-hover:text-white transition-colors" />
         <div className="flex flex-col items-start leading-none">
-          <span className="text-[0.5rem] text-white/40 group-hover:text-white/55 transition-colors">Get it on</span>
+          <span className="text-[0.5rem] text-white/60 group-hover:text-white/55 transition-colors">Get it on</span>
           <span className="text-[0.78rem] font-semibold text-white/80 group-hover:text-white transition-colors -mt-[1px]">Google Play</span>
         </div>
       </a>
@@ -2064,11 +2064,11 @@ export default function LandingPage() {
         <p className="text-sm font-semibold text-white/85">
           {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
         </p>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-white/60">
           {waitlistStatus === "duplicate" ? "We\u2019ll be in touch." : "We\u2019ll reach out when it\u2019s your turn."}
         </p>
       </div>
-      <Link href="/login" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+      <Link href="/login" className="text-xs text-white/60 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
     </>
@@ -2097,7 +2097,7 @@ export default function LandingPage() {
           <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
         )}
       </form>
-      <Link href="/login" className="text-[0.72rem] sm:text-xs text-white/40 hover:text-white/70 transition-colors">
+      <Link href="/login" className="text-[0.72rem] sm:text-xs text-white/60 hover:text-white/70 transition-colors">
         Already have an account? Sign in
       </Link>
     </>
@@ -2126,10 +2126,10 @@ export default function LandingPage() {
           >
             <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[100px] h-[100px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover ring-1 ring-white/10" />
           </motion.div>
-          <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/45 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
+          <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/65 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
           </p>
-          <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/45 mb-[28px] sm:mb-[36px] lg:mb-[48px] -mt-[3px]">
+          <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/65 mb-[28px] sm:mb-[36px] lg:mb-[48px] -mt-[3px]">
             Your AI personal concierge
           </p>
           <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mt-[10px] mb-[59px] sm:mb-[67px] lg:mb-[75px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
@@ -2148,7 +2148,7 @@ export default function LandingPage() {
             </div>
 
             {/* Trust signal — after the demo, before they decide */}
-            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/40 mt-[15px]">
+            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/60 mt-[15px]">
               Orryon doesn&rsquo;t connect to your bank.<br />That&rsquo;s the point. Your data stays yours.
             </p>
           </div>
@@ -2211,7 +2211,7 @@ export default function LandingPage() {
                 <p className="text-base font-semibold text-white/85">
                   {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
                 </p>
-                <p className="text-sm text-white/40">
+                <p className="text-sm text-white/60">
                   {waitlistStatus === "duplicate"
                     ? "We already have your email \u2014 we\u2019ll be in touch."
                     : "We\u2019ll reach out when it\u2019s your turn."}
