@@ -11,8 +11,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from difflib import get_close_matches
+
+try:  # optional; if missing we fall back to regex-only ISO detection
+    import dateparser as _dateparser  # type: ignore
+except Exception:  # pragma: no cover
+    _dateparser = None
 
 from db import (
     delete_row, fetch_rows, get_connection, insert_row, update_row,
@@ -29,28 +36,29 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "add_expense",
+            "name": "log_expense",
             "description": (
-                "Add an expense or transaction. Use when the user mentions spending money, "
-                "buying something, or logging a purchase."
+                "Log a past or today spending event (EXPENSES section). Use when the user "
+                "mentions having spent, bought, paid for, grabbed, or picked up something. "
+                "Do NOT use for future recurring charges — use log_bill for those."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "amount": {"type": "number", "description": "Amount in USD (positive number)"},
                     "merchant": {"type": "string", "description": "Merchant name or short description"},
+                    "description": {"type": "string", "description": "Short description of the purchase (alias: notes)"},
                     "category": {
                         "type": "string",
                         "description": (
-                            "Category. Use exactly one of: Food & Dining, Groceries, Transport, "
-                            "Entertainment, Shopping, Health & Fitness, Utilities, Rent & Housing, "
-                            "Travel, Subscriptions, Personal Care, Education, Other"
+                            "Canonical category. One of: Food & Dining, Groceries, Transport, "
+                            "Subscriptions, Health & Fitness, Shopping, Rent & Housing, Travel, Other."
                         ),
                     },
-                    "date": {"type": "string", "description": "Date as YYYY-MM-DD. Defaults to today if omitted."},
+                    "date": {"type": "string", "description": "ISO date YYYY-MM-DD. Defaults to today."},
                     "notes": {"type": "string", "description": "Optional extra notes"},
                 },
-                "required": ["amount", "merchant", "category"],
+                "required": ["amount", "category"],
             },
         },
     },
@@ -59,15 +67,19 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "add_calendar_event",
             "description": (
-                "Add an event, appointment, meeting, pickup, or reminder to the calendar. "
-                "Use for anything that happens at a specific date/time."
+                "Add a time-bound event to the calendar (CALENDAR section). Use for meetings, "
+                "appointments, dinners, errands at a specific time. If only a deadline (no "
+                "time) was given, ask the user whether they want it on the calendar."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Short event title"},
-                    "date": {"type": "string", "description": "Date as YYYY-MM-DD"},
-                    "time": {"type": "string", "description": "Time as HH:MM (24h). Omit for all-day."},
+                    "start": {"type": "string", "description": "ISO start datetime YYYY-MM-DDTHH:MM:SS (preferred)."},
+                    "end": {"type": "string", "description": "ISO end datetime YYYY-MM-DDTHH:MM:SS (optional)."},
+                    "date": {"type": "string", "description": "Legacy alternative: date only YYYY-MM-DD."},
+                    "time": {"type": "string", "description": "Legacy alternative: HH:MM 24h. Omit for all-day."},
+                    "all_day": {"type": "boolean", "description": "Set true for all-day events (default false)."},
                     "description": {"type": "string", "description": "Optional details"},
                     "event_type": {
                         "type": "string",
@@ -80,7 +92,7 @@ TOOL_SCHEMAS = [
                         "description": "Email reminder: 0=none, 10=10min, 30=30min (default), 60=1hr, 360=6hr, 1440=1day before",
                     },
                 },
-                "required": ["title", "date"],
+                "required": ["title"],
             },
         },
     },
@@ -113,10 +125,11 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "add_recurring_bill",
+            "name": "log_bill",
             "description": (
-                "Add a recurring bill, subscription, or payment. "
-                "Use when the user mentions something happening regularly (monthly, weekly, etc.)."
+                "Log a recurring or scheduled FUTURE bill with a due date (BILLS section). "
+                "Use for rent, utilities, subscriptions, mortgage, etc. Never use for past "
+                "payments — a past payment is an expense (log_expense)."
             ),
             "parameters": {
                 "type": "object",
@@ -125,16 +138,20 @@ TOOL_SCHEMAS = [
                     "amount": {"type": "number", "description": "Amount per cycle in USD"},
                     "frequency": {
                         "type": "string",
-                        "enum": ["monthly", "weekly", "yearly", "bi-weekly"],
+                        "enum": ["weekly", "bi-weekly", "monthly", "yearly"],
                         "description": "How often it recurs",
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "description": "Next due date as ISO YYYY-MM-DD (preferred).",
                     },
                     "due_day": {
                         "type": "integer",
-                        "description": "Day of month (1–31) when bill is due. For monthly bills.",
+                        "description": "Alternative: day of month 1–31 (monthly bills only).",
                     },
-                    "category": {"type": "string", "description": "Category (e.g. Utilities, Subscriptions)"},
+                    "category": {"type": "string", "description": "Category (e.g. Rent & Housing, Subscriptions)"},
                 },
-                "required": ["name"],
+                "required": ["name", "amount", "frequency"],
             },
         },
     },
@@ -308,15 +325,26 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "get_upcoming_schedule",
-            "description": "Get upcoming events, bills, and tasks for the next N days.",
+            "name": "get_calendar",
+            "description": (
+                "Get upcoming events, bills, and tasks (CALENDAR section). Use for any "
+                "'what's on my calendar / schedule / coming up' question."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "days": {
                         "type": "integer",
-                        "description": "Number of days to look ahead (default: 14)",
-                    }
+                        "description": "Days ahead from today (default: 14). Ignored if date_range provided.",
+                    },
+                    "date_range": {
+                        "type": "object",
+                        "description": "Explicit ISO date range. Preferred over `days`.",
+                        "properties": {
+                            "from": {"type": "string", "description": "ISO YYYY-MM-DD start"},
+                            "to": {"type": "string", "description": "ISO YYYY-MM-DD end"},
+                        },
+                    },
                 },
             },
         },
@@ -338,7 +366,7 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "add_goal",
+            "name": "create_goal",
             "description": (
                 "Create a new savings or financial goal. Use when the user wants to save for something "
                 "specific (emergency fund, vacation, paying off debt, buying a car, etc.)."
@@ -365,23 +393,33 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "update_goal_progress",
+            "name": "update_goal",
             "description": (
-                "Add funds to a savings goal or set the current saved amount. "
-                "Use when user says they saved money toward a goal, got a bonus, or transferred money to a goal account."
+                "Update an existing goal's progress or fields (GOALS section). Use when the "
+                "user says they saved toward a goal, added a contribution, or wants to change "
+                "a goal's target/deadline. Pass the goal by `name` (fuzzy-matched)."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "goal_name": {"type": "string", "description": "Name of the goal to update (partial match ok)"},
-                    "amount": {"type": "number", "description": "Amount to add (if action='add') or set (if action='set')"},
+                    "name": {"type": "string", "description": "Goal name (partial match ok). Preferred."},
+                    "goal_name": {"type": "string", "description": "Alias for name (legacy)."},
+                    "progress_amount": {"type": "number", "description": "Amount to add, subtract, or set."},
+                    "amount": {"type": "number", "description": "Alias for progress_amount (legacy)."},
                     "action": {
                         "type": "string",
-                        "enum": ["add", "set"],
-                        "description": "'add' adds to current saved amount; 'set' replaces current saved amount entirely",
+                        "enum": ["add", "subtract", "set"],
+                        "description": "'add' (default) increments, 'subtract' decrements, 'set' replaces.",
+                    },
+                    "target_amount": {"type": "number", "description": "Optional: update the goal's total target."},
+                    "deadline": {"type": "string", "description": "Optional: update target_date as ISO YYYY-MM-DD."},
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "paused", "achieved", "abandoned"],
+                        "description": "Optional: update goal status.",
                     },
                 },
-                "required": ["goal_name", "amount"],
+                "required": [],
             },
         },
     },
@@ -827,6 +865,340 @@ TOOL_SCHEMAS = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+
+    # ─── Canonical 9-section READ/ANALYSIS tools (added in v3 rename) ────────
+    {
+        "type": "function",
+        "function": {
+            "name": "get_bills",
+            "description": (
+                "Retrieve recurring bills / subscriptions, optionally filtered by ISO "
+                "date range. Use for any 'what bills are coming up / this month / next "
+                "2 weeks' question."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_range": {
+                        "type": "object",
+                        "description": "ISO date range filter on next due date.",
+                        "properties": {
+                            "from": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                            "to": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                        },
+                    },
+                    "category": {"type": "string", "description": "Optional category filter."},
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "inactive", "all"],
+                        "description": "Default: active.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_expenses",
+            "description": (
+                "Retrieve logged expenses, optionally filtered by ISO date range, "
+                "category, or merchant/text search."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_range": {
+                        "type": "object",
+                        "description": "ISO date range filter.",
+                        "properties": {
+                            "from": {"type": "string"},
+                            "to": {"type": "string"},
+                        },
+                    },
+                    "category": {"type": "string", "description": "Optional canonical category."},
+                    "search": {"type": "string", "description": "Optional merchant/description text."},
+                    "limit": {"type": "integer", "description": "Max rows (default 50)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_notes",
+            "description": (
+                "Retrieve plain notes (NOT journal entries — those use get_journal). "
+                "Supports text and tag filters."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string", "description": "Optional free-text query."},
+                    "tag": {"type": "string", "description": "Optional tag filter."},
+                    "limit": {"type": "integer", "description": "Max rows (default 20)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_journal_entry",
+            "description": (
+                "Log a dated JOURNAL entry with mood. Use for feelings / reflections / "
+                "mood-tagged content. For neutral reference notes, use add_note instead."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "ISO YYYY-MM-DD. Defaults to today."},
+                    "content": {"type": "string", "description": "The journal body."},
+                    "title": {"type": "string", "description": "Optional short title."},
+                    "mood": {
+                        "type": "string",
+                        "enum": ["happy", "grateful", "motivated", "neutral",
+                                 "stressed", "anxious", "reflective"],
+                        "description": "Canonical mood (required).",
+                    },
+                    "tags": {"type": "string", "description": "Optional comma-separated tags."},
+                },
+                "required": ["content", "mood"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_journal",
+            "description": (
+                "Retrieve journal entries (mood-tagged notes), optionally filtered by "
+                "ISO date range or specific mood."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_range": {
+                        "type": "object",
+                        "properties": {
+                            "from": {"type": "string"},
+                            "to": {"type": "string"},
+                        },
+                    },
+                    "mood": {
+                        "type": "string",
+                        "enum": ["happy", "grateful", "motivated", "neutral",
+                                 "stressed", "anxious", "reflective"],
+                    },
+                    "limit": {"type": "integer", "description": "Max rows (default 20)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_insights",
+            "description": (
+                "Generate INSIGHTS — analytical summary of the user's real data across "
+                "the specified sections and date range. Returns spending totals, top "
+                "categories, budget status, and pattern observations. Never fabricate "
+                "numbers; the tool pulls live data."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "array",
+                        "description": "Sections to analyse.",
+                        "items": {
+                            "type": "string",
+                            "enum": ["expenses", "bills", "goals", "journal", "calendar"],
+                        },
+                    },
+                    "date_range": {
+                        "type": "object",
+                        "properties": {
+                            "from": {"type": "string"},
+                            "to": {"type": "string"},
+                        },
+                    },
+                    "focus": {
+                        "type": "string",
+                        "enum": ["spending", "saving", "trends", "anomalies",
+                                 "progress", "mood", "general"],
+                        "description": "Analysis angle (default: general).",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_forecast",
+            "description": (
+                "Generate a FORECAST — projected future financial state combining "
+                "balance, recurring bills, active goals, and any assumptions. Use for "
+                "'can I afford X next month' / 'how much will I have left' questions."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "horizon_days": {"type": "integer", "description": "Days ahead (default 30)."},
+                    "scope": {
+                        "type": "array",
+                        "description": "Sections to include in projection.",
+                        "items": {
+                            "type": "string",
+                            "enum": ["expenses", "bills", "goals", "income"],
+                        },
+                    },
+                    "scenario": {
+                        "type": "string",
+                        "enum": ["baseline", "optimistic", "pessimistic", "custom"],
+                        "description": "Default: baseline.",
+                    },
+                    "assumptions": {
+                        "type": "array",
+                        "description": "One-line strings describing any one-off purchases or income events.",
+                        "items": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_yearly_summary",
+            "description": (
+                "Generate a YEARLY summary / year-in-review across spending, goals, "
+                "and optionally journal/calendar for a specific calendar year."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "year": {"type": "integer", "description": "4-digit year (required)."},
+                    "sections": {
+                        "type": "array",
+                        "description": "Sections to include (default: expenses, bills, goals).",
+                        "items": {
+                            "type": "string",
+                            "enum": ["expenses", "bills", "goals", "journal", "calendar"],
+                        },
+                    },
+                },
+                "required": ["year"],
+            },
+        },
+    },
+
+    # ─── Full-CRUD additions (v3.1) ──────────────────────────────────────────
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_bill",
+            "description": (
+                "Edit an existing bill / subscription's fields. Resolve the bill_id "
+                "first via get_bills if you only have a name. Only send the fields "
+                "that actually change."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bill_id": {"type": "string", "description": "ID of the bill (required)."},
+                    "name": {"type": "string"},
+                    "amount": {"type": "number"},
+                    "frequency": {
+                        "type": "string",
+                        "enum": ["weekly", "bi-weekly", "monthly", "yearly"],
+                    },
+                    "due_date": {"type": "string", "description": "ISO YYYY-MM-DD for the next due date."},
+                    "category": {"type": "string"},
+                    "is_active": {"type": "boolean", "description": "Set false to pause the bill."},
+                },
+                "required": ["bill_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_goal",
+            "description": (
+                "Delete a goal. Prefer goal_id (resolve via get_goals). If only the "
+                "name is known, pass it — the tool returns 'ambiguous' if multiple "
+                "goals match so you can ask the user which one."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_id": {"type": "string", "description": "Preferred: exact goal ID."},
+                    "name": {"type": "string", "description": "Alternative: goal name (partial match ok)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_journal_entry",
+            "description": (
+                "Edit an existing JOURNAL entry (mood-tagged). Resolve entry_id via "
+                "get_journal first. Use edit_note for plain notes."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entry_id": {"type": "string", "description": "ID of the journal entry (required)."},
+                    "title": {"type": "string"},
+                    "content": {"type": "string"},
+                    "mood": {
+                        "type": "string",
+                        "enum": ["happy", "grateful", "motivated", "neutral",
+                                 "stressed", "anxious", "reflective"],
+                    },
+                    "tags": {"type": "string"},
+                },
+                "required": ["entry_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_journal_entry",
+            "description": (
+                "Delete a journal entry by ID. Resolve the ID via get_journal first. "
+                "Use delete_note for plain notes."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entry_id": {"type": "string", "description": "ID of the journal entry (required)."},
+                },
+                "required": ["entry_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_list",
+            "description": (
+                "Delete an entire user list AND all of its items. Resolve list_id via "
+                "get_user_lists first. Irreversible — confirm in prose."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "list_id": {"type": "string", "description": "ID of the list (required)."},
+                },
+                "required": ["list_id"],
+            },
+        },
+    },
 ]
 
 
@@ -889,13 +1261,15 @@ def _get_goal_impact_for_category(user_id: str, category: str, month: str) -> di
 def _add_expense(args: dict, user_id: str) -> dict:
     date = args.get("date") or _today()
     import json as _json
+    merchant = args.get("merchant") or args.get("description") or "Unknown"
+    description = args.get("description") or args.get("merchant") or ""
     row = {
         "id": _uid(),
         "user_id": user_id,
         "date": date,
         "amount": float(args["amount"]),
-        "merchant": args.get("merchant", "Unknown"),
-        "description": args.get("merchant", ""),
+        "merchant": merchant,
+        "description": description,
         "category": args.get("category", "Other"),
         "is_recurring": 0,
         "metadata": _json.dumps({"notes": args.get("notes", "")}),
@@ -923,8 +1297,16 @@ def _add_expense(args: dict, user_id: str) -> dict:
 
 def _add_calendar_event(args: dict, user_id: str) -> dict:
     title = args["title"]
-    date = args.get("date") or _today()
-    time = args.get("time", "")
+    start = args.get("start")
+    if start:
+        s = str(start).replace("T", " ")
+        date, _, time = s.partition(" ")
+        time = (time or "").strip()[:5]  # HH:MM
+    else:
+        date = args.get("date") or _today()
+        time = args.get("time", "") or ""
+    if args.get("all_day") is True:
+        time = ""
     event_datetime = f"{date} {time}".strip()
     reminder = int(args.get("reminder_minutes", 30))
 
@@ -989,11 +1371,14 @@ def _add_recurring_bill(args: dict, user_id: str) -> dict:
     name = args["name"]
     amount = float(args.get("amount", 0))
     frequency = args.get("frequency", "monthly")
+    due_date_iso = args.get("due_date")  # preferred: ISO YYYY-MM-DD
     due_day = args.get("due_day")
 
     # Compute next due date
     now = datetime.now()
-    if due_day and frequency == "monthly":
+    if due_date_iso and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(due_date_iso)):
+        next_due = str(due_date_iso)
+    elif due_day and frequency == "monthly":
         try:
             due_day_int = int(due_day)
             if now.day < due_day_int:
@@ -1119,6 +1504,152 @@ def _pin_note(args: dict, user_id: str) -> dict:
     update_row("notes", {"is_pinned": pin, "updated_at": _now_iso()}, {"id": nid})
     action = "pinned" if pin else "unpinned"
     return {"status": "ok", "action": action, "title": row["title"]}
+
+
+# ── Full-CRUD additions (edit_bill, delete_goal, journal edit/delete, delete_list) ──
+
+def _edit_bill(args: dict, user_id: str) -> dict:
+    """Edit an existing recurring bill / subscription."""
+    bill_id = args.get("bill_id") or args.get("id")
+    if not bill_id:
+        return {"status": "error", "message": "bill_id is required."}
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM subscriptions WHERE id=? AND user_id=?",
+        (bill_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Bill not found."}
+
+    updates: dict = {}
+    for k in ("name", "category", "frequency"):
+        if args.get(k) is not None:
+            updates[k] = args[k]
+    if args.get("amount") is not None:
+        try:
+            updates["amount"] = float(args["amount"])
+        except (TypeError, ValueError):
+            pass
+    if args.get("due_date"):
+        updates["next_due"] = str(args["due_date"])
+    if args.get("is_active") is not None:
+        updates["is_active"] = 1 if args["is_active"] else 0
+
+    if not updates:
+        return {"status": "no_changes", "message": "Nothing to update."}
+    update_row("subscriptions", updates, {"id": bill_id, "user_id": user_id})
+    return {
+        "status": "ok",
+        "id": bill_id,
+        "name": row["name"],
+        "updated_fields": sorted(updates.keys()),
+    }
+
+
+def _delete_goal(args: dict, user_id: str) -> dict:
+    """Delete a goal by id or fuzzy-matched name."""
+    goal_id = args.get("goal_id") or args.get("id")
+    name_hint = (args.get("name") or args.get("goal_name") or "").strip().lower()
+
+    conn = get_connection()
+    if goal_id:
+        row = conn.execute(
+            "SELECT id, name FROM goals WHERE id=? AND user_id=?",
+            (goal_id, user_id),
+        ).fetchone()
+        matches = [row] if row else []
+    elif name_hint:
+        all_rows = conn.execute(
+            "SELECT id, name FROM goals WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
+        matches = [r for r in all_rows if name_hint in r["name"].lower()]
+    else:
+        conn.close()
+        return {"status": "error", "message": "Provide goal_id or name."}
+    conn.close()
+
+    if not matches:
+        return {"status": "not_found", "message": "Goal not found."}
+    if len(matches) > 1:
+        return {
+            "status": "ambiguous",
+            "message": f"Multiple goals match '{name_hint}'. Ask the user which one.",
+            "candidates": [{"id": r["id"], "name": r["name"]} for r in matches],
+        }
+    target = matches[0]
+    delete_row("goals", {"id": target["id"], "user_id": user_id})
+    return {"status": "ok", "deleted": target["name"], "id": target["id"]}
+
+
+def _edit_journal_entry(args: dict, user_id: str) -> dict:
+    """Edit an existing journal entry (a notes row with is_journal=1)."""
+    entry_id = args.get("entry_id") or args.get("note_id") or args.get("id")
+    if not entry_id:
+        return {"status": "error", "message": "entry_id is required."}
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, is_journal FROM notes WHERE id=? AND user_id=?",
+        (entry_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Journal entry not found."}
+    d = dict(row) if not isinstance(row, dict) else row
+    if not d.get("is_journal"):
+        return {"status": "wrong_kind", "message": "That's a plain note — use edit_note."}
+    # Delegate to _edit_note using its expected arg shape.
+    delegated = {**args, "note_id": entry_id}
+    result = _edit_note(delegated, user_id)
+    if result.get("status") == "ok":
+        result["kind"] = "journal"
+    return result
+
+
+def _delete_journal_entry(args: dict, user_id: str) -> dict:
+    """Delete a journal entry (notes row with is_journal=1)."""
+    entry_id = args.get("entry_id") or args.get("note_id") or args.get("id")
+    if not entry_id:
+        return {"status": "error", "message": "entry_id is required."}
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, title, is_journal FROM notes WHERE id=? AND user_id=?",
+        (entry_id, user_id),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"status": "not_found", "message": "Journal entry not found."}
+    d = dict(row) if not isinstance(row, dict) else row
+    if not d.get("is_journal"):
+        return {"status": "wrong_kind", "message": "That's a plain note — use delete_note."}
+    delete_row("notes", {"id": entry_id, "user_id": user_id})
+    return {"status": "ok", "deleted": d.get("title") or "journal entry", "id": entry_id}
+
+
+def _delete_list(args: dict, user_id: str) -> dict:
+    """Delete a user list and all its items."""
+    list_id = args.get("list_id") or args.get("id")
+    if not list_id:
+        return {"status": "error", "message": "list_id is required."}
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, name FROM user_lists WHERE id=? AND user_id=?",
+        (list_id, user_id),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return {"status": "not_found", "message": "List not found."}
+    item_count_row = conn.execute(
+        "SELECT COUNT(*) AS c FROM list_items WHERE list_id=? AND user_id=?",
+        (list_id, user_id),
+    ).fetchone()
+    item_count = item_count_row["c"] if isinstance(item_count_row, dict) else item_count_row[0]
+    conn.close()
+    delete_row("list_items", {"list_id": list_id, "user_id": user_id})
+    delete_row("user_lists", {"id": list_id, "user_id": user_id})
+    name = row["name"] if not isinstance(row, dict) else row.get("name")
+    return {"status": "ok", "deleted": name, "id": list_id, "items_removed": item_count}
 
 
 def _set_budget(args: dict, user_id: str) -> dict:
@@ -1373,7 +1904,7 @@ def _get_upcoming_schedule(args: dict, user_id: str) -> dict:
         })
 
     items.sort(key=lambda x: x.get("date") or "9999")
-    return {"days_ahead": days, "items": items, "count": len(items)}
+    return {"status": "ok", "days_ahead": days, "items": items, "count": len(items)}
 
 
 def _get_budget_status(args: dict, user_id: str) -> dict:
@@ -1494,8 +2025,15 @@ def _add_goal(args: dict, user_id: str) -> dict:
 
 
 def _update_goal_progress(args: dict, user_id: str) -> dict:
-    goal_name = args["goal_name"].lower()
-    amount = float(args["amount"])
+    # Accept both canonical and legacy arg names.
+    raw_name = args.get("name") or args.get("goal_name") or ""
+    if not raw_name:
+        return {"status": "error", "message": "Goal name is required."}
+    goal_name = str(raw_name).lower()
+    raw_amount = args.get("progress_amount")
+    if raw_amount is None:
+        raw_amount = args.get("amount", 0)
+    amount = float(raw_amount or 0)
     action = args.get("action", "add")
 
     conn = get_connection()
@@ -1507,10 +2045,12 @@ def _update_goal_progress(args: dict, user_id: str) -> dict:
 
     matched = next((r for r in rows if goal_name in r["name"].lower()), None)
     if not matched:
-        return {"status": "not_found", "searched": args["goal_name"]}
+        return {"status": "not_found", "searched": raw_name}
 
     if action == "set":
         new_amount = amount
+    elif action == "subtract":
+        new_amount = float(matched["current_amount"]) - amount
     else:
         new_amount = float(matched["current_amount"]) + amount
 
@@ -1519,11 +2059,15 @@ def _update_goal_progress(args: dict, user_id: str) -> dict:
     is_completed = 1 if new_amount >= target else 0
     new_amount = min(new_amount, target)
 
-    update_row(
-        "goals",
-        {"current_amount": new_amount, "is_completed": is_completed},
-        {"id": matched["id"]},
-    )
+    updates: dict = {"current_amount": new_amount, "is_completed": is_completed}
+    if args.get("target_amount") is not None:
+        try:
+            updates["target_amount"] = float(args["target_amount"])
+        except (TypeError, ValueError):
+            pass
+    if args.get("deadline"):
+        updates["target_date"] = str(args["deadline"])
+    update_row("goals", updates, {"id": matched["id"]})
 
     pct = round((new_amount / target) * 100, 1) if target else 0
     remaining = round(target - new_amount, 2)
@@ -1584,7 +2128,7 @@ def _get_goals(args: dict, user_id: str) -> dict:
             "notes": r["notes"] or "",
         })
 
-    return {"goals": goals, "count": len(goals)}
+    return {"status": "ok", "goals": goals, "count": len(goals)}
 
 
 # ── Spending Recap ────────────────────────────────────────────────────────────
@@ -2335,18 +2879,343 @@ def _get_user_lists(args: dict, user_id: str) -> dict:
     return {"status": "ok", "lists": result, "count": len(result)}
 
 
+# ── Canonical READ/ANALYSIS wrappers (9-section prompt surface) ───────────────
+
+def _get_bills(args: dict, user_id: str) -> dict:
+    """Retrieve bills / subscriptions, optionally filtered by ISO date range."""
+    status = (args.get("status") or "active").lower()
+    date_range = args.get("date_range") or {}
+    date_from = date_range.get("from")
+    date_to = date_range.get("to")
+    category = args.get("category")
+
+    sql = "SELECT * FROM subscriptions WHERE user_id=?"
+    params: list = [user_id]
+    if status == "active":
+        sql += " AND is_active=1"
+    elif status == "inactive":
+        sql += " AND is_active=0"
+    if category:
+        sql += " AND category=?"
+        params.append(category)
+    if date_from:
+        sql += " AND next_due >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND next_due <= ?"
+        params.append(date_to)
+    sql += " ORDER BY next_due ASC"
+
+    conn = get_connection()
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    conn.close()
+    bills = [dict(r) if not isinstance(r, dict) else r for r in rows]
+    total = sum(float(b.get("amount") or 0) for b in bills)
+    return {
+        "status": "ok",
+        "count": len(bills),
+        "total": round(total, 2),
+        "bills": bills,
+    }
+
+
+def _get_expenses(args: dict, user_id: str) -> dict:
+    """Retrieve logged expenses with optional filters."""
+    date_range = args.get("date_range") or {}
+    date_from = date_range.get("from")
+    date_to = date_range.get("to")
+    category = args.get("category")
+    search = (args.get("search") or "").strip()
+    try:
+        limit = int(args.get("limit") or 50)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 500))
+
+    sql = "SELECT * FROM transactions WHERE user_id=?"
+    params: list = [user_id]
+    if date_from:
+        sql += " AND date >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND date <= ?"
+        params.append(date_to)
+    if category:
+        sql += " AND category=?"
+        params.append(category)
+    if search:
+        sql += " AND (LOWER(merchant) LIKE ? OR LOWER(description) LIKE ?)"
+        params.extend([f"%{search.lower()}%", f"%{search.lower()}%"])
+    sql += " ORDER BY date DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    conn = get_connection()
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    conn.close()
+    expenses = [dict(r) if not isinstance(r, dict) else r for r in rows]
+    total = sum(float(e.get("amount") or 0) for e in expenses)
+    return {
+        "status": "ok",
+        "count": len(expenses),
+        "total": round(total, 2),
+        "expenses": expenses,
+    }
+
+
+def _get_notes(args: dict, user_id: str) -> dict:
+    """Retrieve plain notes (non-journal). Delegates to _search_notes for filtering."""
+    if args.get("search") or args.get("tag"):
+        return _search_notes(
+            {"query": args.get("search"), "tag": args.get("tag"),
+             "limit": args.get("limit", 20)},
+            user_id,
+        )
+    try:
+        limit = int(args.get("limit") or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 200))
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM notes WHERE user_id=? AND (is_journal=0 OR is_journal IS NULL) "
+        "ORDER BY is_pinned DESC, created_at DESC LIMIT ?",
+        (user_id, limit),
+    ).fetchall()
+    conn.close()
+    notes = [dict(r) if not isinstance(r, dict) else r for r in rows]
+    return {"status": "ok", "count": len(notes), "notes": notes}
+
+
+def _log_journal_entry(args: dict, user_id: str) -> dict:
+    """Log a mood-tagged journal entry into the notes table with is_journal=1."""
+    content = (args.get("content") or "").strip()
+    mood = (args.get("mood") or "neutral").lower()
+    if not content:
+        return {"status": "error", "message": "Journal content is required."}
+    title = args.get("title") or f"Journal — {args.get('date') or _today()}"
+    tags = args.get("tags") or ""
+    entry_date = args.get("date") or _today()
+    row = {
+        "id": _uid(),
+        "user_id": user_id,
+        "title": title,
+        "content": content,
+        "mood": mood,
+        "tags": tags,
+        "is_pinned": 0,
+        "is_journal": 1,
+        "entry_date": entry_date,
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+    }
+    insert_row("notes", row)
+    return {
+        "status": "ok",
+        "id": row["id"],
+        "mood": mood,
+        "date": entry_date,
+        "title": title,
+    }
+
+
+def _get_journal(args: dict, user_id: str) -> dict:
+    """Retrieve journal (mood-tagged) entries with optional filters."""
+    date_range = args.get("date_range") or {}
+    date_from = date_range.get("from")
+    date_to = date_range.get("to")
+    mood = args.get("mood")
+    try:
+        limit = int(args.get("limit") or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 200))
+
+    sql = "SELECT * FROM notes WHERE user_id=? AND is_journal=1"
+    params: list = [user_id]
+    if date_from:
+        sql += " AND (entry_date >= ? OR created_at >= ?)"
+        params.extend([date_from, date_from])
+    if date_to:
+        sql += " AND (entry_date <= ? OR created_at <= ?)"
+        params.extend([date_to, date_to])
+    if mood:
+        sql += " AND mood=?"
+        params.append(mood)
+    sql += " ORDER BY COALESCE(entry_date, created_at) DESC LIMIT ?"
+    params.append(limit)
+
+    conn = get_connection()
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    conn.close()
+    entries = [dict(r) if not isinstance(r, dict) else r for r in rows]
+    return {"status": "ok", "count": len(entries), "entries": entries}
+
+
+def _generate_insights(args: dict, user_id: str) -> dict:
+    """Composite analytical view combining spending, budget, patterns, and goals."""
+    scope = set(args.get("scope") or ["expenses", "bills", "goals"])
+    focus = args.get("focus") or "general"
+    date_range = args.get("date_range") or {}
+    month = _current_month()
+    if date_range.get("from"):
+        month = str(date_range["from"])[:7]
+
+    result: dict = {"status": "ok", "focus": focus, "scope": list(scope), "sections": {}}
+    try:
+        if "expenses" in scope:
+            result["sections"]["spending_summary"] = _get_spending_summary(
+                {"month": month}, user_id
+            )
+            result["sections"]["budget_status"] = _get_budget_status(
+                {"month": month}, user_id
+            )
+            result["sections"]["patterns"] = _get_spending_patterns({}, user_id)
+        if "bills" in scope:
+            result["sections"]["subscription_health"] = _get_subscription_health(
+                {}, user_id
+            )
+        if "goals" in scope:
+            result["sections"]["goals"] = _get_goals({}, user_id)
+            result["sections"]["money_left_after_goals"] = _get_money_left_after_goals(
+                {}, user_id
+            )
+        if "journal" in scope:
+            result["sections"]["mood_spending"] = _get_mood_spending_report({}, user_id)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error("generate_insights partial failure: %s", e)
+        result["partial_error"] = str(e)
+    return result
+
+
+def _generate_forecast(args: dict, user_id: str) -> dict:
+    """Forward-looking projection blending balance, bills, and goal targets."""
+    try:
+        horizon = int(args.get("horizon_days") or 30)
+    except (TypeError, ValueError):
+        horizon = 30
+    horizon = max(7, min(horizon, 365))
+    scope = set(args.get("scope") or ["expenses", "bills", "goals"])
+    scenario = args.get("scenario") or "baseline"
+    assumptions = args.get("assumptions") or []
+
+    balance = _get_balance({}, user_id)
+    upcoming = _get_upcoming_schedule({"days": horizon}, user_id)
+    goals_info = _get_money_left_after_goals({}, user_id) if "goals" in scope else None
+
+    scheduled_bill_total = 0.0
+    try:
+        items_iter = (upcoming or {}).get("items", []) if isinstance(upcoming, dict) else []
+        for item in items_iter:
+            if item.get("type") == "bill":
+                scheduled_bill_total += float(item.get("amount") or 0)
+    except Exception:
+        pass
+
+    current = float((balance or {}).get("balance", 0) or 0)
+    projected = current - scheduled_bill_total
+    if scenario == "pessimistic":
+        projected -= 0.10 * max(scheduled_bill_total, 0)
+    elif scenario == "optimistic":
+        projected += 0.10 * max(scheduled_bill_total, 0)
+
+    return {
+        "status": "ok",
+        "horizon_days": horizon,
+        "scenario": scenario,
+        "scope": list(scope),
+        "assumptions": list(assumptions),
+        "current_balance": round(current, 2),
+        "scheduled_outflows": round(scheduled_bill_total, 2),
+        "projected_balance": round(projected, 2),
+        "upcoming": upcoming,
+        "goal_impact": goals_info,
+    }
+
+
+def _generate_yearly_summary(args: dict, user_id: str) -> dict:
+    """Year-in-review across selected sections."""
+    try:
+        year = int(args["year"])
+    except (KeyError, TypeError, ValueError):
+        return {"status": "error", "message": "year (4-digit integer) is required."}
+    sections = set(args.get("sections") or ["expenses", "bills", "goals"])
+    date_from = f"{year}-01-01"
+    date_to = f"{year}-12-31"
+
+    summary: dict = {"status": "ok", "year": year, "sections": {}}
+    if "expenses" in sections:
+        summary["sections"]["expenses"] = _get_expenses(
+            {"date_range": {"from": date_from, "to": date_to}, "limit": 500}, user_id
+        )
+    if "bills" in sections:
+        summary["sections"]["bills"] = _get_bills(
+            {"date_range": {"from": date_from, "to": date_to}, "status": "all"}, user_id
+        )
+    if "goals" in sections:
+        summary["sections"]["goals"] = _get_goals({"include_completed": True}, user_id)
+    if "journal" in sections:
+        summary["sections"]["journal"] = _get_journal(
+            {"date_range": {"from": date_from, "to": date_to}, "limit": 200}, user_id
+        )
+    if "calendar" in sections:
+        summary["sections"]["calendar"] = _get_upcoming_schedule({"days": 365}, user_id)
+    return summary
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
+#
+# _TOOL_MAP contains every backing function keyed by BOTH the canonical 16-tool
+# names (the prompt surface Grok is taught about) and legacy aliases that still
+# ship in TOOL_SCHEMAS or might arrive in stale tool-call histories. Adding an
+# alias here is free — we only *advertise* the 16 canonical names to Grok via
+# the updated system prompt, but the dispatcher still honours legacy names so
+# historical conversations and extra orphan tools keep working.
 
 _TOOL_MAP = {
+    # Canonical 16 — Bills
+    "log_bill": _add_recurring_bill,
+    "get_bills": _get_bills,
+    # Canonical 16 — Expenses
+    "log_expense": _add_expense,
+    "get_expenses": _get_expenses,
+    # Canonical 16 — Calendar
+    "add_calendar_event": _add_calendar_event,
+    "get_calendar": _get_upcoming_schedule,
+    # Canonical 16 — Notes
+    "add_note": _add_note,
+    "get_notes": _get_notes,
+    # Canonical 16 — Journal
+    "log_journal_entry": _log_journal_entry,
+    "get_journal": _get_journal,
+    # Canonical 16 — Goals
+    "create_goal": _add_goal,
+    "update_goal": _update_goal_progress,
+    "get_goals": _get_goals,
+    # Canonical 16 — Analytical
+    "generate_insights": _generate_insights,
+    "generate_forecast": _generate_forecast,
+    "generate_yearly_summary": _generate_yearly_summary,
+
+    # Full-CRUD additions (v3.1)
+    "edit_bill": _edit_bill,
+    "delete_goal": _delete_goal,
+    "edit_journal_entry": _edit_journal_entry,
+    "delete_journal_entry": _delete_journal_entry,
+    "delete_list": _delete_list,
+
+    # Legacy aliases (kept for back-compat with historical tool calls)
+    "add_expense": _add_expense,
+    "add_recurring_bill": _add_recurring_bill,
+    "add_goal": _add_goal,
+    "update_goal_progress": _update_goal_progress,
+    "get_upcoming_schedule": _get_upcoming_schedule,
+
+    # Orphan tools — still registered, still dispatchable
     "set_balance": _set_balance,
     "add_money": _add_money,
     "get_balance": _get_balance,
-    "add_expense": _add_expense,
-    "add_calendar_event": _add_calendar_event,
     "add_grocery_items": _add_grocery_items,
-    "add_recurring_bill": _add_recurring_bill,
     "add_task": _add_task,
-    "add_note": _add_note,
     "search_notes": _search_notes,
     "edit_note": _edit_note,
     "pin_note": _pin_note,
@@ -2356,11 +3225,7 @@ _TOOL_MAP = {
     "complete_task": _complete_task,
     "get_spending_summary": _get_spending_summary,
     "get_net_worth": _get_net_worth,
-    "get_upcoming_schedule": _get_upcoming_schedule,
     "get_budget_status": _get_budget_status,
-    "add_goal": _add_goal,
-    "update_goal_progress": _update_goal_progress,
-    "get_goals": _get_goals,
     "get_spending_recap": _get_spending_recap,
     "add_custom_category": _add_custom_category,
     "get_money_left_after_goals": _get_money_left_after_goals,
@@ -2385,28 +3250,54 @@ _TOOL_MAP = {
 }
 
 _TAB_REFRESH_MAP = {
+    # Canonical 16
+    "log_bill": ["schedule", "forecast"],
+    "get_bills": [],
+    "log_expense": ["dashboard", "budget"],
+    "get_expenses": [],
+    "add_calendar_event": ["dashboard", "schedule"],
+    "get_calendar": [],
+    "add_note": ["notes"],
+    "get_notes": [],
+    "log_journal_entry": ["notes", "journal"],
+    "get_journal": [],
+    "create_goal": ["dashboard", "goals"],
+    "update_goal": ["dashboard", "goals"],
+    "get_goals": [],
+    "generate_insights": ["insights"],
+    "generate_forecast": ["forecast"],
+    "generate_yearly_summary": ["yearly"],
+
+    # Full-CRUD additions
+    "edit_bill": ["schedule", "forecast"],
+    "delete_goal": ["dashboard", "goals"],
+    "edit_journal_entry": ["notes", "journal"],
+    "delete_journal_entry": ["notes", "journal"],
+    "delete_list": ["lists"],
+
+    # Legacy aliases
+    "add_expense": ["dashboard", "budget"],
+    "add_recurring_bill": ["schedule", "forecast"],
+    "add_goal": ["dashboard", "goals"],
+    "update_goal_progress": ["dashboard", "goals"],
+    "get_upcoming_schedule": [],
+
+    # Orphan tools
     "set_balance": ["dashboard", "forecast"],
     "add_money": ["dashboard", "budget", "forecast"],
     "get_balance": [],
-    "add_expense": ["dashboard", "budget"],
     "set_budget": ["dashboard", "budget"],
-    "add_calendar_event": ["dashboard", "schedule"],
     "add_grocery_items": ["dashboard", "schedule"],
     "check_grocery_item": ["schedule"],
-    "add_recurring_bill": ["schedule", "forecast"],
+    "get_grocery_list": [],
     "add_task": ["schedule"],
     "complete_task": ["schedule"],
-    "add_note": ["notes"],
     "search_notes": [],
     "edit_note": ["notes"],
     "pin_note": ["notes"],
-    "add_goal": ["dashboard", "goals"],
-    "update_goal_progress": ["dashboard", "goals"],
     "get_spending_summary": [],
     "get_net_worth": [],
-    "get_upcoming_schedule": [],
     "get_budget_status": [],
-    "get_goals": [],
     "get_spending_recap": [],
     "add_custom_category": ["budget"],
     "get_money_left_after_goals": [],
@@ -2431,15 +3322,215 @@ _TAB_REFRESH_MAP = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PRE-DISPATCH ARGUMENT NORMALISER
+# Snaps loosely-formatted Grok arguments onto canonical shapes before the
+# tool function runs. Catches the common failure modes where Grok picks the
+# right tool but passes slightly-off args (non-ISO dates, loose category
+# names, negative amounts, alias frequencies, out-of-taxonomy moods).
+# Safe to run on every tool call — unknown keys are passed through untouched.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CANONICAL_CATEGORIES = [
+    "Food & Dining", "Groceries", "Transport", "Subscriptions",
+    "Health & Fitness", "Shopping", "Rent & Housing", "Travel", "Other",
+]
+
+_CANONICAL_MOODS = [
+    "happy", "grateful", "motivated", "neutral",
+    "stressed", "anxious", "reflective",
+]
+
+_MOOD_ALIASES = {
+    "sad": "reflective", "down": "reflective", "overwhelmed": "stressed",
+    "worried": "anxious", "nervous": "anxious", "tense": "stressed",
+    "excited": "happy", "joyful": "happy", "thankful": "grateful",
+    "proud": "motivated", "inspired": "motivated", "driven": "motivated",
+    "flat": "neutral", "meh": "neutral", "okay": "neutral", "ok": "neutral",
+}
+
+_CANONICAL_FREQS = {"weekly", "bi-weekly", "monthly", "yearly"}
+_FREQ_ALIASES = {
+    "biweekly": "bi-weekly", "bi weekly": "bi-weekly", "fortnightly": "bi-weekly",
+    "annual": "yearly", "annually": "yearly", "per year": "yearly", "year": "yearly",
+    "per month": "monthly", "every month": "monthly", "month": "monthly",
+    "per week": "weekly", "every week": "weekly", "week": "weekly",
+    "once a year": "yearly", "once a week": "weekly",
+    "daily": "weekly",  # fallback — no 'daily' enum, closest bucket
+}
+
+# Date-only fields (strip any accidental time component).
+_DATE_ONLY_FIELDS = {"date", "due_date", "deadline", "target_date", "paid_on"}
+# Fields that may legitimately carry a time component.
+_DATETIME_FIELDS = {"start", "end"}
+_DATE_FIELDS = _DATE_ONLY_FIELDS | _DATETIME_FIELDS
+_RANGE_FIELDS = {"date_range"}
+_AMOUNT_FIELDS = {"amount", "target_amount", "progress_amount", "current_amount"}
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?")
+
+
+_WEEKDAYS = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+    "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3,
+    "thurs": 3, "fri": 4, "sat": 5, "sun": 6,
+}
+
+
+def _natural_date_fallback(s: str, now: datetime) -> datetime | None:
+    """Handle phrases dateparser chokes on ('next friday', 'end of year', etc.)."""
+    v = s.lower().strip()
+    if v in ("end of year", "end of the year", "year end", "eoy"):
+        return now.replace(month=12, day=31)
+    if v in ("end of month", "end of the month", "eom"):
+        next_month = now.replace(day=28) + timedelta(days=4)
+        return next_month - timedelta(days=next_month.day)
+    if v in ("end of week", "end of the week", "eow"):
+        return now + timedelta(days=(6 - now.weekday()))
+    m = re.match(r"^(next|this|upcoming)\s+([a-z]+)$", v)
+    if m:
+        target = _WEEKDAYS.get(m.group(2))
+        if target is not None:
+            delta = (target - now.weekday()) % 7
+            if delta == 0 or m.group(1) == "next":
+                delta = delta or 7
+            return now + timedelta(days=delta)
+    m = re.match(r"^in\s+(\d+)\s+(day|days|week|weeks|month|months)$", v)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("day"):
+            return now + timedelta(days=n)
+        if unit.startswith("week"):
+            return now + timedelta(weeks=n)
+        if unit.startswith("month"):
+            return now + timedelta(days=30 * n)
+    return None
+
+
+def _to_iso_date(value):
+    """Coerce a loose date string to YYYY-MM-DD. Leaves datetimes intact."""
+    if value is None or value == "":
+        return value
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    s = str(value).strip()
+    if _ISO_DATE_RE.match(s) or _ISO_DATETIME_RE.match(s):
+        return s
+    now = datetime.now()
+    if _dateparser is not None:
+        parsed = _dateparser.parse(
+            s,
+            settings={"PREFER_DATES_FROM": "future", "RELATIVE_BASE": now},
+        )
+        if parsed:
+            if parsed.hour or parsed.minute:
+                return parsed.strftime("%Y-%m-%dT%H:%M:%S")
+            return parsed.strftime("%Y-%m-%d")
+    # Custom fallback for phrases dateparser can't handle.
+    fallback = _natural_date_fallback(s, now)
+    if fallback is not None:
+        return fallback.strftime("%Y-%m-%d")
+    return value  # let tool-level validation handle truly malformed input
+
+
+def _normalize_category(value):
+    if not value:
+        return "Other"
+    s = str(value).strip()
+    # Exact-match short-circuit (case-insensitive).
+    for canon in _CANONICAL_CATEGORIES:
+        if s.lower() == canon.lower():
+            return canon
+    match = get_close_matches(s, _CANONICAL_CATEGORIES, n=1, cutoff=0.6)
+    return match[0] if match else "Other"
+
+
+def _normalize_mood(value):
+    if not value:
+        return "neutral"
+    v = str(value).lower().strip()
+    if v in _CANONICAL_MOODS:
+        return v
+    if v in _MOOD_ALIASES:
+        return _MOOD_ALIASES[v]
+    match = get_close_matches(v, _CANONICAL_MOODS, n=1, cutoff=0.6)
+    return match[0] if match else "neutral"
+
+
+def _normalize_frequency(value):
+    if not value:
+        return value
+    v = str(value).lower().strip()
+    if v in _CANONICAL_FREQS:
+        return v
+    return _FREQ_ALIASES.get(v, v)
+
+
+def _normalize_amount(value):
+    if value is None or value == "":
+        return value
+    try:
+        n = float(value)
+        return abs(round(n, 2))
+    except (TypeError, ValueError):
+        return value
+
+
+def normalize_args(tool_name: str, args: dict) -> dict:
+    """Return a copy of args with canonical shapes applied.
+
+    Dates   -> ISO YYYY-MM-DD (or YYYY-MM-DDTHH:MM:SS if time present)
+    Ranges  -> {"from": <iso>, "to": <iso>}
+    Amounts -> positive float, 2 decimals
+    category / mood / frequency -> snapped to the canonical taxonomy
+    Unknown keys pass through untouched.
+    """
+    if not isinstance(args, dict):
+        return args
+    out: dict = {}
+    for k, v in args.items():
+        if k in _DATE_ONLY_FIELDS:
+            coerced = _to_iso_date(v)
+            if isinstance(coerced, str) and "T" in coerced:
+                coerced = coerced.split("T", 1)[0]
+            out[k] = coerced
+        elif k in _DATETIME_FIELDS:
+            out[k] = _to_iso_date(v)
+        elif k in _RANGE_FIELDS and isinstance(v, dict):
+            fr = _to_iso_date(v.get("from"))
+            to = _to_iso_date(v.get("to"))
+            if isinstance(fr, str) and "T" in fr:
+                fr = fr.split("T", 1)[0]
+            if isinstance(to, str) and "T" in to:
+                to = to.split("T", 1)[0]
+            out[k] = {"from": fr, "to": to}
+        elif k in _AMOUNT_FIELDS:
+            out[k] = _normalize_amount(v)
+        elif k == "category":
+            out[k] = _normalize_category(v)
+        elif k == "mood":
+            out[k] = _normalize_mood(v)
+        elif k == "frequency":
+            out[k] = _normalize_frequency(v)
+        else:
+            out[k] = v
+    return out
+
+
 def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[str]]:
     """
     Execute a tool by name with the given args for user_id.
+    Arguments are normalised in-place (dates -> ISO, amounts -> positive float,
+    category / mood / frequency snapped to canonical taxonomy) before dispatch.
     Returns (result_dict, tabs_to_refresh).
     """
     fn = _TOOL_MAP.get(tool_name)
     if fn is None:
         return {"error": f"Unknown tool: {tool_name}"}, []
     try:
+        args = normalize_args(tool_name, args or {})
         result = fn(args, user_id)
         tabs = _TAB_REFRESH_MAP.get(tool_name, [])
         logger.info("Tool %s executed: %s", tool_name, result)

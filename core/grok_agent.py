@@ -36,6 +36,69 @@ HISTORY_WINDOW = 20
 CHAT_TEMPERATURE = 0.7
 CHAT_MAX_TOKENS = 2048
 
+# ── Soft re-prompt: "no tool called but one was obviously needed" detector ───
+# When Grok finishes a turn without calling any tool AND the user message
+# clearly required one (action verb present) AND the assistant prose is not
+# itself a clarifying question, we append a single system correction and
+# re-stream exactly once. Capped at one retry per turn to prevent loops.
+_ACTION_VERB_RE = re.compile(
+    r"\b("
+    r"spent|bought|paid|grabbed|picked|dropped|cost|"
+    r"log|logged|logging|add|adding|added|"
+    r"remind|save|saved|saving|schedule|booked|book|booking|"
+    r"create|created|set|update|updated|"
+    r"edit|editing|change|changed|rename|renamed|modify|modified|fix|bump|"
+    r"delete|deleted|remove|removed|cancel|cancelled|canceled|"
+    r"complete|completed|finish|finished|mark|marked|check|checked|"
+    r"pin|unpin|"
+    r"show|pull|list|find|search|"
+    r"how\s+much|how\s+many|what'?s\s+my|what\s+are\s+my|"
+    r"forecast|insights?|yearly|summary|afford|trend|pattern|analyze|analyse"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_TRAILING_QUESTION_RE = re.compile(r"\?\s*$")
+
+_REPROMPT_SYSTEM_NOTE = (
+    "SYSTEM CORRECTION: The previous user turn required a tool call from the "
+    "40 canonical CRUD tools across 9 sections (BILLS: log_bill, get_bills, "
+    "edit_bill, delete_bill; EXPENSES: log_expense, get_expenses, edit_expense, "
+    "delete_expense, split_expense; CALENDAR: add_calendar_event, get_calendar, "
+    "edit_event, delete_event; NOTES: add_note, get_notes, edit_note, pin_note, "
+    "delete_note; JOURNAL: log_journal_entry, get_journal, edit_journal_entry, "
+    "delete_journal_entry; GOALS: create_goal, get_goals, update_goal, "
+    "delete_goal; TASKS: add_task, edit_task, complete_task, delete_task; "
+    "LISTS: create_list, get_user_lists, add_list_items, delete_list, "
+    "add_grocery_items, check_grocery_item, get_grocery_list; ANALYSIS: "
+    "generate_insights, generate_forecast, generate_yearly_summary). You "
+    "produced no tool call and did not ask a clarifying question. Either "
+    "call the correct tool now with extracted arguments (ISO dates, positive "
+    "amounts, canonical category/mood, resolved IDs for edit/delete via the "
+    "matching read tool), OR ask ONE clarifying question if intent is truly "
+    "ambiguous. Do not apologise — just act."
+)
+
+
+def _needs_tool_reprompt(
+    user_msg: str,
+    tool_calls: list,
+    assistant_text: str,
+) -> bool:
+    """True iff the first pass should be retried with a corrective nudge."""
+    if tool_calls:
+        return False
+    if not user_msg or not _ACTION_VERB_RE.search(user_msg):
+        return False
+    text = (assistant_text or "").strip()
+    if not text:
+        # Empty assistant reply almost always means Grok bailed — do retry.
+        return True
+    last_nonempty = [ln for ln in text.splitlines() if ln.strip()]
+    if last_nonempty and _TRAILING_QUESTION_RE.search(last_nonempty[-1]):
+        return False  # assistant IS asking a question — that's valid
+    return True
+
 # ── API key round-robin ───────────────────────────────────────────────────────
 _all_keys = [k for k in XAI_API_KEYS if k] if XAI_API_KEYS else ([XAI_API_KEY] if XAI_API_KEY else [])
 _key_cycle = itertools.cycle(_all_keys) if _all_keys else None
@@ -71,25 +134,50 @@ async def close_http_client() -> None:
 
 
 _TOOL_LABELS = {
+    # Canonical 16
+    "log_bill": "Logging bill",
+    "get_bills": "Loading bills",
+    "log_expense": "Logging expense",
+    "get_expenses": "Loading expenses",
+    "add_calendar_event": "Adding to calendar",
+    "get_calendar": "Loading calendar",
+    "add_note": "Saving note",
+    "get_notes": "Loading notes",
+    "log_journal_entry": "Saving journal entry",
+    "get_journal": "Loading journal",
+    "create_goal": "Creating goal",
+    "update_goal": "Updating goal",
+    "get_goals": "Loading goals",
+    "generate_insights": "Generating insights",
+    "generate_forecast": "Running forecast",
+    "generate_yearly_summary": "Building yearly summary",
+
+    # Full-CRUD additions
+    "edit_bill": "Updating bill",
+    "delete_goal": "Removing goal",
+    "edit_journal_entry": "Updating journal entry",
+    "delete_journal_entry": "Removing journal entry",
+    "delete_list": "Deleting list",
+
+    # Legacy aliases (still emitted by older histories / back-compat)
+    "add_expense": "Logging expense",
+    "add_recurring_bill": "Logging bill",
+    "add_goal": "Creating goal",
+    "update_goal_progress": "Updating goal",
+    "get_upcoming_schedule": "Loading calendar",
+
+    # Orphan tools
     "set_balance": "Setting balance",
     "add_money": "Adding to balance",
     "get_balance": "Checking balance",
-    "add_expense": "Logging expense",
-    "add_calendar_event": "Adding to calendar",
     "add_grocery_items": "Updating grocery list",
-    "add_recurring_bill": "Adding recurring bill",
     "add_task": "Creating task",
-    "add_note": "Saving note",
     "set_budget": "Setting budget",
     "check_grocery_item": "Checking off item",
     "complete_task": "Completing task",
     "get_spending_summary": "Checking spending",
     "get_net_worth": "Calculating net worth",
-    "get_upcoming_schedule": "Loading schedule",
     "get_budget_status": "Checking budgets",
-    "add_goal": "Creating goal",
-    "update_goal_progress": "Updating goal",
-    "get_goals": "Loading goals",
     "get_spending_recap": "Building recap",
     "add_custom_category": "Creating category",
     "get_money_left_after_goals": "Calculating free money",
@@ -117,12 +205,23 @@ _TOOL_LABELS = {
 }
 
 _UNDO_TABLE_MAP = {
-    "add_expense": "transactions",
+    # Canonical 16 — write tools only
+    "log_expense": "transactions",
+    "log_bill": "subscriptions",
     "add_calendar_event": "events",
-    "add_task": "action_items",
     "add_note": "notes",
-    "add_goal": "goals",
+    "log_journal_entry": "notes",
+    "create_goal": "goals",
+    "update_goal": "goals",
+
+    # Legacy aliases
+    "add_expense": "transactions",
     "add_recurring_bill": "subscriptions",
+    "add_goal": "goals",
+    "update_goal_progress": "goals",
+
+    # Orphan write tools
+    "add_task": "action_items",
     "add_recurring_income": "recurring_income",
     "split_expense": "transactions",
 }
@@ -192,7 +291,8 @@ async def run_orryon_stream(
 
     Event types:
         {"type": "token",  "content": "partial text..."}
-        {"type": "tool",   "name": "add_expense", "label": "Logging expense"}
+        {"type": "tool",   "name": "log_expense", "label": "Logging expense"}
+        {"type": "retry",  "reason": "no_tool_called"}
         {"type": "done",   "message": "...", "actions": [...], "tabs": [...]}
         {"type": "error",  "message": "..."}
 
@@ -210,6 +310,7 @@ async def run_orryon_stream(
     all_tabs: set[str] = set()
     last_undo_info: dict | None = None
     accumulated_usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0}
+    reprompted_once = False
 
     try:
         for _round in range(MAX_TOOL_ROUNDS):
@@ -254,6 +355,24 @@ async def run_orryon_stream(
             messages.append(assistant_msg)
 
             if not tool_calls_buf:
+                # Safety net: if the user clearly asked for an action and Grok
+                # produced no tool call and no clarifying question, nudge it
+                # once with a system correction. Capped at a single retry.
+                if (not reprompted_once) and _needs_tool_reprompt(
+                    user_message, tool_calls_buf, full_content
+                ):
+                    reprompted_once = True
+                    logger.info(
+                        "Soft re-prompt triggered for user_id=%s (user msg: %r)",
+                        user_id, (user_message or "")[:120],
+                    )
+                    yield {"type": "retry", "reason": "no_tool_called"}
+                    messages.append({
+                        "role": "system",
+                        "content": _REPROMPT_SYSTEM_NOTE,
+                    })
+                    continue
+
                 _try_extract_memories(user_message, full_content, user_id)
                 schedule_context_refresh(user_id)
                 yield {

@@ -15,6 +15,9 @@ apscheduler>=3.10.0
 # ── Config ─────────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0
 
+# ── Natural-language date parsing (used by core/tools.py arg normaliser) ──────
+dateparser>=1.2.0
+
 # ── Google Calendar (optional — for Phase 5 calendar sync) ─────────────────────
 google-auth-oauthlib>=1.2.0
 google-api-python-client>=2.100.0

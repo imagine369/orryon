@@ -23,6 +23,9 @@ apscheduler>=3.10.0
 # ── Config ─────────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.0
 
+# ── Natural-language date parsing (core/tools.py arg normaliser) ─────────────
+dateparser>=1.2.0
+
 # ── Error Tracking ────────────────────────────────────────────────────────────
 sentry-sdk[fastapi]>=2.0.0
 

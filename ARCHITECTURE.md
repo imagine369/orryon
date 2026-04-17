@@ -117,11 +117,42 @@ The frontend (`streamChat` in `api.ts`) expects these SSE events:
 
 ```
 data: {"type": "token",  "content": "partial text..."}
-data: {"type": "tool",   "name": "add_expense", "label": "Logging expense"}
+data: {"type": "tool",   "name": "log_expense", "label": "Logging expense"}
+data: {"type": "retry",  "reason": "no_tool_called"}
 data: {"type": "done",   "message": "...", "actions": [...], "tabs": [...], "undo_info": ...}
 data: {"type": "error",  "message": "..."}
 data: [DONE]
 ```
+
+### Canonical Tool Surface (16 tools, 9 sections)
+
+Grok is taught about these 16 names in `core/system_prompt.py`. Legacy aliases
+and ~30 orphan utility tools remain registered in `_TOOL_MAP` for back-compat
+but are not advertised in the prompt.
+
+| Section  | Write tool(s)               | Read/analysis tool(s)   |
+|----------|-----------------------------|--------------------------|
+| Bills    | `log_bill`                  | `get_bills`              |
+| Expenses | `log_expense`               | `get_expenses`           |
+| Calendar | `add_calendar_event`        | `get_calendar`           |
+| Notes    | `add_note`                  | `get_notes`              |
+| Journal  | `log_journal_entry`         | `get_journal`            |
+| Goals    | `create_goal`, `update_goal`| `get_goals`              |
+| Insights | —                           | `generate_insights`      |
+| Forecast | —                           | `generate_forecast`      |
+| Yearly   | —                           | `generate_yearly_summary`|
+
+Two server-side safety nets wrap the dispatcher:
+
+1. **`normalize_args`** (`core/tools.py`) — coerces loose dates to ISO
+   (`YYYY-MM-DD` for date-only fields, `YYYY-MM-DDTHH:MM:SS` for `start`/`end`),
+   snaps categories/moods/frequencies to canonical values via fuzzy match,
+   and forces amounts to positive floats. Runs on every `execute_tool` call.
+2. **`_needs_tool_reprompt`** (`core/grok_agent.py`) — if Grok produces
+   neither a tool call nor a clarifying question on a turn whose user
+   message contained an action verb, a one-shot system correction is
+   appended and the call is retried. Capped at one retry per turn; emits
+   a `{"type":"retry"}` SSE event so the UI can show a micro indicator.
 
 ---
 

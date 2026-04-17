@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWA from "@ducanh2912/next-pwa";
 
@@ -13,7 +14,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  turbopack: {},
+  // Monorepo: lockfile at repo root would otherwise make Turbopack resolve from parent (missing tailwindcss).
+  turbopack: { root: path.resolve(process.cwd()) },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

@@ -499,6 +499,11 @@ _TRANSACTIONS_EXTRA_COLS = {
     "attachment_path": "TEXT DEFAULT ''",
 }
 
+_NOTES_EXTRA_COLS = {
+    "is_journal": "INTEGER DEFAULT 0",
+    "entry_date": "TEXT DEFAULT ''",
+}
+
 
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call multiple times."""
@@ -523,6 +528,7 @@ def _init_db_pg() -> None:
                 cur.execute(stmt)
         _migrate_extra_cols_pg(cur, "users", _USERS_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "transactions", _TRANSACTIONS_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "notes", _NOTES_EXTRA_COLS)
         conn.commit()
         logger.info("Postgres schema initialised")
     except Exception as exc:
@@ -555,6 +561,7 @@ def _init_db_sqlite() -> None:
     conn.commit()
     _migrate_sqlite_cols(conn, "users", _USERS_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "transactions", _TRANSACTIONS_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "notes", _NOTES_EXTRA_COLS)
     conn.commit()
     conn.close()
     logger.info("SQLite database initialised at: %s", DB_PATH)
