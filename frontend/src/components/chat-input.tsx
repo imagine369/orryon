@@ -119,7 +119,7 @@ export function ChatInput({
           disabled={disabled}
           aria-label={listening ? "Stop listening" : "Start voice input"}
           className={cn(
-            "shrink-0 flex items-center justify-center rounded-full w-8 h-8 transition-all duration-150",
+            "shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-150",
             listening
               ? "bg-white text-black"
               : "text-white/35 hover:text-white/65",
@@ -127,9 +127,9 @@ export function ChatInput({
           )}
         >
           {listening ? (
-            <Square className="h-3.5 w-3.5" strokeWidth={2} fill="currentColor" />
+            <Square className="h-5 w-5" strokeWidth={2} fill="currentColor" />
           ) : (
-            <Mic className="h-4 w-4" strokeWidth={1.5} />
+            <Mic className="h-8 w-8" strokeWidth={1.5} />
           )}
         </button>
       )}

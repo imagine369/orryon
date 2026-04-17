@@ -132,6 +132,14 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
+  /* Hide scrollbar on auto-resizing textareas */
+  textarea {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 }
 
 /* Chat thread: thinking / streaming motion (used by chat-thread.tsx) */
