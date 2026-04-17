@@ -171,3 +171,13 @@
 .chat-thinking-shimmer {
   animation: chat-thinking-shimmer 1.45s ease-in-out infinite;
 }
+
+/* Voice input: animated soundwave bars (used by chat-input.tsx) */
+@keyframes soundbar {
+  0% {
+    transform: scaleY(0.2);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}

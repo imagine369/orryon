@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { ArrowUp, Mic, Square } from "lucide-react";
+import { ArrowUp, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -108,7 +108,10 @@ export function ChatInput({
         placeholder={listening ? "Listening…" : placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 placeholder:text-white/30 outline-none py-1 leading-relaxed overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden"
+        className={cn(
+          "flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 outline-none py-1 leading-relaxed overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
+          listening ? "placeholder:text-white/60" : "placeholder:text-white/30"
+        )}
         style={{ maxHeight: "200px", scrollbarWidth: "none" }}
       />
 
@@ -119,15 +122,35 @@ export function ChatInput({
           disabled={disabled}
           aria-label={listening ? "Stop listening" : "Start voice input"}
           className={cn(
-            "shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-150",
+            "relative shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-200",
             listening
-              ? "bg-white text-black"
+              ? "bg-white text-black scale-110"
               : "text-white/35 hover:text-white/65",
             disabled && "pointer-events-none opacity-25"
           )}
         >
+          {/* Pulsing rings when listening */}
+          {listening && (
+            <>
+              <span className="absolute inset-0 rounded-full bg-white/30 animate-ping" />
+              <span className="absolute inset-[-6px] rounded-full border border-white/20 animate-[ping_1.4s_ease-out_0.3s_infinite]" />
+            </>
+          )}
+
           {listening ? (
-            <Square className="h-5 w-5" strokeWidth={2} fill="currentColor" />
+            /* Animated soundwave bars */
+            <span className="relative flex items-end gap-[3px] h-5">
+              {[0, 1, 2, 3].map((i) => (
+                <span
+                  key={i}
+                  className="w-[3px] rounded-full bg-black"
+                  style={{
+                    height: "100%",
+                    animation: `soundbar 0.9s ease-in-out ${i * 0.15}s infinite alternate`,
+                  }}
+                />
+              ))}
+            </span>
           ) : (
             <Mic className="h-8 w-8" strokeWidth={1.5} />
           )}
