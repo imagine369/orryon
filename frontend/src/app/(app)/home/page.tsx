@@ -434,9 +434,15 @@ export default function HomePage() {
     }
   };
 
+  // TTS (Orryon speaking back) is currently disabled — users asked for
+  // text-only replies while we pick a different voice character. The mic
+  // (STT / speaking *to* Orryon) is untouched and still works. To re-enable,
+  // flip SPEAK_REPLIES back to `source === "voice"` / `lastUserMsg.source === "voice"`.
+  const SPEAK_REPLIES = false;
+
   const handleSend = (text: string, source: MessageSource = "text") => {
     setMessages((prev) => [...prev, { role: "user", content: text, source }]);
-    runAI(text, source === "voice");
+    runAI(text, SPEAK_REPLIES && source === "voice");
   };
 
   const handleRetry = () => {
@@ -444,7 +450,7 @@ export default function HomePage() {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
     setMessages((prev) => prev.slice(0, -1));
-    runAI(lastUserMsg.content, lastUserMsg.source === "voice");
+    runAI(lastUserMsg.content, SPEAK_REPLIES && lastUserMsg.source === "voice");
   };
 
   const handleCopy = (content: string, index: number) => {
