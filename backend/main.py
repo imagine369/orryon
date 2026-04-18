@@ -52,6 +52,42 @@ logger = logging.getLogger(__name__)
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
+def _log_email_config_status() -> None:
+    """Log a clear summary of email delivery config on boot.
+
+    Without at least one of Resend or SMTP, the OTP sign-in flow cannot deliver
+    codes to users — a silent misconfiguration that has bitten us in prod before.
+    In production we log an ERROR so it's impossible to miss in Railway/Sentry;
+    in dev we log INFO since on-screen code fallback still works.
+    """
+    from config import RESEND_ENABLED, SMTP_ENABLED, SMTP_HOST, SMTP_USER
+
+    is_prod = os.getenv("NODE_ENV", "").lower() == "production"
+
+    if RESEND_ENABLED:
+        logger.info("Email: Resend HTTP API configured (preferred provider)")
+        return
+    if SMTP_ENABLED:
+        logger.info("Email: SMTP configured (%s, user=%s)", SMTP_HOST, SMTP_USER)
+        if is_prod and SMTP_HOST.endswith("gmail.com"):
+            logger.warning(
+                "Email: Gmail SMTP in production — outbound port 587 is often "
+                "rate-limited or blocked by cloud hosts (Railway, Fly, Render). "
+                "If users report missing codes, switch to Resend (RESEND_API_KEY)."
+            )
+        return
+
+    msg = (
+        "Email: NEITHER Resend NOR SMTP is configured — OTP sign-in codes "
+        "CANNOT be delivered. Set RESEND_API_KEY (recommended) or "
+        "SMTP_HOST/SMTP_USER/SMTP_PASS in the runtime environment."
+    )
+    if is_prod:
+        logger.error(msg)
+    else:
+        logger.info("%s (dev mode: codes will be shown on-screen)", msg)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -77,6 +113,7 @@ async def lifespan(app: FastAPI):
     init_db()
     start_scheduler()
     logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
+    _log_email_config_status()
 
     if XAI_API_KEY:
         try:

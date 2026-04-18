@@ -72,15 +72,36 @@ async def auth_send_code(body: SendCodeReq, request: Request):
     sent = result["sent"]
     reason = result["reason"]
 
-    show_dev_code = not sent and IS_LOCAL_DEV
-    if not sent and reason != "not_configured":
+    if not sent:
         logger.warning("OTP email to %s failed (reason: %s): %s", email, reason, result["detail"])
 
+        # Local dev fallback: show the code on-screen so the developer can still sign in.
+        if IS_LOCAL_DEV:
+            return {
+                "sent": False,
+                "dev_code": code,
+                "smtp_configured": reason != "not_configured",
+                "message": result["detail"],
+            }
+
+        # Production: surface a real error instead of silently showing "Check your inbox".
+        if reason == "not_configured":
+            raise HTTPException(
+                503,
+                "Email delivery isn't configured on the server yet. "
+                "Please contact support@orryon.com so we can send your code.",
+            )
+        raise HTTPException(
+            502,
+            "We couldn't send your verification email right now. "
+            "Please try again in a minute, or contact support@orryon.com if it keeps failing.",
+        )
+
     return {
-        "sent": sent,
-        "dev_code": code if show_dev_code else "",
-        "smtp_configured": reason != "not_configured",
-        "message": result["detail"] if not sent else f"Code sent to {email}",
+        "sent": True,
+        "dev_code": "",
+        "smtp_configured": True,
+        "message": f"Code sent to {email}",
     }
 
 
