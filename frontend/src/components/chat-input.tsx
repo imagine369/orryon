@@ -43,6 +43,42 @@ const SILENCE_HANG_MS = 1400;
 const NO_SPEECH_TIMEOUT_MS = 8000;
 const MAX_RECORDING_MS = 30_000;
 
+/**
+ * Returns a browser-specific, actionable hint for recovering from a
+ * "sticky denied" mic permission. The OS-level toggle and the browser's
+ * global mic toggle don't fix this — only the per-site permission does —
+ * so generic "allow mic access" advice actively misleads users.
+ */
+function stickyDeniedHelpText(): string {
+  if (typeof navigator === "undefined") {
+    return "Microphone permission is blocked for this site.";
+  }
+  const ua = navigator.userAgent.toLowerCase();
+  // Order matters: Brave/Edge/Opera UAs all contain "chrome" too.
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isBrave = "brave" in (navigator as unknown as Record<string, unknown>);
+  const isFirefox = ua.includes("firefox");
+  const isSafari = ua.includes("safari") && !ua.includes("chrome") && !ua.includes("chromium");
+  const isChrome = ua.includes("chrome") || ua.includes("chromium");
+
+  if (isIOS) {
+    return "Mic is blocked for this site in iOS. Tap the AA / \u2026 menu in the address bar → Website Settings → Microphone → Allow, then reload.";
+  }
+  if (isBrave) {
+    return "Mic is blocked for this site in Brave. Tap the padlock in the URL bar → Site settings → change Microphone from Block to Allow, then reload.";
+  }
+  if (isFirefox) {
+    return "Mic is blocked for this site in Firefox. Tap the padlock in the URL bar → Connection Secure → More information → Permissions → uncheck 'Use Default' next to Microphone and set it to Allow, then reload.";
+  }
+  if (isSafari) {
+    return "Mic is blocked for this site in Safari. Safari \u2192 Settings \u2192 Websites \u2192 Microphone \u2192 set this site to Allow, then reload.";
+  }
+  if (isChrome) {
+    return "Mic is blocked for this site in Chrome. Tap the padlock in the URL bar → Site settings → change Microphone from Block to Allow, then reload.";
+  }
+  return "Mic is blocked for this site. Open your browser's site/permissions settings for this URL and set Microphone to Allow, then reload.";
+}
+
 // The input component fills 100% of its parent container.
 // All max-width constraints must be applied by the parent (e.g. max-w-3xl mx-auto).
 export function ChatInput({
@@ -169,6 +205,35 @@ export function ChatInput({
       onVoiceError?.("Microphone access is not available in this browser.");
       return;
     }
+    // Browsers require a secure origin for getUserMedia — localhost is OK
+    // but plain http:// isn't. Catch this up front so the error points at
+    // the real problem rather than "permission denied".
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      onVoiceError?.(
+        "Voice only works over HTTPS. Open the site at its https:// URL and try again.",
+      );
+      return;
+    }
+
+    // Pre-flight: if the browser already has a sticky "denied" decision for
+    // this site, getUserMedia will reject *without ever prompting* and the
+    // user has no way to recover from OS / global browser settings — the
+    // per-site permission has to be flipped manually. Detect that here and
+    // surface a concrete, browser-specific instruction.
+    try {
+      const perms = (navigator as Navigator & {
+        permissions?: { query?: (d: PermissionDescriptor) => Promise<PermissionStatus> };
+      }).permissions;
+      const status = await perms?.query?.({ name: "microphone" as PermissionName });
+      if (status?.state === "denied") {
+        onVoiceError?.(stickyDeniedHelpText());
+        return;
+      }
+    } catch {
+      // Permissions API is not supported everywhere (older Safari). Fall
+      // through to getUserMedia — it'll throw NotAllowedError below and
+      // we'll handle it the same way.
+    }
 
     let stream: MediaStream;
     try {
@@ -183,7 +248,7 @@ export function ChatInput({
       console.error("[voice] getUserMedia failed:", name, e);
       const msg =
         name === "NotAllowedError" || name === "SecurityError"
-          ? "Microphone permission denied. Allow mic access in your browser and OS settings, then reload."
+          ? stickyDeniedHelpText()
           : name === "NotFoundError" || name === "OverconstrainedError"
             ? "No microphone was detected on this device."
             : name === "NotReadableError" || name === "TrackStartError"
