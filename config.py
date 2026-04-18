@@ -108,6 +108,11 @@ SMTP_PASS: str = os.getenv("SMTP_PASS", "")
 SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
 SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
+# Resend HTTP API — preferred over SMTP when set (bypasses port-blocking on Railway).
+# Set RESEND_API_KEY to your re_xxxx key and SMTP variables are ignored.
+RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+RESEND_ENABLED: bool = bool(RESEND_API_KEY)
+
 # Recipient for contact form submissions (defaults to SMTP_USER if not set)
 CONTACT_EMAIL: str = os.getenv("CONTACT_EMAIL", "") or SMTP_USER
 

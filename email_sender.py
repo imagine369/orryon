@@ -21,18 +21,56 @@ Public API
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import smtplib
+import urllib.request
+import urllib.error
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-import os
-
-from config import SMTP_ENABLED, SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
+from config import (
+    RESEND_API_KEY, RESEND_ENABLED,
+    SMTP_ENABLED, SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER,
+)
 
 logger = logging.getLogger(__name__)
 
 _IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
+
+
+def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool:
+    """Send using Resend's HTTP API — works on Railway (no SMTP ports needed)."""
+    payload = json.dumps({
+        "from": SMTP_FROM or f"orryon <noreply@orryon.com>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html,
+        "text": plain,
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode()
+            logger.info("Resend: sent email to %s (id=%s)", to_email, json.loads(body).get("id"))
+            return True
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode() if exc.fp else ""
+        logger.error("Resend HTTP %s sending to %s: %s", exc.code, to_email, body)
+        return False
+    except Exception as exc:
+        logger.exception("Resend error sending to %s: %s", to_email, exc)
+        return False
 
 
 # ── Email templates ───────────────────────────────────────────────────────────
@@ -164,7 +202,23 @@ def send_verification_code(to_email: str, code: str) -> dict:
 # ── Shared SMTP sender ────────────────────────────────────────────────────────
 
 def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
-    """Send an already-built MIMEMultipart message via SMTP."""
+    """Send an already-built MIMEMultipart message.
+
+    Prefers Resend HTTP API (RESEND_API_KEY) over SMTP — Resend works on Railway
+    where outbound SMTP ports are blocked.
+    """
+    if RESEND_ENABLED:
+        subject = msg.get("Subject", "")
+        html = ""
+        plain = ""
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/html":
+                html = part.get_payload(decode=True).decode("utf-8", errors="replace")
+            elif ct == "text/plain":
+                plain = part.get_payload(decode=True).decode("utf-8", errors="replace")
+        return _send_via_resend(to_email, subject, html or plain, plain)
+
     if not SMTP_ENABLED:
         logger.warning(
             "Skipping email to %s: SMTP not configured (SMTP_HOST=%s SMTP_USER_set=%s "
@@ -222,12 +276,9 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
 
 
 def smtp_diagnostics(to_email: str | None = None) -> dict:
-    """Return a machine-readable report on SMTP config & connectivity.
-
-    Used by the admin diagnostic endpoint so operators can see exactly why
-    outbound email is failing without tailing server logs.
-    """
+    """Return a machine-readable report on email config & connectivity."""
     report: dict = {
+        "resend_enabled": bool(RESEND_ENABLED),
         "smtp_enabled": bool(SMTP_ENABLED),
         "smtp_host": SMTP_HOST or None,
         "smtp_port": SMTP_PORT or None,
@@ -239,10 +290,29 @@ def smtp_diagnostics(to_email: str | None = None) -> dict:
         "error": None,
         "sent_to": None,
     }
+
+    if RESEND_ENABLED:
+        report["stage"] = "resend_send"
+        if to_email:
+            ok = _send_via_resend(
+                to_email,
+                "orryon email diagnostic test",
+                "<p>If you received this, Resend is working. — orryon</p>",
+                "If you received this, Resend is working. — orryon",
+            )
+            report["ok"] = ok
+            report["sent_to"] = to_email if ok else None
+            if not ok:
+                report["error"] = "Resend API call failed — check logs for details."
+        else:
+            report["ok"] = True
+            report["stage"] = "resend_configured"
+        return report
+
     if not SMTP_ENABLED:
         report["error"] = (
-            "SMTP is not fully configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS "
-            "in the runtime environment (e.g. Railway variables) and redeploy."
+            "Neither RESEND_API_KEY nor SMTP is fully configured. "
+            "Set RESEND_API_KEY (recommended) or SMTP_HOST/SMTP_USER/SMTP_PASS."
         )
         return report
     try:
