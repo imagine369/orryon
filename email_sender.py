@@ -50,6 +50,13 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
         "text": plain,
     }).encode()
 
+    logger.info(
+        "Resend: POST to api.resend.com/emails (from=%s, to=%s, key_len=%d, key_prefix=%s)",
+        (SMTP_FROM or "noreply@orryon.com"),
+        to_email,
+        len(RESEND_API_KEY),
+        RESEND_API_KEY[:12] if RESEND_API_KEY else "",
+    )
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
@@ -62,11 +69,14 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode()
-            logger.info("Resend: sent email to %s (id=%s)", to_email, json.loads(body).get("id"))
+            logger.info("Resend: sent email to %s (response=%s)", to_email, body[:200])
             return True
     except urllib.error.HTTPError as exc:
         body = exc.read().decode() if exc.fp else ""
-        logger.error("Resend HTTP %s sending to %s: %s", exc.code, to_email, body)
+        logger.error(
+            "Resend HTTP %s sending to %s. Full response: %s. Payload preview: %s",
+            exc.code, to_email, body, payload.decode()[:300],
+        )
         return False
     except Exception as exc:
         logger.exception("Resend error sending to %s: %s", to_email, exc)
