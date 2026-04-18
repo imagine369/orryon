@@ -25,7 +25,23 @@ interface ChatInputProps {
   externalStatus?: VoiceStatus;
   onVoiceStatusChange?: (status: VoiceStatus) => void;
   onVoiceError?: (message: string) => void;
+  /**
+   * Fires synchronously on the very first mic tap of a session. The parent
+   * can use it to "unlock" a persistent HTMLAudioElement while we're still
+   * inside the user gesture, so that later programmatic TTS playback is
+   * not blocked by iOS Safari autoplay rules.
+   */
+  onVoiceUserGesture?: () => void;
 }
+
+// Silence / VAD tuning. Values picked to feel like Siri / ChatGPT voice:
+// - ~1.4s of quiet after the user has spoken triggers auto-stop.
+// - 8s without ever hearing speech cancels the turn with an error.
+// - 30s hard cap so nothing can hold the mic open forever.
+const SILENCE_RMS_THRESHOLD = 0.012; // 0..1, tuned against typical room noise
+const SILENCE_HANG_MS = 1400;
+const NO_SPEECH_TIMEOUT_MS = 8000;
+const MAX_RECORDING_MS = 30_000;
 
 // The input component fills 100% of its parent container.
 // All max-width constraints must be applied by the parent (e.g. max-w-3xl mx-auto).
@@ -36,6 +52,7 @@ export function ChatInput({
   externalStatus = "idle",
   onVoiceStatusChange,
   onVoiceError,
+  onVoiceUserGesture,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -43,6 +60,15 @@ export function ChatInput({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Voice-activity detection so the recorder auto-stops after a short silence
+  // once the user has clearly started and then stopped speaking. Without this
+  // the recorder sits open forever waiting for a second tap.
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Reason a stop was initiated, so onstop knows whether to treat as abort.
+  const stopReasonRef = useRef<"user" | "silence" | "no-speech" | "max" | "error" | null>(null);
 
   // Status actually displayed = external (thinking/speaking) overrides local (listening/transcribing).
   const effectiveStatus: VoiceStatus =
@@ -71,9 +97,14 @@ export function ChatInput({
   // Clean up the MediaStream on unmount so the browser mic indicator goes away.
   useEffect(() => {
     return () => {
+      if (vadRafRef.current !== null) cancelAnimationFrame(vadRafRef.current);
+      if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      audioCtxRef.current?.close().catch(() => {});
       mediaRecorderRef.current = null;
       mediaStreamRef.current = null;
+      analyserRef.current = null;
+      audioCtxRef.current = null;
     };
   }, []);
 
@@ -100,6 +131,37 @@ export function ChatInput({
   const stopMicTracks = () => {
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
+  };
+
+  const teardownVAD = () => {
+    if (vadRafRef.current !== null) {
+      cancelAnimationFrame(vadRafRef.current);
+      vadRafRef.current = null;
+    }
+    if (maxDurationTimerRef.current) {
+      clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = null;
+    }
+    analyserRef.current = null;
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    ctx?.close().catch(() => {});
+  };
+
+  /**
+   * Stop the current recording for a given reason. The reason is stashed
+   * so `recorder.onstop` can decide whether to transcribe or abort.
+   */
+  const finishRecording = (reason: "user" | "silence" | "no-speech" | "max" | "error") => {
+    stopReasonRef.current = reason;
+    teardownVAD();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    } else {
+      stopMicTracks();
+      updateStatus("idle");
+    }
   };
 
   const startRecording = async () => {
@@ -141,15 +203,100 @@ export function ChatInput({
     audioChunksRef.current = [];
     mediaStreamRef.current = stream;
     mediaRecorderRef.current = recorder;
+    stopReasonRef.current = null;
+
+    // ── Voice Activity Detection ────────────────────────────────────────────
+    // Attach an AnalyserNode to the live mic stream so we can watch the
+    // audio energy in real time and auto-stop when the user goes quiet.
+    // Without this, users tap once and then wait forever, not realizing
+    // they'd need to tap again to submit.
+    try {
+      type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
+      const AC =
+        typeof window !== "undefined"
+          ? window.AudioContext || (window as WebkitWindow).webkitAudioContext
+          : undefined;
+      if (AC) {
+        const ctx = new AC();
+        // Safari can create an AudioContext in "suspended" state — resume
+        // inside this (still-live) user gesture chain.
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.4;
+        source.connect(analyser);
+        audioCtxRef.current = ctx;
+        analyserRef.current = analyser;
+
+        const buf = new Float32Array(analyser.fftSize);
+        const startedAt = performance.now();
+        let lastLoudAt: number | null = null; // timestamp of last above-threshold sample
+        let speechDetected = false;
+
+        const tick = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getFloatTimeDomainData(buf);
+          // Compute RMS energy of the current frame (0..~1).
+          let sum = 0;
+          for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+          const rms = Math.sqrt(sum / buf.length);
+          const now = performance.now();
+
+          if (rms > SILENCE_RMS_THRESHOLD) {
+            lastLoudAt = now;
+            if (!speechDetected) speechDetected = true;
+          }
+
+          if (speechDetected) {
+            // Once we've heard the user, hanging silence auto-submits.
+            if (lastLoudAt && now - lastLoudAt > SILENCE_HANG_MS) {
+              finishRecording("silence");
+              return;
+            }
+          } else if (now - startedAt > NO_SPEECH_TIMEOUT_MS) {
+            // User tapped mic but never said anything — abort cleanly.
+            finishRecording("no-speech");
+            return;
+          }
+
+          vadRafRef.current = requestAnimationFrame(tick);
+        };
+        vadRafRef.current = requestAnimationFrame(tick);
+      }
+    } catch (err) {
+      // VAD is a best-effort enhancement. If AudioContext fails for any
+      // reason (rare Safari edge cases, locked-down WebViews), we still
+      // fall back to the manual "tap again to stop" behavior.
+      // eslint-disable-next-line no-console
+      console.warn("[voice] VAD setup failed, falling back to manual stop:", err);
+    }
+
+    // Hard safety cap — no single utterance should hold the mic >30s.
+    maxDurationTimerRef.current = setTimeout(() => {
+      finishRecording("max");
+    }, MAX_RECORDING_MS);
 
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
     };
 
     recorder.onstop = async () => {
+      const reason = stopReasonRef.current;
+      stopReasonRef.current = null;
+      teardownVAD();
       stopMicTracks();
+
       const chunks = audioChunksRef.current;
       audioChunksRef.current = [];
+
+      // If the VAD fired "no-speech", don't even try to transcribe silence.
+      if (reason === "no-speech") {
+        updateStatus("idle");
+        onVoiceError?.("I didn't hear anything — try again.");
+        return;
+      }
+
       const type = mimeType || chunks[0]?.type || "audio/webm";
       const blob = new Blob(chunks, { type });
 
@@ -178,6 +325,8 @@ export function ChatInput({
     };
 
     recorder.onerror = () => {
+      stopReasonRef.current = "error";
+      teardownVAD();
       stopMicTracks();
       updateStatus("idle");
       onVoiceError?.("Recording failed. Please try again.");
@@ -188,13 +337,7 @@ export function ChatInput({
   };
 
   const stopRecording = () => {
-    const recorder = mediaRecorderRef.current;
-    if (recorder && recorder.state !== "inactive") {
-      recorder.stop();
-    } else {
-      stopMicTracks();
-      updateStatus("idle");
-    }
+    finishRecording("user");
   };
 
   const handleMicClick = () => {
@@ -207,6 +350,11 @@ export function ChatInput({
       return;
     }
     if (voiceStatus === "transcribing") return;
+    // Fire the parent's unlock hook *synchronously* inside the tap. iOS
+    // Safari will only allow later audio.play() if the element has been
+    // interacted with during a user gesture — this has to happen before
+    // the `await navigator.mediaDevices.getUserMedia(...)` microtask hop.
+    onVoiceUserGesture?.();
     void startRecording();
   };
 
@@ -240,7 +388,7 @@ export function ChatInput({
         onKeyDown={handleKeyDown}
         placeholder={
           effectiveStatus === "listening"
-            ? "Listening…"
+            ? "Listening… tap mic to send"
             : effectiveStatus === "transcribing"
               ? "Transcribing…"
               : effectiveStatus === "thinking"
@@ -276,11 +424,12 @@ export function ChatInput({
           disabled && "pointer-events-none opacity-25"
         )}
       >
-        {/* Pulsing rings when listening */}
+        {/* Pulsing rings when listening — pointer-events-none so iOS Safari
+            never loses the tap to these absolutely-positioned children. */}
         {isRecording && (
           <>
-            <span className="absolute inset-0 rounded-full bg-white/30 animate-ping" />
-            <span className="absolute inset-[-6px] rounded-full border border-white/20 animate-[ping_1.4s_ease-out_0.3s_infinite]" />
+            <span className="pointer-events-none absolute inset-0 rounded-full bg-white/30 animate-ping" />
+            <span className="pointer-events-none absolute inset-[-6px] rounded-full border border-white/20 animate-[ping_1.4s_ease-out_0.3s_infinite]" />
           </>
         )}
 
@@ -288,7 +437,7 @@ export function ChatInput({
         {!isRecording && isBusy && (
           <span
             className={cn(
-              "absolute inset-[-2px] rounded-full border",
+              "pointer-events-none absolute inset-[-2px] rounded-full border",
               effectiveStatus === "speaking"
                 ? "border-white/25 animate-[ping_1.8s_ease-out_infinite]"
                 : "border-white/15 animate-pulse"
@@ -298,7 +447,7 @@ export function ChatInput({
 
         {isRecording ? (
           /* Animated soundwave bars */
-          <span className="relative flex items-end gap-[3px] h-5">
+          <span className="pointer-events-none relative flex items-end gap-[3px] h-5">
             {[0, 1, 2, 3].map((i) => (
               <span
                 key={i}

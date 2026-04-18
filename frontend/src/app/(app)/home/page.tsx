@@ -89,24 +89,67 @@ export default function HomePage() {
   // Voice is always available via the mic icon. When a user sends a message by
   // voice, we also play the assistant's reply aloud (TTS). Text-typed messages
   // get text-only replies — no audio — so typing stays silent by design.
+  //
+  // TTS playback uses the Web Audio API rather than an <audio> element.
+  // iOS WebKit (Safari, Chrome on iOS, Brave on iOS — all share the same
+  // engine) blocks non-gesture `HTMLAudioElement.play()` even after
+  // "unlock tricks" with silent WAVs. The Web Audio API does not have this
+  // restriction: once an AudioContext is resumed inside a real user gesture,
+  // it can play any decoded AudioBuffer any time afterwards with zero
+  // additional gesture requirements. This is the same technique used by
+  // Howler.js, tone.js, and every reliable browser audio library.
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
+
+  const getOrCreateAudioContext = useCallback((): AudioContext | null => {
+    if (audioCtxRef.current) return audioCtxRef.current;
+    if (typeof window === "undefined") return null;
+    type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
+    const AC = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
+    if (!AC) return null;
+    const ctx = new AC();
+    audioCtxRef.current = ctx;
+    return ctx;
+  }, []);
+
+  /**
+   * Called synchronously inside the mic-button tap. Creates (if needed)
+   * and resumes the AudioContext while we're still inside the user gesture.
+   * Once resumed, iOS WebKit will let us play decoded buffers at any time
+   * afterwards without further gesture requirements.
+   */
+  const primeAudioUnlock = useCallback(() => {
+    const ctx = getOrCreateAudioContext();
+    if (!ctx) return;
+    // Resume is safe to call repeatedly; it's a no-op if already running.
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {
+        /* ignore — next gesture will try again */
+      });
+    }
+  }, [getOrCreateAudioContext]);
 
   const stopAudioPlayback = useCallback(() => {
     ttsAbortRef.current?.abort();
     ttsAbortRef.current = null;
-    const audio = audioRef.current;
-    if (audio) {
+    const src = currentSourceRef.current;
+    if (src) {
       try {
-        audio.pause();
-        audio.src = "";
+        src.onended = null;
+        src.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        src.disconnect();
       } catch {
         /* ignore */
       }
+      currentSourceRef.current = null;
     }
-    audioRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -247,30 +290,69 @@ export default function HomePage() {
 
       setVoiceStatus("speaking");
       try {
+        // Fetch + decode the MP3 into an AudioBuffer, then play via an
+        // AudioBufferSourceNode. This path is immune to iOS autoplay rules
+        // as long as the AudioContext was resumed inside a prior user
+        // gesture (done in primeAudioUnlock when the user tapped the mic).
         const blob = await textToSpeech(spoken);
         if (controller.signal.aborted) return;
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          if (audioRef.current === audio) audioRef.current = null;
+        const arrayBuffer = await blob.arrayBuffer();
+        if (controller.signal.aborted) return;
+
+        const ctx = getOrCreateAudioContext();
+        if (!ctx) {
+          setVoiceStatus("idle");
+          setVoiceError("Audio is not supported on this device.");
+          return;
+        }
+        // Defensive: if the context went back to suspended (rare — can
+        // happen after browser backgrounding), try to resume. Worst case
+        // it stays suspended and start() silently drops, handled below.
+        if (ctx.state === "suspended") {
+          try {
+            await ctx.resume();
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // Safari's decodeAudioData still uses the older callback form; wrap
+        // defensively so it works across engines.
+        const audioBuffer: AudioBuffer = await new Promise((resolve, reject) => {
+          const maybePromise = ctx.decodeAudioData(
+            arrayBuffer,
+            (buf) => resolve(buf),
+            (err) => reject(err),
+          );
+          if (maybePromise && typeof (maybePromise as Promise<AudioBuffer>).then === "function") {
+            (maybePromise as Promise<AudioBuffer>).then(resolve, reject);
+          }
+        });
+        if (controller.signal.aborted) return;
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.onended = () => {
+          if (currentSourceRef.current === source) {
+            currentSourceRef.current = null;
+          }
+          try {
+            source.disconnect();
+          } catch {
+            /* ignore */
+          }
           setVoiceStatus("idle");
         };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          if (audioRef.current === audio) audioRef.current = null;
-          setVoiceStatus("idle");
-          setVoiceError("Couldn't play the response.");
-        };
-        await audio.play();
+        currentSourceRef.current = source;
+        source.start(0);
       } catch (err) {
         if ((err as Error)?.name === "AbortError") return;
         setVoiceStatus("idle");
         setVoiceError(err instanceof Error ? err.message : "Voice playback failed.");
       }
     },
-    [stopAudioPlayback]
+    [stopAudioPlayback, getOrCreateAudioContext],
   );
 
   const runAI = async (text: string, speakReply: boolean) => {
@@ -568,6 +650,7 @@ export default function HomePage() {
                   externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={setVoiceError}
+                  onVoiceUserGesture={primeAudioUnlock}
                 />
               </div>
             </div>
@@ -641,6 +724,7 @@ export default function HomePage() {
                 externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={setVoiceError}
+                onVoiceUserGesture={primeAudioUnlock}
               />
             </div>
           </div>

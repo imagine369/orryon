@@ -40,9 +40,9 @@ _XAI_BASE = "https://api.x.ai/v1"
 _STT_URL = f"{_XAI_BASE}/stt"
 _TTS_URL = f"{_XAI_BASE}/tts"
 
-# STT model override; TTS currently has a single model on xAI, selected by
-# voice ID on the request body rather than a `model` field.
-_STT_MODEL = os.getenv("XAI_STT_MODEL", "grok-speech-1")
+# xAI STT has a single global model — it does NOT accept a `model` request
+# field (unlike OpenAI's Whisper API). Sending one returns 400.
+# Reference: https://docs.x.ai/developers/model-capabilities/audio/speech-to-text
 
 # Default voice for Orryon — `sal` ("smooth, balanced, versatile") of the five
 # xAI voices is the closest match to the voice direction brief in
@@ -50,7 +50,8 @@ _STT_MODEL = os.getenv("XAI_STT_MODEL", "grok-speech-1")
 # for finance. Overridable via env without a redeploy.
 _DEFAULT_VOICE = os.getenv("XAI_TTS_VOICE", "sal")
 
-# Default language — BCP-47 code. xAI requires this field on every TTS call.
+# Default language — BCP-47 code. xAI requires this field on every TTS call
+# and uses it on STT to enable text formatting (numbers / currencies / units).
 _DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
 
 # Hard caps: 25 MB audio upload (≈ 15 min at 256 kbps), 4000 characters for TTS.
@@ -116,14 +117,19 @@ async def speech_to_text(
     if not contents:
         raise HTTPException(status_code=400, detail="Empty audio upload.")
 
-    # xAI STT follows the OpenAI-compatible multipart shape: `file` + `model`.
+    # xAI STT multipart shape: `language` + `format` first, then `file` last.
+    # The docs explicitly require `file` to be the final multipart field, and
+    # there is NO `model` parameter — the service has one global model.
+    # `format=true` + `language` turns on Inverse Text Normalization so numbers,
+    # currencies, and units come back as "$167" / "42 dollars" rather than
+    # spelled-out words, which materially improves the Orryon expense flow.
+    data = {"language": _DEFAULT_LANGUAGE, "format": "true"}
     files = {"file": (file.filename or "audio.webm", contents, mime)}
-    data = {"model": _STT_MODEL}
     headers = {"Authorization": f"Bearer {XAI_API_KEY}"}
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(_STT_URL, headers=headers, files=files, data=data)
+            resp = await client.post(_STT_URL, headers=headers, data=data, files=files)
     except httpx.TimeoutException:
         logger.warning("STT timed out for user=%s", uid)
         raise HTTPException(status_code=504, detail="Transcription timed out. Please try again.")
@@ -132,7 +138,19 @@ async def speech_to_text(
         raise HTTPException(status_code=502, detail="Could not reach the voice service.")
 
     if resp.status_code >= 400:
+        # Log full upstream body so we can debug future API shape drift, but
+        # surface a terse, user-facing message that still distinguishes the
+        # main failure modes (auth vs. quota vs. unsupported audio).
         logger.error("xAI STT error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
+        if resp.status_code == 401:
+            raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+        if resp.status_code == 413:
+            raise HTTPException(status_code=413, detail="Audio clip is too long.")
+        if resp.status_code == 429:
+            raise HTTPException(status_code=429, detail="Voice service is busy — please try again in a moment.")
+        if resp.status_code == 400:
+            # Most commonly: unsupported audio format for whatever the browser recorded.
+            raise HTTPException(status_code=400, detail="Couldn't process that recording — try again.")
         raise HTTPException(status_code=502, detail="Transcription failed. Please try again.")
 
     try:
