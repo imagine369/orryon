@@ -40,12 +40,18 @@ _XAI_BASE = "https://api.x.ai/v1"
 _STT_URL = f"{_XAI_BASE}/stt"
 _TTS_URL = f"{_XAI_BASE}/tts"
 
-# Models are overrideable via env so we can upgrade without a redeploy.
+# STT model override; TTS currently has a single model on xAI, selected by
+# voice ID on the request body rather than a `model` field.
 _STT_MODEL = os.getenv("XAI_STT_MODEL", "grok-speech-1")
-_TTS_MODEL = os.getenv("XAI_TTS_MODEL", "grok-speech-1")
 
-# Default voice — friendly, wellness-forward tone for orryon.
-_DEFAULT_VOICE = os.getenv("XAI_TTS_VOICE", "eve")
+# Default voice for Orryon — `sal` ("smooth, balanced, versatile") of the five
+# xAI voices is the closest match to the voice direction brief in
+# docs/voice-direction.md: warm enough for breathing guidance, grounded enough
+# for finance. Overridable via env without a redeploy.
+_DEFAULT_VOICE = os.getenv("XAI_TTS_VOICE", "sal")
+
+# Default language — BCP-47 code. xAI requires this field on every TTS call.
+_DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
 
 # Hard caps: 25 MB audio upload (≈ 15 min at 256 kbps), 4000 characters for TTS.
 _STT_MAX_BYTES = 25 * 1024 * 1024
@@ -162,11 +168,12 @@ async def text_to_speech(
 
     voice = (body.voice or _DEFAULT_VOICE).strip() or _DEFAULT_VOICE
 
+    # xAI TTS payload shape per docs.x.ai/developers/model-capabilities/audio/text-to-speech
+    # (`text` / `voice_id` / `language`, not the OpenAI-compatible `input` / `voice` / `format`).
     payload = {
-        "model": _TTS_MODEL,
-        "input": text,
-        "voice": voice,
-        "format": "mp3",
+        "text": text,
+        "voice_id": voice,
+        "language": _DEFAULT_LANGUAGE,
     }
     headers = {
         "Authorization": f"Bearer {XAI_API_KEY}",

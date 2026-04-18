@@ -247,7 +247,7 @@ export default function HomePage() {
 
       setVoiceStatus("speaking");
       try {
-        const blob = await textToSpeech(spoken, "eve");
+        const blob = await textToSpeech(spoken);
         if (controller.signal.aborted) return;
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);

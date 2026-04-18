@@ -9,6 +9,11 @@
  */
 
 import { getApiBase } from "@/lib/api";
+import {
+  ORRYON_VOICE_ID,
+  shapeForVoice,
+  type VoiceMode,
+} from "@/lib/voice-config";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -50,19 +55,26 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
 
 /**
  * POST text to xAI TTS and return the synthesized MP3 as a Blob.
- * Default voice is "eve" — friendly + wellness-forward, matches orryon's tone.
+ *
+ * Defaults to the Orryon voice (`sal`, per `docs/voice-direction.md`). The
+ * `mode` argument controls prosody shaping: `"chat"` ships text as-is, while
+ * `"breathing"` wraps the utterance in speech tags so guided breath counts
+ * land at a real breath's pace.
  */
 export async function textToSpeech(
   text: string,
-  voiceId: string = "eve",
+  voiceId: string = ORRYON_VOICE_ID,
+  mode: VoiceMode = "chat",
 ): Promise<Blob> {
+  const shaped = shapeForVoice(text, mode);
+
   const res = await fetch(`${getApiBase()}/api/voice/tts`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...authHeaders(),
     },
-    body: JSON.stringify({ text, voice: voiceId }),
+    body: JSON.stringify({ text: shaped, voice: voiceId }),
   });
 
   if (!res.ok) {
