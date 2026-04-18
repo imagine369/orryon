@@ -88,33 +88,37 @@ USER_ID: str = os.getenv("USER_ID", "default_user")
 # Change this to your deployed URL in production, e.g. https://orryon.app
 APP_URL: str = os.getenv("APP_URL", "http://localhost:3000")
 
-# ── Email / SMTP (for OTP verification codes) ─────────────────────────────────
-# Works with any SMTP provider. Leave blank to use on-screen dev mode.
+# ── Email ─────────────────────────────────────────────────────────────────────
+# Preferred: Resend HTTP API (works on Railway where outbound SMTP is blocked).
+# Fallback: classic SMTP for local dev or other hosts.
 #
-# Gmail setup:
-#   1. Enable 2FA on your Google account
-#   2. Go to myaccount.google.com -> Security -> App Passwords
-#   3. Generate an App Password and paste it as SMTP_PASS
+# Resend setup (production):
+#   1. Sign up at https://resend.com, verify your domain.
+#   2. Create an API key with Full access.
+#   3. Set RESEND_API_KEY=re_xxxx in the runtime environment.
+#   4. Set SMTP_FROM to a verified sender address on your domain.
 #
-# Provider reference:
-#   Gmail   : smtp.gmail.com         port 587
+# SMTP setup (local dev only — most cloud hosts block port 587):
+#   Gmail   : smtp.gmail.com         port 587 (App Password required)
 #   Outlook : smtp-mail.outlook.com  port 587
 #   iCloud  : smtp.mail.me.com       port 587
-#   Yahoo   : smtp.mail.yahoo.com    port 587
 SMTP_HOST: str = os.getenv("SMTP_HOST", "")
 SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER: str = os.getenv("SMTP_USER", "")
 SMTP_PASS: str = os.getenv("SMTP_PASS", "")
-SMTP_FROM: str = os.getenv("SMTP_FROM", SMTP_USER)
 SMTP_ENABLED: bool = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
-# Resend HTTP API — preferred over SMTP when set (bypasses port-blocking on Railway).
-# Set RESEND_API_KEY to your re_xxxx key and SMTP variables are ignored.
+# Resend HTTP API — preferred over SMTP when set.
 RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 RESEND_ENABLED: bool = bool(RESEND_API_KEY)
 
-# Recipient for contact form submissions (defaults to SMTP_USER if not set)
+# Recipient for contact form submissions + admin notifications.
+# Falls back to SMTP_USER for back-compat with older deploys.
 CONTACT_EMAIL: str = os.getenv("CONTACT_EMAIL", "") or SMTP_USER
+
+# Sender address used in outbound emails (Resend "from" + SMTP From header).
+# Resolution order: SMTP_FROM → SMTP_USER → CONTACT_EMAIL.
+SMTP_FROM: str = os.getenv("SMTP_FROM", "") or SMTP_USER or CONTACT_EMAIL
 
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
 # ── Stripe (billing) ──────────────────────────────────────────────────────────

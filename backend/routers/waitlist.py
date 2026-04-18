@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 import db
 from backend.cache import check_rate_limit_async
-from config import SMTP_ENABLED, SMTP_FROM, SMTP_USER, CONTACT_EMAIL
+from config import RESEND_ENABLED, SMTP_ENABLED, SMTP_FROM, SMTP_USER, CONTACT_EMAIL
 from email_sender import _send_email, smtp_diagnostics
 
 APP_URL = os.getenv("APP_URL", "https://www.orryon.com")
@@ -112,10 +112,10 @@ async def join_waitlist(body: WaitlistRequest, request: Request):
 def _notify_admin(email: str, joined_at: str, total: int) -> None:
     """Fire-and-forget email to admin when someone joins the waitlist."""
     admin = (CONTACT_EMAIL or "").strip()
-    if not SMTP_ENABLED:
+    if not SMTP_ENABLED and not RESEND_ENABLED:
         logger.warning(
-            "Waitlist signup for %s — admin notification skipped because SMTP is not "
-            "configured. Set SMTP_HOST / SMTP_USER / SMTP_PASS in the runtime env.",
+            "Waitlist signup for %s — admin notification skipped because neither "
+            "RESEND_API_KEY nor SMTP_* variables are configured.",
             email,
         )
         return
