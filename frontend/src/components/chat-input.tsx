@@ -111,8 +111,25 @@ export function ChatInput({
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      onVoiceError?.("Microphone permission denied.");
+    } catch (err) {
+      // Surface the actual browser error so users (and logs) can tell
+      // the difference between "denied", "no mic plugged in", "mic busy",
+      // and "blocked by extension / privacy shield".
+      const e = err as DOMException | Error;
+      const name = (e as DOMException)?.name || "";
+      // eslint-disable-next-line no-console
+      console.error("[voice] getUserMedia failed:", name, e);
+      const msg =
+        name === "NotAllowedError" || name === "SecurityError"
+          ? "Microphone permission denied. Allow mic access in your browser and OS settings, then reload."
+          : name === "NotFoundError" || name === "OverconstrainedError"
+            ? "No microphone was detected on this device."
+            : name === "NotReadableError" || name === "TrackStartError"
+              ? "Your microphone is in use by another app. Close it (Zoom, Discord, etc.) and try again."
+              : name === "AbortError"
+                ? "Recording was interrupted. Please try again."
+                : `Couldn't access the microphone (${name || "unknown error"}).`;
+      onVoiceError?.(msg);
       return;
     }
 
