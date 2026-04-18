@@ -127,10 +127,24 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Kill the grey flash iOS Safari paints on every tap — we already have
+       our own hover/active states, the default highlight just looks noisy. */
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
     scroll-behavior: smooth;
+  }
+  /* Make every interactive element feel native on iOS:
+       - `touch-action: manipulation` drops the 300ms wait WebKit holds for
+         double-tap-to-zoom, so the first tap on "Sign in", the mic button,
+         etc. registers immediately.
+       - Slight min-height to keep tap targets at / above Apple's 44px HIG
+         minimum even when the text is small. */
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
   }
   /* Hide scrollbar on auto-resizing textareas */
   textarea {

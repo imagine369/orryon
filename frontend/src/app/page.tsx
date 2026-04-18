@@ -2048,7 +2048,13 @@ export default function LandingPage() {
   const navActions = loggedIn ? (
     <PillLink href="/home" variant="primary" size="sm">Go to app</PillLink>
   ) : (
-    <Link href="/login" className="text-xs text-white/50 hover:text-white transition-colors tracking-wide">
+    // Prior version was `text-xs text-white/50` plain text — the tap area
+    // was only ~14px tall on iPhone, well under Apple's 44px min target.
+    // Padded pill so it registers reliably on touch and matches Apple HIG.
+    <Link
+      href="/login"
+      className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
+    >
       Sign in
     </Link>
   );
@@ -2068,8 +2074,11 @@ export default function LandingPage() {
           {waitlistStatus === "duplicate" ? "We\u2019ll be in touch." : "We\u2019ll reach out when it\u2019s your turn."}
         </p>
       </div>
-      <Link href="/login" className="text-xs text-white/60 hover:text-white/70 transition-colors">
-        Already have an account? Sign in
+      <Link
+        href="/login"
+        className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
+      >
+        Already have an account? <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
       </Link>
     </>
   ) : (
@@ -2097,8 +2106,11 @@ export default function LandingPage() {
           <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
         )}
       </form>
-      <Link href="/login" className="text-[0.72rem] sm:text-xs text-white/60 hover:text-white/70 transition-colors">
-        Already have an account? Sign in
+      <Link
+        href="/login"
+        className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
+      >
+        Already have an account? <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
       </Link>
     </>
   );

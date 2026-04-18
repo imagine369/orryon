@@ -252,15 +252,17 @@ export default function LoginPage() {
                 ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
                 : "No credit card required. Cancel anytime during your trial."}
             </p>
-            <p className="text-center text-xs text-white/30 mt-2">
-              Already have an account?{" "}
+            <div className="text-center mt-2">
               <button
                 onClick={() => setStep("email")}
-                className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+                className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/70 hover:text-white transition-colors"
               >
-                Sign in
+                Already have an account?{" "}
+                <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">
+                  Sign in
+                </span>
               </button>
-            </p>
+            </div>
 
           </div>
         </div>
