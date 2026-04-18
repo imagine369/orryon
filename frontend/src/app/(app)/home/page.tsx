@@ -8,9 +8,10 @@ import { useSearchParams } from "next/navigation";
 import { Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
-import { ChatInput } from "@/components/chat-input";
+import { ChatInput, type VoiceStatus } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { textToSpeech } from "@/lib/voice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -60,6 +61,52 @@ function formatSessionDate(iso: string): string {
 const CONTAINER = "mx-auto w-full max-w-3xl px-4";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Voice Mode toggle — compact pill switch that matches existing header buttons.
+// Stays visually quiet when OFF; lights up subtly when ON.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function VoiceModeToggle({
+  enabled,
+  onToggle,
+  disabled,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      role="switch"
+      aria-checked={enabled}
+      title={enabled ? "Voice Mode on — tap mic to talk" : "Enable Voice Chat"}
+      className={`group flex h-9 items-center gap-2 rounded-full border px-2.5 pr-3 text-[12px] font-medium transition disabled:opacity-25 ${
+        enabled
+          ? "border-white/20 bg-white/[0.08] text-white/85 hover:bg-white/[0.12]"
+          : "border-white/[0.08] text-white/45 hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-white/70"
+      }`}
+    >
+      <span
+        className={`relative inline-block h-[14px] w-[26px] shrink-0 rounded-full transition-colors duration-150 ${
+          enabled ? "bg-white/85" : "bg-white/15"
+        }`}
+        aria-hidden
+      >
+        <span
+          className={`absolute top-[2px] h-[10px] w-[10px] rounded-full bg-black transition-all duration-150 ${
+            enabled ? "left-[14px]" : "left-[2px] bg-white/55"
+          }`}
+        />
+      </span>
+      <span className="hidden sm:inline">Voice Mode</span>
+      <span className="inline sm:hidden">Voice</span>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -81,6 +128,66 @@ export default function HomePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // ── Voice Mode ──────────────────────────────────────────────────────────────
+  // Persisted across reloads so the user's preference sticks. Default OFF so
+  // nothing about the text-only experience changes until they opt in.
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    try {
+      setVoiceMode(localStorage.getItem("orryon_voice_mode") === "1");
+    } catch {
+      // no-op (private mode / disabled storage)
+    }
+  }, []);
+
+  const stopAudioPlayback = useCallback(() => {
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      try {
+        audio.pause();
+        audio.src = "";
+      } catch {
+        /* ignore */
+      }
+    }
+    audioRef.current = null;
+  }, []);
+
+  const toggleVoiceMode = useCallback(() => {
+    setVoiceMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("orryon_voice_mode", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      if (!next) {
+        stopAudioPlayback();
+        setVoiceStatus("idle");
+      }
+      return next;
+    });
+  }, [stopAudioPlayback]);
+
+  useEffect(() => {
+    // Cleanup on unmount — don't leave audio playing after navigation.
+    return () => stopAudioPlayback();
+  }, [stopAudioPlayback]);
+
+  // Auto-clear voice errors so they don't linger.
+  useEffect(() => {
+    if (!voiceError) return;
+    const t = setTimeout(() => setVoiceError(null), 3200);
+    return () => clearTimeout(t);
+  }, [voiceError]);
 
   // ── Side-effects ────────────────────────────────────────────────────────────
 
@@ -183,10 +290,65 @@ export default function HomePage() {
 
   // ── AI streaming ────────────────────────────────────────────────────────────
 
-  const runAI = async (text: string) => {
+  // Strip markdown so TTS doesn't read "asterisk" / "pound" / URL junk aloud.
+  const stripMarkdownForSpeech = (md: string): string => {
+    return md
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/[#>*_~]+/g, " ")
+      .replace(/\|/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const playAssistantReply = useCallback(
+    async (reply: string) => {
+      if (!reply) return;
+      const spoken = stripMarkdownForSpeech(reply);
+      if (!spoken) return;
+
+      stopAudioPlayback();
+      const controller = new AbortController();
+      ttsAbortRef.current = controller;
+
+      setVoiceStatus("speaking");
+      try {
+        const blob = await textToSpeech(spoken, "eve");
+        if (controller.signal.aborted) return;
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (audioRef.current === audio) audioRef.current = null;
+          setVoiceStatus("idle");
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          if (audioRef.current === audio) audioRef.current = null;
+          setVoiceStatus("idle");
+          setVoiceError("Couldn't play the response.");
+        };
+        await audio.play();
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return;
+        setVoiceStatus("idle");
+        setVoiceError(err instanceof Error ? err.message : "Voice playback failed.");
+      }
+    },
+    [stopAudioPlayback]
+  );
+
+  const runAI = async (text: string, speakReply: boolean) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // Any audio currently playing is interrupted by the new turn.
+    stopAudioPlayback();
+    if (speakReply) setVoiceStatus("thinking");
 
     setStreaming(true);
     setThinking(true);
@@ -217,6 +379,7 @@ export default function HomePage() {
             return updated;
           });
           setToolLabel("");
+          if (speakReply) void playAssistantReply(final);
         } else if (event.type === "error") {
           setMessages((prev) => {
             const updated = [...prev];
@@ -227,6 +390,7 @@ export default function HomePage() {
             };
             return updated;
           });
+          if (speakReply) setVoiceStatus("idle");
         }
       }
     } catch (err) {
@@ -240,6 +404,7 @@ export default function HomePage() {
         };
         return updated;
       });
+      if (speakReply) setVoiceStatus("idle");
     } finally {
       setStreaming(false);
       setThinking(false);
@@ -250,7 +415,7 @@ export default function HomePage() {
 
   const handleSend = (text: string) => {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
-    runAI(text);
+    runAI(text, voiceMode);
   };
 
   const handleRetry = () => {
@@ -258,7 +423,7 @@ export default function HomePage() {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
     setMessages((prev) => prev.slice(0, -1));
-    runAI(lastUserMsg.content);
+    runAI(lastUserMsg.content, voiceMode);
   };
 
   const handleCopy = (content: string, index: number) => {
@@ -386,7 +551,8 @@ export default function HomePage() {
       {!hasMessages ? (
         <div className="flex min-h-full flex-col">
           {/* Top action bar — aligned with chat container */}
-          <div className={`${CONTAINER} flex shrink-0 items-center justify-end py-3`}>
+          <div className={`${CONTAINER} flex shrink-0 items-center justify-end gap-1 py-3`}>
+            <VoiceModeToggle enabled={voiceMode} onToggle={toggleVoiceMode} />
             <button
               onClick={handleOpenHistory}
               className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
@@ -462,7 +628,17 @@ export default function HomePage() {
               }}
             >
               <div className={CONTAINER}>
-                <ChatInput onSend={handleSend} disabled={streaming} />
+                {voiceError && (
+                  <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
+                )}
+                <ChatInput
+                  onSend={handleSend}
+                  disabled={streaming}
+                  voiceMode={voiceMode}
+                  externalStatus={voiceMode ? voiceStatus : "idle"}
+                  onVoiceStatusChange={setVoiceStatus}
+                  onVoiceError={setVoiceError}
+                />
               </div>
             </div>
 
@@ -483,6 +659,11 @@ export default function HomePage() {
           {/* Chat header bar — border spans full width, buttons align to container */}
           <div className="shrink-0 border-b border-white/[0.06]">
             <div className={`${CONTAINER} flex items-center justify-end gap-1 py-2`}>
+              <VoiceModeToggle
+                enabled={voiceMode}
+                onToggle={toggleVoiceMode}
+                disabled={streaming}
+              />
               <button
                 onClick={handleOpenHistory}
                 disabled={streaming}
@@ -526,7 +707,17 @@ export default function HomePage() {
             }}
           >
             <div className={CONTAINER}>
-              <ChatInput onSend={handleSend} disabled={streaming} />
+              {voiceError && (
+                <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
+              )}
+              <ChatInput
+                onSend={handleSend}
+                disabled={streaming}
+                voiceMode={voiceMode}
+                externalStatus={voiceMode ? voiceStatus : "idle"}
+                onVoiceStatusChange={setVoiceStatus}
+                onVoiceError={setVoiceError}
+              />
             </div>
           </div>
         </div>
