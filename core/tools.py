@@ -1341,25 +1341,92 @@ def _add_calendar_event(args: dict, user_id: str) -> dict:
 
 
 def _add_grocery_items(args: dict, user_id: str) -> dict:
-    items_added = []
-    for item in args.get("items", []):
-        row = {
+    """Add items to the user's Grocery list.
+
+    Routes through the `user_lists` / `list_items` tables that the in-app
+    Lists tab actually reads from (a previous implementation wrote only to
+    a legacy `grocery_items` table that no UI surfaced, so chat-added items
+    appeared to vanish). We find-or-create a `user_lists` row named
+    "Grocery" and append the items there. The legacy `grocery_items` table
+    is kept in sync too so the marketing landing page's `/api/grocery`
+    preview keeps working without redeploys.
+    """
+    raw_items = args.get("items", []) or []
+    if not raw_items:
+        return {"status": "ok", "added": [], "count_added": 0}
+
+    now = _now_iso()
+
+    # 1) Find-or-create the canonical "Grocery" user_list for this user.
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT id FROM user_lists WHERE user_id=? AND LOWER(name)='grocery' "
+        "ORDER BY created_at ASC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    if existing:
+        list_id = existing["id"] if isinstance(existing, dict) else existing[0]
+        order_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order),0) AS val FROM list_items WHERE list_id=?",
+            (list_id,),
+        ).fetchone()
+        max_item_order = order_row["val"] if isinstance(order_row, dict) else order_row[0]
+    else:
+        list_order_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order),0) AS val FROM user_lists WHERE user_id=?",
+            (user_id,),
+        ).fetchone()
+        max_list_order = list_order_row["val"] if isinstance(list_order_row, dict) else list_order_row[0]
+        list_id = _uid()
+        insert_row("user_lists", {
+            "id": list_id,
+            "user_id": user_id,
+            "name": "Grocery",
+            "icon": "",
+            "color": "#22c55e",  # green — matches the grocery / food theme in the palette
+            "sort_order": max_list_order + 1,
+            "created_at": now,
+        })
+        max_item_order = 0
+    conn.close()
+
+    # 2) Insert each item into both the user_list (UI-visible) and the
+    #    legacy grocery_items table (marketing-page preview).
+    items_added: list[str] = []
+    total_est = 0.0
+    for i, item in enumerate(raw_items):
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        price = float(item.get("estimated_price", 0) or 0)
+        total_est += price
+
+        insert_row("list_items", {
+            "id": _uid(),
+            "list_id": list_id,
+            "user_id": user_id,
+            "name": name,
+            "notes": "",
+            "is_checked": 0,
+            "sort_order": max_item_order + 1 + i,
+            "added_at": now,
+        })
+        insert_row("grocery_items", {
             "id": _uid(),
             "user_id": user_id,
-            "name": item["name"],
-            "quantity": item.get("quantity", "1"),
-            "estimated_price": float(item.get("estimated_price", 0)),
+            "name": name,
+            "quantity": str(item.get("quantity", "1")),
+            "estimated_price": price,
             "is_checked": 0,
-            "added_at": _now_iso(),
-        }
-        insert_row("grocery_items", row)
-        items_added.append(item["name"])
-    total_est = sum(
-        float(i.get("estimated_price", 0)) for i in args.get("items", [])
-    )
-    all_items = fetch_rows("grocery_items", {"user_id": user_id, "is_checked": 0})
+            "added_at": now,
+        })
+        items_added.append(name)
+
+    all_items = fetch_rows("list_items", {"list_id": list_id, "user_id": user_id, "is_checked": 0})
     return {
         "status": "ok",
+        "list_id": list_id,
+        "list_name": "Grocery",
         "added": items_added,
         "count_added": len(items_added),
         "total_list_count": len(all_items),
@@ -1680,14 +1747,37 @@ def _set_budget(args: dict, user_id: str) -> dict:
 
 
 def _check_grocery_item(args: dict, user_id: str) -> dict:
+    """Mark a grocery item as checked. Reads the canonical "Grocery"
+    user_list first (what the UI shows); falls back to the legacy
+    grocery_items table if nothing matches there."""
     name = args["item_name"].lower()
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT id, name FROM grocery_items WHERE user_id=? AND is_checked=0",
-        (user_id,),
-    ).fetchall()
-    conn.close()
-    matched = next((r for r in rows if name in r["name"].lower()), None)
+    try:
+        glist = conn.execute(
+            "SELECT id FROM user_lists WHERE user_id=? AND LOWER(name)='grocery' "
+            "ORDER BY created_at ASC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        if glist:
+            list_id = glist["id"] if isinstance(glist, dict) else glist[0]
+            rows = conn.execute(
+                "SELECT id, name FROM list_items "
+                "WHERE list_id=? AND user_id=? AND is_checked=0",
+                (list_id, user_id),
+            ).fetchall()
+            matched = next((r for r in rows if name in r["name"].lower()), None)
+            if matched:
+                conn.close()
+                update_row("list_items", {"is_checked": 1}, {"id": matched["id"]})
+                return {"status": "ok", "checked": matched["name"]}
+        # Legacy fallback for pre-migration items.
+        legacy_rows = conn.execute(
+            "SELECT id, name FROM grocery_items WHERE user_id=? AND is_checked=0",
+            (user_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    matched = next((r for r in legacy_rows if name in r["name"].lower()), None)
     if matched:
         update_row("grocery_items", {"is_checked": 1}, {"id": matched["id"]})
         return {"status": "ok", "checked": matched["name"]}
@@ -1695,6 +1785,28 @@ def _check_grocery_item(args: dict, user_id: str) -> dict:
 
 
 def _get_grocery_list(args: dict, user_id: str) -> dict:
+    """Return the unchecked grocery items as the user sees them in the Lists
+    tab. Prefers the "Grocery" user_list; falls back to the legacy table."""
+    conn = get_connection()
+    try:
+        glist = conn.execute(
+            "SELECT id FROM user_lists WHERE user_id=? AND LOWER(name)='grocery' "
+            "ORDER BY created_at ASC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        if glist:
+            list_id = glist["id"] if isinstance(glist, dict) else glist[0]
+            rows = conn.execute(
+                "SELECT name FROM list_items "
+                "WHERE list_id=? AND user_id=? AND is_checked=0 "
+                "ORDER BY sort_order ASC",
+                (list_id, user_id),
+            ).fetchall()
+            names = [r["name"] if isinstance(r, dict) else r[0] for r in rows]
+            if names:
+                return {"status": "ok", "items": names, "count": len(names)}
+    finally:
+        conn.close()
     items = fetch_rows("grocery_items", {"user_id": user_id, "is_checked": 0})
     names = [i["name"] for i in items]
     return {"status": "ok", "items": names, "count": len(names)}
@@ -3287,8 +3399,8 @@ _TAB_REFRESH_MAP = {
     "add_money": ["dashboard", "budget", "forecast"],
     "get_balance": [],
     "set_budget": ["dashboard", "budget"],
-    "add_grocery_items": ["dashboard", "schedule"],
-    "check_grocery_item": ["schedule"],
+    "add_grocery_items": ["lists", "dashboard"],
+    "check_grocery_item": ["lists"],
     "get_grocery_list": [],
     "add_task": ["schedule"],
     "complete_task": ["schedule"],

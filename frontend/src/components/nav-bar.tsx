@@ -13,6 +13,7 @@ import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { SearchPanel } from "@/components/search-panel";
 import { usePanels } from "@/lib/panel-context";
@@ -153,6 +154,13 @@ export function NavBar() {
     if (notifOpen) { loadToday(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifOpen]);
+
+  // Auto-refresh Today whenever Orryon touches events, tasks, or bills so
+  // a just-scheduled dinner shows up without closing and reopening the
+  // quick-access panel.
+  useDataRefresh(["today", "schedule", "dashboard", "calendar"], () => {
+    if (notifOpen) loadToday();
+  });
 
   // ── Sorted views ─────────────────────────────────────────────────────────
 

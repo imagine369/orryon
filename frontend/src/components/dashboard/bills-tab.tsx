@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { isDemo, DEMO_BILLS } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface Bill {
   id: string;
@@ -62,6 +63,7 @@ export function BillsTab() {
   };
 
   useEffect(() => { load(); }, []);
+  useDataRefresh(["schedule", "forecast", "dashboard"], load);
 
   const addBill = () => {
     if (!name.trim() || !amount) return;

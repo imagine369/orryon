@@ -449,9 +449,50 @@ async def delete_grocery(item_id: str, user: dict = Depends(get_current_user)):
 
 # ── User Lists (multi-list system) ───────────────────────────────────────────
 
+# Name of the always-on, built-in Grocery list. Every user gets one. Orryon's
+# `add_grocery_items` tool writes into this list so anything the user dictates
+# in chat shows up in the same place they'd add items manually. The list is
+# pinned to sort_order=0 and protected from deletion below.
+GROCERY_LIST_NAME = "Grocery"
+GROCERY_LIST_COLOR = "#22c55e"  # green — matches the "food" vibe in the palette
+
+
+def _ensure_grocery_list(uid: str) -> str:
+    """Return the id of this user's "Grocery" list, creating it if missing.
+
+    Called on every `GET /api/lists` so a newly-signed-up user always sees
+    the Grocery list immediately, and so an accidentally-deleted list is
+    auto-restored the next time the Lists tab loads.
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM user_lists WHERE user_id=? AND LOWER(name)=LOWER(?) "
+            "ORDER BY created_at ASC LIMIT 1",
+            (uid, GROCERY_LIST_NAME),
+        ).fetchone()
+        if row:
+            return row["id"] if isinstance(row, dict) else row[0]
+
+    list_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    insert_row("user_lists", {
+        "id": list_id,
+        "user_id": uid,
+        "name": GROCERY_LIST_NAME,
+        "icon": "",
+        "color": GROCERY_LIST_COLOR,
+        # Always pinned to the top so it's the first thing users see.
+        "sort_order": 0,
+        "created_at": now,
+    })
+    return list_id
+
+
 @router.get("/api/lists")
 async def get_lists(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
+    # Make sure the built-in Grocery list is present before we read.
+    _ensure_grocery_list(uid)
     with get_connection() as conn:
         lists = conn.execute(
             "SELECT * FROM user_lists WHERE user_id=? ORDER BY sort_order ASC, created_at ASC",
@@ -464,6 +505,9 @@ async def get_lists(user: dict = Depends(get_current_user)):
                 "SELECT COUNT(*) as cnt FROM list_items WHERE list_id=? AND is_checked=0", (d["id"],)
             ).fetchone()
             d["item_count"] = _cnt_row["cnt"] if isinstance(_cnt_row, dict) else _cnt_row[0]
+            # Flag the built-in Grocery list so the frontend can hide the
+            # delete affordance and tag it visually if desired.
+            d["is_builtin"] = (str(d.get("name", "")).lower() == GROCERY_LIST_NAME.lower())
             result.append(d)
     return result
 
@@ -486,17 +530,42 @@ async def create_list(body: UserListReq, user: dict = Depends(get_current_user))
     return {"id": list_id}
 
 
+def _is_builtin_grocery(uid: str, list_id: str) -> bool:
+    """Return True if `list_id` is this user's protected Grocery list."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT name FROM user_lists WHERE id=? AND user_id=?", (list_id, uid),
+        ).fetchone()
+    if not row:
+        return False
+    name = row["name"] if isinstance(row, dict) else row[0]
+    return str(name or "").lower() == GROCERY_LIST_NAME.lower()
+
+
 @router.patch("/api/lists/{list_id}")
 async def update_list(list_id: str, body: UserListUpdate, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    # Don't let the built-in Grocery list get renamed out from under Orryon,
+    # otherwise `add_grocery_items` would stop finding it. Color / icon /
+    # sort_order changes are still allowed.
+    if _is_builtin_grocery(uid, list_id):
+        updates.pop("name", None)
     if updates:
-        update_row("user_lists", updates, {"id": list_id, "user_id": user["user_id"]})
+        update_row("user_lists", updates, {"id": list_id, "user_id": uid})
     return {"updated": True}
 
 
 @router.delete("/api/lists/{list_id}")
 async def delete_list(list_id: str, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
+    # The Grocery list is built-in and always present. Rejecting the delete
+    # (rather than silently no-op'ing) keeps the UI honest.
+    if _is_builtin_grocery(uid, list_id):
+        raise HTTPException(
+            status_code=400,
+            detail="The Grocery list is built in and can't be deleted. Clear its items instead.",
+        )
     with get_connection() as conn:
         conn.execute("DELETE FROM list_items WHERE list_id=? AND user_id=?", (list_id, uid))
         conn.execute("DELETE FROM user_lists WHERE id=? AND user_id=?", (list_id, uid))

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { isDemo, DEMO_LISTS, DEMO_ITEMS } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ function ListsOverview({
   };
 
   useEffect(() => { load(); }, []);
+  useDataRefresh(["lists"], load);
 
   const createList = () => {
     const name = newName.trim();
@@ -225,6 +227,7 @@ function ListDetail({
   }, [list.id]);
 
   useEffect(() => { load(); }, [load]);
+  useDataRefresh(["lists"], load);
 
   useEffect(() => {
     scrollRef.current?.closest("[data-scroll-container]")?.scrollTo({ top: 0 });

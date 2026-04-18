@@ -12,6 +12,7 @@ import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/ch
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { textToSpeech } from "@/lib/voice";
+import { dispatchDataChanged } from "@/lib/use-data-refresh";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -394,6 +395,12 @@ export default function HomePage() {
           });
           setToolLabel("");
           if (speakReply) void playAssistantReply(final);
+
+          // Notify every dashboard panel that its data may have changed so
+          // any tab the user happens to have open refetches itself —
+          // no "close and reopen to see the update" step.
+          const tabs = Array.isArray(event.tabs) ? (event.tabs as string[]) : [];
+          if (tabs.length > 0) dispatchDataChanged(tabs);
         } else if (event.type === "error") {
           setMessages((prev) => {
             const updated = [...prev];

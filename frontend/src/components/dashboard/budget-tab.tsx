@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { ReceiptScanner } from "@/components/dashboard/receipt-scanner";
 import { isDemo, DEMO_BUDGET } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface BudgetCategory {
   id: string;
@@ -64,6 +65,7 @@ export function BudgetTab() {
   };
 
   useEffect(() => { load(); }, [selectedMonth]);
+  useDataRefresh(["budget", "dashboard"], load);
 
   const addExpense = () => {
     if (!merchant.trim() || !amount) return;

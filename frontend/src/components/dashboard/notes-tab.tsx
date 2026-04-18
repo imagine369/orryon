@@ -8,6 +8,7 @@ import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { NoteEditor } from "@/components/dashboard/note-editor";
 import { cn } from "@/lib/utils";
 import { isDemo, DEMO_NOTES } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 type NoteSort = "date" | "name";
 
@@ -69,10 +70,13 @@ export function NotesTab() {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const loadNotes = () => {
     if (isDemo()) { setNotes(DEMO_NOTES); setLoading(false); return; }
     api.get<Note[]>("/api/notes").then(setNotes).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadNotes(); }, []);
+  useDataRefresh(["notes", "journal"], loadNotes);
 
   const addNote = () => {
     if (!newTitle.trim()) return;

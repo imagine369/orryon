@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, buildDemoData } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface CategorySpend {
   category: string;
@@ -130,6 +131,12 @@ export function InsightsTab() {
     }).catch(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthIndex]);
+
+  // Invalidate cached months and refetch when Orryon logs/edits/deletes
+  // an expense or regenerates insights via chat.
+  useDataRefresh(["insights", "dashboard", "budget"], () => {
+    setData({});
+  });
 
   const currentMonth = months[monthIndex];
   const prevMonth = months[monthIndex - 1];

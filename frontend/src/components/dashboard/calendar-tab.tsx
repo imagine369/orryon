@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface CalEvent {
   id: string;
@@ -72,13 +73,16 @@ export function CalendarTab() {
   const [monthYear, setMonthYear]   = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(today);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     if (isDemo()) { setEvents(DEMO_EVENTS); setTasks(DEMO_TASKS); setLoading(false); return; }
     Promise.all([
       api.get<CalEvent[]>("/api/events?upcoming=true&limit=100"),
       api.get<CalTask[]>("/api/tasks?status=open"),
     ]).then(([e, t]) => { setEvents(e); setTasks(t); }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+  useDataRefresh(["calendar", "schedule", "dashboard"], reload);
 
   const handleIcsUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".ics")) {

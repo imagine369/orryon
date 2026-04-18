@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, DEMO_TRANSACTIONS, DEMO_TOP_CATS, DEMO_TASKS_OV } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface Transaction {
   id: string;
@@ -55,7 +56,7 @@ export function OverviewTab() {
 
   const isCurrentMonth = selectedMonth === nowMonth();
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     if (isDemo()) {
       setTransactions(DEMO_TRANSACTIONS);
       setTopCategories(DEMO_TOP_CATS);
@@ -96,6 +97,9 @@ export function OverviewTab() {
 
     Promise.all(fetches).catch(() => {}).finally(() => setLoading(false));
   }, [selectedMonth, isCurrentMonth]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useDataRefresh(["dashboard", "budget", "schedule", "overview"], reload);
 
   return (
     <div>

@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { isDemo, DEMO_GOALS } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface Goal {
   id: string;
@@ -84,11 +85,14 @@ export function GoalsTab() {
   const [target, setTarget] = useState("");
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadGoals = () => {
     if (isDemo()) { setGoals(DEMO_GOALS); setLoading(false); return; }
     api.get<Goal[]>("/api/goals?include_completed=true")
       .then(setGoals).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadGoals(); }, []);
+  useDataRefresh(["goals", "dashboard"], loadGoals);
 
   const addGoal = () => {
     if (!name.trim() || !target) return;

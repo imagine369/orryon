@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { isDemo, DEMO_FORECAST } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface ForecastData {
   income: number;
@@ -24,10 +25,13 @@ function fmt(n: number) {
 export function ForecastTab() {
   const [data, setData] = useState<ForecastData | null>(null);
 
-  useEffect(() => {
+  const loadForecast = () => {
     if (isDemo()) { setData(DEMO_FORECAST); return; }
     api.get<ForecastData>("/api/forecast").then(setData).catch(() => {});
-  }, []);
+  };
+
+  useEffect(() => { loadForecast(); }, []);
+  useDataRefresh(["forecast", "schedule", "dashboard"], loadForecast);
 
   if (!data) {
     return <div className="flex justify-center py-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>;

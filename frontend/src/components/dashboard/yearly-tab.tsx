@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, buildDemoYearly } from "./demo-data";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface MonthSummary {
   month: string;
@@ -21,6 +22,10 @@ export function YearlyTab() {
   const [months, setMonths] = useState<MonthSummary[]>([]);
   const [topCategories, setTopCategories] = useState<{ category: string; total: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  // Bumped by useDataRefresh to force a refetch when Orryon logs / edits
+  // expenses via chat. Adding it to the effect's dep array is the cheapest
+  // way to re-trigger the existing fetch without refactoring it.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (isDemo()) {
@@ -61,7 +66,11 @@ export function YearlyTab() {
       setTopCategories(cats);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [year]);
+  }, [year, refreshKey]);
+
+  useDataRefresh(["yearly", "dashboard", "budget"], () => {
+    setRefreshKey((k) => k + 1);
+  });
 
   const yearTotal = months.reduce((s, m) => s + m.total, 0);
   const maxMonth = Math.max(...months.map((m) => m.total), 1);
