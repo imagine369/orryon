@@ -1,14 +1,28 @@
 /**
  * API origin for HTTP requests.
- * - If `NEXT_PUBLIC_API_URL` is set: browser talks to that host directly (optional; use for WebSocket + direct API).
- * - Otherwise in the browser: `""` (same origin; `next.config.ts` rewrites `/api/*` → `BACKEND_URL`).
- * - On the server (SSR): `BACKEND_URL` or localhost (rewrites do not apply to server-side fetch).
+ *
+ * In the browser we ALWAYS go same-origin (`""`) so that `/api/*` is handled by
+ * the Next.js route at `src/app/api/[[...path]]/route.ts`, which proxies to the
+ * FastAPI backend (`BACKEND_URL` on Vercel). Going same-origin avoids:
+ *   - CORS preflights on authenticated requests,
+ *   - Firefox Enhanced Tracking Protection blocking third-party hosts,
+ *   - Browser adblock extensions that block requests to hosts containing
+ *     substrings like "railway" / "production".
+ *
+ * `NEXT_PUBLIC_API_URL` is still used for the WebSocket connection (see
+ * `connectChatWs` below) — Next.js rewrites don't tunnel WebSocket, so that
+ * has to connect directly to the backend host.
+ *
+ * On the server (SSR / route handlers) we fall back to `BACKEND_URL` /
+ * `NEXT_PUBLIC_API_URL` / localhost because rewrites don't apply there.
  */
 export function getApiBase(): string {
-  const explicit = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (explicit) return explicit;
   if (typeof window !== "undefined") return "";
-  return (process.env.BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+  return (
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://127.0.0.1:8000"
+  ).replace(/\/$/, "");
 }
 
 function getToken(): string | null {
@@ -33,20 +47,10 @@ function networkErrorMessage(): string {
   const onLocalhost =
     isBrowser &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  const base = getApiBase();
-  const apiLooksLocal = base.includes("localhost") || base.includes("127.0.0.1");
-  if (isBrowser && apiLooksLocal && !onLocalhost) {
-    return (
-      "Can't reach the API: this build points at localhost, but you're not on localhost. " +
-      "Unset NEXT_PUBLIC_API_URL to use the built-in proxy, or set it to your backend's public URL."
-    );
-  }
   if (isBrowser && onLocalhost) {
-    return (
-      "Can't reach the API. Start the backend (e.g. uvicorn on port 8000) or set NEXT_PUBLIC_API_URL."
-    );
+    return "Can't reach the API. Start the backend (e.g. uvicorn on port 8000) and make sure BACKEND_URL is set.";
   }
-  return "Can't reach the API. Check that the backend is running and CORS allows this site (FRONTEND_URL on the server).";
+  return "Can't reach the API. The backend proxy at /api/* may be misconfigured — check that BACKEND_URL is set on Vercel to your Railway URL.";
 }
 
 async function request<T = unknown>(
