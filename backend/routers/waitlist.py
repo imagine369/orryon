@@ -12,22 +12,28 @@ Admin endpoints (secret-key protected):
 
 from __future__ import annotations
 
+import asyncio
 import csv
+import hmac
+import html as _html
 import io
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from urllib.parse import quote as urlquote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import db
+from backend.cache import check_rate_limit_async
 from config import SMTP_ENABLED, SMTP_FROM, SMTP_USER, CONTACT_EMAIL
-from email_sender import _send_email
+from email_sender import _send_email, smtp_diagnostics
 
 APP_URL = os.getenv("APP_URL", "https://www.orryon.com")
 API_URL = os.getenv("API_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://api.orryon.com"))
@@ -35,53 +41,110 @@ API_URL = os.getenv("API_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://api.orr
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["waitlist"])
 
+_EMAIL_MAX_LEN = 254
+_HEADER_INJECTION_RE = re.compile(r"[\r\n\x00]")
+
+
+def _verify_admin_secret(provided: str) -> None:
+    """Constant-time comparison for ADMIN_SECRET to avoid timing attacks."""
+    expected = os.getenv("ADMIN_SECRET", "")
+    if not expected:
+        raise HTTPException(status_code=403, detail="Forbidden.")
+    if not hmac.compare_digest(provided or "", expected):
+        raise HTTPException(status_code=403, detail="Forbidden.")
+
+
+def _assert_header_safe(value: str, field: str) -> None:
+    if _HEADER_INJECTION_RE.search(value):
+        raise HTTPException(status_code=422, detail=f"{field} contains invalid characters.")
+
 
 class WaitlistRequest(BaseModel):
     email: str
 
 
 @router.post("/api/waitlist", status_code=201)
-async def join_waitlist(body: WaitlistRequest):
+async def join_waitlist(body: WaitlistRequest, request: Request):
     email = body.email.strip().lower()
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=422, detail="Invalid email address.")
+    if len(email) > _EMAIL_MAX_LEN:
+        raise HTTPException(status_code=422, detail="Email address is too long.")
+    _assert_header_safe(email, "Email")
+
+    client_ip = (request.client.host if request.client else "unknown") or "unknown"
+    if not await check_rate_limit_async(f"waitlist:ip:{client_ip}", limit=5, window_seconds=3600):
+        raise HTTPException(status_code=429, detail="Too many waitlist signups — please try again later.")
+    if not await check_rate_limit_async("waitlist:global", limit=200, window_seconds=3600):
+        logger.warning("Global waitlist rate limit hit (ip=%s).", client_ip)
+        raise HTTPException(status_code=429, detail="Waitlist signups are temporarily paused — try again shortly.")
 
     conn = db.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
+        existing = cur.execute(
+            "SELECT id FROM waitlist WHERE email = ?", (email,)
+        ).fetchone()
+        if existing:
+            return {"status": "already_on_waitlist"}
 
-    existing = cur.execute(
-        "SELECT id FROM waitlist WHERE email = ?", (email,)
-    ).fetchone()
-    if existing:
-        return {"status": "already_on_waitlist"}
+        now = datetime.now(timezone.utc).isoformat()
+        cur.execute(
+            "INSERT INTO waitlist (id, email, created_at) VALUES (?, ?, ?)",
+            (str(uuid.uuid4()), email, now),
+        )
+        conn.commit()
 
-    now = datetime.now(timezone.utc).isoformat()
-    cur.execute(
-        "INSERT INTO waitlist (id, email, created_at) VALUES (?, ?, ?)",
-        (str(uuid.uuid4()), email, now),
-    )
-    conn.commit()
+        row = cur.execute("SELECT COUNT(*) as cnt FROM waitlist").fetchone()
+        total = row["cnt"] if isinstance(row, dict) else row[0]
+    finally:
+        conn.close()
 
-    row = cur.execute("SELECT COUNT(*) as cnt FROM waitlist").fetchone()
-    total = row["cnt"] if isinstance(row, dict) else row[0]
-    _notify_admin(email, now, total)
-
+    # Run the SMTP send off the event loop so signup latency stays low and a slow
+    # SMTP server (up to the 15s timeout) never blocks the response.
+    try:
+        await asyncio.to_thread(_notify_admin, email, now, total)
+    except Exception as exc:  # noqa: BLE001 — we never want notification to break signup
+        logger.warning("Admin notification dispatch failed for %s: %s", email, exc)
     return {"status": "added"}
 
 
 def _notify_admin(email: str, joined_at: str, total: int) -> None:
     """Fire-and-forget email to admin when someone joins the waitlist."""
-    admin = CONTACT_EMAIL
-    if not SMTP_ENABLED or not admin:
+    admin = (CONTACT_EMAIL or "").strip()
+    if not SMTP_ENABLED:
+        logger.warning(
+            "Waitlist signup for %s — admin notification skipped because SMTP is not "
+            "configured. Set SMTP_HOST / SMTP_USER / SMTP_PASS in the runtime env.",
+            email,
+        )
+        return
+    if not admin:
+        logger.warning(
+            "Waitlist signup for %s — admin notification skipped because CONTACT_EMAIL "
+            "(and SMTP_USER fallback) is empty.",
+            email,
+        )
         return
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"New waitlist signup — #{total}"
-        msg["From"] = admin
+        # From MUST be the authenticated SMTP identity — Gmail rejects / spam-filters
+        # messages whose From header doesn't match the logged-in user. Replies still
+        # land in the admin inbox via Reply-To.
+        msg["From"] = (SMTP_FROM or SMTP_USER or admin)
         msg["To"] = admin
+        msg["Reply-To"] = admin
 
         admin_secret = os.getenv("ADMIN_SECRET", "")
-        approve_url = f"{API_URL}/api/admin/waitlist/approve?email={email}&secret={admin_secret}"
+        approve_url = (
+            f"{API_URL}/api/admin/waitlist/approve"
+            f"?email={urlquote(email, safe='')}"
+            f"&secret={urlquote(admin_secret, safe='')}"
+        )
+        safe_email = _html.escape(email, quote=True)
+        safe_joined = _html.escape(joined_at, quote=True)
+        safe_approve = _html.escape(approve_url, quote=True)
 
         plain = (
             f"New waitlist signup!\n\n"
@@ -116,7 +179,7 @@ def _notify_admin(email: str, joined_at: str, total: int) -> None:
           </tr>
           <tr>
             <td align="center" style="padding:16px 0 12px;">
-              <span style="font-size:22px;font-weight:700;color:#fff;">{email}</span>
+              <span style="font-size:22px;font-weight:700;color:#fff;">{safe_email}</span>
             </td>
           </tr>
           <tr>
@@ -132,7 +195,7 @@ def _notify_admin(email: str, joined_at: str, total: int) -> None:
           </tr>
           <tr>
             <td align="center" style="padding:16px 0 20px;">
-              <a href="{approve_url}"
+              <a href="{safe_approve}"
                  style="display:inline-block;background:#92fe9d;color:#000;
                         font-size:15px;font-weight:700;padding:14px 36px;
                         border-radius:999px;text-decoration:none;">
@@ -143,7 +206,7 @@ def _notify_admin(email: str, joined_at: str, total: int) -> None:
           <tr>
             <td align="center">
               <p style="margin:0;font-size:12px;color:#444;">
-                {joined_at}
+                {safe_joined}
               </p>
             </td>
           </tr>
@@ -156,9 +219,17 @@ def _notify_admin(email: str, joined_at: str, total: int) -> None:
 
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html, "html"))
-        _send_email(admin, msg)
+        ok = _send_email(admin, msg)
+        if ok:
+            logger.info("Waitlist signup admin notification sent to %s for %s", admin, email)
+        else:
+            logger.error(
+                "Waitlist signup admin notification FAILED for %s — see previous SMTP "
+                "error log line from email_sender.",
+                email,
+            )
     except Exception as exc:
-        logger.warning("Failed to send waitlist notification: %s", exc)
+        logger.warning("Failed to build waitlist notification for %s: %s", email, exc)
 
 
 @router.get("/api/waitlist/check")
@@ -173,10 +244,12 @@ async def check_waitlist(email: str = ""):
         return {"approved": True, "on_waitlist": True}
 
     conn = db.get_connection()
-    row = conn.execute(
-        "SELECT approved FROM waitlist WHERE email = ?", (email,)
-    ).fetchone()
-    conn.close()
+    try:
+        row = conn.execute(
+            "SELECT approved FROM waitlist WHERE email = ?", (email,)
+        ).fetchone()
+    finally:
+        conn.close()
 
     if not row:
         return {"approved": False, "on_waitlist": False}
@@ -186,31 +259,49 @@ async def check_waitlist(email: str = ""):
 @router.get("/api/admin/waitlist/approve")
 async def approve_waitlist(email: str = "", secret: str = ""):
     """One-click approve from the admin notification email."""
-    admin_secret = os.getenv("ADMIN_SECRET", "")
-    if not admin_secret or secret != admin_secret:
-        raise HTTPException(status_code=403, detail="Forbidden.")
+    _verify_admin_secret(secret)
 
     email = email.strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email required.")
+    _assert_header_safe(email, "Email")
 
     conn = db.get_connection()
-    row = conn.execute("SELECT id, approved FROM waitlist WHERE email = ?", (email,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Email not on waitlist.")
+    try:
+        row = conn.execute("SELECT id, approved FROM waitlist WHERE email = ?", (email,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Email not on waitlist.")
 
-    if row["approved"]:
-        conn.close()
-        return {"status": "already_approved", "email": email}
+        if row["approved"]:
+            return {"status": "already_approved", "email": email}
 
-    conn.execute("UPDATE waitlist SET approved = 1 WHERE email = ?", (email,))
-    conn.commit()
-    conn.close()
+        conn.execute("UPDATE waitlist SET approved = 1 WHERE email = ?", (email,))
+        conn.commit()
+    finally:
+        conn.close()
 
     _send_welcome_email(email)
 
     return {"status": "approved", "email": email, "message": f"{email} has been approved and notified."}
+
+
+@router.get("/api/admin/email-test")
+async def email_test(secret: str = "", to: str = ""):
+    """Admin-only SMTP diagnostic. Returns why outbound email is (or isn't) working.
+
+    Hit:  https://<api-host>/api/admin/email-test?secret=<ADMIN_SECRET>
+    Or:   https://<api-host>/api/admin/email-test?secret=<ADMIN_SECRET>&to=you@example.com
+    """
+    _verify_admin_secret(secret)
+
+    target = (to or "").strip()
+    if target:
+        if "@" not in target or len(target) > _EMAIL_MAX_LEN:
+            raise HTTPException(status_code=422, detail="Invalid test recipient.")
+        _assert_header_safe(target, "Email")
+
+    report = await asyncio.to_thread(smtp_diagnostics, target or None)
+    return report
 
 
 def _send_welcome_email(email: str) -> None:
@@ -224,6 +315,7 @@ def _send_welcome_email(email: str) -> None:
         msg["To"] = email
 
         login_url = f"{APP_URL}/login"
+        safe_login = _html.escape(login_url, quote=True)
 
         plain = (
             f"You've been approved for early access to orryon!\n\n"
@@ -267,7 +359,7 @@ def _send_welcome_email(email: str) -> None:
           </tr>
           <tr>
             <td align="center" style="padding-bottom:24px;">
-              <a href="{login_url}"
+              <a href="{safe_login}"
                  style="display:inline-block;background:#fff;color:#000;
                         font-size:15px;font-weight:700;padding:14px 36px;
                         border-radius:999px;text-decoration:none;">
@@ -299,14 +391,15 @@ def _send_welcome_email(email: str) -> None:
 
 @router.get("/api/admin/waitlist")
 async def export_waitlist(secret: str = ""):
-    admin_secret = os.getenv("ADMIN_SECRET", "")
-    if not admin_secret or secret != admin_secret:
-        raise HTTPException(status_code=403, detail="Forbidden.")
+    _verify_admin_secret(secret)
 
     conn = db.get_connection()
-    rows = conn.execute(
-        "SELECT email, approved, created_at FROM waitlist ORDER BY created_at ASC"
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            "SELECT email, approved, created_at FROM waitlist ORDER BY created_at ASC"
+        ).fetchall()
+    finally:
+        conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)

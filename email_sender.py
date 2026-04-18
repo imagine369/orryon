@@ -166,6 +166,14 @@ def send_verification_code(to_email: str, code: str) -> dict:
 def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
     """Send an already-built MIMEMultipart message via SMTP."""
     if not SMTP_ENABLED:
+        logger.warning(
+            "Skipping email to %s: SMTP not configured (SMTP_HOST=%s SMTP_USER_set=%s "
+            "SMTP_PASS_set=%s).",
+            to_email,
+            bool(SMTP_HOST),
+            bool(SMTP_USER),
+            bool(SMTP_PASS),
+        )
         return False
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
@@ -174,10 +182,116 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             server.ehlo()
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM or SMTP_USER, [to_email], msg.as_string())
+        logger.info("SMTP: sent email to %s via %s:%s", to_email, SMTP_HOST, SMTP_PORT)
         return True
-    except Exception as exc:
-        logger.error("Failed to send email to %s: %s", to_email, exc)
+    except smtplib.SMTPAuthenticationError as exc:
+        logger.error(
+            "SMTP auth failed for %s (user=%s). With Gmail you MUST use a 16-char "
+            "App Password (not your account password) and 2FA must be enabled. "
+            "Underlying: %s",
+            SMTP_HOST,
+            SMTP_USER,
+            exc,
+        )
         return False
+    except smtplib.SMTPSenderRefused as exc:
+        logger.error(
+            "SMTP sender refused (%s). Likely From header (%s) does not match the "
+            "authenticated user (%s) — Gmail rewrites or rejects forged senders. %s",
+            SMTP_HOST,
+            SMTP_FROM or SMTP_USER,
+            SMTP_USER,
+            exc,
+        )
+        return False
+    except smtplib.SMTPRecipientsRefused as exc:
+        logger.error("SMTP rejected recipient %s: %s", to_email, exc)
+        return False
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, TimeoutError) as exc:
+        logger.error(
+            "SMTP connection issue to %s:%s — some hosting providers block outbound "
+            "port 587. Consider switching to Resend/Postmark or opening the port. %s",
+            SMTP_HOST,
+            SMTP_PORT,
+            exc,
+        )
+        return False
+    except Exception as exc:
+        logger.exception("Failed to send email to %s: %s", to_email, exc)
+        return False
+
+
+def smtp_diagnostics(to_email: str | None = None) -> dict:
+    """Return a machine-readable report on SMTP config & connectivity.
+
+    Used by the admin diagnostic endpoint so operators can see exactly why
+    outbound email is failing without tailing server logs.
+    """
+    report: dict = {
+        "smtp_enabled": bool(SMTP_ENABLED),
+        "smtp_host": SMTP_HOST or None,
+        "smtp_port": SMTP_PORT or None,
+        "smtp_user_set": bool(SMTP_USER),
+        "smtp_pass_set": bool(SMTP_PASS),
+        "smtp_from": SMTP_FROM or SMTP_USER or None,
+        "stage": "start",
+        "ok": False,
+        "error": None,
+        "sent_to": None,
+    }
+    if not SMTP_ENABLED:
+        report["error"] = (
+            "SMTP is not fully configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS "
+            "in the runtime environment (e.g. Railway variables) and redeploy."
+        )
+        return report
+    try:
+        report["stage"] = "connect"
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.ehlo()
+            report["stage"] = "starttls"
+            server.starttls()
+            server.ehlo()
+            report["stage"] = "login"
+            server.login(SMTP_USER, SMTP_PASS)
+            if to_email:
+                report["stage"] = "send"
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = "orryon SMTP diagnostic test"
+                msg["From"] = SMTP_FROM or SMTP_USER
+                msg["To"] = to_email
+                msg.attach(MIMEText(
+                    "If you received this, your SMTP credentials work. — orryon",
+                    "plain",
+                ))
+                server.sendmail(SMTP_FROM or SMTP_USER, [to_email], msg.as_string())
+                report["sent_to"] = to_email
+        report["stage"] = "done"
+        report["ok"] = True
+        return report
+    except smtplib.SMTPAuthenticationError as exc:
+        report["error"] = (
+            f"auth_failed: {exc}. For Gmail: enable 2-Step Verification, then create "
+            "an App Password at https://myaccount.google.com/apppasswords and paste "
+            "the 16-char password (spaces ok) into SMTP_PASS."
+        )
+        return report
+    except smtplib.SMTPSenderRefused as exc:
+        report["error"] = (
+            f"sender_refused: {exc}. From header must match the authenticated SMTP "
+            "user, or your Google Workspace must allow alias sending."
+        )
+        return report
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, TimeoutError) as exc:
+        report["error"] = (
+            f"connection_failed: {exc}. The host may be blocking outbound SMTP on "
+            f"port {SMTP_PORT}. Railway allows 587; if you changed ports or are on a "
+            "restricted platform, switch to a transactional provider (Resend, Postmark)."
+        )
+        return report
+    except Exception as exc:
+        report["error"] = f"{type(exc).__name__}: {exc}"
+        return report
 
 
 # ── Event Reminder Email ──────────────────────────────────────────────────────
