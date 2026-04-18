@@ -10,8 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 
-const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
-const ANNUAL_PRICE_ID: string  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
+const MONTHLY_PRICE_ID: string =
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "price_1TNQXzA7HOYEFna1nNR118xm";
+const ANNUAL_PRICE_ID: string =
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "price_1TNQZeA7HOYEFna1O53Tkcow";
 
 const PRO_FEATURES = [
   "Full access to your personal concierge",
