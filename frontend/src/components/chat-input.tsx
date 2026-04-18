@@ -12,17 +12,18 @@ export type VoiceStatus =
   | "thinking"
   | "speaking";
 
+export type MessageSource = "text" | "voice";
+
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, source?: MessageSource) => void;
   disabled?: boolean;
   placeholder?: string;
-  /** When true, the mic is wired to xAI STT + TTS round-trip. */
-  voiceMode?: boolean;
-  /** External status (e.g. "thinking" during AI stream, "speaking" during TTS). */
+  /**
+   * External status bubble (e.g. "thinking" while Grok streams,
+   * "speaking" while TTS plays) — purely for visual feedback on the mic.
+   */
   externalStatus?: VoiceStatus;
-  /** Notifies the parent of recording lifecycle transitions. */
   onVoiceStatusChange?: (status: VoiceStatus) => void;
-  /** Surface recording / transcription errors to the parent. */
   onVoiceError?: (message: string) => void;
 }
 
@@ -32,14 +33,12 @@ export function ChatInput({
   onSend,
   disabled,
   placeholder = "Ask me anything…",
-  voiceMode = false,
   externalStatus = "idle",
   onVoiceStatusChange,
   onVoiceError,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
-  const [showVoiceOffHint, setShowVoiceOffHint] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -81,7 +80,7 @@ export function ChatInput({
   const handleSend = () => {
     const msg = value.trim();
     if (!msg || disabled) return;
-    onSend(msg);
+    onSend(msg, "text");
     setValue("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     inputRef.current?.focus();
@@ -94,9 +93,9 @@ export function ChatInput({
     }
   };
 
-  // ── Voice-mode recording lifecycle ────────────────────────────────────────
+  // ── Voice recording lifecycle ─────────────────────────────────────────────
   //
-  // Tap mic → getUserMedia → MediaRecorder → Blob → xAI STT → onSend(text).
+  // Tap mic → getUserMedia → MediaRecorder → Blob → xAI STT → onSend(text, "voice").
 
   const stopMicTracks = () => {
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -151,10 +150,10 @@ export function ChatInput({
           onVoiceError?.("Didn't catch that — try again.");
           return;
         }
-        // Handoff to the Grok chat flow. Parent will flip externalStatus
+        // Handoff to the Grok chat flow; parent will flip externalStatus
         // to "thinking" / "speaking" as the response + TTS play out.
         updateStatus("idle");
-        onSend(text);
+        onSend(text, "voice");
       } catch (err) {
         updateStatus("idle");
         onVoiceError?.(err instanceof Error ? err.message : "Transcription failed.");
@@ -183,14 +182,6 @@ export function ChatInput({
 
   const handleMicClick = () => {
     if (disabled) return;
-
-    if (!voiceMode) {
-      // Mic stays visible but inert with a brief "Voice Mode off" hint.
-      setShowVoiceOffHint(true);
-      window.setTimeout(() => setShowVoiceOffHint(false), 1600);
-      return;
-    }
-
     // If AI is currently thinking/speaking, ignore taps — parent owns that state.
     if (externalStatus === "thinking" || externalStatus === "speaking") return;
 
@@ -202,9 +193,8 @@ export function ChatInput({
     void startRecording();
   };
 
-  const micTooltip = !voiceMode
-    ? "Voice Mode off"
-    : effectiveStatus === "listening"
+  const micTooltip =
+    effectiveStatus === "listening"
       ? "Tap to stop"
       : effectiveStatus === "transcribing"
         ? "Transcribing…"
@@ -216,16 +206,12 @@ export function ChatInput({
 
   const isMultiline = value.includes("\n") || value.length > 80;
 
-  // The outline animates the same way on both Web-Speech "listening" (legacy) and
-  // xAI "listening" (new). Visuals are intentionally identical.
-  const glow = isRecording;
-
   return (
     <div
       className={cn(
         "flex w-full items-end gap-2 border bg-[#141414] px-4 py-2.5 transition-colors duration-150",
         isMultiline ? "rounded-2xl" : "rounded-full",
-        glow
+        isRecording
           ? "border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
           : "border-white/[0.09] hover:border-white/[0.14] focus-within:border-white/[0.18]"
       )}
@@ -244,20 +230,18 @@ export function ChatInput({
                 ? "Thinking…"
                 : effectiveStatus === "speaking"
                   ? "Speaking…"
-                  : showVoiceOffHint
-                    ? "Voice Mode is off — enable it to talk"
-                    : placeholder
+                  : placeholder
         }
         disabled={disabled}
         rows={1}
         className={cn(
           "flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 outline-none py-1 leading-relaxed overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
-          glow ? "placeholder:text-white/60" : "placeholder:text-white/30"
+          isRecording ? "placeholder:text-white/60" : "placeholder:text-white/30"
         )}
         style={{ maxHeight: "200px", scrollbarWidth: "none" }}
       />
 
-      {/* Mic button — preserves EXACT visual design. Behavior depends on voiceMode. */}
+      {/* Mic button — single entry point for voice. Visuals unchanged. */}
       <button
         onClick={handleMicClick}
         disabled={disabled}
@@ -271,9 +255,7 @@ export function ChatInput({
               ? "text-white/70"
               : effectiveStatus === "speaking"
                 ? "text-white/80"
-                : voiceMode
-                  ? "text-white/55 hover:text-white/85"
-                  : "text-white/35 hover:text-white/65",
+                : "text-white/35 hover:text-white/65",
           disabled && "pointer-events-none opacity-25"
         )}
       >

@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
-import { ChatInput, type VoiceStatus } from "@/components/chat-input";
+import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { textToSpeech } from "@/lib/voice";
@@ -21,6 +21,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   isError?: boolean;
+  /** Track how a user message was sent so Retry replays in the same mode. */
+  source?: MessageSource;
 }
 
 interface ChatSession {
@@ -61,52 +63,6 @@ function formatSessionDate(iso: string): string {
 const CONTAINER = "mx-auto w-full max-w-3xl px-4";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Voice Mode toggle — compact pill switch that matches existing header buttons.
-// Stays visually quiet when OFF; lights up subtly when ON.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function VoiceModeToggle({
-  enabled,
-  onToggle,
-  disabled,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={disabled}
-      role="switch"
-      aria-checked={enabled}
-      title={enabled ? "Voice Mode on — tap mic to talk" : "Enable Voice Chat"}
-      className={`group flex h-9 items-center gap-2 rounded-full border px-2.5 pr-3 text-[12px] font-medium transition disabled:opacity-25 ${
-        enabled
-          ? "border-white/20 bg-white/[0.08] text-white/85 hover:bg-white/[0.12]"
-          : "border-white/[0.08] text-white/45 hover:border-white/[0.16] hover:bg-white/[0.04] hover:text-white/70"
-      }`}
-    >
-      <span
-        className={`relative inline-block h-[14px] w-[26px] shrink-0 rounded-full transition-colors duration-150 ${
-          enabled ? "bg-white/85" : "bg-white/15"
-        }`}
-        aria-hidden
-      >
-        <span
-          className={`absolute top-[2px] h-[10px] w-[10px] rounded-full bg-black transition-all duration-150 ${
-            enabled ? "left-[14px]" : "left-[2px] bg-white/55"
-          }`}
-        />
-      </span>
-      <span className="hidden sm:inline">Voice Mode</span>
-      <span className="inline sm:hidden">Voice</span>
-    </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Page component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -129,22 +85,14 @@ export default function HomePage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
-  // ── Voice Mode ──────────────────────────────────────────────────────────────
-  // Persisted across reloads so the user's preference sticks. Default OFF so
-  // nothing about the text-only experience changes until they opt in.
-  const [voiceMode, setVoiceMode] = useState(false);
+  // ── Voice ───────────────────────────────────────────────────────────────────
+  // Voice is always available via the mic icon. When a user sends a message by
+  // voice, we also play the assistant's reply aloud (TTS). Text-typed messages
+  // get text-only replies — no audio — so typing stays silent by design.
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    try {
-      setVoiceMode(localStorage.getItem("orryon_voice_mode") === "1");
-    } catch {
-      // no-op (private mode / disabled storage)
-    }
-  }, []);
 
   const stopAudioPlayback = useCallback(() => {
     ttsAbortRef.current?.abort();
@@ -161,24 +109,8 @@ export default function HomePage() {
     audioRef.current = null;
   }, []);
 
-  const toggleVoiceMode = useCallback(() => {
-    setVoiceMode((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("orryon_voice_mode", next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      if (!next) {
-        stopAudioPlayback();
-        setVoiceStatus("idle");
-      }
-      return next;
-    });
-  }, [stopAudioPlayback]);
-
   useEffect(() => {
-    // Cleanup on unmount — don't leave audio playing after navigation.
+    // Don't leave audio playing after navigation.
     return () => stopAudioPlayback();
   }, [stopAudioPlayback]);
 
@@ -413,9 +345,9 @@ export default function HomePage() {
     }
   };
 
-  const handleSend = (text: string) => {
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    runAI(text, voiceMode);
+  const handleSend = (text: string, source: MessageSource = "text") => {
+    setMessages((prev) => [...prev, { role: "user", content: text, source }]);
+    runAI(text, source === "voice");
   };
 
   const handleRetry = () => {
@@ -423,7 +355,7 @@ export default function HomePage() {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
     setMessages((prev) => prev.slice(0, -1));
-    runAI(lastUserMsg.content, voiceMode);
+    runAI(lastUserMsg.content, lastUserMsg.source === "voice");
   };
 
   const handleCopy = (content: string, index: number) => {
@@ -551,8 +483,7 @@ export default function HomePage() {
       {!hasMessages ? (
         <div className="flex min-h-full flex-col">
           {/* Top action bar — aligned with chat container */}
-          <div className={`${CONTAINER} flex shrink-0 items-center justify-end gap-1 py-3`}>
-            <VoiceModeToggle enabled={voiceMode} onToggle={toggleVoiceMode} />
+          <div className={`${CONTAINER} flex shrink-0 items-center justify-end py-3`}>
             <button
               onClick={handleOpenHistory}
               className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
@@ -634,8 +565,7 @@ export default function HomePage() {
                 <ChatInput
                   onSend={handleSend}
                   disabled={streaming}
-                  voiceMode={voiceMode}
-                  externalStatus={voiceMode ? voiceStatus : "idle"}
+                  externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={setVoiceError}
                 />
@@ -659,11 +589,6 @@ export default function HomePage() {
           {/* Chat header bar — border spans full width, buttons align to container */}
           <div className="shrink-0 border-b border-white/[0.06]">
             <div className={`${CONTAINER} flex items-center justify-end gap-1 py-2`}>
-              <VoiceModeToggle
-                enabled={voiceMode}
-                onToggle={toggleVoiceMode}
-                disabled={streaming}
-              />
               <button
                 onClick={handleOpenHistory}
                 disabled={streaming}
@@ -713,8 +638,7 @@ export default function HomePage() {
               <ChatInput
                 onSend={handleSend}
                 disabled={streaming}
-                voiceMode={voiceMode}
-                externalStatus={voiceMode ? voiceStatus : "idle"}
+                externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={setVoiceError}
               />
