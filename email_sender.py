@@ -63,6 +63,10 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
         headers={
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json",
+            # Resend fronts the API with Cloudflare; the default urllib UA
+            # (`Python-urllib/3.x`) trips Cloudflare's bot protection (error 1010).
+            "User-Agent": "orryon/1.0 (+https://orryon.com)",
+            "Accept": "application/json",
         },
         method="POST",
     )
