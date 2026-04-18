@@ -416,36 +416,50 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
         raise HTTPException(404, "User not found")
     row = dict(row)
 
-    customer_id = row.get("stripe_customer_id") or ""
-    if not customer_id:
-        customer = stripe_lib.Customer.create(
-            email=row["email"],
-            metadata={"user_id": row["id"]},
-        )
-        customer_id = customer.id
-        with get_connection() as conn:
-            conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
-            conn.commit()
+    try:
+        customer_id = row.get("stripe_customer_id") or ""
+        if not customer_id:
+            customer = stripe_lib.Customer.create(
+                email=row["email"],
+                metadata={"user_id": row["id"]},
+            )
+            customer_id = customer.id
+            with get_connection() as conn:
+                conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
+                conn.commit()
 
-    current_plan = resolve_plan(row)
-    trial_days = get_trial_days(body.price_id)
-    checkout_params: dict[str, Any] = {
-        "customer": customer_id,
-        "payment_method_types": ["card"],
-        "line_items": [{"price": body.price_id, "quantity": 1}],
-        "mode": "subscription",
-        "success_url": success_url,
-        "cancel_url": cancel_url,
-        "metadata": {"user_id": row["id"]},
-    }
-    if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
-        effective_trial = (
-            max(current_plan.get("trial_days_remaining", 0), 1)
-            if current_plan["plan"] == "trial"
-            else trial_days
-        )
-        checkout_params["subscription_data"] = {"trial_period_days": effective_trial}
-    session = stripe_lib.checkout.Session.create(**checkout_params)
+        current_plan = resolve_plan(row)
+        trial_days = get_trial_days(body.price_id)
+        checkout_params: dict[str, Any] = {
+            "customer": customer_id,
+            "payment_method_types": ["card"],
+            "line_items": [{"price": body.price_id, "quantity": 1}],
+            "mode": "subscription",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "metadata": {"user_id": row["id"]},
+        }
+        if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
+            effective_trial = (
+                max(current_plan.get("trial_days_remaining", 0), 1)
+                if current_plan["plan"] == "trial"
+                else trial_days
+            )
+            checkout_params["subscription_data"] = {"trial_period_days": effective_trial}
+        session = stripe_lib.checkout.Session.create(**checkout_params)
+    except stripe_lib.error.InvalidRequestError as e:
+        # Bad price ID, test/live-mode mismatch, malformed params, etc.
+        logger.warning("Stripe InvalidRequestError in checkout: %s", e.user_message or str(e))
+        raise HTTPException(400, f"Stripe rejected the request: {e.user_message or str(e)}")
+    except stripe_lib.error.AuthenticationError as e:
+        logger.error("Stripe AuthenticationError in checkout: %s", e)
+        raise HTTPException(503, "Stripe authentication failed — check STRIPE_SECRET_KEY on the server.")
+    except stripe_lib.error.StripeError as e:
+        logger.exception("Stripe error in checkout: %s", e)
+        raise HTTPException(502, f"Stripe error: {e.user_message or str(e)}")
+    except Exception as e:
+        logger.exception("Unexpected error in checkout: %s", e)
+        raise HTTPException(500, f"Checkout setup failed: {type(e).__name__}: {e}")
     return {"checkout_url": session.url}
 
 
