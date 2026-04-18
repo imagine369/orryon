@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan, resolve_plan_for_user
 from backend.auth import get_current_user, decode_token
@@ -53,9 +54,8 @@ def _resolve_session(uid: str, session_id: str) -> tuple[str, bool]:
 
 
 def _get_display_name(uid: str) -> str:
-    conn = get_connection()
-    row = conn.execute("SELECT display_name FROM users WHERE id=?", (uid,)).fetchone()
-    conn.close()
+    with get_connection() as conn:
+        row = conn.execute("SELECT display_name FROM users WHERE id=?", (uid,)).fetchone()
     return row["display_name"] if row else "there"
 
 
@@ -287,7 +287,23 @@ async def remove_session(session_id: str, user: dict = Depends(get_current_user)
     return {"deleted": True}
 
 
+class _SessionRenameReq(BaseModel):
+    title: str
+
+
 @router.patch("/api/chat/sessions/{session_id}")
-async def rename_session(session_id: str, user: dict = Depends(get_current_user)):
-    """Update a chat session title (currently a no-op placeholder)."""
-    return {"updated": True}
+async def rename_session(
+    session_id: str,
+    body: _SessionRenameReq,
+    user: dict = Depends(get_current_user),
+):
+    """Update a chat session title."""
+    title = (body.title or "").strip()
+    if not title:
+        raise HTTPException(400, "Title is required")
+    if len(title) > 120:
+        raise HTTPException(400, "Title too long (max 120 characters)")
+    ok = update_chat_session_title(user["user_id"], session_id, title)
+    if not ok:
+        raise HTTPException(500, "Could not rename session")
+    return {"updated": True, "title": title}

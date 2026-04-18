@@ -37,48 +37,45 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
     today = date.today()
     month_start = today.replace(day=1).isoformat()
 
-    conn = get_connection()
-
     balance = get_balance(uid)
 
-    month_row = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
-        "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
-    ).fetchone()
-    month_spend = float(month_row["total"]) if month_row else 0.0
+    with get_connection() as conn:
+        month_row = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
+            "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
+        ).fetchone()
+        month_spend = float(month_row["total"]) if month_row else 0.0
 
-    cats = conn.execute(
-        "SELECT category, SUM(amount) as total FROM transactions "
-        "WHERE user_id=? AND date>=? AND amount>0 "
-        "GROUP BY category ORDER BY total DESC LIMIT 5",
-        (uid, month_start),
-    ).fetchall()
+        cats = conn.execute(
+            "SELECT category, SUM(amount) as total FROM transactions "
+            "WHERE user_id=? AND date>=? AND amount>0 "
+            "GROUP BY category ORDER BY total DESC LIMIT 5",
+            (uid, month_start),
+        ).fetchall()
 
-    recent_txns = conn.execute(
-        "SELECT id, merchant, amount, date, category FROM transactions "
-        "WHERE user_id=? ORDER BY date DESC, rowid DESC LIMIT 10",
-        (uid,),
-    ).fetchall()
+        recent_txns = conn.execute(
+            "SELECT id, merchant, amount, date, category FROM transactions "
+            "WHERE user_id=? ORDER BY date DESC, rowid DESC LIMIT 10",
+            (uid,),
+        ).fetchall()
 
-    next_events = conn.execute(
-        "SELECT id, title, event_date, event_type FROM events "
-        "WHERE user_id=? AND event_date>=? ORDER BY event_date LIMIT 5",
-        (uid, today.isoformat()),
-    ).fetchall()
+        next_events = conn.execute(
+            "SELECT id, title, event_date, event_type FROM events "
+            "WHERE user_id=? AND event_date>=? ORDER BY event_date LIMIT 5",
+            (uid, today.isoformat()),
+        ).fetchall()
 
-    goals = conn.execute(
-        "SELECT id, name, target_amount, current_amount, target_date, category, is_completed "
-        "FROM goals WHERE user_id=? AND is_completed=0 ORDER BY created_at DESC LIMIT 5",
-        (uid,),
-    ).fetchall()
+        goals = conn.execute(
+            "SELECT id, name, target_amount, current_amount, target_date, category, is_completed "
+            "FROM goals WHERE user_id=? AND is_completed=0 ORDER BY created_at DESC LIMIT 5",
+            (uid,),
+        ).fetchall()
 
-    tasks = conn.execute(
-        "SELECT id, title, priority, status, due_date FROM action_items "
-        "WHERE user_id=? AND status='open' ORDER BY priority DESC, due_date ASC LIMIT 5",
-        (uid,),
-    ).fetchall()
-
-    conn.close()
+        tasks = conn.execute(
+            "SELECT id, title, priority, status, due_date FROM action_items "
+            "WHERE user_id=? AND status='open' ORDER BY priority DESC, due_date ASC LIMIT 5",
+            (uid,),
+        ).fetchall()
 
     return {
         "balance": balance,
@@ -104,7 +101,6 @@ async def list_transactions(
     user: dict = Depends(get_current_user),
 ):
     uid = user["user_id"]
-    conn = get_connection()
     query = "SELECT * FROM transactions WHERE user_id=?"
     params: list = [uid]
     if category:
@@ -121,8 +117,8 @@ async def list_transactions(
         params.extend([f"%{search.lower()}%", f"%{search.lower()}%"])
     query += " ORDER BY date DESC, rowid DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
+    with get_connection() as conn:
+        rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -145,12 +141,16 @@ async def create_transaction(body: TransactionReq, user: dict = Depends(get_curr
 async def delete_transaction(txn_id: str, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     conn = get_connection()
-    row = conn.execute("SELECT amount FROM transactions WHERE id=? AND user_id=?", (txn_id, uid)).fetchone()
-    conn.close()
+    try:
+        row = conn.execute(
+            "SELECT amount FROM transactions WHERE id=? AND user_id=?", (txn_id, uid)
+        ).fetchone()
+    finally:
+        conn.close()
     if not row:
         raise HTTPException(404, "Transaction not found")
     from db import delete_row
-    delete_row("transactions", {"id": txn_id})
+    delete_row("transactions", {"id": txn_id, "user_id": uid})
     adjust_balance(uid, float(row["amount"]))
     return {"deleted": True, "balance": get_balance(uid)}
 
@@ -164,19 +164,17 @@ async def get_budget(
 ):
     uid = user["user_id"]
     target_month = month or datetime.now().strftime("%Y-%m")
-    conn = get_connection()
+    with get_connection() as conn:
+        budgets = conn.execute(
+            "SELECT * FROM budget_categories WHERE user_id=? AND month=?",
+            (uid, target_month),
+        ).fetchall()
 
-    budgets = conn.execute(
-        "SELECT * FROM budget_categories WHERE user_id=? AND month=?",
-        (uid, target_month),
-    ).fetchall()
-
-    spent_rows = conn.execute(
-        "SELECT category, SUM(amount) as total FROM transactions "
-        "WHERE user_id=? AND date LIKE ? AND amount>0 GROUP BY category",
-        (uid, f"{target_month}%"),
-    ).fetchall()
-    conn.close()
+        spent_rows = conn.execute(
+            "SELECT category, SUM(amount) as total FROM transactions "
+            "WHERE user_id=? AND date LIKE ? AND amount>0 GROUP BY category",
+            (uid, f"{target_month}%"),
+        ).fetchall()
 
     spent_map = {r["category"]: float(r["total"]) for r in spent_rows}
     result = []
@@ -197,13 +195,19 @@ async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     target_month = body.month or datetime.now().strftime("%Y-%m")
     conn = get_connection()
-    existing = conn.execute(
-        "SELECT id FROM budget_categories WHERE user_id=? AND category=? AND month=?",
-        (uid, body.category, target_month),
-    ).fetchone()
-    conn.close()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM budget_categories WHERE user_id=? AND category=? AND month=?",
+            (uid, body.category, target_month),
+        ).fetchone()
+    finally:
+        conn.close()
     if existing:
-        update_row("budget_categories", {"planned": body.planned}, {"id": existing["id"]})
+        update_row(
+            "budget_categories",
+            {"planned": body.planned},
+            {"id": existing["id"], "user_id": uid},
+        )
         return {"id": existing["id"], "updated": True}
     budget_id = str(uuid.uuid4())
     insert_row("budget_categories", {
@@ -218,14 +222,16 @@ async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
 async def delete_budget_category(cat_id: str, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     conn = get_connection()
-    row = conn.execute(
-        "SELECT id FROM budget_categories WHERE id=? AND user_id=?", (cat_id, uid)
-    ).fetchone()
-    conn.close()
+    try:
+        row = conn.execute(
+            "SELECT id FROM budget_categories WHERE id=? AND user_id=?", (cat_id, uid)
+        ).fetchone()
+    finally:
+        conn.close()
     if not row:
         raise HTTPException(404, "Budget category not found")
     from db import delete_row
-    delete_row("budget_categories", {"id": cat_id})
+    delete_row("budget_categories", {"id": cat_id, "user_id": uid})
     return {"deleted": True}
 
 
@@ -234,12 +240,11 @@ async def delete_budget_category(cat_id: str, user: dict = Depends(get_current_u
 @router.get("/api/bills")
 async def list_bills(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    conn = get_connection()
-    rows = conn.execute(
-        "SELECT * FROM subscriptions WHERE user_id=? ORDER BY next_due ASC",
-        (uid,),
-    ).fetchall()
-    conn.close()
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM subscriptions WHERE user_id=? ORDER BY next_due ASC",
+            (uid,),
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -260,7 +265,17 @@ async def create_bill(body: BillReq, user: dict = Depends(get_current_user)):
 @router.delete("/api/bills/{bill_id}")
 async def delete_bill(bill_id: str, user: dict = Depends(get_current_user)):
     from db import delete_row
-    delete_row("subscriptions", {"id": bill_id})
+    uid = user["user_id"]
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id FROM subscriptions WHERE id=? AND user_id=?", (bill_id, uid)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        raise HTTPException(404, "Bill not found")
+    delete_row("subscriptions", {"id": bill_id, "user_id": uid})
     return {"deleted": True}
 
 
@@ -269,12 +284,11 @@ async def delete_bill(bill_id: str, user: dict = Depends(get_current_user)):
 @router.get("/api/income")
 async def list_income(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    conn = get_connection()
-    rows = conn.execute(
-        "SELECT * FROM recurring_income WHERE user_id=? AND is_active=1 ORDER BY amount DESC",
-        (uid,),
-    ).fetchall()
-    conn.close()
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recurring_income WHERE user_id=? AND is_active=1 ORDER BY amount DESC",
+            (uid,),
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -283,18 +297,17 @@ async def list_income(user: dict = Depends(get_current_user)):
 @router.get("/api/net-worth")
 async def get_net_worth(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    conn = get_connection()
-    assets = conn.execute(
-        "SELECT SUM(balance) as total FROM accounts WHERE user_id=? AND balance>0", (uid,)
-    ).fetchone()
-    liabs = conn.execute(
-        "SELECT ABS(SUM(balance)) as total FROM accounts WHERE user_id=? AND balance<0", (uid,)
-    ).fetchone()
-    snapshots = conn.execute(
-        "SELECT net_worth, snapshot_date FROM net_worth_snapshots "
-        "WHERE user_id=? ORDER BY snapshot_date DESC LIMIT 90", (uid,)
-    ).fetchall()
-    conn.close()
+    with get_connection() as conn:
+        assets = conn.execute(
+            "SELECT SUM(balance) as total FROM accounts WHERE user_id=? AND balance>0", (uid,)
+        ).fetchone()
+        liabs = conn.execute(
+            "SELECT ABS(SUM(balance)) as total FROM accounts WHERE user_id=? AND balance<0", (uid,)
+        ).fetchone()
+        snapshots = conn.execute(
+            "SELECT net_worth, snapshot_date FROM net_worth_snapshots "
+            "WHERE user_id=? ORDER BY snapshot_date DESC LIMIT 90", (uid,)
+        ).fetchall()
 
     total_assets = float(assets["total"] or 0) if assets else 0
     total_liabs = float(liabs["total"] or 0) if liabs else 0
@@ -315,28 +328,27 @@ async def get_forecast(user: dict = Depends(get_current_user)):
     month_start = today.replace(day=1).isoformat()
     from db import get_total_monthly_income
 
-    conn = get_connection()
     income = get_total_monthly_income(uid)
     balance = get_balance(uid)
 
-    spent_row = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
-        "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
-    ).fetchone()
-    month_spent = float(spent_row["total"]) if spent_row else 0
+    with get_connection() as conn:
+        spent_row = conn.execute(
+            "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
+            "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
+        ).fetchone()
+        month_spent = float(spent_row["total"]) if spent_row else 0
 
-    bills = conn.execute(
-        "SELECT name, amount, next_due, frequency FROM subscriptions "
-        "WHERE user_id=? AND is_active=1 ORDER BY next_due ASC", (uid,),
-    ).fetchall()
-    total_bills = sum(float(b["amount"]) for b in bills)
+        bills = conn.execute(
+            "SELECT name, amount, next_due, frequency FROM subscriptions "
+            "WHERE user_id=? AND is_active=1 ORDER BY next_due ASC", (uid,),
+        ).fetchall()
+        total_bills = sum(float(b["amount"]) for b in bills)
 
-    goals = conn.execute(
-        "SELECT name, target_amount, current_amount, target_date FROM goals "
-        "WHERE user_id=? AND is_completed=0", (uid,),
-    ).fetchall()
+        goals = conn.execute(
+            "SELECT name, target_amount, current_amount, target_date FROM goals "
+            "WHERE user_id=? AND is_completed=0", (uid,),
+        ).fetchall()
     total_goal_remaining = sum(max(0, float(g["target_amount"]) - float(g["current_amount"])) for g in goals)
-    conn.close()
 
     projected_remaining = balance + income - total_bills
     free_after_goals = projected_remaining - total_goal_remaining

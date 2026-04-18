@@ -22,6 +22,17 @@ from db import get_connection
 
 IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
 
+# Any non-local environment counts as "remote" and suppresses dev-only affordances
+# (on-screen OTP, unauthenticated demo login, etc.). This fixes the bug where
+# NODE_ENV="staging" silently enabled dev behaviour.
+_ENV = os.getenv("NODE_ENV", "").lower()
+IS_LOCAL_DEV = _ENV in {"", "dev", "development", "local"}
+
+# Demo login must be explicitly opted into. It was previously just "not production",
+# which meant any misconfigured deployment (e.g. NODE_ENV unset) exposed the demo
+# account.
+ENABLE_DEMO = os.getenv("ENABLE_DEMO", "").lower() in {"1", "true", "yes"} and IS_LOCAL_DEV
+
 # ── Rate Limiter (in-memory fallback — Redis version in cache.py) ─────────────
 
 _rate_buckets: dict[str, list[float]] = defaultdict(list)

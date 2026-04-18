@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from backend.auth import get_current_user
+from backend.cache import cache_get, cache_set
 from backend.schemas import CSVColumnMapping, CSVImportConfirmReq
 from config import PLAID_CLIENT_ID, PLAID_ENABLED, PLAID_SECRET
 from db import adjust_balance, get_connection, insert_row
@@ -45,9 +46,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["connections"])
 
-# In-memory staging area for CSV previews, keyed by user_id.
-# Entries expire on confirm or next upload. Not persisted across restarts.
-_csv_staging: dict[str, list[dict]] = {}
+# CSV previews are staged in Redis (when configured) so preview and confirm
+# can land on different workers. Falls back to an in-process dict in dev.
+_CSV_STAGING_TTL = 900  # 15 minutes
+
+
+def _csv_staging_key(uid: str) -> str:
+    return f"csv_staging:{uid}"
+
+
+async def _stage_csv(uid: str, transactions: list[dict]) -> None:
+    await cache_set(_csv_staging_key(uid), transactions, ttl_seconds=_CSV_STAGING_TTL)
+
+
+async def _pop_csv_staging(uid: str) -> list[dict] | None:
+    key = _csv_staging_key(uid)
+    staged = await cache_get(key)
+    if staged is None:
+        return None
+    # Best-effort invalidation — overwrite with an empty list that expires quickly.
+    await cache_set(key, [], ttl_seconds=1)
+    return staged
 
 
 # ── Connection Inventory ──────────────────────────────────────────────────────
@@ -119,7 +138,7 @@ async def upload_csv(
             "message": "Could not auto-detect column mapping. Please provide a mapping.",
         }
 
-    _csv_staging[uid] = result["transactions"]
+    await _stage_csv(uid, result["transactions"])
     logger.info("CSV preview: %d transactions staged for user %s", len(result["transactions"]), uid[:8])
 
     return {
@@ -152,7 +171,7 @@ async def confirm_csv_import(
     the selected transactions are inserted; the rest are discarded.
     """
     uid = user["user_id"]
-    staged = _csv_staging.pop(uid, None)
+    staged = await _pop_csv_staging(uid)
 
     if not staged:
         raise HTTPException(
@@ -221,7 +240,7 @@ async def upload_csv_with_mapping(
     if result["status"] == "error":
         raise HTTPException(422, result.get("error", "Could not parse CSV with provided mapping"))
 
-    _csv_staging[uid] = result["transactions"]
+    await _stage_csv(uid, result["transactions"])
     logger.info(
         "CSV preview (manual mapping): %d transactions staged for user %s",
         len(result["transactions"]),

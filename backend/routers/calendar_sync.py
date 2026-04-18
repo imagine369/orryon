@@ -14,9 +14,14 @@ Google Calendar OAuth (requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env)
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
+import secrets as _secrets
+import time
 import uuid
 from datetime import datetime, timezone, date as date_type
 
@@ -28,6 +33,66 @@ from db import get_connection, insert_row
 
 router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)
+
+
+# ── Signed OAuth state (CSRF defense) ─────────────────────────────────────────
+# State is an HMAC-signed payload containing uid + nonce + issued-at, valid for
+# 10 minutes. The server never accepts a raw user_id in the callback.
+
+_OAUTH_STATE_TTL = 600  # seconds
+
+
+def _oauth_state_secret() -> bytes:
+    secret = os.getenv("JWT_SECRET", "")
+    if not secret:
+        # Lifespan ensures JWT_SECRET is auto-generated in dev; re-read from
+        # the auth module's cache so we match its value.
+        from backend.auth import _get_secret
+        secret = _get_secret()
+    return secret.encode("utf-8")
+
+
+def _sign_oauth_state(uid: str) -> str:
+    payload = {"uid": uid, "nonce": _secrets.token_urlsafe(16), "iat": int(time.time())}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
+    sig = hmac.new(_oauth_state_secret(), body, hashlib.sha256).digest()
+    sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b"=")
+    return f"{body.decode()}.{sig_b64.decode()}"
+
+
+def _verify_oauth_state(state: str) -> str:
+    """Return the uid embedded in a signed state, or raise HTTPException."""
+    try:
+        body_s, sig_s = state.split(".", 1)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid state parameter.")
+
+    def _b64decode(s: str) -> bytes:
+        pad = "=" * (-len(s) % 4)
+        return base64.urlsafe_b64decode(s + pad)
+
+    try:
+        body = _b64decode(body_s)
+        expected_sig = hmac.new(_oauth_state_secret(), body_s.encode(), hashlib.sha256).digest()
+        given_sig = _b64decode(sig_s)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed state parameter.")
+
+    if not hmac.compare_digest(expected_sig, given_sig):
+        raise HTTPException(status_code=400, detail="State signature mismatch.")
+
+    try:
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="State payload unreadable.")
+
+    if int(time.time()) - int(payload.get("iat", 0)) > _OAUTH_STATE_TTL:
+        raise HTTPException(status_code=400, detail="OAuth state expired — please retry the connect flow.")
+
+    uid = payload.get("uid", "")
+    if not uid:
+        raise HTTPException(status_code=400, detail="State is missing user id.")
+    return uid
 
 # ── Google OAuth config ───────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -64,47 +129,47 @@ def _safe_str(val) -> str:
 
 
 def _store_google_tokens(uid: str, tokens: dict):
-    conn = get_connection()
-    existing = conn.execute(
-        "SELECT id FROM user_calendar_tokens WHERE user_id=?", (uid,)
-    ).fetchone()
     now = datetime.now(timezone.utc).isoformat()
     payload = json.dumps(tokens)
-    if existing:
-        conn.execute(
-            "UPDATE user_calendar_tokens SET tokens=?, updated_at=? WHERE user_id=?",
-            (payload, now, uid),
-        )
-    else:
-        conn.execute(
-            "INSERT INTO user_calendar_tokens (id, user_id, tokens, created_at, updated_at) VALUES (?,?,?,?,?)",
-            (str(uuid.uuid4()), uid, payload, now, now),
-        )
-    conn.commit()
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM user_calendar_tokens WHERE user_id=?", (uid,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE user_calendar_tokens SET tokens=?, updated_at=? WHERE user_id=?",
+                (payload, now, uid),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO user_calendar_tokens (id, user_id, tokens, created_at, updated_at) VALUES (?,?,?,?,?)",
+                (str(uuid.uuid4()), uid, payload, now, now),
+            )
+        conn.commit()
 
 
 def _get_google_tokens(uid: str) -> dict | None:
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT tokens FROM user_calendar_tokens WHERE user_id=?", (uid,)
-    ).fetchone()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT tokens FROM user_calendar_tokens WHERE user_id=?", (uid,)
+        ).fetchone()
     if not row:
         return None
     return json.loads(row["tokens"])
 
 
 def _ensure_token_table():
-    conn = get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS user_calendar_tokens (
-            id         TEXT PRIMARY KEY,
-            user_id    TEXT NOT NULL UNIQUE,
-            tokens     TEXT NOT NULL,
-            created_at TEXT,
-            updated_at TEXT
-        )
-    """)
-    conn.commit()
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_calendar_tokens (
+                id         TEXT PRIMARY KEY,
+                user_id    TEXT NOT NULL UNIQUE,
+                tokens     TEXT NOT NULL,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        """)
+        conn.commit()
 
 
 _ensure_token_table()
@@ -140,15 +205,14 @@ async def import_ics(
         raise HTTPException(status_code=422, detail="Could not parse the .ics file. Make sure it's a valid calendar export.")
 
     uid = user["user_id"]
-    conn = get_connection()
-
-    # Collect existing external_uid values to avoid duplicates
-    existing_ids = {
-        row[0]
-        for row in conn.execute(
-            "SELECT external_uid FROM events WHERE user_id=? AND external_uid IS NOT NULL", (uid,)
-        ).fetchall()
-    }
+    with get_connection() as conn:
+        # Collect existing external_uid values to avoid duplicates
+        existing_ids = {
+            row[0]
+            for row in conn.execute(
+                "SELECT external_uid FROM events WHERE user_id=? AND external_uid IS NOT NULL", (uid,)
+            ).fetchall()
+        }
 
     cutoff = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
@@ -237,10 +301,10 @@ async def import_ics(
 async def import_status(user: dict = Depends(get_current_user)):
     """Return the number of externally-synced events for this user."""
     uid = user["user_id"]
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT COUNT(*) FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
-    ).fetchone()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
+        ).fetchone()
     return {"synced_count": row[0] if row else 0}
 
 
@@ -288,11 +352,12 @@ async def google_auth(request: Request, token: str = ""):
         scopes=GOOGLE_SCOPES,
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
+    signed_state = _sign_oauth_state(uid)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
-        state=uid,
+        state=signed_state,
     )
     return RedirectResponse(auth_url)
 
@@ -309,7 +374,7 @@ async def google_callback(code: str, state: str, request: Request):
     except ImportError:
         raise HTTPException(status_code=500, detail="Google auth library not available.")
 
-    uid = state  # we stored user_id as state
+    uid = _verify_oauth_state(state)
 
     flow = Flow.from_client_config(
         {
@@ -323,7 +388,7 @@ async def google_callback(code: str, state: str, request: Request):
         },
         scopes=GOOGLE_SCOPES,
         redirect_uri=GOOGLE_REDIRECT_URI,
-        state=uid,
+        state=state,
     )
     flow.fetch_token(code=code)
     creds = flow.credentials
@@ -369,9 +434,9 @@ async def google_sync(user: dict = Depends(get_current_user)):
 async def google_disconnect(user: dict = Depends(get_current_user)):
     """Remove stored Google tokens for this user."""
     uid  = user["user_id"]
-    conn = get_connection()
-    conn.execute("DELETE FROM user_calendar_tokens WHERE user_id=?", (uid,))
-    conn.commit()
+    with get_connection() as conn:
+        conn.execute("DELETE FROM user_calendar_tokens WHERE user_id=?", (uid,))
+        conn.commit()
     return {"disconnected": True}
 
 

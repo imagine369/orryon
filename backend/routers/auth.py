@@ -15,7 +15,7 @@ from functools import partial
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.auth import create_token, get_current_user
-from backend.deps import IS_PRODUCTION, check_otp_rate_limit
+from backend.deps import ENABLE_DEMO, IS_LOCAL_DEV, IS_PRODUCTION, check_otp_rate_limit
 from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
 from db import (
     create_verification_code,
@@ -47,11 +47,10 @@ async def auth_send_code(body: SendCodeReq, request: Request):
     is_admin = admin_email and email == admin_email
 
     if not is_admin:
-        conn = get_connection()
-        wl = conn.execute(
-            "SELECT approved FROM waitlist WHERE email = ?", (email,)
-        ).fetchone()
-        conn.close()
+        with get_connection() as conn:
+            wl = conn.execute(
+                "SELECT approved FROM waitlist WHERE email = ?", (email,)
+            ).fetchone()
 
         if not wl:
             raise HTTPException(
@@ -73,7 +72,7 @@ async def auth_send_code(body: SendCodeReq, request: Request):
     sent = result["sent"]
     reason = result["reason"]
 
-    show_dev_code = not sent and not IS_PRODUCTION
+    show_dev_code = not sent and IS_LOCAL_DEV
     if not sent and reason != "not_configured":
         logger.warning("OTP email to %s failed (reason: %s): %s", email, reason, result["detail"])
 
@@ -114,9 +113,12 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
     except ImportError:
         raise HTTPException(503, "stripe package not installed")
 
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
-    conn.close()
+    from backend.routers.account import _validate_stripe_return_url
+    success_url = _validate_stripe_return_url(body.success_url, "success_url")
+    cancel_url = _validate_stripe_return_url(body.cancel_url, "cancel_url")
+
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
     row = dict(row)
@@ -138,10 +140,12 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
             ),
         )
         customer_id = customer.id
-        conn = get_connection()
-        conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
-        conn.commit()
-        conn.close()
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE users SET stripe_customer_id=? WHERE id=?",
+                (customer_id, row["id"]),
+            )
+            conn.commit()
 
     trial_days = get_trial_days(body.price_id)
     checkout_params: dict = {
@@ -149,8 +153,8 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
         "payment_method_types": ["card"],
         "line_items": [{"price": body.price_id, "quantity": 1}],
         "mode": "subscription",
-        "success_url": body.success_url,
-        "cancel_url": body.cancel_url,
+        "success_url": success_url,
+        "cancel_url": cancel_url,
         "metadata": {"user_id": row["id"]},
     }
     if trial_days:
@@ -163,9 +167,12 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
 
 @router.post("/api/auth/demo", response_model=AuthRes)
 async def auth_demo():
-    """Issue a demo JWT for local development (disabled in production)."""
-    if IS_PRODUCTION:
-        raise HTTPException(403, "Demo mode is disabled in production")
+    """Issue a demo JWT for local development.
+
+    Disabled unless ENABLE_DEMO=1 AND we're running in a local-dev environment.
+    """
+    if not ENABLE_DEMO:
+        raise HTTPException(403, "Demo mode is disabled")
     email = "demo@orryon.app"
     user = get_or_create_user_by_email(email)
     existing_txns = fetch_rows("transactions", {"user_id": user["id"]})
@@ -179,9 +186,8 @@ async def auth_demo():
 @router.get("/api/auth/me")
 async def auth_me(user: dict = Depends(get_current_user)):
     """Return the authenticated user's full profile."""
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
-    conn.close()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
     return dict(row)
