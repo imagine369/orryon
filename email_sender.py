@@ -50,13 +50,6 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
         "text": plain,
     }).encode()
 
-    logger.info(
-        "Resend: POST to api.resend.com/emails (from=%s, to=%s, key_len=%d, key_prefix=%s)",
-        (SMTP_FROM or "noreply@orryon.com"),
-        to_email,
-        len(RESEND_API_KEY),
-        RESEND_API_KEY[:12] if RESEND_API_KEY else "",
-    )
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
@@ -73,14 +66,11 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode()
-            logger.info("Resend: sent email to %s (response=%s)", to_email, body[:200])
+            logger.info("Resend: sent email to %s (id=%s)", to_email, json.loads(body).get("id"))
             return True
     except urllib.error.HTTPError as exc:
         body = exc.read().decode() if exc.fp else ""
-        logger.error(
-            "Resend HTTP %s sending to %s. Full response: %s. Payload preview: %s",
-            exc.code, to_email, body, payload.decode()[:300],
-        )
+        logger.error("Resend HTTP %s sending to %s: %s", exc.code, to_email, body)
         return False
     except Exception as exc:
         logger.exception("Resend error sending to %s: %s", to_email, exc)
@@ -291,11 +281,8 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
 
 def smtp_diagnostics(to_email: str | None = None) -> dict:
     """Return a machine-readable report on email config & connectivity."""
-    key_preview = (RESEND_API_KEY[:12] + "...") if len(RESEND_API_KEY) > 12 else (RESEND_API_KEY or None)
     report: dict = {
         "resend_enabled": bool(RESEND_ENABLED),
-        "resend_key_preview": key_preview,
-        "resend_key_length": len(RESEND_API_KEY),
         "smtp_enabled": bool(SMTP_ENABLED),
         "smtp_host": SMTP_HOST or None,
         "smtp_port": SMTP_PORT or None,
