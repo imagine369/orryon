@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
@@ -125,23 +125,45 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
+      const priceId = selectedPlan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
+
+      // Stripe path: reserve the checkout session FIRST (using the auth token
+      // from the OTP-verify response, not localStorage). We only persist the
+      // login once Stripe has accepted the session — otherwise a failed
+      // checkout followed by "X" would leave the user signed in for free.
+      if (priceId) {
+        const origin = window.location.origin;
+        const res = await fetch(`${getApiBase()}/api/subscription/checkout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            price_id: priceId,
+            success_url: `${origin}/home?upgraded=1`,
+            cancel_url: `${origin}/login?step=tiers`,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `Checkout failed (${res.status})`);
+        }
+        const data = (await res.json()) as { checkout_url: string };
+
+        login(authToken, { ...authUser!, display_name: name });
+        if (name !== authUser?.display_name) {
+          api.patch("/api/settings", { display_name: name }).catch(() => {});
+        }
+        window.location.href = data.checkout_url;
+        return;
+      }
+
+      // No Stripe configured → no paywall; just finish sign-in.
       login(authToken, { ...authUser!, display_name: name });
       if (name !== authUser?.display_name) {
         api.patch("/api/settings", { display_name: name }).catch(() => {});
       }
-
-      const priceId = selectedPlan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
-      if (priceId) {
-        const origin = window.location.origin;
-        const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
-          price_id: priceId,
-          success_url: `${origin}/home?upgraded=1`,
-          cancel_url: `${origin}/login?step=tiers`,
-        });
-        window.location.href = res.checkout_url;
-        return;
-      }
-
       router.push("/home");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
