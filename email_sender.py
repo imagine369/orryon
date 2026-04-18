@@ -277,8 +277,11 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
 
 def smtp_diagnostics(to_email: str | None = None) -> dict:
     """Return a machine-readable report on email config & connectivity."""
+    key_preview = (RESEND_API_KEY[:12] + "...") if len(RESEND_API_KEY) > 12 else (RESEND_API_KEY or None)
     report: dict = {
         "resend_enabled": bool(RESEND_ENABLED),
+        "resend_key_preview": key_preview,
+        "resend_key_length": len(RESEND_API_KEY),
         "smtp_enabled": bool(SMTP_ENABLED),
         "smtp_host": SMTP_HOST or None,
         "smtp_port": SMTP_PORT or None,
