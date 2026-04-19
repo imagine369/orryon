@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { IntegrityGate } from "@/components/integrity-gate";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -50,11 +51,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} dark h-full antialiased`}>
       <body className="min-h-full bg-black text-white">
-        <AuthProvider>
-          <ErrorBoundary>
-            <TooltipProvider>{children}</TooltipProvider>
-          </ErrorBoundary>
-        </AuthProvider>
+        <IntegrityGate>
+          <AuthProvider>
+            <ErrorBoundary>
+              <TooltipProvider>{children}</TooltipProvider>
+            </ErrorBoundary>
+          </AuthProvider>
+        </IntegrityGate>
       </body>
     </html>
   );

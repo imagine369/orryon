@@ -8,21 +8,27 @@
  * See `backend/routers/voice.py` for the server implementation.
  */
 
-import { getApiBase } from "@/lib/api";
+import { clientHeaders, getApiBase, getCsrfToken } from "@/lib/api";
 import {
   ORRYON_VOICE_ID,
   shapeForVoice,
   type VoiceMode,
 } from "@/lib/voice-config";
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("orryon_token");
+function legacyBearer(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("orryon_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function authHeaders(): Record<string, string> {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const csrf = getCsrfToken();
+  return {
+    ...clientHeaders(),
+    ...legacyBearer(),
+    ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    ...extra,
+  };
 }
 
 /**
@@ -42,6 +48,7 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
     method: "POST",
     headers: authHeaders(),
     body: form,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {
@@ -70,11 +77,9 @@ export async function textToSpeech(
 
   const res = await fetch(`${getApiBase()}/api/voice/tts`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ text: shaped, voice: voiceId }),
+    credentials: "same-origin",
   });
 
   if (!res.ok) {

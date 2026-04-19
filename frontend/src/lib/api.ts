@@ -1,20 +1,20 @@
+import { CANARY } from "@/lib/integrity";
+
 /**
  * API origin for HTTP requests.
  *
  * In the browser we ALWAYS go same-origin (`""`) so that `/api/*` is handled by
  * the Next.js route at `src/app/api/[[...path]]/route.ts`, which proxies to the
- * FastAPI backend (`BACKEND_URL` on Vercel). Going same-origin avoids:
- *   - CORS preflights on authenticated requests,
- *   - Firefox Enhanced Tracking Protection blocking third-party hosts,
- *   - Browser adblock extensions that block requests to hosts containing
- *     substrings like "railway" / "production".
+ * FastAPI backend (`BACKEND_URL` on Vercel). Going same-origin also lets the
+ * HttpOnly `orryon_session` cookie attach automatically — a cross-origin call
+ * would require CORS credentials and a matching Set-Cookie domain.
  *
  * `NEXT_PUBLIC_API_URL` is still used for the WebSocket connection (see
- * `connectChatWs` below) — Next.js rewrites don't tunnel WebSocket, so that
- * has to connect directly to the backend host.
+ * `connectChatWs` below) — Next.js doesn't tunnel WebSocket through the proxy,
+ * so that has to connect directly to the backend host.
  *
  * On the server (SSR / route handlers) we fall back to `BACKEND_URL` /
- * `NEXT_PUBLIC_API_URL` / localhost because rewrites don't apply there.
+ * `NEXT_PUBLIC_API_URL` / localhost because the proxy doesn't apply there.
  */
 export function getApiBase(): string {
   if (typeof window !== "undefined") return "";
@@ -25,21 +25,58 @@ export function getApiBase(): string {
   ).replace(/\/$/, "");
 }
 
+// ── Token shims (legacy) ─────────────────────────────────────────────────────
+// We no longer read or write localStorage for auth. These functions exist so
+// any not-yet-migrated caller doesn't crash; they are effectively no-ops in
+// the cookie world. Remove in a future cleanup once Capacitor also migrates.
+
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("orryon_token");
 }
 
-export function setToken(token: string) {
-  localStorage.setItem("orryon_token", token);
+export function setToken(_token: string) {
+  /* no-op: JWT is set as an HttpOnly cookie by /api/auth/login */
 }
 
 export function clearToken() {
-  localStorage.removeItem("orryon_token");
+  if (typeof window !== "undefined") localStorage.removeItem("orryon_token");
 }
 
+/** @deprecated Use `hasAuthSignal()` instead. Kept for back-compat. */
 export function hasToken(): boolean {
-  return !!getToken();
+  if (typeof window === "undefined") return false;
+  return hasAuthSignal() || !!localStorage.getItem("orryon_token");
+}
+
+// ── Cookie-derived auth signals ──────────────────────────────────────────────
+
+/**
+ * Non-secret signal cookie set by /api/auth/login. Readable from JS so the
+ * auth provider can avoid an unauthenticated /api/auth/me round-trip on cold
+ * start — the real authentication is still the HttpOnly `orryon_session`.
+ */
+export function hasAuthSignal(): boolean {
+  if (typeof document === "undefined") return false;
+  return /(?:^|;\s*)orryon_auth=1/.test(document.cookie);
+}
+
+export function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|;\s*)orryon_csrf=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
+ * Headers attached to every outbound request so the backend can distinguish
+ * real Orryon web-client traffic from scripted abuse. `X-Orryon-Build` is the
+ * build canary (see `next.config.ts`); `X-Orryon-Client` is the client kind.
+ */
+export function clientHeaders(): Record<string, string> {
+  return {
+    "X-Orryon-Client": "web",
+    "X-Orryon-Build": CANARY,
+  };
 }
 
 function networkErrorMessage(): string {
@@ -57,16 +94,37 @@ async function request<T = unknown>(
   path: string,
   opts: RequestInit = {},
 ): Promise<T> {
-  const token = getToken();
+  const method = (opts.method || "GET").toUpperCase();
+  const legacyToken = getToken(); // back-compat for any tab still using localStorage
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...clientHeaders(),
     ...(opts.headers as Record<string, string>),
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Same-origin cookies attach automatically; Authorization is only for the
+  // transitional Capacitor / mobile case that still holds a localStorage JWT.
+  if (legacyToken && !headers.Authorization) {
+    headers.Authorization = `Bearer ${legacyToken}`;
+  }
+
+  // Double-submit CSRF for mutating methods. Harmless if the cookie isn't
+  // present yet (e.g. first request from a fresh browser) — the proxy only
+  // enforces the check when there's also a session cookie.
+  if (method !== "GET" && method !== "HEAD") {
+    const csrf = getCsrfToken();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
 
   let res: Response;
   try {
-    res = await fetch(`${getApiBase()}${path}`, { ...opts, headers });
+    res = await fetch(`${getApiBase()}${path}`, {
+      ...opts,
+      method,
+      headers,
+      credentials: "same-origin",
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (e instanceof TypeError && (msg === "Failed to fetch" || msg === "Load failed")) {
@@ -76,6 +134,8 @@ async function request<T = unknown>(
   }
   if (res.status === 401) {
     clearToken();
+    // Best-effort cookie wipe; ignore failures (e.g. offline).
+    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -92,7 +152,7 @@ async function uploadFile<T = unknown>(
   fieldName = "file",
   extraFields?: Record<string, string>,
 ): Promise<T> {
-  const token = getToken();
+  const legacyToken = getToken();
   const form = new FormData();
   form.append(fieldName, file);
   if (extraFields) {
@@ -101,8 +161,10 @@ async function uploadFile<T = unknown>(
     }
   }
 
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const headers: Record<string, string> = { ...clientHeaders() };
+  if (legacyToken) headers.Authorization = `Bearer ${legacyToken}`;
+  const csrf = getCsrfToken();
+  if (csrf) headers["X-CSRF-Token"] = csrf;
 
   let res: Response;
   try {
@@ -110,6 +172,7 @@ async function uploadFile<T = unknown>(
       method: "POST",
       headers,
       body: form,
+      credentials: "same-origin",
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
@@ -120,6 +183,7 @@ async function uploadFile<T = unknown>(
   }
   if (res.status === 401) {
     clearToken();
+    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -158,10 +222,10 @@ export interface ChatEvent {
 // ── Connection warmup ────────────────────────────────────────────────────────
 
 export function warmConnection(): void {
-  const token = getToken();
-  if (!token) return;
+  if (!hasAuthSignal() && !getToken()) return;
   fetch(`${getApiBase()}/api/chat/warm`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: clientHeaders(),
+    credentials: "same-origin",
   }).catch(() => {});
 }
 
@@ -173,12 +237,16 @@ export async function* streamChat(
   sessionId?: string,
   signal?: AbortSignal,
 ): AsyncGenerator<ChatEvent> {
-  const token = getToken();
+  const legacyToken = getToken();
+  const csrf = getCsrfToken();
   const res = await fetch(`${getApiBase()}/api/chat`, {
     method: "POST",
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...clientHeaders(),
+      ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
     },
     body: JSON.stringify({ message, session_id: sessionId || "" }),
     signal,
@@ -186,6 +254,7 @@ export async function* streamChat(
 
   if (res.status === 401) {
     clearToken();
+    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     if (typeof window !== "undefined") window.location.href = "/login";
     yield { type: "error", message: "Session expired — please log in again." };
     return;
@@ -225,21 +294,50 @@ export async function* streamChat(
 
 
 // ── WebSocket transport (primary, lower latency) ─────────────────────────────
-// Next.js HTTP rewrites do not tunnel WebSocket; connect only when NEXT_PUBLIC_API_URL is set.
+// Next.js HTTP rewrites do not tunnel WebSocket; connect only when
+// NEXT_PUBLIC_API_URL is set. We request a 30-second, single-use ticket from
+// /api/chat/ws-ticket and put THAT in the URL — the JWT never appears on the
+// wire in plaintext ws:// params.
 
 let _chatWs: WebSocket | null = null;
 let _wsConnected = false;
 let _wsConnecting = false;
 
-export function connectChatWs(): void {
-  const token = getToken();
-  if (!token || _wsConnected || _wsConnecting) return;
+async function fetchWsTicket(): Promise<string | null> {
+  try {
+    const legacyToken = getToken();
+    const csrf = getCsrfToken();
+    const res = await fetch(`${getApiBase()}/api/chat/ws-ticket`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        ...clientHeaders(),
+        ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ticket?: string };
+    return data.ticket || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function connectChatWs(): Promise<void> {
+  if (_wsConnected || _wsConnecting) return;
+  if (!hasAuthSignal() && !getToken()) return;
   const publicUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!publicUrl) return;
 
   _wsConnecting = true;
+  const ticket = await fetchWsTicket();
+  if (!ticket) {
+    _wsConnecting = false;
+    return;
+  }
   const wsBase = publicUrl.replace(/^http/, "ws");
-  const ws = new WebSocket(`${wsBase}/ws/chat?token=${encodeURIComponent(token)}`);
+  const ws = new WebSocket(`${wsBase}/ws/chat?ticket=${encodeURIComponent(ticket)}`);
 
   ws.onopen = () => {
     _chatWs = ws;

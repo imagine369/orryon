@@ -24,7 +24,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan, resolve_plan_for_user
-from backend.auth import get_current_user, decode_token
+from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_current_user
 from backend.schemas import ChatReq
 from db import (
     create_chat_session,
@@ -140,13 +140,31 @@ async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
 @router.websocket("/ws/chat")
 async def chat_ws(ws: WebSocket):
     """Persistent WebSocket for chat — same events as SSE but lower per-message
-    overhead since the connection stays open across turns."""
-    token_str = ws.query_params.get("token", "")
-    try:
-        payload = decode_token(token_str)
-        uid = payload["sub"]
-    except Exception:
-        await ws.close(code=4001, reason="Invalid or missing token")
+    overhead since the connection stays open across turns.
+
+    Prefers a short-lived ticket (?ticket=...) fetched from /api/chat/ws-ticket.
+    Falls back to ?token=<JWT> for legacy clients (Capacitor mobile, older tabs)
+    until they all migrate.
+    """
+    uid: str | None = None
+
+    ticket_str = ws.query_params.get("ticket", "")
+    if ticket_str:
+        payload = consume_ws_ticket(ticket_str)
+        if payload:
+            uid = payload["user_id"]
+
+    if uid is None:
+        token_str = ws.query_params.get("token", "")
+        if token_str:
+            try:
+                payload = decode_token(token_str)
+                uid = payload["sub"]
+            except Exception:
+                uid = None
+
+    if uid is None:
+        await ws.close(code=4001, reason="Invalid or missing ticket")
         return
 
     await ws.accept()
@@ -234,6 +252,19 @@ async def chat_ws(ws: WebSocket):
         pass
     except Exception as exc:
         logger.error("WS unexpected error: %s", exc)
+
+
+# ── WebSocket ticket issuance ─────────────────────────────────────────────────
+
+@router.post("/api/chat/ws-ticket")
+async def chat_ws_ticket(user: dict = Depends(get_current_user)):
+    """
+    Mint a one-time, 30-second ticket for authenticating a WebSocket connection
+    to /ws/chat. The browser uses this instead of the long-lived JWT so the
+    raw token never appears in the WS URL (and therefore never in logs).
+    """
+    ticket = create_ws_ticket(user["user_id"], user["email"])
+    return {"ticket": ticket, "expires_in": 30}
 
 
 # ── Connection warmup ─────────────────────────────────────────────────────────

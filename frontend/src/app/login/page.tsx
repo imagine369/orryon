@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
 import Link from "next/link";
-import { api, getApiBase } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
@@ -49,7 +49,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [authToken, setAuthToken] = useState("");
   const [authUser, setAuthUser] = useState<{ id: string; email: string; display_name: string } | null>(null);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [resendCountdown, setResendCountdown] = useState(0);
@@ -97,16 +96,17 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post<{ token: string; user: { id: string; email: string; display_name: string } }>(
-        "/api/auth/verify",
+      // Cookie-setting proxy route: the JWT is stored in an HttpOnly cookie
+      // and never reaches this page's JS. Response only carries the user.
+      const res = await api.post<{ user: { id: string; email: string; display_name: string; stripe_subscription_id?: string } }>(
+        "/api/auth/login",
         { email: email.trim().toLowerCase(), code: code.trim() },
       );
-      setAuthToken(res.token);
       setAuthUser(res.user);
       setDisplayName(res.user.display_name || "");
 
-      if (res.user && (res.user as Record<string, unknown>).stripe_subscription_id) {
-        login(res.token, res.user);
+      if (res.user && res.user.stripe_subscription_id) {
+        login(res.user);
         router.push("/home");
       } else {
         setStep("name");
@@ -129,31 +129,22 @@ export default function LoginPage() {
     try {
       const priceId = selectedPlan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
 
-      // Stripe path: reserve the checkout session FIRST (using the auth token
-      // from the OTP-verify response, not localStorage). We only persist the
-      // login once Stripe has accepted the session — otherwise a failed
-      // checkout followed by "X" would leave the user signed in for free.
+      // Cookie was set by /api/auth/login during handleVerify; subsequent API
+      // calls authenticate via that cookie automatically. A user who abandons
+      // Stripe checkout will stay signed in as a free-tier user and hit the
+      // server-enforced paywall on protected endpoints — the real gate.
       if (priceId) {
         const origin = window.location.origin;
-        const res = await fetch(`${getApiBase()}/api/subscription/checkout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
+        const data = await api.post<{ checkout_url: string }>(
+          "/api/subscription/checkout",
+          {
             price_id: priceId,
             success_url: `${origin}/home?upgraded=1`,
             cancel_url: `${origin}/login?step=tiers`,
-          }),
-        });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.detail || `Checkout failed (${res.status})`);
-        }
-        const data = (await res.json()) as { checkout_url: string };
+          },
+        );
 
-        login(authToken, { ...authUser!, display_name: name });
+        login({ ...authUser!, display_name: name });
         if (name !== authUser?.display_name) {
           api.patch("/api/settings", { display_name: name }).catch(() => {});
         }
@@ -162,7 +153,7 @@ export default function LoginPage() {
       }
 
       // No Stripe configured → no paywall; just finish sign-in.
-      login(authToken, { ...authUser!, display_name: name });
+      login({ ...authUser!, display_name: name });
       if (name !== authUser?.display_name) {
         api.patch("/api/settings", { display_name: name }).catch(() => {});
       }

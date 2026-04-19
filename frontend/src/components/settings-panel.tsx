@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ChevronRight, Download, CreditCard, CalendarDays, RefreshCw, Unlink } from "lucide-react";
-import { api, getApiBase, setToken } from "@/lib/api";
+import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
@@ -221,13 +221,15 @@ export function SettingsPanel() {
     setEmailLoading(true);
     setEmailError("");
     try {
-      const res = await api.post<{ token: string; email: string }>("/api/settings/email-change/verify", {
+      // The Next.js proxy route at /api/settings/email-change/verify intercepts
+      // the rotated JWT and re-sets the HttpOnly session cookie for us, so the
+      // browser never sees the raw token. We just need to refresh local state.
+      const res = await api.post<{ email: string }>("/api/settings/email-change/verify", {
         new_email: newEmail,
         code: emailCode,
       });
       const me = await api.get<{ id: string; email: string; display_name: string }>("/api/auth/me");
-      setToken(res.token);
-      login(res.token, {
+      login({
         id: me.id,
         email: res.email,
         display_name: me.display_name || settings?.display_name || "",

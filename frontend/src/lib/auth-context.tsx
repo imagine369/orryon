@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
-import { api, setToken, clearToken, hasToken } from "./api";
+import { api, clearToken, hasAuthSignal, hasToken } from "./api";
 
 interface User {
   id: string;
@@ -12,15 +12,15 @@ interface User {
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (token: string, user: User) => void;
-  logout: () => void;
+  login: (user: User) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null,
   loading: true,
   login: () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 const DEMO_USER: User = { id: "demo", email: "demo@orryon.app", display_name: "Alex" };
@@ -35,25 +35,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    if (!hasToken()) {
+    // Fast path: no auth signal cookie AND no legacy token → unauthenticated.
+    // Skip the /auth/me round-trip; avoids an annoying 401 log on every cold
+    // start for logged-out visitors.
+    if (!hasAuthSignal() && !hasToken()) {
       setLoading(false);
       return;
     }
     api
       .get<User>("/api/auth/me")
       .then(setUser)
-      .catch(() => clearToken())
+      .catch(() => {
+        clearToken();
+        // Cookies may be stale; best-effort clear.
+        fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback((token: string, u: User) => {
-    setToken(token);
+  const login = useCallback((u: User) => {
+    // Cookies were set by /api/auth/login (or /api/auth/demo-login); we just
+    // need to remember the user object in React state.
     setUser(u);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     clearToken();
     if (typeof window !== "undefined") localStorage.removeItem("orryon_demo");
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    } catch {
+      /* ignore — we still want to clear local state */
+    }
     setUser(null);
   }, []);
 
