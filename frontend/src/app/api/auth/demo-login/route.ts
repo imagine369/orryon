@@ -1,0 +1,45 @@
+import { NextRequest, NextResponse } from "next/server";
+import { makeCsrf, setAuthCookies } from "@/lib/server/auth-cookies";
+
+/** POST /api/auth/demo-login — cookie-setting wrapper around FastAPI /api/auth/demo. */
+
+function backendBase(): string {
+  return (
+    process.env.BACKEND_URL ??
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://127.0.0.1:8000"
+  ).replace(/\/$/, "");
+}
+
+export async function POST(req: NextRequest) {
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${backendBase()}/api/auth/demo`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(req.headers.get("origin") ? { Origin: req.headers.get("origin")! } : {}),
+      },
+    });
+  } catch {
+    return NextResponse.json({ detail: "Upstream service unavailable." }, { status: 502 });
+  }
+
+  const data = (await upstream.json().catch(() => ({}))) as {
+    token?: string;
+    user?: unknown;
+    detail?: string;
+  };
+
+  if (!upstream.ok || !data.token) {
+    return NextResponse.json(
+      { detail: data.detail || "Demo login failed" },
+      { status: upstream.status || 403 },
+    );
+  }
+
+  const res = NextResponse.json({ user: data.user });
+  setAuthCookies(res, data.token, makeCsrf());
+  return res;
+}
