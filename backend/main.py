@@ -24,6 +24,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.middleware import OriginEnforcementMiddleware, PerIpRateLimitMiddleware
 from backend.routers import auth, chat, finance, organize, account, connections, waitlist, contact, calendar_sync, voice
 from config import XAI_API_KEY
 
@@ -144,7 +145,10 @@ app = FastAPI(
 _is_prod = os.getenv("NODE_ENV", "").lower() == "production"
 _cors_origins: list[str] = []
 if not _is_prod:
-    _cors_origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Cover common Next.js dev ports — the server picks the next available port
+    # when one is busy, so 3000..3009 is a pragmatic dev window.
+    for _port in range(3000, 3010):
+        _cors_origins += [f"http://localhost:{_port}", f"http://127.0.0.1:{_port}"]
 
 
 def _append_origins_from_env(value: str) -> None:
@@ -158,6 +162,10 @@ def _append_origins_from_env(value: str) -> None:
 _append_origins_from_env(os.getenv("FRONTEND_URL", ""))
 _append_origins_from_env(os.getenv("APP_URL", ""))
 
+# Middleware execution order = reverse of add_middleware calls. We want, per
+# incoming request: (1) per-IP rate-limit circuit breaker, then (2) origin
+# enforcement on mutating requests, then (3) CORS handling / preflight. So:
+#   add CORS first (innermost) → origin second → rate limit last (outermost).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -165,6 +173,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(OriginEnforcementMiddleware, allowed_origins=_cors_origins)
+app.add_middleware(PerIpRateLimitMiddleware)
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
