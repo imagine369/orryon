@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from backend.auth import get_current_user
 from backend.cache import check_rate_limit_async
 from backend.deps import MONTHLY_SPEND_CAP_USD
+from backend.signing import require_signed_request
 from config import XAI_API_KEY
 from db import get_monthly_spend
 
@@ -96,6 +97,7 @@ async def _enforce_voice_quota(uid: str, kind: str) -> None:
 async def speech_to_text(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
+    _signed: dict = Depends(require_signed_request),
 ) -> dict:
     """
     Transcribe an audio clip using xAI STT.
@@ -169,6 +171,7 @@ async def speech_to_text(
 async def text_to_speech(
     body: TTSReq,
     user: dict = Depends(get_current_user),
+    _signed: dict = Depends(require_signed_request),
 ) -> Response:
     """
     Synthesize speech from text using xAI TTS.

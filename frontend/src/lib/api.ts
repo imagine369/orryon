@@ -239,6 +239,9 @@ export async function* streamChat(
 ): AsyncGenerator<ChatEvent> {
   const legacyToken = getToken();
   const csrf = getCsrfToken();
+  const bodyStr = JSON.stringify({ message, session_id: sessionId || "" });
+  const { signRequest, invalidateSigningKey } = await import("@/lib/signing");
+  const sigHeaders = await signRequest("POST", "/api/chat", bodyStr);
   const res = await fetch(`${getApiBase()}/api/chat`, {
     method: "POST",
     credentials: "same-origin",
@@ -247,13 +250,15 @@ export async function* streamChat(
       ...clientHeaders(),
       ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
       ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      ...sigHeaders,
     },
-    body: JSON.stringify({ message, session_id: sessionId || "" }),
+    body: bodyStr,
     signal,
   });
 
   if (res.status === 401) {
     clearToken();
+    invalidateSigningKey();
     fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     if (typeof window !== "undefined") window.location.href = "/login";
     yield { type: "error", message: "Session expired — please log in again." };

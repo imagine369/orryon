@@ -113,3 +113,39 @@ async def cache_set(key: str, value: Any, ttl_seconds: int = 60) -> None:
         await _redis.set(f"cache:{key}", json.dumps(value), ex=ttl_seconds)
         return
     _mem_cache[key] = (time.time() + ttl_seconds, value)
+
+
+# ── Nonce replay protection ───────────────────────────────────────────────────
+# Used by backend/signing.py to reject replayed HMAC-signed requests. A nonce is
+# "consumed" at most once within its TTL. Redis-backed when available so the
+# guarantee holds across workers; in-memory (pruned opportunistically) otherwise.
+
+_mem_nonces: dict[str, float] = {}
+
+
+async def consume_nonce_async(nonce: str, ttl_seconds: int = 180) -> bool:
+    """
+    Atomically claim a nonce. Returns True on first use, False if the nonce has
+    already been seen within its TTL window (= replay).
+    """
+    if not nonce:
+        return False
+    if _USE_REDIS and _redis:
+        # SET NX EX is atomic: returns None if the key already exists.
+        created = await _redis.set(f"nonce:{nonce}", "1", nx=True, ex=ttl_seconds)
+        return bool(created)
+    return _consume_nonce_mem(nonce, ttl_seconds)
+
+
+def _consume_nonce_mem(nonce: str, ttl_seconds: int) -> bool:
+    now = time.time()
+    # Opportunistic prune so memory can't grow unbounded.
+    if len(_mem_nonces) > 4096:
+        for k, expires in list(_mem_nonces.items()):
+            if expires < now:
+                _mem_nonces.pop(k, None)
+    expires = _mem_nonces.get(nonce)
+    if expires and expires > now:
+        return False
+    _mem_nonces[nonce] = now + ttl_seconds
+    return True

@@ -212,3 +212,31 @@ async def auth_me(user: dict = Depends(get_current_user)):
     if not row:
         raise HTTPException(404, "User not found")
     return dict(row)
+
+
+@router.post("/api/auth/sign-key")
+async def auth_sign_key(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Issue the HMAC signing key for the current session. Used by the frontend
+    to sign calls to /api/chat and /api/voice/*.
+
+    The key is *derived* from JWT_SECRET + user_id + iat, so there's no server
+    state to invalidate — rotating the user's JWT automatically invalidates
+    any in-flight signing keys. Clients keep this in memory only; it must
+    never be persisted to localStorage/sessionStorage.
+    """
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(401, "Missing bearer token.")
+    token = auth.split(" ", 1)[1].strip()
+    from backend.signing import issue_signing_key_for_token
+    try:
+        return issue_signing_key_for_token(token)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("sign-key derivation failed for uid=%s: %s", user.get("user_id"), exc)
+        raise HTTPException(500, "Could not issue signing key.")

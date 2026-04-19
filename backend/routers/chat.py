@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan, resolve_plan_for_user
 from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_current_user
+from backend.signing import require_signed_request
 from backend.schemas import ChatReq
 from db import (
     create_chat_session,
@@ -62,7 +63,11 @@ def _get_display_name(uid: str) -> str:
 # ── SSE transport ─────────────────────────────────────────────────────────────
 
 @router.post("/api/chat")
-async def chat_stream(body: ChatReq, user: dict = Depends(require_active_plan)):
+async def chat_stream(
+    body: ChatReq,
+    user: dict = Depends(require_active_plan),
+    _signed: dict = Depends(require_signed_request),
+):
     """
     Stream an AI response as Server-Sent Events.
 

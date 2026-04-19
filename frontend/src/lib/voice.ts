@@ -9,6 +9,7 @@
  */
 
 import { clientHeaders, getApiBase, getCsrfToken } from "@/lib/api";
+import { signRequest } from "@/lib/signing";
 import {
   ORRYON_VOICE_ID,
   shapeForVoice,
@@ -44,9 +45,12 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
       : `recording.${(audioBlob.type.split("/")[1] || "webm").split(";")[0]}`;
   form.append("file", audioBlob, filename);
 
+  // Multipart bodies are signed with an empty payload (see backend/signing.py);
+  // the HMAC still binds method + path + timestamp + nonce.
+  const sigHeaders = await signRequest("POST", "/api/voice/stt", null);
   const res = await fetch(`${getApiBase()}/api/voice/stt`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: authHeaders(sigHeaders),
     body: form,
     credentials: "same-origin",
   });
@@ -74,11 +78,13 @@ export async function textToSpeech(
   mode: VoiceMode = "chat",
 ): Promise<Blob> {
   const shaped = shapeForVoice(text, mode);
+  const bodyStr = JSON.stringify({ text: shaped, voice: voiceId });
+  const sigHeaders = await signRequest("POST", "/api/voice/tts", bodyStr);
 
   const res = await fetch(`${getApiBase()}/api/voice/tts`, {
     method: "POST",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ text: shaped, voice: voiceId }),
+    headers: authHeaders({ "Content-Type": "application/json", ...sigHeaders }),
+    body: bodyStr,
     credentials: "same-origin",
   });
 
