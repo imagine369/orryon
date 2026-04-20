@@ -281,9 +281,31 @@ export default function LoginPage() {
           <PillButton onClick={handleSendCode} disabled={loading} className="w-full">
             {loading ? "Sending…" : "Send code"}
           </PillButton>
+
+          <div className="mt-5 w-full flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/8" />
+            <span className="text-[0.6rem] uppercase tracking-[3px] text-white/25">or</span>
+            <div className="flex-1 h-px bg-white/8" />
+          </div>
+
+          <button
+            onClick={() => {
+              if (typeof window === "undefined") return;
+              localStorage.setItem("orryon_demo", "true");
+              login({ id: "demo", email: "demo@orryon.app", display_name: "Alex" });
+              router.push("/home");
+            }}
+            className="mt-4 w-full py-3 text-sm text-white/70 hover:text-white border border-white/10 hover:border-white/25 rounded-full transition-colors duration-200"
+          >
+            Try the demo
+          </button>
+          <p className="text-[0.7rem] text-white/25 mt-2 text-center">
+            No account. Data stays on this device.
+          </p>
+
           <Link
             href="/"
-            className="mt-3 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200 text-center block"
+            className="mt-5 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200 text-center block"
           >
             &larr; Back to home
           </Link>

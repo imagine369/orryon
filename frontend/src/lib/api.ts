@@ -61,6 +61,20 @@ export function hasAuthSignal(): boolean {
   return /(?:^|;\s*)orryon_auth=1/.test(document.cookie);
 }
 
+/**
+ * True when the user is in local-only demo mode. Demo sessions have no
+ * backend cookie, so API calls will 401 — we must NOT force-redirect to
+ * /login in that case, or the app becomes unusable.
+ */
+function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("orryon_demo") === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
   const m = document.cookie.match(/(?:^|;\s*)orryon_csrf=([^;]+)/);
@@ -133,6 +147,9 @@ async function request<T = unknown>(
     throw e;
   }
   if (res.status === 401) {
+    // Demo users have no backend session; surface the error silently so
+    // the local-only UI (streaks, journal, etc.) stays usable.
+    if (isDemoMode()) throw new Error("Unauthorized");
     clearToken();
     // Best-effort cookie wipe; ignore failures (e.g. offline).
     fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
@@ -182,6 +199,7 @@ async function uploadFile<T = unknown>(
     throw e;
   }
   if (res.status === 401) {
+    if (isDemoMode()) throw new Error("Unauthorized");
     clearToken();
     fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     if (typeof window !== "undefined") window.location.href = "/login";
@@ -257,6 +275,10 @@ export async function* streamChat(
   });
 
   if (res.status === 401) {
+    if (isDemoMode()) {
+      yield { type: "error", message: "Chat isn't available in the demo." };
+      return;
+    }
     clearToken();
     invalidateSigningKey();
     fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
