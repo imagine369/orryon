@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
 import { Separator } from "@/components/ui/separator";
+import { InstallButton } from "@/components/install-prompt";
 
 interface Settings {
   display_name: string;
@@ -703,6 +704,20 @@ export function SettingsPanel() {
                         )}
                       </div>
                     </div>
+                  </section>
+
+                  <Separator className="bg-white/5" />
+
+                  {/* ── INSTALL APP ── */}
+                  <section>
+                    <SectionLabel>App</SectionLabel>
+                    <InstallButton variant="settings" />
+                    <a
+                      href="/download"
+                      className="mt-2 block text-center text-xs text-white/25 hover:text-white/45 transition"
+                    >
+                      View all download options →
+                    </a>
                   </section>
 
                   <Separator className="bg-white/5" />

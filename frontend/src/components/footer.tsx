@@ -13,6 +13,9 @@ export function Footer() {
         <Link href="/contact" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
           Contact
         </Link>
+        <Link href="/download" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
+          Download
+        </Link>
       </div>
       <p className="text-[0.65rem] text-white/15">© 2026 Orryon</p>
     </footer>

@@ -3,10 +3,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
-  Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical, SlidersHorizontal,
+  Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical, SlidersHorizontal, Flame, Feather,
 } from "lucide-react";
 import { BreathingWidget } from "@/components/dashboard/breathing-widget";
-import { NotesTab } from "@/components/dashboard/notes-tab";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
@@ -16,6 +15,7 @@ import { api } from "@/lib/api";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { SearchPanel } from "@/components/search-panel";
+import { InstallButton } from "@/components/install-prompt";
 import { usePanels } from "@/lib/panel-context";
 
 // ── Priority system (Todoist-style) ─────────────────────────────────────────
@@ -90,7 +90,7 @@ interface Bill {
   next_due: string;
 }
 
-type Tab = "today" | "calendar" | "lists" | "journal";
+type Tab = "today" | "calendar" | "lists";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -250,7 +250,6 @@ export function NavBar() {
     { key: "today",    label: "Today"    },
     { key: "calendar", label: "Calendar" },
     { key: "lists",    label: "Lists"    },
-    { key: "journal",  label: "Journal"  },
   ];
 
   const TASK_SORT_OPTIONS: { key: TaskSort; label: string }[] = [
@@ -289,6 +288,30 @@ export function NavBar() {
           </button>
 
           <button
+            onClick={() => toggle("streaks")}
+            className={cn(
+              "flex items-center justify-center rounded-lg p-2 transition-colors",
+              "text-white/60 hover:text-white hover:bg-white/5",
+              openPanel === "streaks" && "text-white bg-white/5",
+            )}
+            aria-label="Streaks"
+          >
+            <Flame className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+
+          <button
+            onClick={() => toggle("journal")}
+            className={cn(
+              "flex items-center justify-center rounded-lg p-2 transition-colors",
+              "text-white/60 hover:text-white hover:bg-white/5",
+              openPanel === "journal" && "text-white bg-white/5",
+            )}
+            aria-label="Journal"
+          >
+            <Feather className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+
+          <button
             onClick={() => toggle("dashboard")}
             className={cn(
               "flex items-center justify-center rounded-lg p-2 transition-colors",
@@ -298,6 +321,8 @@ export function NavBar() {
           >
             <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />
           </button>
+
+          <InstallButton variant="navbar" />
 
           <button
             onClick={() => toggle("settings")}
@@ -342,7 +367,7 @@ export function NavBar() {
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
-                  <p className="text-sm font-semibold text-white/85">Quick Access</p>
+                  <h1 className="text-2xl font-extrabold">Quick Access</h1>
                   <button onClick={() => setNotifOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                     <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />
                   </button>
@@ -608,9 +633,6 @@ export function NavBar() {
 
                   {/* ── Lists tab ── */}
                   {activeTab === "lists" && <ListsTab />}
-
-                  {/* ── Journal tab ── */}
-                  {activeTab === "journal" && <NotesTab />}
 
                  </ErrorBoundary>
                 </div>
