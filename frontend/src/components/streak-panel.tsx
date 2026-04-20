@@ -389,7 +389,7 @@ interface StreakDetailViewProps {
   streak: Streak;
   onBack: () => void;
   onToggleDay: (dateKey: string) => void;
-  onUpdate: (patch: Partial<Pick<Streak, "name" | "emoji">>) => void;
+  onUpdate: (patch: Partial<Pick<Streak, "name" | "emoji" | "targetDays">>) => void;
 }
 
 function StreakDetailView({
