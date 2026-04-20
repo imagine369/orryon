@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { FadeIn } from "@/components/motion";
 import { Footer } from "@/components/footer";
+import { PillLink } from "@/components/pill-cta";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 
 type PlatformTab = "pwa" | "ios" | "android" | "desktop";
@@ -311,13 +312,10 @@ export default function DownloadPage() {
 
           {/* Bottom CTA */}
           <FadeIn delay={0.3} className="mt-20 text-center">
-            <p className="text-xs text-white/20 mb-4">Already have Orryon installed?</p>
-            <Link
-              href="/home"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-white/[0.08] bg-white/[0.03] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.06] transition"
-            >
-              Open Orryon →
-            </Link>
+            <p className="text-xs text-white/20 mb-5">Already have Orryon installed?</p>
+            <PillLink href="/home" variant="secondary">
+              Open Orryon
+            </PillLink>
           </FadeIn>
 
         </div>
