@@ -8,7 +8,7 @@ const StarEight = ({ className }: { className?: string }) => (
   </svg>
 );
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon } from "lucide-react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon, Flame } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -1459,6 +1459,71 @@ function JournalPreview() {
   );
 }
 
+function StreaksPreview() {
+  const ACCENT = "#ff9a14";
+
+  const habits = [
+    { emoji: "🏋️", name: "Workout",       count: 14, target: 30 },
+    { emoji: "📚", name: "Read 30 mins",   count: 7,  target: 21 },
+    { emoji: "💧", name: "Drink water",    count: 21, target: 30 },
+  ];
+
+  // Mini 5-week dot grid — last 35 days, last 5 in each row lit up differently per habit
+  const totalDots = 21;
+  const completedCounts = [14, 7, 21];
+
+  return (
+    <div className="w-full px-1 space-y-3">
+      {habits.map((h, hi) => {
+        const done = completedCounts[hi];
+        return (
+          <div key={h.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+            {/* Emoji */}
+            <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0 text-sm leading-none">
+              {h.emoji}
+            </div>
+            {/* Name + progress */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[0.7rem] font-semibold text-white/85 truncate">{h.name}</p>
+              <p className="text-[0.55rem] text-white/30 mt-0.5">{h.count} / {h.target} days</p>
+            </div>
+            {/* Dot mini-grid: 7 dots showing last week */}
+            <div className="flex gap-1 shrink-0">
+              {Array.from({ length: 7 }, (_, i) => {
+                const filled = i < (done % 7 === 0 ? 7 : done % 7) || done >= totalDots;
+                const isGoalDot = i === 6 && h.count === h.target;
+                return (
+                  <div
+                    key={i}
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      backgroundColor: isGoalDot
+                        ? ACCENT
+                        : filled
+                        ? "rgba(255,255,255,0.75)"
+                        : "rgba(255,255,255,0.08)",
+                    }}
+                  />
+                );
+              })}
+            </div>
+            {/* Count */}
+            <span className="text-[0.75rem] font-bold tabular-nums shrink-0" style={{ color: ACCENT }}>
+              {h.count}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* Bottom: total streak fire */}
+      <div className="flex items-center justify-center gap-1.5 pt-1">
+        <Flame className="h-3.5 w-3.5" style={{ color: ACCENT }} strokeWidth={1.5} />
+        <span className="text-[0.65rem] font-medium" style={{ color: ACCENT }}>3 habits · best streak 21 days</span>
+      </div>
+    </div>
+  );
+}
+
 function SearchPreview() {
   const results: { Icon: React.FC<{ className?: string; strokeWidth?: number }>; label: string; meta: string }[] = [
     { Icon: Receipt,  label: "Coffee & breakfast",   meta: "Today · $9.50"      },
@@ -1495,6 +1560,7 @@ const ORGANIZE_CARDS: FeatureCardData[] = [
   { tag: "LISTS",    Icon: List,     highlighted: "Groceries, errands,",  rest: "anything. Just say it.",   from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)",  preview: <ListsPreview />    },
   { tag: "CALENDAR", Icon: Calendar, highlighted: "Your whole week,",     rest: "organized instantly.",     from: "#120900", to: "#221400", glow: "rgba(251,146,60,0.10)",  preview: <CalendarPreview /> },
   { tag: "JOURNAL",  Icon: BookOpen, highlighted: "Capture thoughts,",    rest: "track what matters.",      from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.10)", preview: <JournalPreview />  },
+  { tag: "STREAKS",  Icon: Flame,    highlighted: "Build habits,",        rest: "don't break the chain.",   from: "#1a0800", to: "#2d1200", glow: "rgba(255,154,20,0.10)",  preview: <StreaksPreview />  },
   { tag: "SEARCH",   Icon: Search,   highlighted: "Find anything",        rest: "across your entire life.", from: "#031a1a", to: "#063028", glow: "rgba(45,212,191,0.10)",  preview: <SearchPreview />   },
 ];
 
