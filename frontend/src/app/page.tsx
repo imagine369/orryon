@@ -8,7 +8,7 @@ const StarEight = ({ className }: { className?: string }) => (
   </svg>
 );
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon, Flame } from "lucide-react";
+import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon, Flame, Dumbbell, Droplets } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
@@ -1463,12 +1463,11 @@ function StreaksPreview() {
   const ACCENT = "#ff9a14";
 
   const habits = [
-    { emoji: "🏋️", name: "Workout",       count: 14, target: 30 },
-    { emoji: "📚", name: "Read 30 mins",   count: 7,  target: 21 },
-    { emoji: "💧", name: "Drink water",    count: 21, target: 30 },
+    { Icon: Dumbbell,  name: "Workout",      count: 14, target: 30 },
+    { Icon: BookOpen,  name: "Read 30 mins", count: 7,  target: 21 },
+    { Icon: Droplets,  name: "Drink water",  count: 21, target: 30 },
   ];
 
-  // Mini 5-week dot grid — last 35 days, last 5 in each row lit up differently per habit
   const totalDots = 21;
   const completedCounts = [14, 7, 21];
 
@@ -1478,9 +1477,9 @@ function StreaksPreview() {
         const done = completedCounts[hi];
         return (
           <div key={h.name} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02]">
-            {/* Emoji */}
-            <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0 text-sm leading-none">
-              {h.emoji}
+            {/* Icon */}
+            <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0">
+              <h.Icon className="h-3.5 w-3.5 text-white/50" strokeWidth={1.5} />
             </div>
             {/* Name + progress */}
             <div className="flex-1 min-w-0">
