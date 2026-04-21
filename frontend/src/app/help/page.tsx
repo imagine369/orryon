@@ -251,7 +251,7 @@ const FAQ: FAQCategory[] = [
       },
       {
         q: "Is my data private?",
-        a: "Your data is encrypted in transit and stored securely. Orryon never sells your data. You can export or permanently delete everything at any time from Settings \u2192 Data.",
+        a: "Orryon knows a lot about you \u2014 your spending, your goals, your thoughts. That makes privacy non-negotiable. We don\u2019t sell your data, we don\u2019t show you ads, and we don\u2019t share anything with third parties. You pay for Orryon directly. That\u2019s the whole deal.\n\nHere\u2019s exactly what that means:\n\u2022 We don\u2019t sell your data. Ever.\n\u2022 No ads. No advertisers. No one watching.\n\u2022 Everything you share stays between you and Orryon.\n\u2022 You pay us directly \u2014 that\u2019s how we make money, not from your data.\n\u2022 Your data is encrypted at rest and in transit.\n\u2022 You can export or delete everything, anytime, in Settings.",
       },
     ],
   },
@@ -323,7 +323,7 @@ function SearchResult({
         />
       </div>
       {open && (
-        <p className="text-sm text-white/40 leading-relaxed mt-3 pr-6">
+        <p className="text-sm text-white/40 leading-relaxed mt-3 pr-6 whitespace-pre-line">
           {item.a}
         </p>
       )}
@@ -396,7 +396,7 @@ function CategoryDetail({ category }: { category: FAQCategory }) {
                 />
               </div>
               {isOpen && (
-                <p className="text-sm text-white/40 leading-relaxed mt-3 pr-6">
+                <p className="text-sm text-white/40 leading-relaxed mt-3 pr-6 whitespace-pre-line">
                   {item.a}
                 </p>
               )}
