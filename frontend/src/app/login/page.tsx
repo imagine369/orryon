@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -164,8 +165,29 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-black">
-      <div className="px-4 pt-4 flex items-center justify-end shrink-0">
-        <Link href="/" className="text-white/50 hover:text-white p-1">
+      <div className="px-4 pt-4 flex items-center justify-between shrink-0">
+        <Link
+          href="/"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          aria-label="Orryon home"
+        >
+          <Image
+            src="/avatar.png"
+            alt="Orryon"
+            width={28}
+            height={28}
+            className="rounded-full object-cover ring-1 ring-white/10"
+            priority
+          />
+          <span className="text-white font-extrabold tracking-widest uppercase text-sm font-[family-name:var(--font-playfair)]">
+            ORRYON
+          </span>
+        </Link>
+        <Link
+          href="/"
+          className="text-white/50 hover:text-white p-1"
+          aria-label="Close"
+        >
           <X className="h-5 w-5" strokeWidth={1.5} />
         </Link>
       </div>
