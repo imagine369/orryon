@@ -6,8 +6,9 @@ Public endpoints (no auth required):
     GET  /api/waitlist/check        — Check if an email is approved.
 
 Admin endpoints (secret-key protected):
-    GET  /api/admin/waitlist            — Download the full waitlist as CSV.
-    GET  /api/admin/waitlist/approve    — Approve an email (one-click from notification).
+    GET    /api/admin/waitlist            — Download the full waitlist as CSV.
+    GET    /api/admin/waitlist/approve    — Approve an email (one-click from notification).
+    DELETE /api/admin/waitlist            — Remove a single email from the waitlist.
 """
 
 from __future__ import annotations
@@ -283,6 +284,39 @@ async def approve_waitlist(email: str = "", secret: str = ""):
     _send_welcome_email(email)
 
     return {"status": "approved", "email": email, "message": f"{email} has been approved and notified."}
+
+
+@router.delete("/api/admin/waitlist")
+async def delete_waitlist_entry(email: str = "", secret: str = ""):
+    """Remove a single email from the waitlist. Admin-only.
+
+    Usage:
+        curl -X DELETE \\
+          "https://api.orryon.com/api/admin/waitlist?email=foo@bar.com&secret=<ADMIN_SECRET>"
+    """
+    _verify_admin_secret(secret)
+
+    email = email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required.")
+    if len(email) > _EMAIL_MAX_LEN:
+        raise HTTPException(status_code=422, detail="Email address is too long.")
+    _assert_header_safe(email, "Email")
+
+    conn = db.get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id FROM waitlist WHERE email = ?", (email,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Email not on waitlist.")
+        conn.execute("DELETE FROM waitlist WHERE email = ?", (email,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    logger.info("Admin deleted waitlist entry: %s", email)
+    return {"status": "deleted", "email": email}
 
 
 @router.get("/api/admin/email-test")

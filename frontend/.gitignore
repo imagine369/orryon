@@ -40,9 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# data files
-waitlist.json
-
 # AI assistant files
 AGENTS.md
 CLAUDE.md
