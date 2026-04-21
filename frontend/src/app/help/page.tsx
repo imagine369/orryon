@@ -206,10 +206,6 @@ const FAQ: FAQCategory[] = [
         a: "A guided breathing or grounding session. Open the Reset tab, pick an anchor (like Box Breathing or Evening Release), and follow the orb. Your mood before and after is tracked so Orryon can learn which resets work best for you.",
       },
       {
-        q: "Does the orb speak?",
-        a: "Yes. The orb uses a calm voice to guide you through each step. On supported devices it uses AI-generated speech; otherwise it falls back to your browser\u2019s built-in voice.",
-      },
-      {
         q: "Can I ask Orryon about my wellness history?",
         a: "Yes. Orryon tracks every session you complete, including which anchor you used, how long you went, and your mood before and after. Ask things like \u201cHow many times did I do breathwork last week?\u201d, \u201cWhich reset anchor works best for me?\u201d, or \u201cCompare my wellness this week vs last week.\u201d",
       },
