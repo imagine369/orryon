@@ -14,6 +14,17 @@ import { PillButton } from "@/components/pill-cta";
 const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "";
 const ANNUAL_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "";
 
+// Beta flag: when enabled, signup bypasses Stripe Checkout and drops the new
+// user straight into /home. Their 14-day trial is already provisioned on the
+// backend (users.plan='trial', trial_ends_at set at account creation — see
+// db.py:819). When the trial expires, backend `resolve_plan` auto-downgrades
+// them to 'free' and the in-app TrialBanner surfaces the upgrade CTA, which
+// *does* route through Stripe Checkout — so revenue path is unaffected, only
+// the signup-time friction is removed. Default off to preserve prior
+// behaviour; flip on for beta by setting NEXT_PUBLIC_NO_CARD_TRIAL=true.
+const NO_CARD_TRIAL: boolean =
+  (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
+
 const PRO_FEATURES = [
   "Full access to your personal concierge",
   "Easy voice input",
@@ -132,7 +143,13 @@ export default function LoginPage() {
       // calls authenticate via that cookie automatically. A user who abandons
       // Stripe checkout will stay signed in as a free-tier user and hit the
       // server-enforced paywall on protected endpoints — the real gate.
-      if (priceId) {
+      //
+      // Beta bypass: when NO_CARD_TRIAL is set, skip the Stripe redirect
+      // entirely. The user lands in /home with their 14-day trial active.
+      // The paywall still fires on day 15 via the in-app TrialBanner's
+      // upgrade button, which *does* hit Stripe Checkout — so this only
+      // removes friction at the very front door, not the monetisation path.
+      if (priceId && !NO_CARD_TRIAL) {
         const origin = window.location.origin;
         const data = await api.post<{ checkout_url: string }>(
           "/api/subscription/checkout",
@@ -259,7 +276,7 @@ export default function LoginPage() {
               Start 14-day free trial
             </PillButton>
             <p className="text-center text-xs text-white/25">
-              {MONTHLY_PRICE_ID
+              {MONTHLY_PRICE_ID && !NO_CARD_TRIAL
                 ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
                 : "No credit card required. Cancel anytime during your trial."}
             </p>
