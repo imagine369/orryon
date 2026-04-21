@@ -61,10 +61,6 @@ const FAQ: FAQCategory[] = [
         q: "Can Orryon remember everything I put in?",
         a: "Yes. Orryon has access to all your data across every feature \u2014 transactions, journal entries, streaks, reset sessions, lists, goals, calendar events, and more. You can ask questions that span any of these: \u201cHow much did I spend on food last month?\u201d, \u201cHow many times did I do breathwork last week?\u201d, \u201cSummarize what I wrote about Edward in my journal.\u201d Orryon looks it up, does the math, and gives you a clear answer.",
       },
-      {
-        q: "What\u2019s demo mode?",
-        a: "Demo mode lets you explore the app without creating an account. Your data stays on the current device only and won\u2019t sync. To get the full experience with cross-device sync, sign up with your email.",
-      },
     ],
   },
   {
