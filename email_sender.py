@@ -40,6 +40,54 @@ logger = logging.getLogger(__name__)
 _IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
 
 
+# ── Brand assets for email templates ─────────────────────────────────────────
+#
+# Every transactional email renders the same header: the orryon mascot avatar
+# above the ORRYON wordmark, centred, on the dark email canvas. Keep the
+# treatment identical to the website's nav wordmark so the brand reads the
+# same on web and in the inbox.
+#
+# * AVATAR_URL defaults to the live public asset at www.orryon.com so Gmail
+#   / Outlook / Apple Mail can fetch it directly. If you move assets to a
+#   CDN, override via env without a code change.
+# * Custom web fonts (Playfair Display) are dropped by almost every mail
+#   client. Georgia is the universal premium-serif fallback and ships on
+#   macOS, iOS, Windows, and Android — it gives the same editorial feel at
+#   small wordmark sizes.
+# * Remote images are blocked by default in some clients (Outlook, older
+#   Gmail). The wordmark underneath is live text, so if the avatar is
+#   blocked the email still reads as ORRYON-branded.
+ORRYON_AVATAR_URL = os.getenv("ORRYON_AVATAR_URL", "https://www.orryon.com/avatar.png")
+ORRYON_SITE_URL = os.getenv("ORRYON_SITE_URL", "https://www.orryon.com")
+
+
+def orryon_email_header_html() -> str:
+    """Return the shared branded email header: avatar + ORRYON wordmark.
+
+    Call this at the top of every outbound HTML template (waitlist admin
+    notification, welcome, contact form, OTP, reminder, digest, weekly
+    report) so brand treatment stays in one place. Downstream tweaks —
+    swap the mascot, retune the tracking, add a tagline — happen once.
+
+    Returns a fully-formed `<tr>` row meant to be dropped inside the
+    existing inner `<table>` of each email template.
+    """
+    return (
+        '<tr>'
+        '<td align="center" style="padding-bottom:28px;">'
+        f'<img src="{ORRYON_AVATAR_URL}" alt="orryon" '
+        'width="64" height="64" '
+        'style="display:block;width:64px;height:64px;border-radius:50%;'
+        'margin:0 auto 14px;background:#000;" />'
+        '<div style="font-family:\'Playfair Display\',Georgia,'
+        '\'Times New Roman\',serif;font-size:22px;font-weight:800;'
+        'letter-spacing:6px;text-transform:uppercase;color:#ffffff;'
+        'line-height:1;">ORRYON</div>'
+        '</td>'
+        '</tr>'
+    )
+
+
 def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool:
     """Send using Resend's HTTP API — works on Railway (no SMTP ports needed)."""
     payload = json.dumps({
@@ -102,12 +150,7 @@ def _build_email(to_email: str, code: str) -> MIMEMultipart:
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;
-                           letter-spacing:-0.5px;">💰 orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <p style="margin:0;font-size:16px;color:#aaa;">
@@ -410,12 +453,7 @@ def _build_reminder_email(
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;
-                           letter-spacing:-0.5px;">&#128176; orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <p style="margin:0;font-size:14px;color:#00c9ff;
@@ -584,12 +622,7 @@ def send_daily_digest(
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;
-                           letter-spacing:-0.5px;">&#128176; orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:20px;">
               <p style="margin:0;font-size:18px;font-weight:700;color:#fff;">
@@ -707,11 +740,7 @@ def send_weekly_report(
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">&#128176; orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:20px;">
               <p style="margin:0;font-size:18px;font-weight:700;color:#fff;">

@@ -21,7 +21,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.cache import check_rate_limit_async
-from email_sender import _send_email
+from email_sender import _send_email, orryon_email_header_html
 from config import SMTP_ENABLED, SMTP_FROM, SMTP_USER
 
 router = APIRouter(tags=["contact"])
@@ -84,10 +84,10 @@ def _build_contact_email(
       <td align="center" style="padding:40px 20px;">
         <table width="480" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
+          {orryon_email_header_html()}
           <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:24px;font-weight:700;letter-spacing:-0.5px;">&#128176; orryon</span>
-              <p style="margin:6px 0 0;font-size:12px;color:#555;letter-spacing:0.5px;">
+            <td align="center" style="padding-bottom:18px;">
+              <p style="margin:0;font-size:12px;color:#555;letter-spacing:0.5px;">
                 New message from orryon.com
               </p>
             </td>
