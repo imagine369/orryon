@@ -35,7 +35,7 @@ from pydantic import BaseModel
 import db
 from backend.cache import check_rate_limit_async
 from config import RESEND_ENABLED, SMTP_ENABLED, SMTP_FROM, SMTP_USER, CONTACT_EMAIL
-from email_sender import _send_email, smtp_diagnostics
+from email_sender import _send_email, orryon_email_header_html, smtp_diagnostics
 
 APP_URL = os.getenv("APP_URL", "https://www.orryon.com")
 API_URL = os.getenv("API_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://api.orryon.com"))
@@ -201,11 +201,7 @@ def _notify_admin(email: str, joined_at: str, total: int, approve_token: str) ->
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">&#128176; orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <p style="margin:0;font-size:14px;color:#92fe9d;
@@ -489,11 +485,7 @@ def _send_welcome_email(email: str) -> None:
       <td align="center" style="padding:40px 20px;">
         <table width="420" cellpadding="0" cellspacing="0"
                style="background:#111;border-radius:16px;padding:40px;">
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">&#128176; orryon</span>
-            </td>
-          </tr>
+          {orryon_email_header_html()}
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <p style="margin:0;font-size:14px;color:#92fe9d;
