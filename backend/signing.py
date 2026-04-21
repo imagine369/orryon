@@ -79,10 +79,10 @@ def _signing_mode() -> str:
     mode = (os.getenv("REQUEST_SIGNING_MODE") or "").strip().lower()
     if mode in {"off", "warn", "enforce"}:
         return mode
-    # No explicit mode → off in dev, warn in prod. Deliberately conservative:
-    # a misconfigured prod environment shouldn't silently drop the protection.
-    is_prod = (os.getenv("NODE_ENV") or "").lower() == "production"
-    return "warn" if is_prod else "off"
+    # No explicit mode → off in dev, enforce in prod. Fail closed: any
+    # non-local environment enforces signatures by default.
+    from backend.deps import IS_LOCAL_DEV
+    return "off" if IS_LOCAL_DEV else "enforce"
 
 
 def derive_signing_key(user_id: str, iat: int) -> str:

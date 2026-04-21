@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
-from backend.auth import create_token, get_current_user
+from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import check_rate_limit_async
 from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION, MONTHLY_SPEND_CAP_USD, resolve_plan
 from backend.schemas import (
@@ -47,6 +47,14 @@ router = APIRouter(tags=["account"])
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 
+_SETTINGS_READ_FIELDS = {
+    "id", "email", "display_name", "created_at", "plan", "trial_ends_at",
+    "currency", "budget_cycle_start", "spending_alert_pct",
+    "default_reminder_minutes", "daily_digest_enabled", "daily_digest_time",
+    "weekly_report_enabled", "bill_due_alert_days",
+}
+
+
 @router.get("/api/settings")
 async def get_settings(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
@@ -54,7 +62,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
         row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
-    d = dict(row)
+    d = {k: v for k, v in dict(row).items() if k in _SETTINGS_READ_FIELDS}
     d["smtp_enabled"] = SMTP_ENABLED
     d["ai_connected"] = bool(XAI_API_KEY)
     d["grok_model"] = os.getenv("GROK_MODEL", "grok-3-mini")
@@ -111,7 +119,11 @@ async def email_change_send_code(body: EmailChangeSendReq, user: dict = Depends(
 
 
 @router.post("/api/settings/email-change/verify")
-async def email_change_verify(body: EmailChangeVerifyReq, user: dict = Depends(get_current_user)):
+async def email_change_verify(
+    body: EmailChangeVerifyReq,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
     new_email = body.new_email.strip().lower()
     if not verify_code(new_email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
@@ -123,7 +135,11 @@ async def email_change_verify(body: EmailChangeVerifyReq, user: dict = Depends(g
     if existing:
         raise HTTPException(400, "That email is already in use")
     update_row("users", {"email": new_email}, {"id": uid})
-    token = create_token(uid, new_email)
+    ua = request.headers.get("user-agent", "")
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+    if ip and "," in ip:
+        ip = ip.split(",")[0].strip()
+    token = create_token(uid, new_email, device_name=_parse_device_name(ua), ip_address=ip)
     return {"token": token, "email": new_email}
 
 
@@ -374,7 +390,8 @@ async def get_subscription(user: dict = Depends(get_current_user)):
 # Vercel preview URLs working even when env vars point elsewhere — the real
 # Orryon domain list lives in `_TRUSTED_STRIPE_HOST_SUFFIXES` below.
 _TRUSTED_STRIPE_HOSTS = {"localhost", "127.0.0.1"}
-_TRUSTED_STRIPE_HOST_SUFFIXES = (".orryon.com", ".vercel.app")
+_TRUSTED_STRIPE_HOST_SUFFIXES = (".orryon.com",)
+_TRUSTED_STRIPE_HOST_PATTERNS = ("orryon",)  # only orryon*.vercel.app, not arbitrary
 
 
 def _validate_stripe_return_url(url: str, field: str) -> str:
@@ -399,6 +416,8 @@ def _validate_stripe_return_url(url: str, field: str) -> str:
     if host in _TRUSTED_STRIPE_HOSTS:
         return url
     if any(host == s.lstrip(".") or host.endswith(s) for s in _TRUSTED_STRIPE_HOST_SUFFIXES):
+        return url
+    if host.endswith(".vercel.app") and any(host.startswith(p) for p in _TRUSTED_STRIPE_HOST_PATTERNS):
         return url
 
     allowed: list[str] = []
@@ -527,6 +546,16 @@ async def stripe_webhook(request: Request):
         event = stripe_lib.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
     except stripe_lib.errors.SignatureVerificationError:
         raise HTTPException(400, "Invalid Stripe signature")
+
+    event_id = event.get("id", "")
+    if event_id:
+        from backend.cache import check_rate_limit_async
+        already_processed = not await check_rate_limit_async(
+            f"stripe_event:{event_id}", limit=1, window_seconds=86400
+        )
+        if already_processed:
+            logger.info("Skipping duplicate Stripe event %s", event_id)
+            return {"received": True}
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]

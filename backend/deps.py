@@ -22,11 +22,11 @@ from db import get_connection
 
 IS_PRODUCTION = os.getenv("NODE_ENV", "").lower() == "production"
 
-# Any non-local environment counts as "remote" and suppresses dev-only affordances
-# (on-screen OTP, unauthenticated demo login, etc.). This fixes the bug where
-# NODE_ENV="staging" silently enabled dev behaviour.
+# Fail closed: only explicitly local environments get dev affordances. An unset
+# or unrecognized NODE_ENV is treated as production to prevent accidental OTP
+# code leakage, demo login exposure, etc.
 _ENV = os.getenv("NODE_ENV", "").lower()
-IS_LOCAL_DEV = _ENV in {"", "dev", "development", "local"}
+IS_LOCAL_DEV = _ENV in {"dev", "development", "local"}
 
 # Demo login must be explicitly opted into. It was previously just "not production",
 # which meant any misconfigured deployment (e.g. NODE_ENV unset) exposed the demo
