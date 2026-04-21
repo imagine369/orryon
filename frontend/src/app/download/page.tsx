@@ -20,7 +20,7 @@ import {
 import { FadeIn } from "@/components/motion";
 import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
-import { usePwaInstall } from "@/lib/use-pwa-install";
+import { usePwaInstall, platformLabel } from "@/lib/use-pwa-install";
 
 type PlatformTab = "pwa" | "ios" | "android" | "desktop";
 
@@ -33,12 +33,14 @@ const FEATURES = [
 
 export default function DownloadPage() {
   const { isInstallable, isInstalled, isIos, platform, install } = usePwaInstall();
+  const label = platformLabel(platform);
   const [activeTab, setActiveTab] = useState<PlatformTab>("pwa");
   const [installTriggered, setInstallTriggered] = useState(false);
 
   useEffect(() => {
     if (platform === "ios") setActiveTab("ios");
     else if (platform === "android") setActiveTab("android");
+    else if (platform === "mac" || platform === "windows" || platform === "linux") setActiveTab("desktop");
   }, [platform]);
 
   const handleInstall = async () => {
@@ -92,18 +94,26 @@ export default function DownloadPage() {
             </motion.div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
-              Download Orryon
+              Download for {label}
             </h1>
             <p className="text-white/40 max-w-md text-[15px] leading-relaxed">
-              Your AI concierge, always within reach. Install Orryon on any device for a faster, native-like experience.
+              Your AI concierge, always within reach. Full-screen, home screen icon, no browser chrome.
             </p>
 
-            {isInstalled && (
-              <div className="mt-5 flex items-center gap-2 px-4 py-2 rounded-full border border-green-500/20 bg-green-500/10">
+            {isInstalled ? (
+              <div className="mt-6 flex items-center gap-2 px-4 py-2.5 rounded-full border border-green-500/20 bg-green-500/10">
                 <Check className="h-4 w-4 text-green-400" strokeWidth={2} />
                 <span className="text-sm text-green-400 font-medium">Orryon is installed on this device</span>
               </div>
-            )}
+            ) : (isInstallable || isIos) ? (
+              <button
+                onClick={isIos ? undefined : handleInstall}
+                className="mt-6 flex items-center gap-2 px-6 py-3 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition active:scale-[0.98]"
+              >
+                <Download className="h-4 w-4" strokeWidth={2} />
+                {installTriggered ? "Installing…" : `Download for ${label}`}
+              </button>
+            ) : null}
           </FadeIn>
 
           {/* Platform tabs */}
@@ -257,13 +267,13 @@ export default function DownloadPage() {
                     taskbar icon, and runs independently from your browser.
                   </p>
 
-                  {isInstallable && platform === "desktop" && !isInstalled ? (
+                  {isInstallable && (platform === "desktop" || platform === "mac" || platform === "windows" || platform === "linux") && !isInstalled ? (
                     <button
                       onClick={handleInstall}
                       className="w-full flex items-center justify-center gap-2 py-3.5 bg-white text-black text-sm font-semibold rounded-xl hover:bg-gray-100 transition active:scale-[0.98] mb-5"
                     >
                       <Download className="h-4 w-4" strokeWidth={2} />
-                      Install for Desktop
+                      Download for {label}
                     </button>
                   ) : isInstalled ? (
                     <div className="w-full flex items-center justify-center gap-2 py-3.5 border border-green-500/20 bg-green-500/5 text-green-400 text-sm font-medium rounded-xl mb-5">

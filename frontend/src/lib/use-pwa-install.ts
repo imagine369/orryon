@@ -7,7 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-type Platform = "ios" | "android" | "desktop" | "unknown";
+type Platform = "ios" | "android" | "mac" | "windows" | "linux" | "desktop" | "unknown";
 
 const DISMISS_KEY = "orryon_install_dismissed";
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -19,7 +19,21 @@ function detectPlatform(): Platform {
     return "ios";
   }
   if (/Android/i.test(ua)) return "android";
+  if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) return "mac";
+  if (/Win32|Win64|Windows|WinCE/.test(ua)) return "windows";
+  if (/Linux/.test(ua)) return "linux";
   return "desktop";
+}
+
+export function platformLabel(platform: Platform): string {
+  switch (platform) {
+    case "ios":     return "iPhone";
+    case "android": return "Android";
+    case "mac":     return "Mac";
+    case "windows": return "Windows";
+    case "linux":   return "Linux";
+    default:        return "your device";
+  }
 }
 
 function isStandalone(): boolean {
@@ -103,12 +117,14 @@ export function usePwaInstall() {
 
   const showPrompt = isInstallable && !isInstalled && !dismissed;
   const isIos = platform === "ios";
+  const label = platformLabel(platform);
 
   return {
     isInstallable,
     isInstalled,
     isIos,
     platform,
+    label,
     showPrompt,
     install,
     dismiss,

@@ -15,7 +15,6 @@ import { api } from "@/lib/api";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { SearchPanel } from "@/components/search-panel";
-import { InstallButton } from "@/components/install-prompt";
 import { usePanels } from "@/lib/panel-context";
 
 // ── Priority system (Todoist-style) ─────────────────────────────────────────
@@ -347,8 +346,6 @@ export function NavBar() {
           >
             <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />
           </button>
-
-          <InstallButton variant="navbar" />
 
           <button
             onClick={() => toggle("settings")}
