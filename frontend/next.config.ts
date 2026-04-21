@@ -6,6 +6,9 @@ import withPWA from "@ducanh2912/next-pwa";
 // ── Content Security Policy ──────────────────────────────────────────────────
 // Allowlist-based (not nonce-based) so we don't need per-request middleware or
 // force pages into dynamic rendering. Opened only where specific deps require:
+//  - `'unsafe-inline'` on script-src is required because Next.js App Router
+//    embeds React Server Component payloads as inline <script> tags. Without it
+//    (and without nonce-based CSP) the page fails to hydrate in production.
 //  - `'wasm-unsafe-eval'` covers wasm-heavy clients (sqlite-wasm, TF, etc.)
 //  - `'unsafe-inline'` on style-src is unavoidable while using Tailwind JIT
 //    and inline `style` props in React components.
@@ -25,10 +28,11 @@ const cspDirectives: Record<string, string[]> = {
   "default-src": ["'self'"],
   "script-src": [
     "'self'",
+    "'unsafe-inline'",
     "'wasm-unsafe-eval'",
     "https://*.sentry.io",
     "https://browser.sentry-cdn.com",
-    ...(IS_DEV ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
+    ...(IS_DEV ? ["'unsafe-eval'"] : []),
   ],
   "style-src": ["'self'", "'unsafe-inline'"],
   "img-src": ["'self'", "data:", "blob:", "https:"],
