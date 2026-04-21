@@ -40,6 +40,23 @@ from email_sender import _send_email, smtp_diagnostics
 APP_URL = os.getenv("APP_URL", "https://www.orryon.com")
 API_URL = os.getenv("API_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://api.orryon.com"))
 
+# Base URL embedded in the admin "Approve User" email button. We deliberately
+# default to the customer-facing frontend domain (APP_URL) rather than the
+# backend's API host:
+#
+#   * Reliability — the marketing site is how users reach orryon in the first
+#     place, so it's always DNS-live. The backend's custom domain
+#     (api.orryon.com) is optional and has historically been the source of 404s
+#     when the CNAME drifts out of sync with Railway.
+#   * Forwarding — the Next.js `/api/[[...path]]` catch-all route proxies every
+#     `/api/*` request (including admin GETs with query strings) straight to
+#     this backend. Approve links that go through the frontend domain always
+#     reach the right backend, regardless of which Railway URL it's on.
+#   * Overridable — set APPROVE_URL_BASE in the backend env to pin a specific
+#     host if you ever want the raw API URL (e.g. for internal-only admin
+#     tooling that shouldn't transit the public frontend).
+_APPROVE_URL_BASE = os.getenv("APPROVE_URL_BASE", APP_URL).rstrip("/")
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["waitlist"])
 
@@ -155,8 +172,11 @@ def _notify_admin(email: str, joined_at: str, total: int, approve_token: str) ->
         # Token-only URL — no shared secret in query string. If this email is
         # ever forwarded, screenshotted, or pulled from a log, the worst an
         # attacker can do is approve this one pending signup before the admin.
+        # URL targets the frontend domain; the Next.js catch-all `/api/*`
+        # proxy forwards it to this backend transparently (see
+        # `_APPROVE_URL_BASE` notes above).
         approve_url = (
-            f"{API_URL}/api/admin/waitlist/approve"
+            f"{_APPROVE_URL_BASE}/api/admin/waitlist/approve"
             f"?token={urlquote(approve_token, safe='')}"
         )
         safe_email = _html.escape(email, quote=True)
