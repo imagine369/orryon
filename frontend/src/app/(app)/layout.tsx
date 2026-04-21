@@ -10,6 +10,7 @@ import { DashboardPanel } from "@/components/dashboard-panel";
 import { SettingsPanel } from "@/components/settings-panel";
 import { StreakPanel } from "@/components/streak-panel";
 import { JournalPanel } from "@/components/journal-panel";
+import { ResetAnchorPanel } from "@/components/reset-anchor-panel";
 import { TrialBanner } from "@/components/trial-banner";
 import { InstallPrompt } from "@/components/install-prompt";
 import { useSubscription } from "@/lib/use-subscription";
@@ -57,6 +58,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <SettingsPanel />
       <StreakPanel />
       <JournalPanel />
+      <ResetAnchorPanel />
       <InstallPrompt />
     </div>
   );

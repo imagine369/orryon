@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from "react";
 
-type Panel = "dashboard" | "settings" | "streaks" | "journal" | null;
+type Panel = "dashboard" | "settings" | "streaks" | "journal" | "reset" | null;
 
 interface PanelContextValue {
   openPanel: Panel;

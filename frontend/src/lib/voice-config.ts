@@ -13,20 +13,31 @@
  * and `rex` too corporate.
  */
 
-/** xAI TTS voice ID for Orryon. */
+/** xAI TTS voice ID for Orryon — the assistant's chat voice. */
 export const ORRYON_VOICE_ID = "sal" as const;
+
+/**
+ * Orb voice — used exclusively for breathing and Reset Anchor sessions.
+ * Separate from Orryon so they feel like two distinct presences:
+ * Orryon speaks, Orb guides.
+ * `ara` is female, warm, and measured — closest xAI voice to the
+ * calm, unhurried presence we're after.
+ */
+export const ORB_VOICE_ID = "ara" as const;
 
 /** BCP-47 language code. English only for now; the model supports 20+. */
 export const ORRYON_VOICE_LANGUAGE = "en" as const;
 
 /**
  * Delivery mode for a given utterance.
- * - `chat`: normal assistant replies (budgeting, tips, celebrations).
- *   Natural pace, no wrapping tags. The voice does the work.
- * - `breathing`: guided-breath prompts. Wrapped in `<slow>` with a `[pause]`
- *   inserted at sentence boundaries so counts land at the pace of a real breath.
+ * - `chat`: normal assistant replies. Natural pace, no wrapping tags.
+ * - `breathing`: guided-breath prompts. Wrapped in `<slow>` with pauses at
+ *   sentence boundaries so counts land at the pace of a real breath.
+ * - `anchor`: reset anchor session cues. Maximum stillness — very slow,
+ *   double pauses between phrases, silence after each sentence. Designed
+ *   for eyes-closed, Tolle-paced delivery.
  */
-export type VoiceMode = "chat" | "breathing";
+export type VoiceMode = "chat" | "breathing" | "anchor";
 
 /**
  * Apply mode-specific prosody tags to text before sending to xAI TTS.
@@ -43,12 +54,21 @@ export function shapeForVoice(text: string, mode: VoiceMode = "chat"): string {
     return clean;
   }
 
-  // Breathing mode: insert a brief pause after each sentence/clause so the
-  // user has space to actually inhale or exhale, then wrap the whole thing
-  // in <slow> for a noticeably calmer pace.
+  if (mode === "breathing") {
+    // Brief pause after each sentence/clause so counts land at breath pace.
+    const withPauses = clean
+      .replace(/([.!?])(\s+)/g, "$1 [pause] ")
+      .replace(/,(\s+)/g, ", [pause] ");
+    return `<slow>${withPauses}</slow>`;
+  }
+
+  // Anchor mode: maximum stillness. Double pauses after every sentence,
+  // single pause after every clause. The silence is the instruction.
   const withPauses = clean
-    .replace(/([.!?])(\s+)/g, "$1 [pause] ")
-    .replace(/,(\s+)/g, ", [pause] ");
+    .replace(/([.!?])(\s+|$)/g, "$1 [pause] [pause] ")
+    .replace(/,(\s+)/g, ", [pause] ")
+    .replace(/—/g, " [pause] ")
+    .replace(/\.\.\./g, " [pause] [pause] ");
 
   return `<slow>${withPauses}</slow>`;
 }

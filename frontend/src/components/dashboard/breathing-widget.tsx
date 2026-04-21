@@ -9,7 +9,7 @@ import { PillButton } from "@/components/pill-cta";
 // ── Shared constants ──────────────────────────────────────────────────────────
 
 const BG        = "linear-gradient(180deg, #0d2535 0%, #112e40 45%, #0c2233 100%)";
-const ORB_BG    = "linear-gradient(135deg, hsl(200,45%,68%) 0%, hsl(205,40%,52%) 50%, hsl(210,38%,38%) 100%)";
+const ORB_BG    = "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)";
 const FONT      = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // ── Tibetan bowl synthesizer ──────────────────────────────────────────────────
@@ -553,7 +553,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", marginBottom: "0.85rem" }}>
             <motion.div
-              style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: "rgba(255,255,255,.55)" }}
+              style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0, background: ORB_BG, opacity: 0.72 }}
               animate={{ scale: [1, 1.055, 1], boxShadow: ["0 0 0 1px rgba(255,255,255,0.22)", "0 0 0 1px rgba(255,255,255,0.40), 0 0 12px rgba(255,255,255,0.10)", "0 0 0 1px rgba(255,255,255,0.22)"] }}
               transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
             />

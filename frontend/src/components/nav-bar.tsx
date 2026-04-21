@@ -273,6 +273,32 @@ export function NavBar() {
             <Search className="h-5 w-5" strokeWidth={1.5} />
           </button>
 
+          {/* ── Reset Anchors orb — placed before notifications ── */}
+          <button
+            onClick={() => toggle("reset")}
+            className={cn(
+              "relative flex items-center justify-center rounded-lg p-2 transition-opacity",
+              openPanel === "reset" ? "opacity-100 bg-white/5" : "opacity-70 hover:opacity-100 hover:bg-white/5",
+            )}
+            aria-label="Reset Anchors"
+          >
+            <motion.div
+              animate={
+                openPanel === "reset"
+                  ? { scale: 1 }
+                  : { scale: [0.88, 1.0, 0.88] }
+              }
+              transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }}
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                opacity: 0.72,
+                background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
+              }}
+            />
+          </button>
+
           <button
             onClick={() => setNotifOpen((v) => !v)}
             className={cn(

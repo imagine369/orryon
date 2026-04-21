@@ -7,13 +7,15 @@ import { X, ChevronLeft, Check } from "lucide-react";
 import type { ResetAnchor, ResetAnimation } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
+import { textToSpeech } from "@/lib/voice";
+import { ORB_VOICE_ID } from "@/lib/voice-config";
 
 // ── Design tokens (consistent with breathing-widget.tsx) ─────────────────────
 
 // Navy-to-purple background
 const SESSION_BG  = "linear-gradient(180deg, #1e3a48 0%, #2d3a62 35%, #5a4872 68%, #7e6082 100%)";
 // Orb — warm pink center (shifted high) → lavender body → teal pools at the bottom
-const ORB_FILL    = "radial-gradient(circle at 50% 50%, transparent 60%, rgba(62,207,190,0.82) 77%, rgba(20,176,152,0.54) 100%), radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)";
+const ORB_FILL    = "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)";
 const ACCENT_TEXT = "rgba(255,255,255,0.88)";
 const MUTED_TEXT  = "rgba(255,255,255,0.42)";
 const FONT        = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -101,31 +103,22 @@ function BreathingOrb({
     return expanded ? 1.20 : 1.0;
   })();
 
-  const opacity = animation === "none" ? 0.45 : 1;
-
   return (
     <div
       style={{
         position: "relative",
-      width: "86vw",
-      height: "86vw",
-      maxWidth: 360,
-      maxHeight: 360,
+        width: "86vw",
+        height: "86vw",
+        maxWidth: 360,
+        maxHeight: 360,
+        borderRadius: "50%",
+        overflow: "hidden",
         transform: `scale(${scale})`,
         transition: "transform 4s ease-in-out",
-        opacity,
+        opacity: 0.72,
       }}
     >
-      {/* Outer teal glow — large, soft, bleeds far into background */}
-      <div style={{
-        position: "absolute",
-        inset: "-55%",
-        borderRadius: "50%",
-        background: "radial-gradient(ellipse at 50% 40%, rgba(62,207,186,0.06) 0%, rgba(62,207,186,0.02) 45%, transparent 65%)",
-        pointerEvents: "none",
-      }} />
-
-      {/* Gradient ring — bright teal at top, fading to soft purple at bottom */}
+      {/* Gradient ring — muted, consistent */}
       <svg
         viewBox="0 0 100 100"
         aria-hidden="true"
@@ -133,10 +126,9 @@ function BreathingOrb({
       >
         <defs>
           <linearGradient id="ra-ring-grad" x1="0.3" y1="0" x2="0.7" y2="1">
-            <stop offset="0%"   stopColor="#3ecfba" stopOpacity="1.0" />
-            <stop offset="35%"  stopColor="#7de0d2" stopOpacity="0.80" />
-            <stop offset="70%"  stopColor="#a8c8e8" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#8866a0" stopOpacity="0.15" />
+            <stop offset="0%"   stopColor="#3ecfba" stopOpacity="0.45" />
+            <stop offset="50%"  stopColor="#a8c8e8" stopOpacity="0.20" />
+            <stop offset="100%" stopColor="#8866a0" stopOpacity="0.08" />
           </linearGradient>
         </defs>
         <circle
@@ -148,14 +140,13 @@ function BreathingOrb({
         />
       </svg>
 
-      {/* Filled orb with teal outer glow */}
+      {/* Filled orb */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           borderRadius: "50%",
           background: ORB_FILL,
-          boxShadow: "0 0 35px rgba(62,207,186,0.07), 0 0 70px rgba(62,207,186,0.04), inset 0 0 20px rgba(219,168,197,0.06)",
         }}
       />
     </div>
@@ -317,10 +308,62 @@ function SessionScreen({
 
   const steps = anchor.steps;
 
-  // For box-breathing anchors with variable duration, we cycle the middle
-  // box-breath steps (indices 1–4 for QUICK_BOX) to fill the chosen duration.
-  // For all other anchors the steps are fixed.
   const isVariable = !!anchor.durationOptions;
+
+  // ── Orb voice playback ────────────────────────────────────────────────────
+  const orbAudio = useRef<HTMLAudioElement | null>(null);
+  const orbBlobUrl = useRef<string | null>(null);
+  const orbAbort  = useRef<AbortController | null>(null);
+
+  const stopOrbAudio = useCallback(() => {
+    orbAbort.current?.abort();
+    orbAbort.current = null;
+    if (orbAudio.current) {
+      orbAudio.current.pause();
+      orbAudio.current.src = "";
+      orbAudio.current = null;
+    }
+    if (orbBlobUrl.current) {
+      URL.revokeObjectURL(orbBlobUrl.current);
+      orbBlobUrl.current = null;
+    }
+  }, []);
+
+  // Speak the cue for the current step via Orb voice (ara, anchor mode).
+  useEffect(() => {
+    const text = steps[stepIdx]?.text?.trim();
+    if (!text || !mounted) return;
+
+    stopOrbAudio();
+    const ctrl = new AbortController();
+    orbAbort.current = ctrl;
+
+    (async () => {
+      try {
+        const blob = await textToSpeech(text, ORB_VOICE_ID, "anchor");
+        if (ctrl.signal.aborted) return;
+
+        const url = URL.createObjectURL(blob);
+        orbBlobUrl.current = url;
+
+        const audio = new Audio(url);
+        orbAudio.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (orbBlobUrl.current === url) orbBlobUrl.current = null;
+          if (orbAudio.current === audio) orbAudio.current = null;
+        };
+        await audio.play();
+      } catch { /* audio unavailable or aborted — fail silently */ }
+    })();
+
+    return () => { ctrl.abort(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIdx, mounted]);
+
+  useEffect(() => {
+    return () => stopOrbAudio();
+  }, [stopOrbAudio]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100);
@@ -451,7 +494,7 @@ function SessionScreen({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: ACCENT_TEXT,
+                color: "rgba(255,255,255,0.52)",
                 lineHeight: 1.5,
                 letterSpacing: "-0.01em",
               }}
@@ -766,8 +809,7 @@ export function ResetAnchorSession({
   onUpdateCompletion,
   onMarkStreak,
 }: ResetAnchorSessionProps) {
-  const [screen,          setScreen]          = useState<Screen>("pre-mood");
-  const [preMood,         setPreMood]         = useState<MoodState | undefined>(undefined);
+  const [screen,          setScreen]          = useState<Screen>("session");
   const [completionId,    setCompletionId]    = useState<string | null>(null);
   const [sessionSecs,     setSessionSecs]     = useState(0);
   const [durationOptIdx,  setDurationOptIdx]  = useState(anchor.defaultDurationIndex ?? 0);
@@ -778,17 +820,12 @@ export function ResetAnchorSession({
 
   const durationSecs = resolvedDuration(anchor, durationOptIdx);
 
-  const handlePreMoodContinue = useCallback((mood?: MoodState) => {
-    setPreMood(mood);
-    setScreen("session");
-  }, []);
-
   const handleSessionComplete = useCallback((elapsed: number) => {
     setSessionSecs(elapsed);
-    const id = onAddCompletion(anchor.id, elapsed, preMood);
+    const id = onAddCompletion(anchor.id, elapsed, undefined);
     setCompletionId(id);
     setScreen("post-mood");
-  }, [anchor.id, preMood, onAddCompletion]);
+  }, [anchor.id, onAddCompletion]);
 
   const handlePostMoodDone = useCallback(
     (params: { postMood?: MoodState; note?: string; markStreak: boolean }) => {
@@ -833,7 +870,7 @@ export function ResetAnchorSession({
       >
         <div>
           <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT_TEXT }}>{anchor.title}</p>
-          {screen === "pre-mood" && anchor.durationOptions && (
+          {screen === "session" && anchor.durationOptions && (
             <DurationPicker
               options={anchor.durationOptions}
               selectedIdx={durationOptIdx}
@@ -862,23 +899,6 @@ export function ResetAnchorSession({
 
         {/* Screen content */}
         <AnimatePresence mode="wait">
-          {screen === "pre-mood" && (
-            <motion.div
-              key="pre-mood"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
-              style={{ display: "flex", flex: 1 }}
-            >
-              <PreMoodScreen
-                anchor={anchor}
-                onSkip={() => handlePreMoodContinue(undefined)}
-                onContinue={handlePreMoodContinue}
-              />
-            </motion.div>
-          )}
-
           {screen === "session" && (
             <motion.div
               key="session"
@@ -892,7 +912,7 @@ export function ResetAnchorSession({
                 anchor={anchor}
                 durationSecs={durationSecs}
                 onComplete={handleSessionComplete}
-                onBack={() => setScreen("pre-mood")}
+                onBack={onClose}
               />
             </motion.div>
           )}
