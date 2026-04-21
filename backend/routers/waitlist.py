@@ -21,6 +21,7 @@ import io
 import logging
 import os
 import re
+import secrets
 import uuid
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
@@ -80,6 +81,14 @@ async def join_waitlist(body: WaitlistRequest, request: Request):
         logger.warning("Global waitlist rate limit hit (ip=%s).", client_ip)
         raise HTTPException(status_code=429, detail="Waitlist signups are temporarily paused — try again shortly.")
 
+    # 256-bit URL-safe token embedded in the admin's "Approve User" email link.
+    # Random, per-signup, single-use — cleared from the row the moment an admin
+    # clicks approve. Replaces the old pattern of putting ADMIN_SECRET into
+    # query strings, which leaked the master credential into browser history,
+    # server access logs, and screenshots. Leaking one of these tokens can at
+    # worst approve one pending signup, once.
+    approve_token = secrets.token_urlsafe(32)
+
     conn = db.get_connection()
     try:
         cur = conn.cursor()
@@ -91,8 +100,9 @@ async def join_waitlist(body: WaitlistRequest, request: Request):
 
         now = datetime.now(timezone.utc).isoformat()
         cur.execute(
-            "INSERT INTO waitlist (id, email, created_at) VALUES (?, ?, ?)",
-            (str(uuid.uuid4()), email, now),
+            "INSERT INTO waitlist (id, email, created_at, approve_token) "
+            "VALUES (?, ?, ?, ?)",
+            (str(uuid.uuid4()), email, now, approve_token),
         )
         conn.commit()
 
@@ -104,14 +114,19 @@ async def join_waitlist(body: WaitlistRequest, request: Request):
     # Run the SMTP send off the event loop so signup latency stays low and a slow
     # SMTP server (up to the 15s timeout) never blocks the response.
     try:
-        await asyncio.to_thread(_notify_admin, email, now, total)
+        await asyncio.to_thread(_notify_admin, email, now, total, approve_token)
     except Exception as exc:  # noqa: BLE001 — we never want notification to break signup
         logger.warning("Admin notification dispatch failed for %s: %s", email, exc)
     return {"status": "added"}
 
 
-def _notify_admin(email: str, joined_at: str, total: int) -> None:
-    """Fire-and-forget email to admin when someone joins the waitlist."""
+def _notify_admin(email: str, joined_at: str, total: int, approve_token: str) -> None:
+    """Fire-and-forget email to admin when someone joins the waitlist.
+
+    `approve_token` is a per-signup, single-use random value. The admin's
+    "Approve User" button embeds this token (instead of ADMIN_SECRET) so the
+    URL stays useless to anyone who sees it after the admin clicks it once.
+    """
     admin = (CONTACT_EMAIL or "").strip()
     if not SMTP_ENABLED and not RESEND_ENABLED:
         logger.warning(
@@ -137,11 +152,12 @@ def _notify_admin(email: str, joined_at: str, total: int) -> None:
         msg["To"] = admin
         msg["Reply-To"] = admin
 
-        admin_secret = os.getenv("ADMIN_SECRET", "")
+        # Token-only URL — no shared secret in query string. If this email is
+        # ever forwarded, screenshotted, or pulled from a log, the worst an
+        # attacker can do is approve this one pending signup before the admin.
         approve_url = (
             f"{API_URL}/api/admin/waitlist/approve"
-            f"?email={urlquote(email, safe='')}"
-            f"&secret={urlquote(admin_secret, safe='')}"
+            f"?token={urlquote(approve_token, safe='')}"
         )
         safe_email = _html.escape(email, quote=True)
         safe_joined = _html.escape(joined_at, quote=True)
@@ -258,32 +274,118 @@ async def check_waitlist(email: str = ""):
 
 
 @router.get("/api/admin/waitlist/approve")
-async def approve_waitlist(email: str = "", secret: str = ""):
-    """One-click approve from the admin notification email."""
+async def approve_waitlist(token: str = "", email: str = "", secret: str = ""):
+    """Approve a waitlist entry.
+
+    Two auth paths are supported:
+
+    1. Token (preferred, used by the "Approve User" button in the admin's
+       notification email):
+
+           GET /api/admin/waitlist/approve?token=<per-signup-token>
+
+       The token is random 256-bit data stored on the waitlist row at signup
+       time. It's validated with a constant-time compare and **cleared on
+       success** — clicking the same link a second time returns 410 Gone.
+       A leaked token can, at worst, approve its one associated signup once.
+
+    2. Admin secret (legacy / recovery path, retained so operators can
+       approve from the CLI when the notification email didn't arrive):
+
+           GET /api/admin/waitlist/approve?email=foo@bar.com&secret=<ADMIN_SECRET>
+
+       NEVER open this variant in a browser — the secret will end up in
+       history, logs, and the address bar. Use curl from your terminal.
+    """
+    token = (token or "").strip()
+    if token:
+        return await _approve_by_token(token)
+
+    # Fall through to the legacy secret-based path.
     _verify_admin_secret(secret)
 
     email = email.strip().lower()
     if not email:
-        raise HTTPException(status_code=400, detail="Email required.")
+        raise HTTPException(status_code=400, detail="Email or token required.")
     _assert_header_safe(email, "Email")
 
     conn = db.get_connection()
     try:
-        row = conn.execute("SELECT id, approved FROM waitlist WHERE email = ?", (email,)).fetchone()
+        row = conn.execute(
+            "SELECT id, approved FROM waitlist WHERE email = ?", (email,)
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Email not on waitlist.")
 
         if row["approved"]:
             return {"status": "already_approved", "email": email}
 
-        conn.execute("UPDATE waitlist SET approved = 1 WHERE email = ?", (email,))
+        conn.execute(
+            "UPDATE waitlist SET approved = 1, approve_token = '' WHERE email = ?",
+            (email,),
+        )
         conn.commit()
     finally:
         conn.close()
 
     _send_welcome_email(email)
-
+    logger.info("Admin approved waitlist entry via secret: %s", email)
     return {"status": "approved", "email": email, "message": f"{email} has been approved and notified."}
+
+
+async def _approve_by_token(token: str) -> dict:
+    """Look up a waitlist row by its single-use approve_token and mark approved.
+
+    The token must be non-empty; we use constant-time compare on the DB value
+    to avoid timing side-channels even though 256 random bits are already
+    brute-force-infeasible. The token is cleared on successful approve, so
+    clicking the same link twice yields a clean 410 Gone instead of silently
+    re-approving or leaking "this token existed once".
+    """
+    # Brute-force protection is really just defence in depth — a 256-bit
+    # random value is already unreachable — but a sanity check keeps obvious
+    # garbage out of the DB lookup.
+    if len(token) < 16 or len(token) > 256:
+        raise HTTPException(status_code=400, detail="Invalid approval link.")
+
+    conn = db.get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id, email, approved, approve_token FROM waitlist "
+            "WHERE approve_token = ? AND approve_token != ''",
+            (token,),
+        ).fetchone()
+
+        if not row or not hmac.compare_digest(row["approve_token"] or "", token):
+            raise HTTPException(
+                status_code=410,
+                detail="This approval link has already been used or is invalid.",
+            )
+
+        if row["approved"]:
+            # Shouldn't happen (approve clears the token) but be graceful.
+            conn.execute(
+                "UPDATE waitlist SET approve_token = '' WHERE id = ?", (row["id"],)
+            )
+            conn.commit()
+            return {"status": "already_approved", "email": row["email"]}
+
+        conn.execute(
+            "UPDATE waitlist SET approved = 1, approve_token = '' WHERE id = ?",
+            (row["id"],),
+        )
+        conn.commit()
+        email = row["email"]
+    finally:
+        conn.close()
+
+    _send_welcome_email(email)
+    logger.info("Admin approved waitlist entry via token: %s", email)
+    return {
+        "status": "approved",
+        "email": email,
+        "message": f"{email} has been approved and notified.",
+    }
 
 
 @router.delete("/api/admin/waitlist")

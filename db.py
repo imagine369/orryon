@@ -492,10 +492,11 @@ CREATE TABLE IF NOT EXISTS user_api_spend (
 );
 
 CREATE TABLE IF NOT EXISTS waitlist (
-    id         TEXT PRIMARY KEY,
-    email      TEXT UNIQUE NOT NULL,
-    approved   INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL
+    id            TEXT PRIMARY KEY,
+    email         TEXT UNIQUE NOT NULL,
+    approved      INTEGER DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    approve_token TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS streaks (
@@ -598,6 +599,14 @@ _NOTES_EXTRA_COLS = {
     "entry_date": "TEXT DEFAULT ''",
 }
 
+# Per-signup single-use token for the admin "one-click approve" email link.
+# Having this on the row (instead of a shared ADMIN_SECRET in the URL) means a
+# leaked approve URL can only approve one specific pending signup, once, and is
+# useless the moment it's clicked. See backend/routers/waitlist.py for usage.
+_WAITLIST_EXTRA_COLS = {
+    "approve_token": "TEXT DEFAULT ''",
+}
+
 
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call multiple times."""
@@ -623,6 +632,7 @@ def _init_db_pg() -> None:
         _migrate_extra_cols_pg(cur, "users", _USERS_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "transactions", _TRANSACTIONS_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "notes", _NOTES_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "waitlist", _WAITLIST_EXTRA_COLS)
         conn.commit()
         logger.info("Postgres schema initialised")
     except Exception as exc:
@@ -656,6 +666,7 @@ def _init_db_sqlite() -> None:
     _migrate_sqlite_cols(conn, "users", _USERS_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "transactions", _TRANSACTIONS_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "notes", _NOTES_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "waitlist", _WAITLIST_EXTRA_COLS)
     conn.commit()
     conn.close()
     logger.info("SQLite database initialised at: %s", DB_PATH)
