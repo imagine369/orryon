@@ -20,9 +20,39 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from config import DB_PATH, DATABASE_URL
+from config import DB_PATH, DATABASE_URL, ENCRYPTION_KEY
 
 logger = logging.getLogger(__name__)
+
+# ── At-rest encryption (Fernet) ───────────────────────────────────────────────
+# Encrypts sensitive financial fields (balances, amounts) stored in the DB.
+# Enabled when ENCRYPTION_KEY is set. Transparent passthrough otherwise.
+
+_fernet = None
+if ENCRYPTION_KEY:
+    try:
+        from cryptography.fernet import Fernet
+        _fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+        logger.info("At-rest encryption enabled (Fernet)")
+    except Exception as exc:
+        logger.error("ENCRYPTION_KEY is set but invalid — encryption disabled: %s", exc)
+
+
+def encrypt_value(value: str) -> str:
+    """Encrypt a string value for storage. Returns plaintext if no key configured."""
+    if _fernet is None:
+        return value
+    return _fernet.encrypt(value.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_value(value: str) -> str:
+    """Decrypt a stored value. Returns as-is if not encrypted or no key configured."""
+    if _fernet is None:
+        return value
+    try:
+        return _fernet.decrypt(value.encode("utf-8")).decode("utf-8")
+    except Exception:
+        return value  # not encrypted (legacy data) — passthrough
 
 # ── Backend detection ──────────────────────────────────────────────────────────
 
@@ -355,6 +385,17 @@ CREATE TABLE IF NOT EXISTS budget_categories (
     UNIQUE(user_id, category, month)
 );
 
+CREATE TABLE IF NOT EXISTS budget_templates (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    planned     REAL DEFAULT 0,
+    rollover    INTEGER DEFAULT 0,
+    created_at  TEXT,
+    updated_at  TEXT,
+    UNIQUE(user_id, category)
+);
+
 CREATE TABLE IF NOT EXISTS grocery_items (
     id               TEXT PRIMARY KEY,
     user_id          TEXT NOT NULL,
@@ -456,6 +497,52 @@ CREATE TABLE IF NOT EXISTS waitlist (
     approved   INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS streaks (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    emoji       TEXT DEFAULT '',
+    target_days INTEGER,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS streak_days (
+    id          TEXT PRIMARY KEY,
+    streak_id   TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    date_key    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    UNIQUE(streak_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS reset_completions (
+    id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL,
+    anchor_id         TEXT NOT NULL,
+    date_key          TEXT NOT NULL,
+    duration          INTEGER NOT NULL,
+    pre_mood          TEXT,
+    post_mood         TEXT,
+    note              TEXT,
+    marked_for_streak INTEGER DEFAULT 0,
+    created_at        TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id           TEXT PRIMARY KEY,
+    last_reset_anchor TEXT
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    device_name TEXT DEFAULT '',
+    ip_address  TEXT DEFAULT '',
+    created_at  TEXT NOT NULL,
+    last_active TEXT NOT NULL,
+    revoked     INTEGER DEFAULT 0
+);
 """
 
 _SCHEMA_INDEXES = """
@@ -471,8 +558,15 @@ CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(em
 CREATE INDEX IF NOT EXISTS idx_user_lists_user ON user_lists(user_id);
 CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id);
 CREATE INDEX IF NOT EXISTS idx_budget_categories_user_month ON budget_categories(user_id, month);
+CREATE INDEX IF NOT EXISTS idx_budget_templates_user ON budget_templates(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_memory_user ON user_memory(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_streaks_user ON streaks(user_id);
+CREATE INDEX IF NOT EXISTS idx_streak_days_streak ON streak_days(streak_id);
+CREATE INDEX IF NOT EXISTS idx_streak_days_user_date ON streak_days(user_id, date_key);
+CREATE INDEX IF NOT EXISTS idx_reset_completions_user ON reset_completions(user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_completions_user_date ON reset_completions(user_id, date_key);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_revoked ON auth_sessions(user_id, revoked);
 """
 
 # Additional columns that may be missing on older databases.
@@ -581,6 +675,25 @@ def _migrate_sqlite_cols(conn, table: str, cols: dict) -> None:
 
 # ── Generic CRUD helpers ──────────────────────────────────────────────────────
 
+_ALLOWED_TABLES: frozenset[str] = frozenset({
+    "users", "transactions", "accounts", "holdings", "goals", "notes", "events",
+    "subscriptions", "credit_scores", "action_items", "links", "inspo_images",
+    "budget_categories", "budget_templates", "grocery_items", "custom_categories",
+    "share_tokens", "user_memory", "recurring_income", "net_worth_snapshots",
+    "link_pages", "chat_messages", "chat_sessions", "verification_codes",
+    "user_calendar_tokens", "goal_contributions", "user_lists", "list_items",
+    "auth_sessions", "streaks", "streak_days", "reset_completions",
+    "user_preferences", "waitlist", "contact_submissions",
+})
+
+
+def _validate_table(table: str) -> str:
+    """Validate a table name against the allowlist to prevent SQL injection."""
+    if table not in _ALLOWED_TABLES:
+        raise ValueError(f"Disallowed table name: {table!r}")
+    return table
+
+
 def _ph(n: int) -> str:
     """Return n placeholders for the current backend."""
     p = "%s" if _USE_PG else "?"
@@ -590,6 +703,7 @@ def _ph(n: int) -> str:
 def insert_row(table: str, data: dict) -> bool:
     """Insert a row. Uses ON CONFLICT for Postgres, INSERT OR REPLACE for SQLite."""
     try:
+        _validate_table(table)
         cols = ", ".join(data.keys())
         placeholders = _ph(len(data))
         values = list(data.values())
@@ -617,6 +731,7 @@ def insert_row(table: str, data: dict) -> bool:
 def fetch_rows(table: str, where: dict | None = None, limit: int = 500) -> list[dict]:
     """Fetch rows from *table* with optional equality filters."""
     try:
+        _validate_table(table)
         conn = get_connection()
         ph = "%s" if _USE_PG else "?"
         query = f"SELECT * FROM {table}"
@@ -637,6 +752,7 @@ def fetch_rows(table: str, where: dict | None = None, limit: int = 500) -> list[
 def update_row(table: str, data: dict, where: dict) -> bool:
     """Update rows in *table* matching *where* conditions with *data* values."""
     try:
+        _validate_table(table)
         ph = "%s" if _USE_PG else "?"
         set_clause = ", ".join(f"{k} = {ph}" for k in data)
         where_clause = " AND ".join(f"{k} = {ph}" for k in where)
@@ -654,6 +770,7 @@ def update_row(table: str, data: dict, where: dict) -> bool:
 def delete_row(table: str, where: dict) -> bool:
     """Delete rows from *table* matching *where* conditions."""
     try:
+        _validate_table(table)
         ph = "%s" if _USE_PG else "?"
         where_clause = " AND ".join(f"{k} = {ph}" for k in where)
         conn = get_connection()
@@ -720,9 +837,47 @@ def create_verification_code(email: str) -> str:
     return code
 
 
+_OTP_MAX_ATTEMPTS = 5
+_OTP_LOCKOUT_MINUTES = 15
+
+# In-memory lockout tracker: email -> (attempt_count, first_attempt_epoch)
+_otp_attempts: dict[str, tuple[int, float]] = {}
+
+
+def _check_otp_lockout(email: str) -> bool:
+    """Return True if the email is currently locked out from OTP attempts."""
+    import time
+    entry = _otp_attempts.get(email)
+    if not entry:
+        return False
+    count, first_ts = entry
+    if time.time() - first_ts > _OTP_LOCKOUT_MINUTES * 60:
+        _otp_attempts.pop(email, None)
+        return False
+    return count >= _OTP_MAX_ATTEMPTS
+
+
+def _record_otp_failure(email: str) -> None:
+    """Increment failed OTP attempt counter for the email."""
+    import time
+    entry = _otp_attempts.get(email)
+    now = time.time()
+    if not entry or now - entry[1] > _OTP_LOCKOUT_MINUTES * 60:
+        _otp_attempts[email] = (1, now)
+    else:
+        _otp_attempts[email] = (entry[0] + 1, entry[1])
+
+
+def _clear_otp_attempts(email: str) -> None:
+    """Reset the failed attempt counter on successful verification."""
+    _otp_attempts.pop(email, None)
+
+
 def verify_code(email: str, code: str) -> bool:
-    """Check OTP validity. Marks as used on success."""
+    """Check OTP validity. Marks as used on success. Enforces lockout after repeated failures."""
     email = email.strip().lower()
+    if _check_otp_lockout(email):
+        return False
     code_hash = _hash_code(code.strip())
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -735,10 +890,12 @@ def verify_code(email: str, code: str) -> bool:
         ).fetchone()
         if not row:
             conn.close()
+            _record_otp_failure(email)
             return False
         conn.execute("UPDATE verification_codes SET used = 1 WHERE id = ?", (row["id"],))
         conn.commit()
         conn.close()
+        _clear_otp_attempts(email)
         return True
     except Exception as exc:
         logger.error("verify_code error: %s", exc)

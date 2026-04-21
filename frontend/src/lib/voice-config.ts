@@ -18,10 +18,9 @@ export const ORRYON_VOICE_ID = "sal" as const;
 
 /**
  * Orb voice — used exclusively for breathing and Reset Anchor sessions.
- * Separate from Orryon so they feel like two distinct presences:
- * Orryon speaks, Orb guides.
- * `ara` is female, warm, and measured — closest xAI voice to the
- * calm, unhurried presence we're after.
+ * xAI has 5 voices (ara, eve, rex, sal, leo) — none are explicitly female.
+ * `ara` is the warmest and friendliest, closest to what we need.
+ * For a genuinely female voice, migrate to ElevenLabs.
  */
 export const ORB_VOICE_ID = "ara" as const;
 
@@ -55,20 +54,20 @@ export function shapeForVoice(text: string, mode: VoiceMode = "chat"): string {
   }
 
   if (mode === "breathing") {
-    // Brief pause after each sentence/clause so counts land at breath pace.
-    const withPauses = clean
-      .replace(/([.!?])(\s+)/g, "$1 [pause] ")
-      .replace(/,(\s+)/g, ", [pause] ");
-    return `<slow>${withPauses}</slow>`;
+    // Punctuation drives the pauses — the model already breathes at periods.
+    return `<slow>${clean}</slow>`;
   }
 
-  // Anchor mode: maximum stillness. Double pauses after every sentence,
-  // single pause after every clause. The silence is the instruction.
-  const withPauses = clean
-    .replace(/([.!?])(\s+|$)/g, "$1 [pause] [pause] ")
-    .replace(/,(\s+)/g, ", [pause] ")
-    .replace(/—/g, " [pause] ")
-    .replace(/\.\.\./g, " [pause] [pause] ");
+  // Anchor mode — slow, spacious, meditative.
+  // [pause] = short beat. [long-pause] = Tolle-length silence between thoughts.
+  // One per sentence boundary — stacking them causes them to be spoken literally.
+  const shaped = clean
+    // Long silence after each sentence
+    .replace(/([.!?])\s+/g, "$1 [long-pause] ")
+    .replace(/([.!?])$/, "$1 [long-pause]")
+    // Short beat after comma or dash
+    .replace(/,\s+/g, ", [pause] ")
+    .replace(/—/g, " [pause] ");
 
-  return `<slow>${withPauses}</slow>`;
+  return `<slow>${shaped}</slow>`;
 }

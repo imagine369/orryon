@@ -10,10 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 
-const MONTHLY_PRICE_ID: string =
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "price_1TNQXzA7HOYEFna1nNR118xm";
-const ANNUAL_PRICE_ID: string =
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "price_1TNQZeA7HOYEFna1O53Tkcow";
+const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "";
+const ANNUAL_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "";
 
 const PRO_FEATURES = [
   "Full access to your personal concierge",
@@ -289,15 +287,39 @@ export default function LoginPage() {
           </div>
 
           <button
-            onClick={() => {
+            onClick={async () => {
               if (typeof window === "undefined") return;
-              localStorage.setItem("orryon_demo", "true");
-              login({ id: "demo", email: "demo@orryon.app", display_name: "Alex" });
-              router.push("/home");
+              setLoading(true);
+              setError("");
+              try {
+                const res = await fetch("/api/auth/demo-login", {
+                  method: "POST",
+                  credentials: "same-origin",
+                });
+                if (res.ok) {
+                  // Real session — xAI TTS (Orb voice) will work
+                  localStorage.setItem("orryon_demo", "true");
+                  login({ id: "demo", email: "demo@orryon.app", display_name: "Alex" });
+                  router.push("/home");
+                } else {
+                  // Fallback: local-only demo (browser TTS)
+                  localStorage.setItem("orryon_demo", "true");
+                  login({ id: "demo", email: "demo@orryon.app", display_name: "Alex" });
+                  router.push("/home");
+                }
+              } catch {
+                // Offline fallback
+                localStorage.setItem("orryon_demo", "true");
+                login({ id: "demo", email: "demo@orryon.app", display_name: "Alex" });
+                router.push("/home");
+              } finally {
+                setLoading(false);
+              }
             }}
-            className="mt-4 w-full py-3 text-sm text-white/70 hover:text-white border border-white/10 hover:border-white/25 rounded-full transition-colors duration-200"
+            disabled={loading}
+            className="mt-4 w-full py-3 text-sm text-white/70 hover:text-white border border-white/10 hover:border-white/25 rounded-full transition-colors duration-200 disabled:opacity-50"
           >
-            Try the demo
+            {loading ? "Entering…" : "Try the demo"}
           </button>
           <p className="text-[0.7rem] text-white/25 mt-2 text-center">
             No account. Data stays on this device.

@@ -2,13 +2,34 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, ChevronRight, Download, CreditCard, CalendarDays, RefreshCw, Unlink } from "lucide-react";
+import {
+  X,
+  Check,
+  ChevronRight,
+  ArrowLeft,
+  Download,
+  CreditCard,
+  CalendarDays,
+  RefreshCw,
+  Unlink,
+  Smartphone,
+  Monitor,
+  Shield,
+  Lock,
+  Bell,
+  DollarSign,
+  HelpCircle,
+  ExternalLink,
+  FileText,
+  Heart,
+} from "lucide-react";
 import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
-import { Separator } from "@/components/ui/separator";
 import { InstallButton } from "@/components/install-prompt";
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface Settings {
   display_name: string;
@@ -25,6 +46,30 @@ interface Settings {
   ai_connected: boolean;
   grok_model: string;
 }
+
+interface AuthSession {
+  id: string;
+  device_name: string;
+  ip_address: string;
+  created_at: string;
+  last_active: string;
+  current: boolean;
+}
+
+type View =
+  | null
+  | "security-access"
+  | "security"
+  | "sessions"
+  | "connected"
+  | "privacy-safety"
+  | "data"
+  | "notifications"
+  | "financial"
+  | "subscription"
+  | "app";
+
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const CURRENCIES = [
   { code: "USD", label: "$ USD — US Dollar" },
@@ -77,6 +122,48 @@ const BILL_ALERT_DAYS = [
   { label: "1 week before", value: 7 },
 ];
 
+const DEMO_SETTINGS: Settings = {
+  display_name: "Alex",
+  email: "demo@orryon.app",
+  currency: "USD",
+  budget_cycle_start: 1,
+  spending_alert_pct: 80,
+  bill_due_alert_days: 3,
+  default_reminder_minutes: 30,
+  daily_digest_enabled: 1,
+  daily_digest_time: "08:00",
+  weekly_report_enabled: 0,
+  smtp_enabled: false,
+  ai_connected: false,
+  grok_model: "grok-3-mini",
+};
+
+const VIEW_TITLES: Record<string, string> = {
+  "security-access": "Security & Account Access",
+  security: "Security",
+  sessions: "Sessions",
+  connected: "Connected Accounts",
+  "privacy-safety": "Privacy & Safety",
+  data: "Data",
+  notifications: "Notifications",
+  financial: "Financial Preferences",
+  subscription: "Subscription",
+  app: "App",
+};
+
+function parentOf(view: View): View {
+  if (view === "security" || view === "sessions" || view === "connected")
+    return "security-access";
+  if (view === "data") return "privacy-safety";
+  return null;
+}
+
+// ── Small shared components ──────────────────────────────────────────────────
+
+function isDemo() {
+  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+}
+
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <button
@@ -87,14 +174,6 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
         className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : ""}`}
       />
     </button>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[0.65rem] uppercase tracking-widest text-white/25 font-semibold mb-3 mt-1">
-      {children}
-    </p>
   );
 }
 
@@ -128,33 +207,63 @@ function SelectField({ value, onChange, options }: {
   );
 }
 
-const DEMO_SETTINGS: Settings = {
-  display_name: "Alex",
-  email: "demo@orryon.app",
-  currency: "USD",
-  budget_cycle_start: 1,
-  spending_alert_pct: 80,
-  bill_due_alert_days: 3,
-  default_reminder_minutes: 30,
-  daily_digest_enabled: 1,
-  daily_digest_time: "08:00",
-  weekly_report_enabled: 0,
-  smtp_enabled: false,
-  ai_connected: false,
-  grok_model: "grok-3-mini",
-};
+function NavItem({
+  icon,
+  title,
+  description,
+  onClick,
+  href,
+  external,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick?: () => void;
+  href?: string;
+  external?: boolean;
+}) {
+  const content = (
+    <>
+      <span className="text-white/25 shrink-0">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[15px] text-white/85">{title}</p>
+        <p className="text-xs text-white/30 mt-0.5 leading-relaxed">{description}</p>
+      </div>
+      {external ? (
+        <ExternalLink className="h-3.5 w-3.5 text-white/15 shrink-0" strokeWidth={1.5} />
+      ) : (
+        <ChevronRight className="h-4 w-4 text-white/15 shrink-0" strokeWidth={1.5} />
+      )}
+    </>
+  );
 
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
+  const cls = "w-full flex items-center gap-4 px-1 py-4 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition text-left";
+
+  if (href) {
+    return (
+      <a href={href} className={cls} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={cls}>
+      {content}
+    </button>
+  );
 }
+
+// ── Main component ───────────────────────────────────────────────────────────
 
 export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
-  const { sub, refresh: refreshSub } = useSubscription();
+  const { sub } = useSubscription();
   const isOpen = openPanel === "settings";
 
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [view, setView] = useState<View>(null);
 
   // display name editing
   const [editingName, setEditingName] = useState(false);
@@ -178,18 +287,25 @@ export function SettingsPanel() {
 
   // export
   const [exportLoading, setExportLoading] = useState(false);
-  const [calConnected, setCalConnected]   = useState(false);
-  const [calSynced, setCalSynced]         = useState(0);
-  const [calLoading, setCalLoading]       = useState(false);
-  const [calMsg, setCalMsg]               = useState("");
+  const [calConnected, setCalConnected] = useState(false);
+  const [calSynced, setCalSynced] = useState(0);
+  const [calLoading, setCalLoading] = useState(false);
+  const [calMsg, setCalMsg] = useState("");
+
+  // active sessions / devices
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [revokeAllLoading, setRevokeAllLoading] = useState(false);
+  const [revokeAllDone, setRevokeAllDone] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    setView(null);
     if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
     api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
     api.get<{ connected: boolean; synced_count: number }>("/api/calendar/google/status")
       .then((d) => { setCalConnected(d.connected); setCalSynced(d.synced_count); })
       .catch(() => {});
+    api.get<AuthSession[]>("/api/sessions").then(setSessions).catch(() => {});
   }, [isOpen]);
 
   const patch = async (updates: Record<string, unknown>) => {
@@ -222,9 +338,6 @@ export function SettingsPanel() {
     setEmailLoading(true);
     setEmailError("");
     try {
-      // The Next.js proxy route at /api/settings/email-change/verify intercepts
-      // the rotated JWT and re-sets the HttpOnly session cookie for us, so the
-      // browser never sees the raw token. We just need to refresh local state.
       const res = await api.post<{ email: string }>("/api/settings/email-change/verify", {
         new_email: newEmail,
         code: emailCode,
@@ -257,10 +370,713 @@ export function SettingsPanel() {
     }
   };
 
+  const goBack = () => setView(parentOf(view));
+
   const initials = (settings?.display_name || settings?.email || "?")
     .split(/[\s@]/)[0]
     .slice(0, 2)
     .toUpperCase();
+
+  // ── View renderers ─────────────────────────────────────────────────────────
+
+  const renderMainMenu = () => (
+    <>
+      {/* Profile card */}
+      <div className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
+        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-base font-bold text-white shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
+                className="flex-1 bg-white/5 border border-white/20 rounded-lg px-2.5 py-1.5 text-sm text-white outline-none"
+                placeholder="Display name"
+              />
+              <button onClick={saveName} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                <Check className="h-3.5 w-3.5 text-green-400" strokeWidth={2} />
+              </button>
+              <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                <X className="h-3.5 w-3.5 text-white/40" strokeWidth={2} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="font-semibold text-sm truncate">{settings!.display_name || "Set a name"}</p>
+                <p className="text-xs text-white/30 mt-0.5 break-all">{settings!.email}</p>
+              </div>
+              <button
+                onClick={() => { setNameInput(settings!.display_name || ""); setEditingName(true); }}
+                className="text-xs text-white/40 hover:text-white/70 transition px-2 py-1 rounded-lg hover:bg-white/5"
+              >
+                Edit
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation items */}
+      <div>
+        <NavItem
+          icon={<Shield className="h-5 w-5" strokeWidth={1.5} />}
+          title="Security & Account Access"
+          description="Security, sessions, and connected accounts"
+          onClick={() => setView("security-access")}
+        />
+        <NavItem
+          icon={<Lock className="h-5 w-5" strokeWidth={1.5} />}
+          title="Privacy & Safety"
+          description="Manage your data and privacy settings"
+          onClick={() => setView("privacy-safety")}
+        />
+        <NavItem
+          icon={<Bell className="h-5 w-5" strokeWidth={1.5} />}
+          title="Notifications"
+          description="Reminders, digests, and email reports"
+          onClick={() => setView("notifications")}
+        />
+        <NavItem
+          icon={<DollarSign className="h-5 w-5" strokeWidth={1.5} />}
+          title="Financial Preferences"
+          description="Currency, budget cycle, and spending alerts"
+          onClick={() => setView("financial")}
+        />
+        {sub && (
+          <NavItem
+            icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
+            title="Subscription"
+            description={
+              sub.plan === "trial"
+                ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
+                : sub.plan === "pro"
+                ? "Pro — active"
+                : "Free — trial ended"
+            }
+            onClick={() => setView("subscription")}
+          />
+        )}
+        <NavItem
+          icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
+          title="App"
+          description="Install Orryon on your device"
+          onClick={() => setView("app")}
+        />
+      </div>
+
+      {/* Help Center link */}
+      <div className="mt-4 border-t border-white/[0.04] pt-2">
+        <NavItem
+          icon={<HelpCircle className="h-5 w-5" strokeWidth={1.5} />}
+          title="Help Center"
+          description="FAQs, guides, and support"
+          href="/help"
+        />
+      </div>
+
+      {/* Sign out + delete */}
+      <div className="mt-6 pt-2">
+        <button
+          onClick={() => { logout(); close(); }}
+          className="w-full py-3 text-sm text-white/40 hover:text-white/70 transition rounded-xl hover:bg-white/5"
+        >
+          Sign out
+        </button>
+
+        {!deleteConfirm ? (
+          <button
+            onClick={() => setDeleteConfirm(true)}
+            className="w-full text-xs text-white/20 hover:text-white/40 transition mt-1"
+          >
+            Delete account
+          </button>
+        ) : (
+          <div className="space-y-3 mt-2">
+            <p className="text-xs text-white/40 text-center">
+              This permanently deletes all your data and cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="flex-1 py-2 text-xs text-white/30 border border-white/10 rounded-lg hover:bg-white/5 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+                className="flex-1 py-2 text-xs text-white/50 border border-white/10 rounded-lg hover:bg-white/5 transition disabled:opacity-40"
+              >
+                {deleteLoading ? "Deleting…" : "Yes, delete everything"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  const renderSecurityAccess = () => (
+    <div>
+      <p className="text-sm text-white/30 mb-6 leading-relaxed">
+        Manage your account&apos;s security, active sessions, and connected apps.
+      </p>
+      <NavItem
+        icon={<Shield className="h-5 w-5" strokeWidth={1.5} />}
+        title="Security"
+        description="Sign-in method and email settings"
+        onClick={() => setView("security")}
+      />
+      <NavItem
+        icon={<Smartphone className="h-5 w-5" strokeWidth={1.5} />}
+        title="Sessions"
+        description={
+          sessions.length > 0
+            ? `${sessions.length} active session${sessions.length !== 1 ? "s" : ""}`
+            : "Manage devices signed into your account"
+        }
+        onClick={() => setView("sessions")}
+      />
+      <NavItem
+        icon={<CalendarDays className="h-5 w-5" strokeWidth={1.5} />}
+        title="Connected Accounts"
+        description={calConnected ? "Google Calendar connected" : "Connect Google Calendar and more"}
+        onClick={() => setView("connected")}
+      />
+    </div>
+  );
+
+  const renderSecurity = () => (
+    <div className="space-y-4">
+      <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+        <p className="text-xs text-white/40 mb-1">Sign-in method</p>
+        <p className="text-sm text-white/70">Passwordless — one-time code via email</p>
+      </div>
+
+      {emailStep === "idle" && (
+        <button
+          onClick={() => { setEmailStep("input"); setEmailError(""); }}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.06] transition text-sm text-white/70 hover:text-white"
+        >
+          <span>Change login email</span>
+          <ChevronRight className="h-4 w-4 text-white/30" strokeWidth={1.5} />
+        </button>
+      )}
+
+      {emailStep === "input" && (
+        <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
+          <p className="text-xs text-white/40">Enter your new email address. We&apos;ll send a verification code to confirm.</p>
+          <input
+            autoFocus
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="new@email.com"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
+          />
+          {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setEmailStep("idle"); setNewEmail(""); setEmailError(""); }}
+              className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={sendEmailCode}
+              disabled={emailLoading || !newEmail.includes("@")}
+              className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+            >
+              {emailLoading ? "Sending…" : "Send code"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {emailStep === "code" && (
+        <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
+          <p className="text-xs text-white/40">
+            Enter the 6-digit code sent to <span className="text-white/70">{newEmail}</span>
+          </p>
+          {emailDevCode && (
+            <p className="text-xs text-yellow-400 bg-yellow-400/10 rounded-lg px-3 py-2">
+              Dev mode — code: <span className="font-mono font-bold">{emailDevCode}</span>
+            </p>
+          )}
+          <input
+            autoFocus
+            value={emailCode}
+            onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20 tracking-widest text-center font-mono text-base"
+            maxLength={6}
+          />
+          {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setEmailStep("input"); setEmailCode(""); setEmailError(""); }}
+              className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
+            >
+              Back
+            </button>
+            <button
+              onClick={verifyEmailCode}
+              disabled={emailLoading || emailCode.length < 6}
+              className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+            >
+              {emailLoading ? "Verifying…" : "Confirm"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSessions = () => (
+    <div>
+      <p className="text-sm text-white/30 mb-4 leading-relaxed">
+        Sessions signed into your account. If you lose a device, sign out all other devices to protect your data.
+      </p>
+
+      {sessions.length === 0 ? (
+        <p className="text-xs text-white/20 text-center py-8">No active sessions found.</p>
+      ) : (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+          {sessions.map((s) => {
+            const isMobile = /iPhone|iPad|Android/i.test(s.device_name);
+            const Icon = isMobile ? Smartphone : Monitor;
+            const lastActive = (() => {
+              if (!s.last_active) return "";
+              const d = new Date(s.last_active);
+              const now = new Date();
+              const diffMs = now.getTime() - d.getTime();
+              const diffMins = Math.floor(diffMs / 60000);
+              if (diffMins < 2) return "Just now";
+              if (diffMins < 60) return `${diffMins}m ago`;
+              const diffHours = Math.floor(diffMins / 60);
+              if (diffHours < 24) return `${diffHours}h ago`;
+              const diffDays = Math.floor(diffHours / 24);
+              return `${diffDays}d ago`;
+            })();
+
+            return (
+              <div key={s.id} className="flex items-center gap-3 px-3 py-3">
+                <Icon className="h-4 w-4 text-white/30 shrink-0" strokeWidth={1.5} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-white/80 truncate">
+                      {s.device_name || "Unknown device"}
+                    </p>
+                    {s.current && (
+                      <span className="text-[10px] font-medium text-emerald-400/80 bg-emerald-400/10 px-1.5 py-0.5 rounded shrink-0">
+                        This device
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/25 mt-0.5">
+                    {lastActive}{s.ip_address ? ` · ${s.ip_address}` : ""}
+                  </p>
+                </div>
+                {!s.current && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.delete(`/api/sessions/${s.id}`);
+                        setSessions((prev) => prev.filter((x) => x.id !== s.id));
+                      } catch {}
+                    }}
+                    className="text-xs text-red-400/70 hover:text-red-400 transition shrink-0 px-2 py-1"
+                  >
+                    Sign out
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sessions.filter((s) => !s.current).length > 0 && (
+        <button
+          onClick={async () => {
+            setRevokeAllLoading(true);
+            try {
+              await api.post("/api/sessions/revoke-all");
+              setSessions((prev) => prev.filter((s) => s.current));
+              setRevokeAllDone(true);
+              setTimeout(() => setRevokeAllDone(false), 3000);
+            } catch {}
+            setRevokeAllLoading(false);
+          }}
+          disabled={revokeAllLoading}
+          className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/15 transition text-sm text-red-400 disabled:opacity-50"
+        >
+          <Shield className="h-4 w-4" strokeWidth={1.5} />
+          {revokeAllLoading
+            ? "Signing out…"
+            : revokeAllDone
+            ? "All other devices signed out"
+            : "Sign out all other devices"}
+        </button>
+      )}
+    </div>
+  );
+
+  const renderConnected = () => (
+    <div>
+      <p className="text-sm text-white/30 mb-4 leading-relaxed">
+        Manage third-party apps and services connected to your account.
+      </p>
+
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+          <CalendarDays className="w-4 h-4 text-white/50" strokeWidth={1.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-white/80 font-medium">Google Calendar</p>
+          <p className="text-xs text-white/30 mt-0.5">
+            {calConnected
+              ? `Connected · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`
+              : "Sync your Google Calendar events"}
+          </p>
+          {calMsg && <p className="text-xs text-green-400 mt-1">{calMsg}</p>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {calConnected ? (
+            <>
+              <button
+                onClick={async () => {
+                  setCalLoading(true); setCalMsg("");
+                  try {
+                    const res = await api.post<{ synced: number; message: string }>("/api/calendar/google/sync", {});
+                    setCalSynced((p) => p + res.synced);
+                    setCalMsg(res.message);
+                  } catch { setCalMsg("Sync failed. Try again."); }
+                  finally { setCalLoading(false); }
+                }}
+                disabled={calLoading}
+                className="p-1.5 text-white/30 hover:text-white/70 transition disabled:opacity-40"
+                title="Sync now"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${calLoading ? "animate-spin" : ""}`} strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={async () => {
+                  setCalLoading(true);
+                  try {
+                    await api.delete("/api/calendar/google/disconnect");
+                    setCalConnected(false); setCalSynced(0); setCalMsg("");
+                  } catch { }
+                  finally { setCalLoading(false); }
+                }}
+                disabled={calLoading}
+                className="p-1.5 text-white/20 hover:text-red-400 transition disabled:opacity-40"
+                title="Disconnect"
+              >
+                <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                const token = localStorage.getItem("orryon_token") ?? "";
+                window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
+            >
+              <ChevronRight className="w-3 h-3" strokeWidth={2} />
+              Connect
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPrivacySafety = () => (
+    <div>
+      <p className="text-sm text-white/30 mb-6 leading-relaxed">
+        Control your data and review Orryon&apos;s privacy and safety policies.
+      </p>
+      <NavItem
+        icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
+        title="Your Data"
+        description="Export or delete your account data"
+        onClick={() => setView("data")}
+      />
+      <NavItem
+        icon={<FileText className="h-5 w-5" strokeWidth={1.5} />}
+        title="Privacy Policy"
+        description="How we collect, use, and protect your information"
+        href="/privacy"
+      />
+      <NavItem
+        icon={<FileText className="h-5 w-5" strokeWidth={1.5} />}
+        title="Terms of Service"
+        description="Usage terms and conditions"
+        href="/terms"
+      />
+      <NavItem
+        icon={<Heart className="h-5 w-5" strokeWidth={1.5} />}
+        title="Wellness Disclaimer"
+        description="Reset Anchors are not a substitute for professional care"
+        href="/terms#wellness"
+      />
+    </div>
+  );
+
+  const renderData = () => (
+    <div>
+      <p className="text-sm text-white/30 mb-4 leading-relaxed">
+        Your streaks, reset sessions, and preferences are synced to your account.
+        {isDemo() && " In demo mode, data is saved to this browser only and won\u2019t transfer across devices."}
+      </p>
+      <button
+        onClick={async () => {
+          setExportLoading(true);
+          try {
+            const token = localStorage.getItem("orryon_token");
+            const res = await fetch(`${getApiBase()}/api/export`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (!res.ok) throw new Error("Export failed");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "orryon_export.zip";
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch {
+          } finally {
+            setExportLoading(false);
+          }
+        }}
+        disabled={exportLoading}
+        className="w-full flex items-center justify-center gap-2 py-3 text-sm text-white/60 hover:text-white border border-white/[0.06] rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition disabled:opacity-40"
+      >
+        <Download className="h-4 w-4" strokeWidth={1.5} />
+        {exportLoading ? "Exporting…" : "Export all data (ZIP)"}
+      </button>
+    </div>
+  );
+
+  const renderNotifications = () => (
+    <div>
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+        <Row
+          label="Default reminder"
+          right={
+            <SelectField
+              value={settings!.default_reminder_minutes}
+              onChange={(v) => patch({ default_reminder_minutes: parseInt(v) })}
+              options={REMINDER_OPTS}
+            />
+          }
+        />
+        <Row
+          label="Bill due alert"
+          sublabel="Get notified before a bill is due"
+          right={
+            <SelectField
+              value={settings!.bill_due_alert_days ?? 3}
+              onChange={(v) => patch({ bill_due_alert_days: parseInt(v) })}
+              options={BILL_ALERT_DAYS}
+            />
+          }
+        />
+        <Row
+          label="Daily morning digest"
+          right={
+            <Toggle
+              on={!!settings!.daily_digest_enabled}
+              onToggle={() => patch({ daily_digest_enabled: settings!.daily_digest_enabled ? 0 : 1 })}
+            />
+          }
+        />
+        {!!settings!.daily_digest_enabled && (
+          <Row
+            label="Digest time"
+            right={
+              <SelectField
+                value={settings!.daily_digest_time}
+                onChange={(v) => patch({ daily_digest_time: v })}
+                options={DIGEST_TIMES.map((t) => ({ label: t, value: t }))}
+              />
+            }
+          />
+        )}
+        <Row
+          label="Weekly email report"
+          right={
+            <Toggle
+              on={!!settings!.weekly_report_enabled}
+              onToggle={() => patch({ weekly_report_enabled: settings!.weekly_report_enabled ? 0 : 1 })}
+            />
+          }
+        />
+      </div>
+
+      <p className="text-xs text-white/25 mt-3">
+        {settings!.smtp_enabled
+          ? "Email notifications active"
+          : "SMTP not configured — set in .env to enable email alerts"}
+      </p>
+    </div>
+  );
+
+  const renderFinancial = () => (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+      <Row
+        label="Currency"
+        sublabel="Used for display across the app"
+        right={
+          <select
+            value={settings!.currency || "USD"}
+            onChange={(e) => patch({ currency: e.target.value })}
+            className="bg-[#111] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/20 cursor-pointer max-w-[160px]"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+        }
+      />
+      <Row
+        label="Budget cycle starts"
+        sublabel="Day of month your budget resets"
+        right={
+          <SelectField
+            value={settings!.budget_cycle_start || 1}
+            onChange={(v) => patch({ budget_cycle_start: parseInt(v) })}
+            options={Array.from({ length: 28 }, (_, i) => ({
+              label: i === 0 ? "1st" : i === 1 ? "2nd" : i === 2 ? "3rd" : `${i + 1}th`,
+              value: i + 1,
+            }))}
+          />
+        }
+      />
+      <Row
+        label="Spending alert"
+        sublabel="Notify when category reaches"
+        right={
+          <SelectField
+            value={settings!.spending_alert_pct || 80}
+            onChange={(v) => patch({ spending_alert_pct: parseInt(v) })}
+            options={ALERT_PCTS}
+          />
+        }
+      />
+    </div>
+  );
+
+  const renderSubscription = () => {
+    if (!sub) return null;
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+        <Row
+          label="Current plan"
+          sublabel={
+            sub.plan === "trial"
+              ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
+              : sub.plan === "pro"
+              ? "Pro"
+              : "Free — trial ended"
+          }
+          right={
+            <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60 uppercase tracking-wider">
+              {sub.plan === "trial" ? "Trial" : sub.plan === "pro" ? "Active" : "Expired"}
+            </span>
+          }
+        />
+        {sub.plan === "pro" && (
+          <div className="px-3 py-3">
+            <button
+              onClick={async () => {
+                setBillingLoading(true);
+                try {
+                  const res = await api.post<{ portal_url: string }>("/api/subscription/portal");
+                  window.location.href = res.portal_url;
+                } catch {
+                  setBillingLoading(false);
+                }
+              }}
+              disabled={billingLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white/60 hover:text-white border border-white/10 rounded-xl hover:bg-white/5 transition disabled:opacity-40"
+            >
+              <CreditCard className="h-4 w-4" strokeWidth={1.5} />
+              {billingLoading ? "Opening…" : "Manage billing & cancel"}
+            </button>
+          </div>
+        )}
+        {sub.plan !== "pro" && (
+          <div className="px-3 py-3">
+            <button
+              onClick={async () => {
+                setBillingLoading(true);
+                try {
+                  const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
+                  if (!priceId) {
+                    window.location.href = "/login?step=tiers";
+                    return;
+                  }
+                  const origin = window.location.origin;
+                  const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
+                    price_id: priceId,
+                    success_url: `${origin}/home?upgraded=1`,
+                    cancel_url: `${origin}/home`,
+                  });
+                  window.location.href = res.checkout_url;
+                } catch {
+                  setBillingLoading(false);
+                }
+              }}
+              disabled={billingLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition disabled:opacity-40"
+            >
+              <CreditCard className="h-4 w-4" strokeWidth={1.5} />
+              {billingLoading ? "Opening…" : "Upgrade to Pro"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderApp = () => (
+    <div>
+      <InstallButton variant="settings" />
+      <a
+        href="/download"
+        className="mt-3 block text-center text-xs text-white/25 hover:text-white/45 transition"
+      >
+        View all download options →
+      </a>
+    </div>
+  );
+
+  const renderView = () => {
+    switch (view) {
+      case "security-access": return renderSecurityAccess();
+      case "security": return renderSecurity();
+      case "sessions": return renderSessions();
+      case "connected": return renderConnected();
+      case "privacy-safety": return renderPrivacySafety();
+      case "data": return renderData();
+      case "notifications": return renderNotifications();
+      case "financial": return renderFinancial();
+      case "subscription": return renderSubscription();
+      case "app": return renderApp();
+      default: return renderMainMenu();
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <AnimatePresence>
@@ -294,7 +1110,19 @@ export function SettingsPanel() {
             <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl overflow-y-auto flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 sticky top-0 bg-[#080808] z-10 border-b border-white/5 rounded-tl-2xl">
-                <h1 className="text-2xl font-extrabold">Settings</h1>
+                <div className="flex items-center gap-3">
+                  {view && (
+                    <button
+                      onClick={goBack}
+                      className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5 transition-colors -ml-1"
+                    >
+                      <ArrowLeft className="h-4 w-4 text-white/60" strokeWidth={1.5} />
+                    </button>
+                  )}
+                  <h1 className="text-lg font-bold">
+                    {view ? VIEW_TITLES[view] : "Your Account"}
+                  </h1>
+                </div>
                 <button
                   onClick={close}
                   className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
@@ -308,494 +1136,18 @@ export function SettingsPanel() {
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 </div>
               ) : (
-                <div className="px-5 py-5 flex-1 space-y-6">
-
-                  {/* ── PROFILE ── */}
-                  <section>
-                    <SectionLabel>Profile</SectionLabel>
-
-                    <div className="flex items-center gap-4 mb-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl">
-                      <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-base font-bold text-white shrink-0">
-                        {initials}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {editingName ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              autoFocus
-                              value={nameInput}
-                              onChange={(e) => setNameInput(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
-                              className="flex-1 bg-white/5 border border-white/20 rounded-lg px-2.5 py-1.5 text-sm text-white outline-none"
-                              placeholder="Display name"
-                            />
-                            <button onClick={saveName} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
-                              <Check className="h-3.5 w-3.5 text-green-400" strokeWidth={2} />
-                            </button>
-                            <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
-                              <X className="h-3.5 w-3.5 text-white/40" strokeWidth={2} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate">{settings.display_name || "Set a name"}</p>
-                              <p className="text-xs text-white/30 mt-0.5 break-all">{settings.email}</p>
-                            </div>
-                            <button
-                              onClick={() => { setNameInput(settings.display_name || ""); setEditingName(true); }}
-                              className="text-xs text-white/40 hover:text-white/70 transition px-2 py-1 rounded-lg hover:bg-white/5"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── SECURITY ── */}
-                  <section>
-                    <SectionLabel>Security</SectionLabel>
-
-                    <div className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-3">
-                      <p className="text-xs text-white/40 mb-1">Sign-in method</p>
-                      <p className="text-sm text-white/70">Passwordless — one-time code via email</p>
-                    </div>
-
-                    {emailStep === "idle" && (
-                      <button
-                        onClick={() => { setEmailStep("input"); setEmailError(""); }}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.06] transition text-sm text-white/70 hover:text-white"
-                      >
-                        <span>Change login email</span>
-                        <ChevronRight className="h-4 w-4 text-white/30" strokeWidth={1.5} />
-                      </button>
-                    )}
-
-                    {emailStep === "input" && (
-                      <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
-                        <p className="text-xs text-white/40">Enter your new email address. We&apos;ll send a verification code to confirm.</p>
-                        <input
-                          autoFocus
-                          type="email"
-                          value={newEmail}
-                          onChange={(e) => setNewEmail(e.target.value)}
-                          placeholder="new@email.com"
-                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
-                        />
-                        {emailError && <p className="text-xs text-red-400">{emailError}</p>}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setEmailStep("idle"); setNewEmail(""); setEmailError(""); }}
-                            className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={sendEmailCode}
-                            disabled={emailLoading || !newEmail.includes("@")}
-                            className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
-                          >
-                            {emailLoading ? "Sending…" : "Send code"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {emailStep === "code" && (
-                      <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
-                        <p className="text-xs text-white/40">
-                          Enter the 6-digit code sent to <span className="text-white/70">{newEmail}</span>
-                        </p>
-                        {emailDevCode && (
-                          <p className="text-xs text-yellow-400 bg-yellow-400/10 rounded-lg px-3 py-2">
-                            Dev mode — code: <span className="font-mono font-bold">{emailDevCode}</span>
-                          </p>
-                        )}
-                        <input
-                          autoFocus
-                          value={emailCode}
-                          onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                          placeholder="000000"
-                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20 tracking-widest text-center font-mono text-base"
-                          maxLength={6}
-                        />
-                        {emailError && <p className="text-xs text-red-400">{emailError}</p>}
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setEmailStep("input"); setEmailCode(""); setEmailError(""); }}
-                            className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
-                          >
-                            Back
-                          </button>
-                          <button
-                            onClick={verifyEmailCode}
-                            disabled={emailLoading || emailCode.length < 6}
-                            className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
-                          >
-                            {emailLoading ? "Verifying…" : "Confirm"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── FINANCIAL PREFERENCES ── */}
-                  <section>
-                    <SectionLabel>Financial Preferences</SectionLabel>
-
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
-                      <Row
-                        label="Currency"
-                        sublabel="Used for display across the app"
-                        right={
-                          <select
-                            value={settings.currency || "USD"}
-                            onChange={(e) => patch({ currency: e.target.value })}
-                            className="bg-[#111] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/20 cursor-pointer max-w-[160px]"
-                          >
-                            {CURRENCIES.map((c) => (
-                              <option key={c.code} value={c.code}>{c.label}</option>
-                            ))}
-                          </select>
-                        }
-                      />
-                      <Row
-                        label="Budget cycle starts"
-                        sublabel="Day of month your budget resets"
-                        right={
-                          <SelectField
-                            value={settings.budget_cycle_start || 1}
-                            onChange={(v) => patch({ budget_cycle_start: parseInt(v) })}
-                            options={Array.from({ length: 28 }, (_, i) => ({
-                              label: i === 0 ? "1st" : i === 1 ? "2nd" : i === 2 ? "3rd" : `${i + 1}th`,
-                              value: i + 1,
-                            }))}
-                          />
-                        }
-                      />
-                      <Row
-                        label="Spending alert"
-                        sublabel="Notify when category reaches"
-                        right={
-                          <SelectField
-                            value={settings.spending_alert_pct || 80}
-                            onChange={(v) => patch({ spending_alert_pct: parseInt(v) })}
-                            options={ALERT_PCTS}
-                          />
-                        }
-                      />
-                    </div>
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── NOTIFICATIONS ── */}
-                  <section>
-                    <SectionLabel>Notifications</SectionLabel>
-
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
-                      <Row
-                        label="Default reminder"
-                        right={
-                          <SelectField
-                            value={settings.default_reminder_minutes}
-                            onChange={(v) => patch({ default_reminder_minutes: parseInt(v) })}
-                            options={REMINDER_OPTS}
-                          />
-                        }
-                      />
-                      <Row
-                        label="Bill due alert"
-                        sublabel="Get notified before a bill is due"
-                        right={
-                          <SelectField
-                            value={settings.bill_due_alert_days ?? 3}
-                            onChange={(v) => patch({ bill_due_alert_days: parseInt(v) })}
-                            options={BILL_ALERT_DAYS}
-                          />
-                        }
-                      />
-                      <Row
-                        label="Daily morning digest"
-                        right={
-                          <Toggle
-                            on={!!settings.daily_digest_enabled}
-                            onToggle={() => patch({ daily_digest_enabled: settings.daily_digest_enabled ? 0 : 1 })}
-                          />
-                        }
-                      />
-                      {!!settings.daily_digest_enabled && (
-                        <Row
-                          label="Digest time"
-                          right={
-                            <SelectField
-                              value={settings.daily_digest_time}
-                              onChange={(v) => patch({ daily_digest_time: v })}
-                              options={DIGEST_TIMES.map((t) => ({ label: t, value: t }))}
-                            />
-                          }
-                        />
-                      )}
-                      <Row
-                        label="Weekly email report"
-                        right={
-                          <Toggle
-                            on={!!settings.weekly_report_enabled}
-                            onToggle={() => patch({ weekly_report_enabled: settings.weekly_report_enabled ? 0 : 1 })}
-                          />
-                        }
-                      />
-                    </div>
-
-                    <p className="text-xs text-white/25 mt-2">
-                      {settings.smtp_enabled
-                        ? "Email notifications active"
-                        : "SMTP not configured — set in .env to enable email alerts"}
-                    </p>
-                  </section>
-
-                  {/* ── SUBSCRIPTION ── */}
-                  {sub && (
-                    <>
-                      <Separator className="bg-white/5" />
-                      <section>
-                        <SectionLabel>Subscription</SectionLabel>
-                        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
-                          <Row
-                            label="Current plan"
-                            sublabel={
-                              sub.plan === "trial"
-                                ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
-                                : sub.plan === "pro"
-                                ? "Pro"
-                                : "Free — trial ended"
-                            }
-                            right={
-                              <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60 uppercase tracking-wider">
-                                {sub.plan === "trial" ? "Trial" : sub.plan === "pro" ? "Active" : "Expired"}
-                              </span>
-                            }
-                          />
-                          {sub.plan === "pro" && (
-                            <div className="px-3 py-3">
-                              <button
-                                onClick={async () => {
-                                  setBillingLoading(true);
-                                  try {
-                                    const res = await api.post<{ portal_url: string }>("/api/subscription/portal");
-                                    window.location.href = res.portal_url;
-                                  } catch {
-                                    setBillingLoading(false);
-                                  }
-                                }}
-                                disabled={billingLoading}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white/60 hover:text-white border border-white/10 rounded-xl hover:bg-white/5 transition disabled:opacity-40"
-                              >
-                                <CreditCard className="h-4 w-4" strokeWidth={1.5} />
-                                {billingLoading ? "Opening…" : "Manage billing & cancel"}
-                              </button>
-                            </div>
-                          )}
-                          {sub.plan !== "pro" && (
-                            <div className="px-3 py-3">
-                              <button
-                                onClick={async () => {
-                                  setBillingLoading(true);
-                                  try {
-                                    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
-                                    if (!priceId) {
-                                      window.location.href = "/login?step=tiers";
-                                      return;
-                                    }
-                                    const origin = window.location.origin;
-                                    const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
-                                      price_id: priceId,
-                                      success_url: `${origin}/home?upgraded=1`,
-                                      cancel_url: `${origin}/home`,
-                                    });
-                                    window.location.href = res.checkout_url;
-                                  } catch {
-                                    setBillingLoading(false);
-                                  }
-                                }}
-                                disabled={billingLoading}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition disabled:opacity-40"
-                              >
-                                <CreditCard className="h-4 w-4" strokeWidth={1.5} />
-                                {billingLoading ? "Opening…" : "Upgrade to Pro"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </section>
-                    </>
-                  )}
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── CONNECTIONS ── */}
-                  <section>
-                    <SectionLabel>Connections</SectionLabel>
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
-                        <CalendarDays className="w-4 h-4 text-white/50" strokeWidth={1.5} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white/80 font-medium">Google Calendar</p>
-                        <p className="text-xs text-white/30 mt-0.5">
-                          {calConnected
-                            ? `Connected · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`
-                            : "Sync your Google Calendar events"}
-                        </p>
-                        {calMsg && <p className="text-xs text-green-400 mt-1">{calMsg}</p>}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {calConnected ? (
-                          <>
-                            <button
-                              onClick={async () => {
-                                setCalLoading(true); setCalMsg("");
-                                try {
-                                  const res = await api.post<{ synced: number; message: string }>("/api/calendar/google/sync", {});
-                                  setCalSynced((p) => p + res.synced);
-                                  setCalMsg(res.message);
-                                } catch { setCalMsg("Sync failed. Try again."); }
-                                finally { setCalLoading(false); }
-                              }}
-                              disabled={calLoading}
-                              className="p-1.5 text-white/30 hover:text-white/70 transition disabled:opacity-40"
-                              title="Sync now"
-                            >
-                              <RefreshCw className={`w-3.5 h-3.5 ${calLoading ? "animate-spin" : ""}`} strokeWidth={1.5} />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setCalLoading(true);
-                                try {
-                                  await api.delete("/api/calendar/google/disconnect");
-                                  setCalConnected(false); setCalSynced(0); setCalMsg("");
-                                } catch { }
-                                finally { setCalLoading(false); }
-                              }}
-                              disabled={calLoading}
-                              className="p-1.5 text-white/20 hover:text-red-400 transition disabled:opacity-40"
-                              title="Disconnect"
-                            >
-                              <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} />
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              const token = localStorage.getItem("orryon_token") ?? "";
-                              window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
-                            }}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
-                          >
-                            <ChevronRight className="w-3 h-3" strokeWidth={2} />
-                            Connect
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── INSTALL APP ── */}
-                  <section>
-                    <SectionLabel>App</SectionLabel>
-                    <InstallButton variant="settings" />
-                    <a
-                      href="/download"
-                      className="mt-2 block text-center text-xs text-white/25 hover:text-white/45 transition"
+                <div className="px-5 py-5 flex-1">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={view ?? "main"}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
                     >
-                      View all download options →
-                    </a>
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── DATA ── */}
-                  <section>
-                    <SectionLabel>Data</SectionLabel>
-                    <button
-                      onClick={async () => {
-                        setExportLoading(true);
-                        try {
-                          const token = localStorage.getItem("orryon_token");
-                          const res = await fetch(`${getApiBase()}/api/export`, {
-                            headers: token ? { Authorization: `Bearer ${token}` } : {},
-                          });
-                          if (!res.ok) throw new Error("Export failed");
-                          const blob = await res.blob();
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = "orryon_export.zip";
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        } catch {
-                        } finally {
-                          setExportLoading(false);
-                        }
-                      }}
-                      disabled={exportLoading}
-                      className="w-full flex items-center justify-center gap-2 py-3 text-sm text-white/60 hover:text-white border border-white/[0.06] rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition disabled:opacity-40"
-                    >
-                      <Download className="h-4 w-4" strokeWidth={1.5} />
-                      {exportLoading ? "Exporting…" : "Export all data (ZIP)"}
-                    </button>
-                  </section>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* ── SIGN OUT + DELETE ── */}
-                  <section className="pb-6">
-                    <button
-                      onClick={() => { logout(); close(); }}
-                      className="w-full py-3 text-sm text-white/40 hover:text-white/70 transition rounded-xl hover:bg-white/5"
-                    >
-                      Sign out
-                    </button>
-
-                    {!deleteConfirm ? (
-                      <button
-                        onClick={() => setDeleteConfirm(true)}
-                        className="w-full text-xs text-white/20 hover:text-white/40 transition"
-                      >
-                        Delete account
-                      </button>
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="text-xs text-white/40 text-center">
-                          This permanently deletes all your data and cannot be undone.
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setDeleteConfirm(false)}
-                            className="flex-1 py-2 text-xs text-white/30 border border-white/10 rounded-lg hover:bg-white/5 transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleDeleteAccount}
-                            disabled={deleteLoading}
-                            className="flex-1 py-2 text-xs text-white/50 border border-white/10 rounded-lg hover:bg-white/5 transition disabled:opacity-40"
-                          >
-                            {deleteLoading ? "Deleting…" : "Yes, delete everything"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </section>
-
+                      {renderView()}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               )}
             </div>

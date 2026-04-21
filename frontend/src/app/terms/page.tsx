@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { Footer } from "@/components/footer";
+import { BackButton } from "@/components/back-button";
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen flex flex-col">
     <div className="flex-1 max-w-2xl mx-auto px-4 py-12 w-full">
-      <Link href="/" className="text-white/30 hover:text-white text-sm">&larr; Back</Link>
+      <BackButton />
       <h1 className="text-3xl font-bold mt-4 mb-6">Terms of Service</h1>
       <div className="prose prose-invert prose-sm max-w-none">
         <p className="text-white/40 text-xs mb-6">Last updated: April 12, 2026</p>

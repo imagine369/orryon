@@ -354,9 +354,7 @@ function SessionScreen({
     }
   }, []);
 
-  // Orb voice — temporarily disabled pending voice selection.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const ORB_VOICE_ENABLED = false;
+  const ORB_VOICE_ENABLED = true;
 
   // Speak the cue for the current step via Orb voice (ara, anchor mode).
   useEffect(() => {

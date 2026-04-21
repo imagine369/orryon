@@ -25,7 +25,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.middleware import OriginEnforcementMiddleware, PerIpRateLimitMiddleware
-from backend.routers import auth, chat, finance, organize, account, connections, waitlist, contact, calendar_sync, voice
+from backend.routers import auth, chat, finance, organize, account, connections, waitlist, contact, calendar_sync, voice, habits
 from config import XAI_API_KEY
 
 # ── Sentry Setup ─────────────────────────────────────────────────────────────
@@ -189,18 +189,16 @@ app.include_router(waitlist.router)
 app.include_router(contact.router)
 app.include_router(calendar_sync.router)
 app.include_router(voice.router)
+app.include_router(habits.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/health", tags=["health"])
 async def health():
-    """Liveness probe for Railway / Render / Docker health checks."""
-    from config import DATABASE_URL, REDIS_URL
-    return {
-        "status": "ok",
-        "version": "3.0",
-        "ai": bool(XAI_API_KEY),
-        "postgres": bool(DATABASE_URL),
-        "redis": bool(REDIS_URL),
-    }
+    """Liveness probe for Railway / Render / Docker health checks.
+
+    Returns only the status string. Infrastructure details are not exposed
+    publicly to avoid information disclosure.
+    """
+    return {"status": "ok"}

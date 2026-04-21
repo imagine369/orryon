@@ -1,7 +1,10 @@
 """
 backend/auth.py — JWT token creation and FastAPI dependency for auth.
 
-Tokens are HS256-signed, contain user_id + email, expire in 30 days.
+Tokens are HS256-signed, contain user_id + email + jti (session ID),
+and expire in 30 days. Each token maps to an `auth_sessions` row so
+sessions can be individually revoked (stolen-device protection).
+
 The secret is read from JWT_SECRET in .env (auto-generated on first run if missing).
 """
 
@@ -9,18 +12,22 @@ from __future__ import annotations
 
 import os
 import secrets
+import uuid
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from backend.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_DAYS = 30
+_SESSION_CACHE_TTL = 60  # seconds
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -44,12 +51,65 @@ def _get_secret() -> str:
     return secret
 
 
-def create_token(user_id: str, email: str) -> str:
+def _parse_device_name(user_agent: str) -> str:
+    """Extract a human-friendly device name from a User-Agent string."""
+    if not user_agent:
+        return "Unknown device"
+    ua = user_agent.lower()
+    browser = "Browser"
+    if "firefox" in ua:
+        browser = "Firefox"
+    elif "edg/" in ua or "edg " in ua:
+        browser = "Edge"
+    elif "chrome" in ua and "safari" in ua:
+        browser = "Chrome"
+    elif "safari" in ua:
+        browser = "Safari"
+    platform = ""
+    if "iphone" in ua:
+        platform = "iPhone"
+    elif "ipad" in ua:
+        platform = "iPad"
+    elif "android" in ua:
+        platform = "Android"
+    elif "macintosh" in ua or "mac os" in ua:
+        platform = "macOS"
+    elif "windows" in ua:
+        platform = "Windows"
+    elif "linux" in ua:
+        platform = "Linux"
+    if platform:
+        return f"{browser} on {platform}"
+    return browser
+
+
+def create_token(
+    user_id: str,
+    email: str,
+    *,
+    device_name: str = "",
+    ip_address: str = "",
+) -> str:
+    """Mint a JWT and create the corresponding auth_sessions row."""
+    from db import get_connection
+    session_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO auth_sessions (id, user_id, device_name, ip_address, created_at, last_active, revoked) "
+            "VALUES (?, ?, ?, ?, ?, ?, 0)",
+            (session_id, user_id, device_name, ip_address, now_iso, now_iso),
+        )
+        conn.commit()
+
     payload = {
         "sub": user_id,
         "email": email,
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(days=_JWT_EXPIRY_DAYS),
+        "jti": session_id,
+        "iat": now,
+        "exp": now + timedelta(days=_JWT_EXPIRY_DAYS),
     }
     return jwt.encode(payload, _get_secret(), algorithm=_JWT_ALGORITHM)
 
@@ -63,6 +123,40 @@ def decode_token(token: str) -> dict[str, Any]:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
 
 
+async def _check_session_valid(jti: str) -> bool:
+    """Check if a session is still active (not revoked). Cached for 60s."""
+    if not jti:
+        return False  # reject legacy tokens without jti — forces re-login
+
+    cache_key = f"session_valid:{jti}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    from db import get_connection
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT revoked FROM auth_sessions WHERE id=?", (jti,),
+        ).fetchone()
+
+    if row is None:
+        valid = False  # no session row = unknown token — reject
+    else:
+        valid = not dict(row).get("revoked", 0)
+
+    await cache_set(cache_key, valid, _SESSION_CACHE_TTL)
+
+    if valid and row is not None:
+        from db import update_row
+        update_row(
+            "auth_sessions",
+            {"last_active": datetime.now(timezone.utc).isoformat()},
+            {"id": jti},
+        )
+
+    return valid
+
+
 async def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> dict[str, str]:
@@ -70,7 +164,12 @@ async def get_current_user(
     if creds is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing authorization header")
     payload = decode_token(creds.credentials)
-    return {"user_id": payload["sub"], "email": payload["email"]}
+
+    jti = payload.get("jti", "")
+    if not await _check_session_valid(jti):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session revoked")
+
+    return {"user_id": payload["sub"], "email": payload["email"], "jti": jti}
 
 
 # ── WebSocket tickets ────────────────────────────────────────────────────────

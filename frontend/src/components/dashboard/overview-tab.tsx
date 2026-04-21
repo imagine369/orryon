@@ -50,6 +50,7 @@ function priorityColor(p: string) {
 export function OverviewTab() {
   const [selectedMonth, setSelectedMonth] = useState(nowMonth);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [deposits, setDeposits] = useState<Transaction[]>([]);
   const [topCategories, setTopCategories] = useState<{ category: string; total: number }[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +60,7 @@ export function OverviewTab() {
   const reload = useCallback(() => {
     if (isDemo()) {
       setTransactions(DEMO_TRANSACTIONS);
+      setDeposits([]);
       setTopCategories(DEMO_TOP_CATS);
       setTasks(DEMO_TASKS_OV);
       setLoading(false);
@@ -74,6 +76,9 @@ export function OverviewTab() {
       api.get<Transaction[]>(`/api/transactions?date_from=${from}&date_to=${to}&limit=500`).then((txns) => {
         const positive = txns.filter((t) => t.amount > 0);
         setTransactions(positive.slice(0, 10));
+
+        const income = txns.filter((t) => t.amount < 0);
+        setDeposits(income.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10));
 
         const catMap: Record<string, number> = {};
         for (const t of positive) {
@@ -139,6 +144,21 @@ export function OverviewTab() {
             </div>
           )}
 
+          {deposits.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[0.65rem] uppercase tracking-wide text-white/25 mb-2">Deposits & Income</p>
+              {deposits.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/85 truncate">{t.merchant}</p>
+                    <p className="text-[0.7rem] text-white/25">{t.date}</p>
+                  </div>
+                  <span className="font-semibold text-emerald-400 ml-3">+{fmt(Math.abs(t.amount))}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {transactions.length > 0 && (
             <div className="mb-5">
               <p className="text-[0.65rem] uppercase tracking-wide text-white/25 mb-2">Transactions</p>
@@ -167,7 +187,7 @@ export function OverviewTab() {
             </div>
           )}
 
-          {topCategories.length === 0 && transactions.length === 0 && tasks.length === 0 && (
+          {topCategories.length === 0 && transactions.length === 0 && deposits.length === 0 && tasks.length === 0 && (
             <p className="text-white/30 text-sm text-center py-10">No data for {formatMonthLabel(selectedMonth)}.</p>
           )}
         </>

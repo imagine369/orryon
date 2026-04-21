@@ -66,7 +66,7 @@ export function hasAuthSignal(): boolean {
  * backend cookie, so API calls will 401 — we must NOT force-redirect to
  * /login in that case, or the app becomes unusable.
  */
-function isDemoMode(): boolean {
+export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false;
   try {
     return localStorage.getItem("orryon_demo") === "true";

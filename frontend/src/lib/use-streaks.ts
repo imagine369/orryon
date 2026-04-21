@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, isDemoMode } from "@/lib/api";
 
 export type Streak = {
   id: string;
   name: string;
   emoji?: string;
-  targetDays?: number; // optional target length (no limit if undefined)
+  target_days?: number;
+  targetDays?: number;
   createdAt: string;
+  created_at?: string;
   completions: string[]; // "YYYY-MM-DD"
 };
 
@@ -30,10 +33,6 @@ export function todayKey(): string {
 
 // ── Streak math ─────────────────────────────────────────────────────────────
 
-/**
- * Consecutive completed days ending today — or yesterday, as a one-day grace
- * so the streak doesn't read "0" until you've actually missed a day.
- */
 export function calculateStreak(completions: string[]): number {
   if (completions.length === 0) return 0;
   const set = new Set(completions);
@@ -63,9 +62,9 @@ export function calculateStreak(completions: string[]): number {
   return count;
 }
 
-// ── Persistence ─────────────────────────────────────────────────────────────
+// ── localStorage helpers (demo mode + write-through cache) ──────────────────
 
-function load(): Streak[] {
+function loadLocal(): Streak[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -78,28 +77,58 @@ function load(): Streak[] {
   }
 }
 
-function persist(streaks: Streak[]) {
+function persistLocal(streaks: Streak[]) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(streaks));
   } catch {
-    // quota / private-mode — swallow
+    // quota / private-mode
   }
+}
+
+function normalizeStreak(s: Record<string, unknown>): Streak {
+  return {
+    id: (s.id as string) || "",
+    name: (s.name as string) || "",
+    emoji: (s.emoji as string) || undefined,
+    target_days: (s.target_days as number) ?? (s.targetDays as number) ?? undefined,
+    targetDays: (s.target_days as number) ?? (s.targetDays as number) ?? undefined,
+    createdAt: (s.created_at as string) || (s.createdAt as string) || new Date().toISOString(),
+    created_at: (s.created_at as string) || (s.createdAt as string) || new Date().toISOString(),
+    completions: (s.completions as string[]) || [],
+  };
 }
 
 // ── Hook ────────────────────────────────────────────────────────────────────
 
 export function useStreaks() {
   const [streaks, setStreaks] = useState<Streak[]>([]);
+  const fetchedRef = useRef(false);
 
-  // Hydrate on client mount to avoid SSR/client mismatch.
+  // Hydrate: read localStorage first for instant render, then fetch from API
   useEffect(() => {
-    setStreaks(load());
+    const local = loadLocal();
+    if (local.length > 0) setStreaks(local);
+
+    if (isDemoMode()) return;
+
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
+    api.get<Record<string, unknown>[]>("/api/streaks")
+      .then((serverStreaks) => {
+        const normalized = serverStreaks.map(normalizeStreak);
+        setStreaks(normalized);
+        persistLocal(normalized);
+      })
+      .catch(() => {
+        // API unavailable — keep localStorage data
+      });
   }, []);
 
   const save = useCallback((next: Streak[]) => {
     setStreaks(next);
-    persist(next);
+    persistLocal(next);
   }, []);
 
   const createStreak = useCallback(
@@ -112,10 +141,21 @@ export function useStreaks() {
         name: trimmed,
         emoji: emoji?.trim() || undefined,
         targetDays: targetDays && targetDays > 0 ? targetDays : undefined,
+        target_days: targetDays && targetDays > 0 ? targetDays : undefined,
         createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         completions: [],
       };
       save([...streaks, s]);
+
+      if (!isDemoMode()) {
+        api.post("/api/streaks", {
+          name: trimmed,
+          emoji: emoji?.trim() || "",
+          target_days: targetDays && targetDays > 0 ? targetDays : null,
+          id: s.id,
+        }).catch(() => {});
+      }
       return s;
     },
     [streaks, save]
@@ -124,6 +164,9 @@ export function useStreaks() {
   const deleteStreak = useCallback(
     (id: string) => {
       save(streaks.filter((s) => s.id !== id));
+      if (!isDemoMode()) {
+        api.delete(`/api/streaks/${id}`).catch(() => {});
+      }
     },
     [streaks, save]
   );
@@ -146,10 +189,24 @@ export function useStreaks() {
                       ? patch.targetDays
                       : undefined
                     : s.targetDays,
+                target_days:
+                  patch.targetDays !== undefined
+                    ? patch.targetDays && patch.targetDays > 0
+                      ? patch.targetDays
+                      : undefined
+                    : s.target_days,
               }
             : s
         )
       );
+      if (!isDemoMode()) {
+        const apiPatch: Record<string, unknown> = {};
+        if (patch.name !== undefined) apiPatch.name = patch.name.trim();
+        if (patch.emoji !== undefined) apiPatch.emoji = patch.emoji.trim();
+        if (patch.targetDays !== undefined)
+          apiPatch.target_days = patch.targetDays && patch.targetDays > 0 ? patch.targetDays : null;
+        api.patch(`/api/streaks/${id}`, apiPatch).catch(() => {});
+      }
     },
     [streaks, save]
   );
@@ -168,6 +225,9 @@ export function useStreaks() {
           };
         })
       );
+      if (!isDemoMode()) {
+        api.post(`/api/streaks/${id}/days`, { date_key: dateKey }).catch(() => {});
+      }
     },
     [streaks, save]
   );

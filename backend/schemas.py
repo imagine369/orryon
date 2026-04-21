@@ -202,3 +202,57 @@ class CSVColumnMapping(BaseModel):
 class CSVImportConfirmReq(BaseModel):
     """Commit previously-previewed CSV transactions to the database."""
     transaction_ids: List[str]
+
+
+# ── Streaks / Habits ─────────────────────────────────────────────────────────
+
+class StreakReq(BaseModel):
+    name: str
+    emoji: Optional[str] = ""
+    target_days: Optional[int] = None
+    id: Optional[str] = None
+
+class StreakUpdate(BaseModel):
+    name: Optional[str] = None
+    emoji: Optional[str] = None
+    target_days: Optional[int] = None
+
+class StreakDayToggle(BaseModel):
+    date_key: str
+
+class ResetCompletionReq(BaseModel):
+    anchor_id: str
+    duration: int
+    pre_mood: Optional[str] = None
+    id: Optional[str] = None
+
+class ResetCompletionUpdate(BaseModel):
+    post_mood: Optional[str] = None
+    note: Optional[str] = None
+    marked_for_streak: Optional[int] = None
+
+class UserPreferencesUpdate(BaseModel):
+    last_reset_anchor: Optional[str] = None
+
+class StreakImportItem(BaseModel):
+    id: str
+    name: str
+    emoji: Optional[str] = ""
+    target_days: Optional[int] = None
+    created_at: str
+    completions: List[str] = []
+
+class ResetCompletionImportItem(BaseModel):
+    id: str
+    anchor_id: str
+    date_key: str
+    duration: int
+    pre_mood: Optional[str] = None
+    post_mood: Optional[str] = None
+    note: Optional[str] = None
+    marked_for_streak: bool = False
+
+class HabitsImportReq(BaseModel):
+    streaks: List[StreakImportItem] = []
+    reset_completions: List[ResetCompletionImportItem] = []
+    last_reset_anchor: Optional[str] = None

@@ -14,7 +14,8 @@ from functools import partial
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from backend.auth import create_token, get_current_user
+from backend.auth import _parse_device_name, create_token, get_current_user
+from backend.cache import cache_set
 from backend.deps import ENABLE_DEMO, IS_LOCAL_DEV, IS_PRODUCTION, check_otp_rate_limit
 from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
 from db import (
@@ -30,6 +31,18 @@ from email_sender import send_verification_code
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+_PUBLIC_USER_FIELDS = {
+    "id", "email", "display_name", "created_at", "plan", "trial_ends_at",
+    "currency", "budget_cycle_start", "spending_alert_pct",
+    "default_reminder_minutes", "daily_digest_enabled", "daily_digest_time",
+    "weekly_report_enabled", "bill_due_alert_days",
+}
+
+
+def _safe_user(user: dict) -> dict:
+    """Strip sensitive fields before sending user data to the client."""
+    return {k: v for k, v in user.items() if k in _PUBLIC_USER_FIELDS}
 
 
 @router.post("/api/auth/send-code")
@@ -106,7 +119,7 @@ async def auth_send_code(body: SendCodeReq, request: Request):
 
 
 @router.post("/api/auth/verify", response_model=AuthRes)
-async def auth_verify(body: VerifyReq):
+async def auth_verify(body: VerifyReq, request: Request):
     """Verify OTP code, create/fetch user, issue JWT."""
     email = body.email.strip().lower()
     if not verify_code(email, body.code.strip()):
@@ -116,8 +129,12 @@ async def auth_verify(body: VerifyReq):
     if display_name and user.get("display_name") != display_name:
         update_row("users", {"display_name": display_name}, {"id": user["id"]})
         user["display_name"] = display_name
-    token = create_token(user["id"], email)
-    return {"token": token, "user": user}
+    ua = request.headers.get("user-agent", "")
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+    if ip and "," in ip:
+        ip = ip.split(",")[0].strip()
+    token = create_token(user["id"], email, device_name=_parse_device_name(ua), ip_address=ip)
+    return {"token": token, "user": _safe_user(user)}
 
 
 @router.post("/api/auth/signup-checkout")
@@ -187,7 +204,7 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
 
 
 @router.post("/api/auth/demo", response_model=AuthRes)
-async def auth_demo():
+async def auth_demo(request: Request):
     """Issue a demo JWT for local development.
 
     Disabled unless ENABLE_DEMO=1 AND we're running in a local-dev environment.
@@ -200,18 +217,22 @@ async def auth_demo():
     if not existing_txns:
         from core.tools import seed_sample_data
         seed_sample_data(user["id"])
-    token = create_token(user["id"], email)
-    return {"token": token, "user": user}
+    ua = request.headers.get("user-agent", "")
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+    if ip and "," in ip:
+        ip = ip.split(",")[0].strip()
+    token = create_token(user["id"], email, device_name=_parse_device_name(ua), ip_address=ip)
+    return {"token": token, "user": _safe_user(user)}
 
 
 @router.get("/api/auth/me")
 async def auth_me(user: dict = Depends(get_current_user)):
-    """Return the authenticated user's full profile."""
+    """Return the authenticated user's profile (sensitive fields stripped)."""
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
-    return dict(row)
+    return _safe_user(dict(row))
 
 
 @router.post("/api/auth/sign-key")
@@ -240,3 +261,71 @@ async def auth_sign_key(
     except Exception as exc:
         logger.exception("sign-key derivation failed for uid=%s: %s", user.get("user_id"), exc)
         raise HTTPException(500, "Could not issue signing key.")
+
+
+# ── Session management (stolen-device protection) ────────────────────────────
+
+
+@router.get("/api/sessions")
+async def list_sessions(user: dict = Depends(get_current_user)):
+    """List active (non-revoked) sessions for the current user."""
+    uid = user["user_id"]
+    current_jti = user.get("jti", "")
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM auth_sessions WHERE user_id=? AND revoked=0 ORDER BY last_active DESC",
+            (uid,),
+        ).fetchall()
+    sessions = []
+    for r in rows:
+        s = dict(r)
+        s["current"] = s["id"] == current_jti
+        sessions.append(s)
+    return sessions
+
+
+@router.delete("/api/sessions/{session_id}")
+async def revoke_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Revoke a specific session (sign out that device)."""
+    uid = user["user_id"]
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM auth_sessions WHERE id=? AND user_id=?",
+            (session_id, uid),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    update_row("auth_sessions", {"revoked": 1}, {"id": session_id, "user_id": uid})
+    await cache_set(f"session_valid:{session_id}", False, 60)
+    return {"ok": True}
+
+
+@router.post("/api/sessions/revoke-all")
+async def revoke_all_sessions(user: dict = Depends(get_current_user)):
+    """Revoke all sessions except the current one (stolen-device kill switch)."""
+    uid = user["user_id"]
+    current_jti = user.get("jti", "")
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id FROM auth_sessions WHERE user_id=? AND revoked=0",
+            (uid,),
+        ).fetchall()
+        for r in rows:
+            sid = dict(r)["id"]
+            if sid != current_jti:
+                conn.execute(
+                    "UPDATE auth_sessions SET revoked=1 WHERE id=?", (sid,),
+                )
+                await cache_set(f"session_valid:{sid}", False, 60)
+        conn.commit()
+    return {"ok": True, "revoked_count": sum(1 for r in rows if dict(r)["id"] != current_jti)}
+
+
+@router.post("/api/auth/logout")
+async def auth_logout(user: dict = Depends(get_current_user)):
+    """Mark the current session as revoked server-side."""
+    jti = user.get("jti", "")
+    if jti:
+        update_row("auth_sessions", {"revoked": 1}, {"id": jti})
+        await cache_set(f"session_valid:{jti}", False, 60)
+    return {"ok": True}

@@ -1013,7 +1013,7 @@ TOOL_SCHEMAS = [
                         "description": "Sections to analyse.",
                         "items": {
                             "type": "string",
-                            "enum": ["expenses", "bills", "goals", "journal", "calendar"],
+                            "enum": ["expenses", "bills", "goals", "journal", "calendar", "wellness"],
                         },
                     },
                     "date_range": {
@@ -1199,6 +1199,79 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_wellness_history",
+            "description": (
+                "Retrieve the user's wellness history: reset/anchor session completions, "
+                "mood trends (pre vs post), durations, and streak data. Use when the user "
+                "asks 'how has my meditation been going', 'show my reset history', "
+                "'compare my moods this week vs last', etc."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD). Defaults to 30 days ago."},
+                    "date_to": {"type": "string", "description": "End date (YYYY-MM-DD). Defaults to today."},
+                    "anchor_id": {"type": "string", "description": "Optional: filter by a specific anchor/reset type."},
+                    "include_streaks": {"type": "boolean", "description": "Also return streak stats. Defaults true."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_periods",
+            "description": (
+                "Compare data across two time periods for spending, wellness, journal moods, "
+                "or streaks. Use when the user asks things like 'how did last month compare "
+                "to this month', 'am I spending more than before', 'has my mood improved', etc."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["spending", "wellness", "journal_mood", "streaks"],
+                        "description": "What to compare.",
+                    },
+                    "period_a_from": {"type": "string", "description": "Start of period A (YYYY-MM-DD)."},
+                    "period_a_to": {"type": "string", "description": "End of period A (YYYY-MM-DD)."},
+                    "period_b_from": {"type": "string", "description": "Start of period B (YYYY-MM-DD)."},
+                    "period_b_to": {"type": "string", "description": "End of period B (YYYY-MM-DD)."},
+                    "category": {"type": "string", "description": "Optional: filter spending by category."},
+                },
+                "required": ["scope", "period_a_from", "period_a_to", "period_b_from", "period_b_to"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cross_feature_search",
+            "description": (
+                "Search across multiple features at once: journal entries, notes, transactions, "
+                "events, lists, and goals. Use when the user asks a broad question like "
+                "'what do I know about Edward', 'everything related to Japan trip', "
+                "'find anything about groceries', etc."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search term or phrase."},
+                    "features": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": ["journal", "notes", "transactions", "events", "lists", "goals"]},
+                        "description": "Which features to search. Defaults to all.",
+                    },
+                    "limit": {"type": "integer", "description": "Max results per feature. Default 10."},
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 
@@ -1212,6 +1285,56 @@ def _today() -> str:
 
 def _current_month() -> str:
     return datetime.now().strftime("%Y-%m")
+
+
+def _get_cycle_day(user_id: str) -> int:
+    """Return the user's budget_cycle_start day (1-28), defaulting to 1."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT budget_cycle_start FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    conn.close()
+    if row:
+        val = row["budget_cycle_start"] if isinstance(row, dict) else row[0]
+        if val and 1 <= int(val) <= 28:
+            return int(val)
+    return 1
+
+
+def _cycle_boundaries(user_id: str, ref: datetime | None = None) -> tuple[str, str]:
+    """Return (start_date, end_date) for the user's current budget cycle.
+
+    If cycle_day == 1 this is identical to calendar month boundaries.
+    If cycle_day == 15, the cycle runs from the 15th of one month to the 14th
+    of the next.
+    """
+    ref = ref or datetime.now()
+    day = _get_cycle_day(user_id)
+    if ref.day >= day:
+        start = ref.replace(day=day)
+    else:
+        prev = ref.replace(day=1) - timedelta(days=1)
+        start = prev.replace(day=min(day, prev.day))
+    next_month = (start + timedelta(days=32)).replace(day=1)
+    end = next_month.replace(day=min(day, 28)) - timedelta(days=1)
+    return start.strftime("%Y-%m-%d"), min(end, ref).strftime("%Y-%m-%d")
+
+
+def _cycle_month_key(user_id: str, ref: datetime | None = None) -> str:
+    """Return a YYYY-MM key representing the budget cycle that contains *ref*.
+
+    Uses the cycle start date's month so budget_categories rows line up."""
+    start_str, _ = _cycle_boundaries(user_id, ref)
+    return start_str[:7]
+
+
+def _prev_cycle_boundaries(user_id: str, ref: datetime | None = None) -> tuple[str, str]:
+    """Return (start_date, end_date) for the previous budget cycle."""
+    ref = ref or datetime.now()
+    cur_start_str, _ = _cycle_boundaries(user_id, ref)
+    cur_start = datetime.strptime(cur_start_str, "%Y-%m-%d")
+    prev_ref = cur_start - timedelta(days=1)
+    return _cycle_boundaries(user_id, prev_ref)
 
 
 def _now_iso() -> str:
@@ -1276,12 +1399,16 @@ def _add_expense(args: dict, user_id: str) -> dict:
     }
     insert_row("transactions", row)
     new_bal = adjust_balance(user_id, -row["amount"])
-    month = date[:7]
     category = args.get("category", "Other")
-    spent = _get_category_spending(user_id, category, month)
-    budget = _get_category_budget(user_id, category, month)
-    goal_impact = _get_goal_impact_for_category(user_id, category, month)
-    return {
+    cycle_month = _cycle_month_key(user_id)
+    _ensure_budget_for_cycle(user_id, cycle_month)
+    spent = _get_category_spending_cycle(user_id, category)
+    budget = _get_category_budget(user_id, category, cycle_month)
+    goal_impact = _get_goal_impact_for_category(user_id, category, cycle_month)
+
+    alert = _check_spending_alert(user_id, category, spent, budget)
+
+    result: dict = {
         "status": "ok",
         "id": row["id"],
         "amount": row["amount"],
@@ -1293,6 +1420,9 @@ def _add_expense(args: dict, user_id: str) -> dict:
         "new_balance": round(new_bal, 2),
         "goal_impact": goal_impact,
     }
+    if alert:
+        result["spending_alert"] = alert
+    return result
 
 
 def _add_calendar_event(args: dict, user_id: str) -> dict:
@@ -1720,10 +1850,11 @@ def _delete_list(args: dict, user_id: str) -> dict:
 
 
 def _set_budget(args: dict, user_id: str) -> dict:
-    month = args.get("month") or _current_month()
+    month = args.get("month") or _cycle_month_key(user_id)
     category = args["category"]
     amount = float(args["amount"])
     rollover = 1 if args.get("rollover") else 0
+    now_ts = _now_iso()
     conn = get_connection()
     existing = conn.execute(
         "SELECT id FROM budget_categories WHERE user_id=? AND category=? AND month=?",
@@ -1740,10 +1871,61 @@ def _set_budget(args: dict, user_id: str) -> dict:
             "planned": amount,
             "month": month,
             "rollover": rollover,
-            "created_at": _now_iso(),
+            "created_at": now_ts,
         })
-    spent = _get_category_spending(user_id, category, month)
+
+    _upsert_budget_template(user_id, category, amount, rollover)
+
+    spent = _get_category_spending_cycle(user_id, category)
     return {"status": "ok", "category": category, "planned": amount, "spent": spent, "month": month, "rollover": bool(rollover)}
+
+
+def _upsert_budget_template(user_id: str, category: str, planned: float, rollover: int = 0) -> None:
+    """Persist the budget category as a reusable template ("set once, carry forever")."""
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT id FROM budget_templates WHERE user_id=? AND category=?",
+        (user_id, category),
+    ).fetchone()
+    conn.close()
+    now_ts = _now_iso()
+    if existing:
+        eid = existing["id"] if isinstance(existing, dict) else existing[0]
+        update_row("budget_templates", {"planned": planned, "rollover": rollover, "updated_at": now_ts}, {"id": eid})
+    else:
+        insert_row("budget_templates", {
+            "id": _uid(), "user_id": user_id, "category": category,
+            "planned": planned, "rollover": rollover,
+            "created_at": now_ts, "updated_at": now_ts,
+        })
+
+
+def _ensure_budget_for_cycle(user_id: str, month_key: str) -> None:
+    """Auto-carry budget templates into a new cycle month if no rows exist yet."""
+    conn = get_connection()
+    existing = conn.execute(
+        "SELECT COUNT(*) as cnt FROM budget_categories WHERE user_id=? AND month=?",
+        (user_id, month_key),
+    ).fetchone()
+    cnt = existing["cnt"] if isinstance(existing, dict) else existing[0]
+    if cnt > 0:
+        conn.close()
+        return
+    templates = conn.execute(
+        "SELECT category, planned, rollover FROM budget_templates WHERE user_id=?",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    now_ts = _now_iso()
+    for t in templates:
+        cat = t["category"] if isinstance(t, dict) else t[0]
+        planned = t["planned"] if isinstance(t, dict) else t[1]
+        roll = t["rollover"] if isinstance(t, dict) else t[2]
+        insert_row("budget_categories", {
+            "id": _uid(), "user_id": user_id, "category": cat,
+            "planned": float(planned), "month": month_key,
+            "rollover": int(roll), "created_at": now_ts,
+        })
 
 
 def _check_grocery_item(args: dict, user_id: str) -> dict:
@@ -1906,13 +2088,9 @@ def _get_spending_summary(args: dict, user_id: str) -> dict:
         start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
         end = now.strftime("%Y-%m-%d")
     elif period == "this_month":
-        start = now.strftime("%Y-%m-01")
-        end = now.strftime("%Y-%m-%d")
+        start, end = _cycle_boundaries(user_id)
     elif period == "last_month":
-        first_this = now.replace(day=1)
-        last_month_end = first_this - timedelta(days=1)
-        start = last_month_end.replace(day=1).strftime("%Y-%m-%d")
-        end = last_month_end.strftime("%Y-%m-%d")
+        start, end = _prev_cycle_boundaries(user_id)
     elif period == "last_7_days":
         start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
         end = now.strftime("%Y-%m-%d")
@@ -2020,8 +2198,10 @@ def _get_upcoming_schedule(args: dict, user_id: str) -> dict:
 
 
 def _get_budget_status(args: dict, user_id: str) -> dict:
-    month = args.get("month") or _current_month()
+    month = args.get("month") or _cycle_month_key(user_id)
     category_filter = args.get("category", "")
+
+    _ensure_budget_for_cycle(user_id, month)
 
     conn = get_connection()
     if category_filter:
@@ -2035,8 +2215,7 @@ def _get_budget_status(args: dict, user_id: str) -> dict:
             (user_id, month),
         ).fetchall()
 
-    start = f"{month}-01"
-    end = f"{month}-31"
+    start, end = _cycle_boundaries(user_id)
     txns = conn.execute(
         "SELECT category, SUM(amount) as total FROM transactions "
         "WHERE user_id=? AND date>=? AND date<=? AND amount>0 GROUP BY category",
@@ -2086,6 +2265,19 @@ def _get_category_spending(user_id: str, category: str, month: str) -> float:
     return round(float(row["total"] or 0), 2)
 
 
+def _get_category_spending_cycle(user_id: str, category: str, ref: datetime | None = None) -> float:
+    """Spending in a category within the user's current budget cycle."""
+    start, end = _cycle_boundaries(user_id, ref)
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
+        "WHERE user_id=? AND category=? AND date>=? AND date<=? AND amount>0",
+        (user_id, category, start, end),
+    ).fetchone()
+    conn.close()
+    return round(float(row["total"] or 0), 2)
+
+
 def _get_category_budget(user_id: str, category: str, month: str) -> float:
     conn = get_connection()
     row = conn.execute(
@@ -2094,6 +2286,39 @@ def _get_category_budget(user_id: str, category: str, month: str) -> float:
     ).fetchone()
     conn.close()
     return float(row["planned"]) if row else 0.0
+
+
+def _check_spending_alert(user_id: str, category: str, spent: float, budget: float) -> dict | None:
+    """Return an alert dict if category spending has crossed the user's threshold."""
+    if budget <= 0:
+        return None
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT spending_alert_pct FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+    except Exception:
+        row = None
+    conn.close()
+    threshold_pct = 80
+    if row:
+        val = row["spending_alert_pct"] if isinstance(row, dict) else row[0]
+        if val is not None:
+            threshold_pct = int(val)
+    pct_used = round(spent / budget * 100, 1)
+    if pct_used >= 100:
+        return {
+            "level": "over_budget",
+            "message": f"You've exceeded your {category} budget — ${spent:,.0f} of ${budget:,.0f} ({pct_used:.0f}%).",
+            "category": category, "spent": spent, "budget": budget, "pct_used": pct_used,
+        }
+    if pct_used >= threshold_pct:
+        return {
+            "level": "warning",
+            "message": f"Heads up — you've used {pct_used:.0f}% of your {category} budget (${spent:,.0f} of ${budget:,.0f}).",
+            "category": category, "spent": spent, "budget": budget, "pct_used": pct_used,
+        }
+    return None
 
 
 # ── Goal tools ────────────────────────────────────────────────────────────────
@@ -2263,20 +2488,14 @@ def _get_spending_recap(args: dict, user_id: str) -> dict:
         prev_end = (monday - timedelta(days=1)).strftime("%Y-%m-%d")
         label = "Last Week"
     elif period == "last_month":
-        first_this = now.replace(day=1)
-        last_mo_end = first_this - timedelta(days=1)
-        start = last_mo_end.replace(day=1).strftime("%Y-%m-%d")
-        end = last_mo_end.strftime("%Y-%m-%d")
-        prev_first = last_mo_end.replace(day=1) - timedelta(days=1)
-        prev_start = prev_first.replace(day=1).strftime("%Y-%m-%d")
-        prev_end = prev_first.strftime("%Y-%m-%d")
+        start, end = _prev_cycle_boundaries(user_id)
+        prev_start_dt = datetime.strptime(start, "%Y-%m-%d")
+        ps, pe = _prev_cycle_boundaries(user_id, prev_start_dt)
+        prev_start, prev_end = ps, pe
         label = "Last Month"
     else:  # this_month
-        start = now.strftime("%Y-%m-01")
-        end = now.strftime("%Y-%m-%d")
-        prev_mo = (now.replace(day=1) - timedelta(days=1))
-        prev_start = prev_mo.replace(day=1).strftime("%Y-%m-%d")
-        prev_end = prev_mo.strftime("%Y-%m-%d")
+        start, end = _cycle_boundaries(user_id)
+        prev_start, prev_end = _prev_cycle_boundaries(user_id)
         label = "This Month"
 
     conn = get_connection()
@@ -2290,9 +2509,11 @@ def _get_spending_recap(args: dict, user_id: str) -> dict:
         "WHERE user_id=? AND date>=? AND date<=? AND amount>0",
         (user_id, prev_start, prev_end),
     ).fetchone()
+    cycle_month = _cycle_month_key(user_id)
+    _ensure_budget_for_cycle(user_id, cycle_month)
     budgets = conn.execute(
         "SELECT category, planned FROM budget_categories WHERE user_id=? AND month=?",
-        (user_id, start[:7]),
+        (user_id, cycle_month),
     ).fetchall()
     conn.close()
 
@@ -3164,7 +3385,7 @@ def _get_journal(args: dict, user_id: str) -> dict:
 
 
 def _generate_insights(args: dict, user_id: str) -> dict:
-    """Composite analytical view combining spending, budget, patterns, and goals."""
+    """Composite analytical view combining spending, budget, patterns, goals, and wellness."""
     scope = set(args.get("scope") or ["expenses", "bills", "goals"])
     focus = args.get("focus") or "general"
     date_range = args.get("date_range") or {}
@@ -3193,6 +3414,11 @@ def _generate_insights(args: dict, user_id: str) -> dict:
             )
         if "journal" in scope:
             result["sections"]["mood_spending"] = _get_mood_spending_report({}, user_id)
+        if "wellness" in scope:
+            result["sections"]["wellness"] = _get_wellness_history(
+                {"date_from": date_range.get("from"), "date_to": date_range.get("to")},
+                user_id,
+            )
     except Exception as e:  # pragma: no cover - defensive
         logger.error("generate_insights partial failure: %s", e)
         result["partial_error"] = str(e)
@@ -3272,6 +3498,268 @@ def _generate_yearly_summary(args: dict, user_id: str) -> dict:
     if "calendar" in sections:
         summary["sections"]["calendar"] = _get_upcoming_schedule({"days": 365}, user_id)
     return summary
+
+
+# ── Wellness History ──────────────────────────────────────────────────────────
+
+def _get_wellness_history(args: dict, user_id: str) -> dict:
+    """Return reset-session completions, mood pre/post trends, and streak data."""
+    now = datetime.now()
+    date_from = args.get("date_from") or (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    date_to = args.get("date_to") or now.strftime("%Y-%m-%d")
+    anchor_filter = args.get("anchor_id", "")
+    include_streaks = args.get("include_streaks", True)
+
+    conn = get_connection()
+    sql = (
+        "SELECT * FROM reset_completions "
+        "WHERE user_id=? AND date_key>=? AND date_key<=?"
+    )
+    params: list = [user_id, date_from, date_to]
+    if anchor_filter:
+        sql += " AND anchor_id=?"
+        params.append(anchor_filter)
+    sql += " ORDER BY date_key ASC"
+    completions = conn.execute(sql, tuple(params)).fetchall()
+
+    total_sessions = len(completions)
+    total_duration = 0
+    moods_pre: list[str] = []
+    moods_post: list[str] = []
+    for c in completions:
+        c = dict(c) if not isinstance(c, dict) else c
+        total_duration += int(c.get("duration") or 0)
+        if c.get("pre_mood"):
+            moods_pre.append(c["pre_mood"])
+        if c.get("post_mood"):
+            moods_post.append(c["post_mood"])
+
+    def _mood_summary(moods: list[str]) -> dict:
+        if not moods:
+            return {}
+        from collections import Counter
+        counts = Counter(moods)
+        return {mood: cnt for mood, cnt in counts.most_common()}
+
+    result: dict = {
+        "status": "ok",
+        "date_from": date_from,
+        "date_to": date_to,
+        "total_sessions": total_sessions,
+        "total_duration_min": total_duration,
+        "avg_duration_min": round(total_duration / max(total_sessions, 1), 1),
+        "pre_mood_distribution": _mood_summary(moods_pre),
+        "post_mood_distribution": _mood_summary(moods_post),
+        "sessions": [
+            {
+                "date": (dict(c) if not isinstance(c, dict) else c).get("date_key"),
+                "anchor_id": (dict(c) if not isinstance(c, dict) else c).get("anchor_id"),
+                "duration": (dict(c) if not isinstance(c, dict) else c).get("duration"),
+                "pre_mood": (dict(c) if not isinstance(c, dict) else c).get("pre_mood"),
+                "post_mood": (dict(c) if not isinstance(c, dict) else c).get("post_mood"),
+                "note": (dict(c) if not isinstance(c, dict) else c).get("note"),
+            }
+            for c in completions[:50]
+        ],
+    }
+
+    if include_streaks:
+        streaks = conn.execute(
+            "SELECT s.id, s.name, s.emoji, s.target_days, "
+            "  (SELECT COUNT(*) FROM streak_days sd WHERE sd.streak_id=s.id) as total_days, "
+            "  (SELECT MAX(sd.date_key) FROM streak_days sd WHERE sd.streak_id=s.id) as last_day "
+            "FROM streaks s WHERE s.user_id=?",
+            (user_id,),
+        ).fetchall()
+        streak_list = []
+        for s in streaks:
+            s = dict(s) if not isinstance(s, dict) else s
+            last_day = s.get("last_day", "")
+            is_active = last_day == now.strftime("%Y-%m-%d") or last_day == (now - timedelta(days=1)).strftime("%Y-%m-%d")
+            streak_list.append({
+                "name": s["name"],
+                "emoji": s.get("emoji", ""),
+                "total_days": s.get("total_days", 0),
+                "target_days": s.get("target_days"),
+                "last_day": last_day,
+                "is_active": is_active,
+            })
+        result["streaks"] = streak_list
+
+    conn.close()
+    return result
+
+
+# ── Period Comparison ────────────────────────────────────────────────────────
+
+def _compare_periods(args: dict, user_id: str) -> dict:
+    """Compare two time periods across spending, wellness, journal mood, or streaks."""
+    scope = args["scope"]
+    pa_from, pa_to = args["period_a_from"], args["period_a_to"]
+    pb_from, pb_to = args["period_b_from"], args["period_b_to"]
+    category = args.get("category", "")
+
+    conn = get_connection()
+
+    if scope == "spending":
+        def _spend(d_from: str, d_to: str) -> dict:
+            sql = "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM transactions WHERE user_id=? AND date>=? AND date<=? AND amount>0"
+            p: list = [user_id, d_from, d_to]
+            if category:
+                sql += " AND category=?"
+                p.append(category)
+            sql += " GROUP BY category"
+            rows = conn.execute(sql, tuple(p)).fetchall()
+            total = sum(float(r["total"]) for r in rows)
+            by_cat = {r["category"]: round(float(r["total"]), 2) for r in rows}
+            return {"total": round(total, 2), "by_category": by_cat, "txn_count": sum(r["cnt"] for r in rows)}
+        a = _spend(pa_from, pa_to)
+        b = _spend(pb_from, pb_to)
+        diff = round(b["total"] - a["total"], 2)
+        pct = round((diff / a["total"] * 100) if a["total"] > 0 else 0, 1)
+        conn.close()
+        return {"scope": "spending", "period_a": {"from": pa_from, "to": pa_to, **a}, "period_b": {"from": pb_from, "to": pb_to, **b}, "change": diff, "change_pct": pct}
+
+    if scope == "wellness":
+        def _well(d_from: str, d_to: str) -> dict:
+            rows = conn.execute(
+                "SELECT COUNT(*) as cnt, COALESCE(SUM(duration),0) as dur FROM reset_completions WHERE user_id=? AND date_key>=? AND date_key<=?",
+                (user_id, d_from, d_to),
+            ).fetchone()
+            return {"sessions": rows["cnt"], "total_duration_min": int(rows["dur"])}
+        a = _well(pa_from, pa_to)
+        b = _well(pb_from, pb_to)
+        conn.close()
+        return {"scope": "wellness", "period_a": {"from": pa_from, "to": pa_to, **a}, "period_b": {"from": pb_from, "to": pb_to, **b}, "session_change": b["sessions"] - a["sessions"], "duration_change": b["total_duration_min"] - a["total_duration_min"]}
+
+    if scope == "journal_mood":
+        from collections import Counter
+        def _moods(d_from: str, d_to: str) -> dict:
+            rows = conn.execute(
+                "SELECT mood FROM notes WHERE user_id=? AND is_journal=1 AND (entry_date>=? OR created_at>=?) AND (entry_date<=? OR created_at<=?)",
+                (user_id, d_from, d_from, d_to, d_to),
+            ).fetchall()
+            moods = [r["mood"] for r in rows if r["mood"]]
+            return {"entry_count": len(rows), "mood_distribution": dict(Counter(moods))}
+        a = _moods(pa_from, pa_to)
+        b = _moods(pb_from, pb_to)
+        conn.close()
+        return {"scope": "journal_mood", "period_a": {"from": pa_from, "to": pa_to, **a}, "period_b": {"from": pb_from, "to": pb_to, **b}}
+
+    if scope == "streaks":
+        def _streak_days(d_from: str, d_to: str) -> dict:
+            rows = conn.execute(
+                "SELECT s.name, COUNT(sd.id) as days FROM streak_days sd "
+                "JOIN streaks s ON s.id=sd.streak_id "
+                "WHERE sd.user_id=? AND sd.date_key>=? AND sd.date_key<=? "
+                "GROUP BY s.name",
+                (user_id, d_from, d_to),
+            ).fetchall()
+            return {"by_streak": {r["name"]: r["days"] for r in rows}, "total_days": sum(r["days"] for r in rows)}
+        a = _streak_days(pa_from, pa_to)
+        b = _streak_days(pb_from, pb_to)
+        conn.close()
+        return {"scope": "streaks", "period_a": {"from": pa_from, "to": pa_to, **a}, "period_b": {"from": pb_from, "to": pb_to, **b}, "day_change": b["total_days"] - a["total_days"]}
+
+    conn.close()
+    return {"status": "error", "message": f"Unknown scope: {scope}"}
+
+
+# ── Cross-Feature Search ─────────────────────────────────────────────────────
+
+def _cross_feature_search(args: dict, user_id: str) -> dict:
+    """Unified search across journal, notes, transactions, events, lists, and goals."""
+    query = (args.get("query") or "").lower()
+    if not query:
+        return {"status": "error", "message": "query is required."}
+    features = set(args.get("features") or ["journal", "notes", "transactions", "events", "lists", "goals"])
+    try:
+        limit = int(args.get("limit") or 10)
+    except (TypeError, ValueError):
+        limit = 10
+    limit = max(1, min(limit, 50))
+
+    conn = get_connection()
+    results: dict = {"status": "ok", "query": query, "features": {}}
+
+    if "journal" in features:
+        rows = conn.execute(
+            "SELECT id, title, content, mood, entry_date, created_at FROM notes "
+            "WHERE user_id=? AND is_journal=1 AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?) "
+            "ORDER BY COALESCE(entry_date, created_at) DESC LIMIT ?",
+            (user_id, f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["journal"] = [
+            {"id": r["id"], "title": r["title"], "preview": (r["content"] or "")[:200], "mood": r["mood"], "date": r["entry_date"] or r["created_at"]}
+            for r in rows
+        ]
+
+    if "notes" in features:
+        rows = conn.execute(
+            "SELECT id, title, content, tags, updated_at FROM notes "
+            "WHERE user_id=? AND (is_journal=0 OR is_journal IS NULL) AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ? OR LOWER(tags) LIKE ?) "
+            "ORDER BY updated_at DESC LIMIT ?",
+            (user_id, f"%{query}%", f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["notes"] = [
+            {"id": r["id"], "title": r["title"], "preview": (r["content"] or "")[:200], "tags": r["tags"], "updated_at": r["updated_at"]}
+            for r in rows
+        ]
+
+    if "transactions" in features:
+        rows = conn.execute(
+            "SELECT id, merchant, amount, date, category, description FROM transactions "
+            "WHERE user_id=? AND (LOWER(merchant) LIKE ? OR LOWER(category) LIKE ? OR LOWER(description) LIKE ?) "
+            "ORDER BY date DESC LIMIT ?",
+            (user_id, f"%{query}%", f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["transactions"] = [
+            {"id": r["id"], "merchant": r["merchant"], "amount": float(r["amount"]), "date": r["date"], "category": r["category"]}
+            for r in rows
+        ]
+
+    if "events" in features:
+        rows = conn.execute(
+            "SELECT id, title, event_date, event_type, notes FROM events "
+            "WHERE user_id=? AND (LOWER(title) LIKE ? OR LOWER(notes) LIKE ?) "
+            "ORDER BY event_date DESC LIMIT ?",
+            (user_id, f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["events"] = [
+            {"id": r["id"], "title": r["title"], "date": r["event_date"], "type": r.get("event_type", "")}
+            for r in rows
+        ]
+
+    if "lists" in features:
+        rows = conn.execute(
+            "SELECT li.id, li.name, li.is_checked, ul.name as list_name FROM list_items li "
+            "JOIN user_lists ul ON ul.id=li.list_id "
+            "WHERE li.user_id=? AND LOWER(li.name) LIKE ? "
+            "ORDER BY li.sort_order ASC LIMIT ?",
+            (user_id, f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["lists"] = [
+            {"id": r["id"], "item": r["name"], "list": r["list_name"], "checked": bool(r["is_checked"])}
+            for r in rows
+        ]
+
+    if "goals" in features:
+        rows = conn.execute(
+            "SELECT id, name, target_amount, current_amount, target_date, category, is_completed FROM goals "
+            "WHERE user_id=? AND (LOWER(name) LIKE ? OR LOWER(category) LIKE ? OR LOWER(notes) LIKE ?) "
+            "ORDER BY created_at DESC LIMIT ?",
+            (user_id, f"%{query}%", f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        results["features"]["goals"] = [
+            {"id": r["id"], "name": r["name"], "target": float(r["target_amount"]), "current": float(r["current_amount"]), "category": r["category"], "completed": bool(r["is_completed"])}
+            for r in rows
+        ]
+
+    conn.close()
+
+    total = sum(len(v) for v in results["features"].values())
+    results["total_results"] = total
+    return results
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
@@ -3359,6 +3847,11 @@ _TOOL_MAP = {
     "create_list": _create_list,
     "add_list_items": _add_list_items,
     "get_user_lists": _get_user_lists,
+
+    # Historical lookup + cross-feature tools
+    "get_wellness_history": _get_wellness_history,
+    "compare_periods": _compare_periods,
+    "cross_feature_search": _cross_feature_search,
 }
 
 _TAB_REFRESH_MAP = {
@@ -3431,6 +3924,11 @@ _TAB_REFRESH_MAP = {
     "create_list": ["lists"],
     "add_list_items": ["lists"],
     "get_user_lists": [],
+
+    # Historical lookup + cross-feature tools
+    "get_wellness_history": [],
+    "compare_periods": [],
+    "cross_feature_search": [],
 }
 
 

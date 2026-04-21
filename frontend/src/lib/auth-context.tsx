@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
+import { migrateHabitsToServer } from "./migrate-habits";
 
 interface User {
   id: string;
@@ -44,7 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     api
       .get<User>("/api/auth/me")
-      .then(setUser)
+      .then((u) => {
+        setUser(u);
+        migrateHabitsToServer().catch(() => {});
+      })
       .catch(() => {
         clearToken();
         // Cookies may be stale; best-effort clear.

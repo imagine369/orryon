@@ -14,6 +14,7 @@ import { InsightsTab } from "@/components/dashboard/insights-tab";
 import { BillsTab } from "@/components/dashboard/bills-tab";
 import { YearlyTab } from "@/components/dashboard/yearly-tab";
 import { OverviewTab } from "@/components/dashboard/overview-tab";
+import { BankTab } from "@/components/dashboard/bank-tab";
 
 interface DashboardData {
   balance: number;
@@ -146,6 +147,7 @@ export function DashboardPanel() {
                     {/* Tabs */}
                     <Tabs defaultValue="insights">
                       <TabsList className="bg-[#111] border border-white/5 p-0.5 mb-4 h-auto w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
+                        <TabsTrigger value="bank" className="text-xs">Bank</TabsTrigger>
                         <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
                         <TabsTrigger value="budget" className="text-xs">Budget</TabsTrigger>
                         <TabsTrigger value="bills" className="text-xs">Bills</TabsTrigger>
@@ -155,6 +157,7 @@ export function DashboardPanel() {
                         <TabsTrigger value="yearly" className="text-xs">Yearly</TabsTrigger>
                       </TabsList>
 
+                      <TabsContent value="bank"><BankTab /></TabsContent>
                       <TabsContent value="overview"><OverviewTab /></TabsContent>
 
                       <TabsContent value="insights"><InsightsTab /></TabsContent>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Footer } from "@/components/footer";
+import { BackButton } from "@/components/back-button";
 import { Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -54,12 +54,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
       <div className="flex-1 max-w-xl mx-auto px-5 py-12 w-full">
-        <Link
-          href="/"
-          className="text-white/30 hover:text-white/70 text-sm transition inline-flex items-center gap-1"
-        >
-          &larr; Back
-        </Link>
+        <BackButton />
 
         <div className="mt-8 mb-10">
           <h1 className="text-3xl font-bold tracking-tight">Get in touch</h1>

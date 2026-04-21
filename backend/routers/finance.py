@@ -25,6 +25,12 @@ from db import (
     update_row,
 )
 
+from core.tools import (
+    _cycle_boundaries, _cycle_month_key, _ensure_budget_for_cycle,
+    _upsert_budget_template, _check_spending_alert,
+    _get_category_spending_cycle, _get_category_budget,
+)
+
 router = APIRouter(tags=["finance"])
 
 
@@ -35,22 +41,22 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
     """Aggregated snapshot for the main dashboard: balance, spending, events, goals, tasks."""
     uid = user["user_id"]
     today = date.today()
-    month_start = today.replace(day=1).isoformat()
+    cycle_start, cycle_end = _cycle_boundaries(uid)
 
     balance = get_balance(uid)
 
     with get_connection() as conn:
         month_row = conn.execute(
             "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
-            "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0", (uid, cycle_start, cycle_end),
         ).fetchone()
         month_spend = float(month_row["total"]) if month_row else 0.0
 
         cats = conn.execute(
             "SELECT category, SUM(amount) as total FROM transactions "
-            "WHERE user_id=? AND date>=? AND amount>0 "
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0 "
             "GROUP BY category ORDER BY total DESC LIMIT 5",
-            (uid, month_start),
+            (uid, cycle_start, cycle_end),
         ).fetchall()
 
         recent_txns = conn.execute(
@@ -134,7 +140,15 @@ async def create_transaction(body: TransactionReq, user: dict = Depends(get_curr
         "is_recurring": 0, "metadata": "",
     })
     adjust_balance(uid, -body.amount)
-    return {"id": txn_id, "balance": get_balance(uid)}
+    cycle_month = _cycle_month_key(uid)
+    _ensure_budget_for_cycle(uid, cycle_month)
+    spent = _get_category_spending_cycle(uid, body.category)
+    budget = _get_category_budget(uid, body.category, cycle_month)
+    alert = _check_spending_alert(uid, body.category, spent, budget)
+    result: dict = {"id": txn_id, "balance": get_balance(uid)}
+    if alert:
+        result["spending_alert"] = alert
+    return result
 
 
 @router.delete("/api/transactions/{txn_id}")
@@ -163,7 +177,12 @@ async def get_budget(
     user: dict = Depends(get_current_user),
 ):
     uid = user["user_id"]
-    target_month = month or datetime.now().strftime("%Y-%m")
+    target_month = month or _cycle_month_key(uid)
+
+    _ensure_budget_for_cycle(uid, target_month)
+
+    cycle_start, cycle_end = _cycle_boundaries(uid)
+
     with get_connection() as conn:
         budgets = conn.execute(
             "SELECT * FROM budget_categories WHERE user_id=? AND month=?",
@@ -172,8 +191,8 @@ async def get_budget(
 
         spent_rows = conn.execute(
             "SELECT category, SUM(amount) as total FROM transactions "
-            "WHERE user_id=? AND date LIKE ? AND amount>0 GROUP BY category",
-            (uid, f"{target_month}%"),
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0 GROUP BY category",
+            (uid, cycle_start, cycle_end),
         ).fetchall()
 
     spent_map = {r["category"]: float(r["total"]) for r in spent_rows}
@@ -193,7 +212,7 @@ async def get_budget(
 @router.post("/api/budget")
 async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    target_month = body.month or datetime.now().strftime("%Y-%m")
+    target_month = body.month or _cycle_month_key(uid)
     conn = get_connection()
     try:
         existing = conn.execute(
@@ -208,6 +227,7 @@ async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
             {"planned": body.planned},
             {"id": existing["id"], "user_id": uid},
         )
+        _upsert_budget_template(uid, body.category, body.planned)
         return {"id": existing["id"], "updated": True}
     budget_id = str(uuid.uuid4())
     insert_row("budget_categories", {
@@ -215,6 +235,7 @@ async def set_budget(body: BudgetReq, user: dict = Depends(get_current_user)):
         "planned": body.planned, "month": target_month,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
+    _upsert_budget_template(uid, body.category, body.planned)
     return {"id": budget_id, "created": True}
 
 
@@ -325,7 +346,7 @@ async def get_net_worth(user: dict = Depends(get_current_user)):
 async def get_forecast(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     today = date.today()
-    month_start = today.replace(day=1).isoformat()
+    cycle_start, cycle_end = _cycle_boundaries(uid)
     from db import get_total_monthly_income
 
     income = get_total_monthly_income(uid)
@@ -334,7 +355,7 @@ async def get_forecast(user: dict = Depends(get_current_user)):
     with get_connection() as conn:
         spent_row = conn.execute(
             "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
-            "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
+            "WHERE user_id=? AND date>=? AND date<=? AND amount>0", (uid, cycle_start, cycle_end),
         ).fetchone()
         month_spent = float(spent_row["total"]) if spent_row else 0
 
