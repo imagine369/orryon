@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, Zap, type LucideProps } from "lucide-react";
+import { X, Play, ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, Zap, Waves, type LucideProps } from "lucide-react";
 import { usePanels } from "@/lib/panel-context";
 import { useResetAnchors } from "@/lib/use-reset-anchors";
 import { RESET_ANCHORS, getRecommendedAnchor, type ResetAnchor } from "@/lib/reset-scripts";
@@ -21,6 +21,7 @@ const ANCHOR_ICON: Record<string, IconComponent> = {
   "focus-return-4min":       Crosshair,
   "midday-reset-5min":       Sun,
   "evening-release-7min":    Moon,
+  "sleep-descent":           Waves,
   "do-nothing":              Pause,
 };
 
@@ -226,95 +227,156 @@ function AnchorRow({
   isRecommended: boolean;
   onStart: (anchor: ResetAnchor) => void;
 }) {
+  // Hover (desktop) and tap-toggle (mobile) both reveal the info box.
+  const [showInfo, setShowInfo] = useState(false);
+  // Track whether the pointer is a true hover device so we don't leave the
+  // info box stuck open after a tap on desktop touchscreens.
+  const isHoverDevice = useRef(
+    typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches
+  );
+
+  const handleRowClick = () => {
+    // On hover-capable devices the hover already shows/hides; a click pins or
+    // dismisses. On touch-only devices click is the only trigger.
+    if (!isHoverDevice.current) {
+      setShowInfo((v) => !v);
+    }
+  };
+
   return (
     <div
+      onClick={handleRowClick}
+      onMouseEnter={() => isHoverDevice.current && setShowInfo(true)}
+      onMouseLeave={() => isHoverDevice.current && setShowInfo(false)}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
         padding: "14px 0",
         borderBottom: "1px solid rgba(255,255,255,0.04)",
+        cursor: anchor.science ? "default" : undefined,
       }}
     >
-      {/* Category orb */}
-      <AnchorIcon anchor={anchor} size={30} />
+      {/* Main row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {/* Category orb */}
+        <AnchorIcon anchor={anchor} size={30} />
 
-      {/* Text */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.85)",
+                letterSpacing: "-0.01em",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {anchor.title}
+            </p>
+            {isRecommended && (
+              <span
+                style={{
+                  fontSize: 8,
+                  color: "rgba(255,255,255,0.28)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 4,
+                  padding: "1px 5px",
+                  letterSpacing: "0.06em",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                NOW
+              </span>
+            )}
+          </div>
           <p
             style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.85)",
-              letterSpacing: "-0.01em",
+              fontSize: 11,
+              color: "rgba(255,255,255,0.32)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}
           >
-            {anchor.title}
+            {anchor.tagline}
           </p>
-          {isRecommended && (
-            <span
-              style={{
-                fontSize: 8,
-                color: "rgba(255,255,255,0.28)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 4,
-                padding: "1px 5px",
-                letterSpacing: "0.06em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              NOW
-            </span>
-          )}
         </div>
-        <p
-          style={{
-            fontSize: 11,
-            color: "rgba(255,255,255,0.32)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {anchor.tagline}
-        </p>
+
+        {/* Duration + start */}
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", fontWeight: 600, letterSpacing: "0.03em" }}>
+            {anchor.displayDuration}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onStart(anchor); }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.04)",
+              color: "rgba(255,255,255,0.55)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <ChevronRight size={13} strokeWidth={1.8} />
+          </button>
+        </div>
       </div>
 
-      {/* Duration + start */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", fontWeight: 600, letterSpacing: "0.03em" }}>
-          {anchor.displayDuration}
-        </span>
-        <button
-          onClick={() => onStart(anchor)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.55)",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <ChevronRight size={13} strokeWidth={1.8} />
-        </button>
-      </div>
+      {/* Info expand — science note */}
+      <AnimatePresence>
+        {showInfo && anchor.science && (
+          <motion.div
+            key="info"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: [0.25, 0, 0, 1] }}
+            style={{ overflow: "hidden" }}
+          >
+            <div
+              style={{
+                marginTop: 10,
+                marginLeft: 44,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.28)",
+                  letterSpacing: "0.09em",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  marginBottom: 7,
+                }}
+              >
+                {CATEGORY_LABEL[anchor.category] ?? anchor.category}
+              </p>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.52)",
+                  lineHeight: 1.7,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {anchor.science}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

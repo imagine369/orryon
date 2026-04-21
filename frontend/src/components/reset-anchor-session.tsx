@@ -92,16 +92,36 @@ const MOOD_OPTIONS: MoodOption[] = [
 function BreathingOrb({
   animation,
   expanded,
+  transitionSecs = 4,
 }: {
   animation: ResetAnimation;
   expanded: boolean;
+  transitionSecs?: number;
 }) {
-  // Scale factor driven by animation type + phase
+  // Gentle idle oscillator for "none" steps — the orb breathes softly from
+  // the first frame so it never appears frozen. Resets to base when a real
+  // breathwork step takes over.
+  const [idleExpanded, setIdleExpanded] = useState(false);
+
+  useEffect(() => {
+    if (animation !== "none") {
+      setIdleExpanded(false);
+      return;
+    }
+    const t = setTimeout(() => setIdleExpanded(true), 400);
+    const id = setInterval(() => setIdleExpanded((v) => !v), 3200);
+    return () => { clearTimeout(t); clearInterval(id); };
+  }, [animation]);
+
+  // Scale factor driven by animation type + phase.
+  // "none" uses the idle oscillator; "orb"/"orb-double" use the caller's expanded flag.
   const scale = (() => {
-    if (animation === "none")       return 0.92;
+    if (animation === "none")       return idleExpanded ? 1.04 : 0.94;
     if (animation === "orb-double") return expanded ? 1.18 : 0.90;
     return expanded ? 1.20 : 1.0;
   })();
+
+  const transitionDuration = animation === "none" ? 3.2 : transitionSecs;
 
   return (
     <div
@@ -114,7 +134,7 @@ function BreathingOrb({
         borderRadius: "50%",
         overflow: "hidden",
         transform: `scale(${scale})`,
-        transition: "transform 4s ease-in-out",
+        transition: `transform ${transitionDuration}s ease-in-out`,
         opacity: 0.72,
       }}
     >
@@ -292,19 +312,24 @@ function PreMoodScreen({
 function SessionScreen({
   anchor,
   durationSecs,
+  durationOptIdx,
+  onDurationSelect,
   onComplete,
   onBack,
 }: {
   anchor: ResetAnchor;
   durationSecs: number;
+  durationOptIdx?: number;
+  onDurationSelect?: (idx: number) => void;
   onComplete: (elapsed: number) => void;
   onBack: () => void;
 }) {
-  const [elapsed,  setElapsed]  = useState(0);
-  const [done,     setDone]     = useState(false);
-  const [mounted,  setMounted]  = useState(false);
-  const [stepIdx,  setStepIdx]  = useState(0);
-  const [fadeKey,  setFadeKey]  = useState(0);
+  const [elapsed,      setElapsed]     = useState(0);
+  const [done,         setDone]        = useState(false);
+  const [mounted,      setMounted]     = useState(false);
+  const [stepIdx,      setStepIdx]     = useState(0);
+  const [fadeKey,      setFadeKey]     = useState(0);
+  const [stepStartSec, setStepStartSec] = useState(0);
 
   const steps = anchor.steps;
 
@@ -329,10 +354,14 @@ function SessionScreen({
     }
   }, []);
 
+  // Orb voice — temporarily disabled pending voice selection.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const ORB_VOICE_ENABLED = false;
+
   // Speak the cue for the current step via Orb voice (ara, anchor mode).
   useEffect(() => {
     const text = steps[stepIdx]?.text?.trim();
-    if (!text || !mounted) return;
+    if (!text || !mounted || !ORB_VOICE_ENABLED) return;
 
     stopOrbAudio();
     const ctrl = new AbortController();
@@ -410,7 +439,10 @@ function SessionScreen({
     }
 
     setStepIdx((prev) => {
-      if (prev !== idx) setFadeKey((k) => k + 1);
+      if (prev !== idx) {
+        setFadeKey((k) => k + 1);
+        setStepStartSec(elapsed);
+      }
       return idx;
     });
   }, [elapsed, steps, durationSecs, isVariable, mounted]);
@@ -422,10 +454,45 @@ function SessionScreen({
     }
   }, [elapsed, done, durationSecs, onComplete]);
 
-  const remaining  = Math.max(0, durationSecs - elapsed);
-  const progress   = Math.min(1, elapsed / durationSecs);
-  const step       = steps[stepIdx] ?? steps[steps.length - 1];
-  const expanded   = step.animation === "orb" && (stepIdx % 4 === 1 || stepIdx % 4 === 2);
+  const remaining   = Math.max(0, durationSecs - elapsed);
+  const progress    = Math.min(1, elapsed / durationSecs);
+  const step        = steps[stepIdx] ?? steps[steps.length - 1];
+  const isLastStep  = stepIdx >= steps.length - 1;
+
+  // Append a typographic ellipsis to non-final steps so the user knows
+  // more is coming. Strip any trailing sentence punctuation first so we
+  // don't end up with "Settle in.…".
+  const stepText = step.text && !isLastStep
+    ? step.text.replace(/[.!?]$/, "") + " \u2026"
+    : step.text;
+
+  // Decide whether the orb is expanded this tick and how long the scale
+  // transition should take so movement matches the actual breath pace.
+  const { expanded, transitionSecs } = (() => {
+    if (step.animation !== "orb") {
+      return { expanded: false, transitionSecs: 4 };
+    }
+
+    const pattern = step.breathPattern;
+    if (pattern) {
+      const { inSecs, outSecs, holdInSecs = 0, holdOutSecs = 0 } = pattern;
+      const cycleLen = inSecs + holdInSecs + outSecs + holdOutSecs;
+      if (cycleLen <= 0) {
+        return { expanded: false, transitionSecs: 4 };
+      }
+      const t = (elapsed - stepStartSec) % cycleLen;
+      // Expanded during inhale AND the post-inhale hold (orb at the top).
+      const isExpanded = t < inSecs + holdInSecs;
+      // Match transition to the actual phase the orb is entering.
+      // Rising: use inSecs. Falling: use outSecs.
+      const phaseSecs = isExpanded ? inSecs : outSecs;
+      return { expanded: isExpanded, transitionSecs: phaseSecs };
+    }
+
+    // Box-breathing fallback: odd-phase steps = top of breath.
+    const isExpanded = stepIdx % 4 === 1 || stepIdx % 4 === 2;
+    return { expanded: isExpanded, transitionSecs: 4 };
+  })();
 
   const mins = Math.floor(remaining / 60);
   const secs = String(remaining % 60).padStart(2, "0");
@@ -438,45 +505,25 @@ function SessionScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "16px 32px 48px",
+        padding: "16px 32px 36px",
         fontFamily: FONT,
       }}
     >
-      {/* Back */}
-      <div style={{ width: "100%", display: "flex", justifyContent: "flex-start" }}>
-        <button
-          onClick={onBack}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            color: MUTED_TEXT,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 13,
-            fontFamily: FONT,
-            padding: "8px 0",
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          <ChevronLeft size={16} strokeWidth={1.5} />
-          Back
-        </button>
-      </div>
-
       {/* Orb + step text */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 40,
+          gap: 105,
           flex: 1,
           justifyContent: "center",
+          paddingBottom: 60,
         }}
       >
-        <BreathingOrb animation={step.animation} expanded={expanded} />
+        <div style={{ marginTop: -20 }}>
+          <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
+        </div>
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -494,12 +541,12 @@ function SessionScreen({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: "rgba(255,255,255,0.52)",
+                color: "rgba(255,255,255,0.29)",
                 lineHeight: 1.5,
                 letterSpacing: "-0.01em",
               }}
             >
-              {step.text}
+              {stepText}
             </p>
           </motion.div>
         </AnimatePresence>
@@ -517,14 +564,47 @@ function SessionScreen({
           }}
         >
           <motion.div
-            style={{ height: "100%", background: "rgba(255,255,255,0.38)", borderRadius: 2 }}
+            style={{ height: "100%", background: "rgba(255,255,255,0.19)", borderRadius: 2 }}
             animate={{ width: `${progress * 100}%` }}
             transition={{ duration: 0.8, ease: "linear" }}
           />
         </div>
-        <p style={{ fontSize: 12, color: MUTED_TEXT, letterSpacing: "0.06em" }}>
-          {mins}:{secs} remaining
-        </p>
+        {/* Back + title + duration picker */}
+        <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+          <button
+            onClick={onBack}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              color: MUTED_TEXT,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              fontFamily: FONT,
+              padding: "8px 0",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <ChevronLeft size={16} strokeWidth={1.5} />
+            Back
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 14, color: "rgba(255,255,255,0.28)", fontWeight: 600, fontFamily: FONT }}>
+              {anchor.title}
+            </span>
+            {anchor.durationOptions && durationOptIdx !== undefined && onDurationSelect && (
+              <DurationPicker
+                options={anchor.durationOptions}
+                selectedIdx={durationOptIdx}
+                onSelect={onDurationSelect}
+              />
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -758,32 +838,39 @@ function DurationPicker({
   selectedIdx: number;
   onSelect: (idx: number) => void;
 }) {
+  const [chosen, setChosen] = useState(false);
+
+  const handleSelect = (idx: number) => {
+    onSelect(idx);
+    setChosen(true);
+  };
+
+  const toLabel = (secs: number) => secs < 60 ? `${secs}s` : `${secs / 60} min`;
+
   return (
-    <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 20 }}>
-      {options.map((secs, idx) => {
-        const label = secs < 60 ? `${secs}s` : `${secs / 60} min`;
-        const active = selectedIdx === idx;
-        return (
-          <button
-            key={idx}
-            onClick={() => onSelect(idx)}
-            style={{
-              padding: "7px 16px",
-              borderRadius: 999,
-              border: active ? "1px solid rgba(255,255,255,0.30)" : "1px solid rgba(255,255,255,0.12)",
-              background: active ? "rgba(255,255,255,0.10)" : "transparent",
-              color: active ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.38)",
-              fontSize: 12,
-              fontWeight: 500,
-              fontFamily: FONT,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {label}
-          </button>
-        );
-      })}
+    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      {options.map((secs, idx) => (
+        <button
+          key={idx}
+          onClick={() => handleSelect(idx)}
+          style={{
+            padding: "5px 14px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.18)",
+            background: "transparent",
+            color: "rgba(255,255,255,0.55)",
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: FONT,
+            cursor: "pointer",
+            opacity: chosen && idx !== selectedIdx ? 0.25 : 1,
+            transition: "opacity 0.3s ease",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {toLabel(secs)}
+        </button>
+      ))}
     </div>
   );
 }
@@ -868,29 +955,19 @@ export function ResetAnchorSession({
           padding: "16px 20px",
         }}
       >
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: ACCENT_TEXT }}>{anchor.title}</p>
-          {screen === "session" && anchor.durationOptions && (
-            <DurationPicker
-              options={anchor.durationOptions}
-              selectedIdx={durationOptIdx}
-              onSelect={setDurationOptIdx}
-            />
-          )}
-        </div>
+        <div />
         <button
           onClick={onClose}
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)",
+            background: "none",
             border: "none",
             cursor: "pointer",
-            color: "rgba(255,255,255,0.45)",
+            color: "rgba(255,255,255,0.22)",
+            padding: 8,
+            WebkitTapHighlightColor: "transparent",
           }}
         >
           <X size={15} strokeWidth={1.5} />
@@ -911,6 +988,8 @@ export function ResetAnchorSession({
               <SessionScreen
                 anchor={anchor}
                 durationSecs={durationSecs}
+                durationOptIdx={durationOptIdx}
+                onDurationSelect={setDurationOptIdx}
                 onComplete={handleSessionComplete}
                 onBack={onClose}
               />
