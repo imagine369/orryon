@@ -1757,23 +1757,25 @@ function FeatureSection() {
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex justify-center gap-2 px-4 sm:px-6 mb-6 sm:mb-8 mt-[16px] sm:mt-[20px] flex-wrap">
-        {FEATURE_TABS_LIST.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => switchTab(tab)}
-            className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[0.7rem] sm:text-[0.75rem] font-semibold tracking-wider transition-all duration-200"
-            style={{
-              background: activeTab === tab ? "white" : "transparent",
-              color: activeTab === tab ? "black" : "rgba(255,255,255,0.45)",
-              border: activeTab === tab ? "1px solid white" : "1px solid rgba(255,255,255,0.12)",
-            }}
-          >
-            {tab.toUpperCase()}
-          </button>
-        ))}
-      </div>
+      {/* Tabs hidden — Finance cards only */}
+      {false && (
+        <div className="flex justify-center gap-2 px-4 sm:px-6 mb-6 sm:mb-8 mt-[16px] sm:mt-[20px] flex-wrap">
+          {FEATURE_TABS_LIST.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => switchTab(tab)}
+              className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-[0.7rem] sm:text-[0.75rem] font-semibold tracking-wider transition-all duration-200"
+              style={{
+                background: activeTab === tab ? "white" : "transparent",
+                color: activeTab === tab ? "black" : "rgba(255,255,255,0.45)",
+                border: activeTab === tab ? "1px solid white" : "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              {tab.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Carousel */}
       <div className="relative">
