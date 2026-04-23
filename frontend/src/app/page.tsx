@@ -32,9 +32,9 @@ type HowPhase =
   | "s2-enter"  | "s2-show"    | "s2-wait"
   | "s3-typing" | "s3-sending" | "s3-thinking" | "s3-responding" | "s3-done";
 
-const S1_PROMPT   = "Save $4,000 for a vacation by December";
-const S3_PROMPT   = "Am I on track for my vacation goal?";
-const S3_RESPONSE = "You're at $0 of $4,000. Save $444/mo to hit it by December.";
+const S1_PROMPT   = "Help me save for a goal by year end";
+const S3_PROMPT   = "Am I on track with my savings goal?";
+const S3_RESPONSE = "You're making good progress. Keep saving consistently and you'll hit it on time.";
 
 function HowItWorksDemo() {
   const [phase, setPhase]       = useState<HowPhase>("s1-typing");
@@ -270,29 +270,29 @@ function HowItWorksDemo() {
               <div style={{ transition: "opacity 0.4s ease, transform 0.4s ease", opacity: goalIn ? 1 : 0, transform: goalIn ? "translateY(0)" : "translateY(-8px)" }}>
                 <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-sm">Vacation Fund</span>
-                    <span className="text-sm font-bold text-green-400">0%</span>
+                    <span className="font-semibold text-sm">Savings Goal</span>
+                    <span className="text-sm font-bold text-green-400">—%</span>
                   </div>
                   <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                     <div className="absolute inset-y-0 left-0 rounded-full bg-green-600/50" style={{ width: "0%" }} />
                   </div>
                   <div className="flex justify-between text-[0.7rem] text-white/30">
-                    <span>$0 saved of $4,000</span>
-                    <span>$4,000 to go · by Dec</span>
+                    <span>$X,XXX saved of $X,XXX</span>
+                    <span>In progress · by Dec</span>
                   </div>
                 </div>
               </div>
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-sm">Emergency Fund</span>
-                  <span className="text-sm font-bold text-green-400">32%</span>
+                  <span className="font-semibold text-sm">Long-term Fund</span>
+                  <span className="text-sm font-bold text-green-400">—%</span>
                 </div>
                 <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                   <div className="absolute inset-y-0 left-0 rounded-full bg-green-600/50" style={{ width: "32%" }} />
                 </div>
                 <div className="flex justify-between text-[0.7rem] text-white/30">
-                  <span>$1,600 saved of $5,000</span>
-                  <span>$3,400 to go</span>
+                  <span>$X,XXX saved of $X,XXX</span>
+                  <span>$X,XXX to go</span>
                 </div>
               </div>
             </div>
@@ -306,24 +306,24 @@ function HowItWorksDemo() {
 
 const chatExamples = [
   {
-    prompt: "Add coffee and breakfast $9.50",
-    response: "Done — coffee & breakfast logged for $9.50.",
+    prompt: "Log a purchase for this morning",
+    response: "Done — logged and categorized.",
   },
   {
-    prompt: "Help me save $4000 for a vacation by December",
-    response: "Goal created. Save $444/mo to hit $4,000 by December.",
+    prompt: "Help me set a savings goal",
+    response: "Goal created. I'll track your progress automatically.",
   },
   {
-    prompt: "Add milk, eggs, bread, and chicken to my grocery list",
-    response: "Added 4 items to your grocery list.",
+    prompt: "Add a few items to my grocery list",
+    response: "Added to your grocery list.",
   },
   {
-    prompt: "Doctor appointment on July 15 at 10am",
-    response: "Scheduled — doctor on July 15 at 10am.",
+    prompt: "Remind me about an appointment next week",
+    response: "Scheduled — I'll remind you in advance.",
   },
   {
-    prompt: "Give me a spending recap for this week",
-    response: "This week: $284 across 12 transactions. Dining leads at $94.",
+    prompt: "How did my spending look this week?",
+    response: "You stayed within budget. A few categories worth reviewing.",
   },
 ];
 
@@ -506,359 +506,28 @@ function getDemoGreeting() {
 
 type TourPhase =
   | "home" | "typing" | "sending" | "chat-bubble"
-  | "thinking" | "responding" | "next-chat" | "clearing" | "pre-dash"
-  | "tap-grid" | "panel-open"
-  | "tab-budget" | "tab-bills" | "tab-forecast" | "tab-goals"
-  | "panel-close" | "bell-tap" | "today-open" | "today-close"
-  | "list-open" | "list-close"
-  | "journal-open" | "journal-close"
-  | "breathe-open" | "breathe-close" | "reset";
+  | "thinking" | "responding" | "next-chat" | "clearing" | "reset";
 
 const TOUR_CHATS = [
-  { prompt: "Add coffee and breakfast $12.50",                response: "Done — coffee & breakfast logged for $12.50." },
-  { prompt: "Help me save $4,000 for a vacation by December", response: "Goal created. Save $444/mo to hit $4,000 by December." },
-  { prompt: "How did I do with spending this month?",         response: "Great month — you're down 8% overall. Dining is your only category running a bit hot, everything else is under budget." },
-  { prompt: "Pull up my grocery list",                        response: "Here's your grocery list." },
-  { prompt: "Am I on track for my vacation goal?",            response: "You're at $2,720 of $4,000 — 68% there. Keep it up and you'll hit it with 3 weeks to spare." },
+  { prompt: "Log a purchase from this morning",      response: "Done — logged and categorized automatically." },
+  { prompt: "Help me set a savings goal",            response: "Goal created. I'll track your progress and keep you on course." },
+  { prompt: "How did my spending look this month?",  response: "You stayed within budget overall. A couple of categories worth keeping an eye on." },
+  { prompt: "Remind me about something next week",   response: "Got it — I'll remind you in advance." },
+  { prompt: "Am I on track with my savings goal?",   response: "You're making steady progress. Keep it up and you'll hit it on time." },
 ];
 
-const TOUR_TABS = ["Insights","Budget","Bills","Forecast","Goals"] as const;
-type TourTab = typeof TOUR_TABS[number];
 
-const INSIGHT_COLORS = ["#60a5fa","#2dd4bf","#c084fc","#fbbf24","#818cf8","#86efac"];
-
-function TourInsightsTab() {
-  const cats = [
-    { name: "Rent & Housing", total: 2200, pct: 77, color: "#60a5fa", trend: "+8%" },
-    { name: "Food & Dining",  total: 386,  pct: 13, color: "#2dd4bf", trend: "+12%" },
-    { name: "Groceries",      total: 173,  pct:  6, color: "#c084fc", trend: "-4%" },
-    { name: "Transport",      total: 103,  pct:  4, color: "#fbbf24", trend: "+3%" },
-  ];
-  const pieData = cats.map((c) => ({ name: c.name, value: c.total }));
-  const totalSpent = cats.reduce((s, c) => s + c.total, 0);
-
-  return (
-    <div>
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-3">
-        <button className="p-1 text-white/30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
-        <p className="text-sm font-semibold text-white/85">April 2026</p>
-        <button className="p-1 text-white/30 opacity-20"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
-      </div>
-
-      {/* Total */}
-      <div className="text-center mb-1">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Total Spent</p>
-        <p className="text-3xl font-bold text-white/85 mt-0.5">${totalSpent.toLocaleString()}</p>
-        <div className="flex items-center justify-center gap-1 mt-1">
-          <TrendingDown className="h-3 w-3 text-green-400" strokeWidth={1.5} />
-          <p className="text-xs text-green-400">↓ 8% vs last month</p>
-        </div>
-      </div>
-
-      {/* Donut chart */}
-      <div style={{ height: 170 }} className="w-full my-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
-              {pieData.map((_, i) => (
-                <Cell key={i} fill={INSIGHT_COLORS[i % INSIGHT_COLORS.length]} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Category rows */}
-      <div>
-        {cats.map((c, i) => (
-          <div key={c.name} className="flex items-center gap-3 py-2.5 border-b border-white/5">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INSIGHT_COLORS[i] }} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm text-white/85 truncate">{c.name}</p>
-                <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className={`text-xs ${c.trend.startsWith("+") ? "text-red-400" : "text-green-400"}`}>{c.trend}</span>
-                  <span className="text-sm font-semibold text-white/85">${c.total.toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${c.pct}%`, backgroundColor: INSIGHT_COLORS[i] }} />
-                </div>
-                <span className="text-[0.6rem] text-white/25 w-7 text-right">{c.pct}%</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TourScheduleTab() {
-  const days = ["S","M","T","W","T","F","S"];
-  // April 2026 starts on Wednesday (index 3), has 30 days
-  const startDay = 3;
-  const totalDays = 30;
-  const today = 11;
-  // Days with events: { day: dots[] }
-  const eventDots: Record<number, string[]> = {
-    11: ["#60a5fa"],
-    14: ["#2dd4bf"],
-    16: ["#c084fc","#fbbf24"],
-    20: ["#f87171"],
-    25: ["#60a5fa"],
-    28: ["#2dd4bf"],
-  };
-  const cells: (number | null)[] = [
-    ...Array(startDay).fill(null),
-    ...Array.from({ length: totalDays }, (_, i) => i + 1),
-  ];
-  // pad to full weeks
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const events = [
-    { icon: "🔔", title: "Doctor appointment",  date: "Apr 14" },
-    { icon: "📅", title: "Lunch with team",      date: "Apr 16" },
-    { icon: "💳", title: "Pay rent",              date: "Apr 20" },
-    { icon: "📅", title: "Birthday party",        date: "Apr 25" },
-  ];
-
-  return (
-    <div>
-      {/* Calendar header */}
-      <div className="flex items-center justify-between mb-3">
-        <button className="p-1 text-white/30"><ChevronLeft className="h-4 w-4" strokeWidth={1.5} /></button>
-        <p className="text-sm font-semibold text-white/85">April 2026</p>
-        <button className="p-1 text-white/30"><ChevronRight className="h-4 w-4" strokeWidth={1.5} /></button>
-      </div>
-
-      {/* Day headers */}
-      <div className="grid grid-cols-7 mb-1">
-        {days.map((d, i) => (
-          <div key={i} className="text-center text-[0.6rem] text-white/25 font-medium py-1">{d}</div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-y-1 mb-5">
-        {cells.map((day, i) => {
-          if (!day) return <div key={i} />;
-          const isToday = day === today;
-          const dots = eventDots[day];
-          return (
-            <div key={i} className="flex flex-col items-center gap-0.5 py-0.5">
-              <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium transition-colors
-                ${isToday ? "bg-white text-black font-bold" : "text-white/70 hover:text-white"}`}>
-                {day}
-              </div>
-              <div className="flex gap-0.5 h-1.5 items-center">
-                {dots?.slice(0,2).map((color, j) => (
-                  <span key={j} className="w-1 h-1 rounded-full" style={{ backgroundColor: color }} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Upcoming events */}
-      <p className="text-[0.65rem] uppercase tracking-wide text-white/30 mb-2">Upcoming</p>
-      {events.map((e) => (
-        <div key={e.title} className="flex items-start gap-3 py-2.5 border-b border-white/5">
-          <span className="text-base mt-0.5 shrink-0">{e.icon}</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white/85">{e.title}</p>
-            <p className="text-[0.7rem] text-white/30">{e.date}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TourBudgetTab() {
-  const cats = [
-    { name: "Entertainment",  spent: 0,    planned: 100  },
-    { name: "Food & Dining",  spent: 386,  planned: 600  },
-    { name: "Groceries",      spent: 173,  planned: 400  },
-    { name: "Health & Fitness",spent: 42,  planned: 150  },
-    { name: "Rent & Housing", spent: 2200, planned: 2300 },
-    { name: "Shopping",       spent: 0,    planned: 200  },
-  ];
-  const totalPlanned = cats.reduce((s, c) => s + c.planned, 0);
-  const totalSpent   = cats.reduce((s, c) => s + c.spent, 0);
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/30">Budget · 2026-04</p>
-          <p className="text-lg font-bold">${totalPlanned.toLocaleString()} <span className="text-sm font-normal text-white/30">/ ${totalSpent.toLocaleString()} spent</span></p>
-        </div>
-        <button className="flex items-center justify-center w-7 h-7 rounded-full bg-white shrink-0">
-          <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
-        </button>
-      </div>
-      {cats.map((c) => {
-        const pct = c.planned > 0 ? Math.round((c.spent / c.planned) * 100) : 0;
-        const bar = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-yellow-500" : "bg-green-500";
-        return (
-          <div key={c.name} className="py-3 border-b border-white/5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-semibold">{c.name}</span>
-              <span className="text-sm text-white/50">${c.spent.toLocaleString()} / ${c.planned.toLocaleString()}</span>
-            </div>
-            <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">
-              <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-[0.65rem] text-white/25">{pct}% used</span>
-              <span className="text-[0.65rem] text-white/25">${Math.max(0, c.planned - c.spent).toLocaleString()} left</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TourBillsTab() {
-  const bills = [
-    { name: "Netflix",  amount: 15.99, due: "Apr 18", daysLeft: 5  },
-    { name: "Spotify",  amount:  9.99, due: "Apr 20", daysLeft: 7  },
-    { name: "iCloud",   amount:  2.99, due: "Apr 22", daysLeft: 9  },
-    { name: "Internet", amount: 65.00, due: "Apr 25", daysLeft: 12 },
-    { name: "Rent",     amount: 2200,  due: "May 1",  daysLeft: 18 },
-  ];
-  const total = bills.reduce((s, b) => s + b.amount, 0);
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-wide text-white/25">Upcoming Bills</p>
-          <p className="text-lg font-bold mt-0.5">
-            ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            <span className="text-sm font-normal text-white/30"> this month</span>
-          </p>
-        </div>
-      </div>
-      {bills.map((b) => (
-        <div key={b.name} className="flex items-center gap-3 py-2.5 border-b border-white/5">
-          <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0">
-            <span className="text-[0.6rem] font-bold text-white/60">$</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white/85">{b.name}</p>
-            <p className="text-[0.6rem] text-white/25">Due {b.due}</p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-sm font-semibold text-white/85">${b.amount.toFixed(2)}</p>
-            <p className={`text-[0.6rem] ${b.daysLeft <= 7 ? "text-red-400/70" : "text-white/25"}`}>{b.daysLeft}d left</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TourForecastTab() {
-  const months = [
-    { m: "Apr", income: 5200, out: 3800 },
-    { m: "May", income: 5200, out: 3600 },
-    { m: "Jun", income: 5200, out: 3900 },
-    { m: "Jul", income: 5500, out: 3400 },
-  ];
-  const max = 6000;
-  return (
-    <div>
-      <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-4">Cash Flow Forecast</p>
-      <div className="flex items-end justify-between gap-3 mb-3" style={{ height: 100 }}>
-        {months.map((m) => (
-          <div key={m.m} className="flex-1 flex flex-col items-center gap-1 h-full">
-            <div className="w-full flex gap-0.5 items-end h-full">
-              <div className="flex-1 rounded-t" style={{ height: `${(m.income / max) * 100}%`, background: "rgba(74,222,128,0.35)" }} />
-              <div className="flex-1 rounded-t" style={{ height: `${(m.out / max) * 100}%`, background: "rgba(248,113,113,0.35)" }} />
-            </div>
-            <p className="text-[0.6rem] text-white/30">{m.m}</p>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-sm" style={{ background: "rgba(74,222,128,0.5)" }} />
-          <span className="text-[0.6rem] text-white/30">Income</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-sm" style={{ background: "rgba(248,113,113,0.5)" }} />
-          <span className="text-[0.6rem] text-white/30">Expenses</span>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
-          <p className="text-[0.6rem] text-white/25 uppercase tracking-wide">Avg In</p>
-          <p className="text-base font-bold text-green-400 mt-0.5">+$5,275</p>
-        </div>
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
-          <p className="text-[0.6rem] text-white/25 uppercase tracking-wide">Avg Out</p>
-          <p className="text-base font-bold text-red-400/80 mt-0.5">−$3,675</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TourGoalsTab() {
-  const goals=[
-    {name:"Vacation Fund",  current:2720,target:4000,pct:68},
-    {name:"Emergency Fund", current:1600,target:5000,pct:32},
-  ];
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[0.65rem] uppercase tracking-wide text-white/20">Goals</p>
-        <button className="flex items-center justify-center w-6 h-6 rounded-full bg-white shrink-0"><Plus className="h-3 w-3 text-black" strokeWidth={2} /></button>
-      </div>
-      {goals.map((g)=>{
-        const bar=g.pct>=75?"bg-green-400":g.pct>=40?"bg-green-500/70":"bg-green-600/50";
-        return (
-          <div key={g.name} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 mb-2.5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-xs">{g.name}</span>
-              <span className="text-xs font-bold text-green-400">{g.pct}%</span>
-            </div>
-            <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden mb-1.5">
-              <div className={`absolute inset-y-0 left-0 rounded-full ${bar}`} style={{width:`${g.pct}%`}} />
-            </div>
-            <div className="flex justify-between text-[0.6rem] text-white/30">
-              <span>${g.current.toLocaleString()} saved of ${g.target.toLocaleString()}</span>
-              <span>${(g.target-g.current).toLocaleString()} to go</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function AppTourDemo() {
-  const [phase, setPhase]             = useState<TourPhase>("home");
-  const [chatIdx, setChatIdx]         = useState(0);
-  const [inputText, setInputText]     = useState("");
-  const [sending, setSending]         = useState(false);
+  const [phase, setPhase]               = useState<TourPhase>("home");
+  const [chatIdx, setChatIdx]           = useState(0);
+  const [inputText, setInputText]       = useState("");
+  const [sending, setSending]           = useState(false);
   const [currentBubble, setCurrentBubble] = useState("");
   const [currentResponse, setCurrentResponse] = useState("");
-  const [thinking, setThinking]       = useState(false);
-  const [gridLit, setGridLit]         = useState(false);
-  const [bellLit, setBellLit]         = useState(false);
-  const [breatheOpen, setBreatheOpen] = useState(false);
-  const [todayOpen, setTodayOpen]     = useState(false);
-  const [journalOpen, setJournalOpen] = useState(false);
-  const [listOpen, setListOpen]       = useState(false);
-  const [micActive, setMicActive]     = useState(false);
-  const [panelOpen, setPanelOpen]     = useState(false);
-  const [activeTab, setActiveTab]     = useState<TourTab>("Insights");
-  const [visible, setVisible]         = useState(true);
+  const [thinking, setThinking]         = useState(false);
+  const [micActive, setMicActive]       = useState(false);
+  const [visible, setVisible]           = useState(true);
   const tmr         = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -871,15 +540,13 @@ function AppTourDemo() {
 
     if (phase === "home") {
       setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
-      setSending(false); setGridLit(false); setBellLit(false); setBreatheOpen(false);
-      setTodayOpen(false); setJournalOpen(false); setListOpen(false); setPanelOpen(false);
-      setMicActive(false); setActiveTab("Insights");
+      setSending(false); setMicActive(false);
       setChatIdx(0); setVisible(true);
       go("typing", 900);
     }
     if (phase === "typing") {
-      // Chat #3 (index 2) uses voice input — mic pulses, then text appears all at once
-      if (chatIdx === 2) {
+      // Every 3rd chat uses voice input — mic pulses, then text appears all at once
+      if (chatIdx % 3 === 2) {
         setMicActive(true);
         tmr.current = setTimeout(() => {
           setInputText(chat.prompt);
@@ -889,7 +556,7 @@ function AppTourDemo() {
       } else {
         let i = 0;
         const type = () => {
-          if (i <= chat.prompt.length) { setInputText(chat.prompt.slice(0,i)); i++; tmr.current = setTimeout(type, 32); }
+          if (i <= chat.prompt.length) { setInputText(chat.prompt.slice(0, i)); i++; tmr.current = setTimeout(type, 32); }
           else go("sending", 200);
         };
         tmr.current = setTimeout(type, 150);
@@ -905,9 +572,8 @@ function AppTourDemo() {
       setThinking(false);
       let i = 0;
       const type = () => {
-        if (i <= chat.response.length) { setCurrentResponse(chat.response.slice(0,i)); i++; tmr.current = setTimeout(type, 22); }
-        else if (chatIdx === 3) go("list-open", 600);
-        else go("next-chat", 700);
+        if (i <= chat.response.length) { setCurrentResponse(chat.response.slice(0, i)); i++; tmr.current = setTimeout(type, 22); }
+        else go("next-chat", 900);
       };
       tmr.current = setTimeout(type, 50);
     }
@@ -917,29 +583,13 @@ function AppTourDemo() {
         setPhase("clearing");
         setChatIdx(c => c + 1);
       } else {
-        go("pre-dash", 200);
+        go("reset", 400);
       }
     }
-    if (phase === "clearing")    { go("typing", 500); }
-    if (phase === "pre-dash")    { go("tap-grid", 100); }
-    if (phase === "tap-grid")    { setGridLit(true); go("panel-open", 200); }
-    if (phase === "panel-open")  { setPanelOpen(true); setGridLit(false); go("tab-budget", 1500); }
-    if (phase === "tab-budget")  { setActiveTab("Budget");   go("tab-bills", 1500); }
-    if (phase === "tab-bills")   { setActiveTab("Bills");    go("tab-forecast", 1800); }
-    if (phase === "tab-forecast"){ setActiveTab("Forecast"); go("tab-goals", 1800); }
-    if (phase === "tab-goals")   { setActiveTab("Goals");    go("panel-close", 1500); }
-    if (phase === "list-open")   { setListOpen(true);   go("list-close", 2200); }
-    if (phase === "list-close")  { setListOpen(false);  go("next-chat", 300); }
-    if (phase === "panel-close") { setPanelOpen(false); go("today-open", 300); }
-    if (phase === "today-open")  { setTodayOpen(true);  go("today-close", 2500); }
-    if (phase === "today-close") { setTodayOpen(false); go("journal-open", 300); }
-    if (phase === "journal-open"){ setJournalOpen(true);  go("journal-close", 2500); }
-    if (phase === "journal-close"){ setJournalOpen(false); go("breathe-open", 300); }
-    if (phase === "breathe-open") { setBreatheOpen(true);  go("breathe-close", 3500); }
-    if (phase === "breathe-close"){ setBreatheOpen(false); go("reset", 300); }
+    if (phase === "clearing") { go("typing", 500); }
     if (phase === "reset") {
       setVisible(false);
-      tmr.current = setTimeout(() => setPhase("home"), 450);
+      tmr.current = setTimeout(() => setPhase("home"), 500);
     }
     return () => { if (tmr.current) clearTimeout(tmr.current); };
   }, [phase, chatIdx]);
@@ -950,31 +600,26 @@ function AppTourDemo() {
   }, [currentBubble, currentResponse, thinking]);
 
   const hasInput      = inputText.length > 0;
-  // Stay in chat mode for subsequent messages once the conversation has started
-  const isChatMode    = chatIdx > 0 || !["home","typing","sending"].includes(phase);
+  const isChatMode    = chatIdx > 0 || !["home", "typing", "sending"].includes(phase);
   const isTypingPhase = phase === "typing";
 
   return (
-    <div className="w-full max-w-[320px] sm:max-w-[360px] mx-auto" style={{ transition: "opacity 0.4s", opacity: visible ? 1 : 0 }}>
+    <div className="w-full max-w-[320px] sm:max-w-[360px] mx-auto" style={{ transition: "opacity 0.5s", opacity: visible ? 1 : 0 }}>
       {/* Phone shell */}
       <div className="relative rounded-[36px] overflow-hidden bg-black shadow-2xl h-[600px] sm:h-[650px]" style={{ border: "6px solid #1a1a1a", boxShadow: "0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px rgba(0,0,0,0.7)" }}>
 
-        {/* ── Main app content ── */}
-        <div className="absolute inset-0 flex flex-col"
-          style={{ transform: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? "scale(0.93)" : "scale(1)", borderRadius: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? 36 : 0, opacity: (panelOpen || todayOpen || listOpen || journalOpen || breatheOpen) ? 0.55 : 1, transition: "all 0.25s cubic-bezier(0.25,0.46,0.45,0.94)", transformOrigin: "center center" }}>
+        <div className="absolute inset-0 flex flex-col">
 
-          {/* Nav bar — matches real app exactly */}
+          {/* Nav bar */}
           <nav className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5 shrink-0">
             <span className="text-white font-extrabold tracking-widest uppercase text-[0.5rem] font-[family-name:var(--font-playfair)]">ORRYON</span>
             <div className="flex items-center gap-1">
               <button className="p-2 rounded-lg text-white/60"><Search className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
-              <button className={`relative p-2 rounded-lg transition-colors ${bellLit ? "text-white bg-white/5" : "text-white/60"}`}>
+              <button className="relative p-2 rounded-lg text-white/60">
                 <Bell className="h-2.5 w-2.5" strokeWidth={1.5} />
                 <span className="absolute top-1.5 right-1.5 w-1 h-1 rounded-full bg-white" />
               </button>
-              <button className={`p-2 rounded-lg transition-colors ${gridLit ? "text-white bg-white/5" : "text-white/60"}`}>
-                <LayoutGrid className="h-2.5 w-2.5" strokeWidth={1.5} />
-              </button>
+              <button className="p-2 rounded-lg text-white/60"><LayoutGrid className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
               <button className="p-2 rounded-lg text-white/60"><Settings className="h-2.5 w-2.5" strokeWidth={1.5} /></button>
             </div>
           </nav>
@@ -983,12 +628,10 @@ function AppTourDemo() {
           {!isChatMode && (
             <div className="flex-1 flex flex-col items-center justify-center px-4" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
               <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover mb-5 ring-1 ring-white/10" />
-              <p className="text-white/60 text-[14px] mb-6 max-w-[220px] text-center leading-tight">
-                Hello, Alex.
-              </p>
+              <p className="text-white/60 text-[14px] mb-6 max-w-[220px] text-center leading-tight">Hello.</p>
               <div className="mb-6 flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/[0.03]">
                 <span className="text-white/30 text-sm">✦</span>
-                <span className="text-xs text-white/50">{getDemoGreeting()}. You have 1 task due today.</span>
+                <span className="text-xs text-white/50">{getDemoGreeting()}. Ready when you are.</span>
               </div>
               <div className="w-full max-w-xl">
                 <div className="flex items-center gap-2 rounded-full border bg-[#1c1c1e] px-4 py-2 transition-all duration-300"
@@ -1023,11 +666,7 @@ function AppTourDemo() {
           {/* Chat screen */}
           {isChatMode && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div
-                ref={chatScrollRef}
-                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
-                style={{ scrollbarWidth: "none" }}
-              >
+              <div ref={chatScrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" style={{ scrollbarWidth: "none" }}>
                 <div className="flex justify-center pb-1 pt-2">
                   <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover ring-1 ring-white/10" />
                 </div>
@@ -1039,35 +678,19 @@ function AppTourDemo() {
                 )}
                 {thinking && (
                   <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image
-                      src="/avatar.png"
-                      alt="Orryon"
-                      width={28}
-                      height={28}
-                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                    />
+                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
-                        <ThinkingIndicator />
-                      </div>
+                      <div className={CHAT_ASSISTANT_BUBBLE_CLASS}><ThinkingIndicator /></div>
                     </div>
                   </div>
                 )}
                 {currentResponse && (
                   <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image
-                      src="/avatar.png"
-                      alt="Orryon"
-                      width={28}
-                      height={28}
-                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                    />
+                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className={`${CHAT_ASSISTANT_BUBBLE_CLASS} whitespace-pre-line`}>
                         {currentResponse}
-                        {phase === "responding" && (
-                          <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />
-                        )}
+                        {phase === "responding" && <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />}
                       </div>
                     </div>
                   </div>
@@ -1103,236 +726,6 @@ function AppTourDemo() {
           )}
         </div>
 
-        {/* ── Today panel (slides in from right after bell tap) ── */}
-        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
-          style={{ width: "95%", transform: todayOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
-
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
-              <div>
-                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Today</p>
-                <p className="text-[0.55rem] text-white/25 mt-0.5">Sunday, April 12</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button className="flex items-center gap-1 text-[0.6rem] font-medium px-2 py-1 rounded-lg text-white/30">
-                  <SlidersHorizontal className="h-2.5 w-2.5" strokeWidth={1.5} />
-                  View
-                </button>
-                <button className="flex items-center justify-center w-5 h-5 rounded-full bg-white shrink-0">
-                  <Plus className="h-2.5 w-2.5 text-black" strokeWidth={2} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
-              <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center shrink-0">
-                <div className="w-1 h-1 rounded-full border border-white/30" />
-              </div>
-              <p className="text-[0.55rem] text-white/25">11 items today</p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 pb-4" style={{ scrollbarWidth: "none" }}>
-              {[
-                { title: "Team standup",        type: "meeting"     },
-                { title: "Lunch with Sarah",    type: "personal"    },
-                { title: "Dentist appointment", type: "appointment" },
-              ].map((e) => (
-                <div key={e.title} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
-                  <div className="shrink-0 w-4 h-4 rounded-full border border-white/15 flex items-center justify-center">
-                    <Calendar className="h-2 w-2 text-white/25" strokeWidth={1.5} />
-                  </div>
-                  <p className="text-[0.78rem] text-white/70 flex-1 leading-snug">{e.title}</p>
-                  <span className="text-[0.5rem] uppercase tracking-widest text-white/20 shrink-0">{e.type}</span>
-                </div>
-              ))}
-
-              {[
-                { title: "Review Q2 budget report",        border: "#f87171" },
-                { title: "Call with accountant at 3pm",    border: "#f87171" },
-                { title: "Send weekly update to team",     border: "#fb923c" },
-                { title: "Book flight to NYC",             border: "#fb923c" },
-                { title: "Review gym membership renewal",  border: "#60a5fa" },
-                { title: "Pick up dry cleaning",           border: "rgba(255,255,255,0.2)" },
-              ].map((t) => (
-                <div key={t.title} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
-                  <button className="shrink-0 w-4 h-4 rounded-full border-2" style={{ borderColor: t.border }} />
-                  <p className="text-[0.78rem] text-white/85 flex-1 leading-snug">{t.title}</p>
-                </div>
-              ))}
-
-              {[
-                { name: "Netflix", amount: 15.99 },
-                { name: "Spotify", amount: 9.99  },
-              ].map((b) => (
-                <div key={b.name} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.05]">
-                  <div className="shrink-0 w-4 h-4 rounded-full border border-red-400/30 flex items-center justify-center">
-                    <span className="text-red-400/50 text-[0.5rem] font-bold leading-none">$</span>
-                  </div>
-                  <p className="text-[0.78rem] text-white/70 flex-1 leading-snug">{b.name}</p>
-                  <span className="text-[0.72rem] font-semibold text-red-400/70 shrink-0 tabular-nums">
-                    ${b.amount.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Grocery list panel ── */}
-        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
-          style={{ width: "95%", transform: listOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
-
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
-              <div>
-                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Grocery</p>
-                <p className="text-[0.55rem] text-white/25 mt-0.5">8 items</p>
-              </div>
-              <button className="flex items-center justify-center w-5 h-5 rounded-full bg-white shrink-0">
-                <Plus className="h-2.5 w-2.5 text-black" strokeWidth={2} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-3" style={{ scrollbarWidth: "none" }}>
-              {[
-                { name: "Greek yogurt",    done: false },
-                { name: "Oat milk",        done: false },
-                { name: "Sourdough",       done: false },
-                { name: "Chicken thighs",  done: false },
-                { name: "Cherry tomatoes", done: false },
-                { name: "Spinach",         done: false },
-                { name: "Avocados",        done: false },
-                { name: "Olive oil",       done: true  },
-              ].map((item) => (
-                <div key={item.name} className="flex items-center gap-3 py-2.5 border-b border-white/[0.05]">
-                  <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${item.done ? "border-orange-400/60 bg-orange-400/10" : "border-white/20"}`}>
-                    {item.done && <div className="w-1.5 h-1.5 rounded-full bg-orange-400/70" />}
-                  </div>
-                  <p className={`text-[0.82rem] flex-1 leading-snug ${item.done ? "line-through text-white/30" : "text-white/80"}`}>{item.name}</p>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </div>
-
-        {/* ── Journal panel ── */}
-        <div className="absolute top-0 right-0 h-full z-[55] flex flex-col"
-          style={{ width: "95%", transform: journalOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl bg-[#0f0f0f]">
-
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.06] shrink-0">
-              <div>
-                <p className="text-[1rem] font-bold text-white/90 leading-tight tracking-tight">Journal</p>
-                <p className="text-[0.55rem] text-white/25 mt-0.5">Private · Sunday, April 13</p>
-              </div>
-              <BookOpen className="h-3.5 w-3.5 text-white/20" strokeWidth={1.5} />
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4" style={{ scrollbarWidth: "none" }}>
-              <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-3">Today&rsquo;s entry</p>
-              <p className="text-[0.85rem] text-white/70 leading-relaxed">
-                Stayed within budget today. Logged coffee and breakfast — small win. Feeling more in control of spending lately.
-                <span className="inline-block w-[1.5px] h-[0.85em] bg-white/40 ml-0.5 align-middle animate-pulse" />
-              </p>
-              <div className="mt-6 pt-4 border-t border-white/[0.05]">
-                <p className="text-[0.65rem] uppercase tracking-wide text-white/20 mb-2">Past entries</p>
-                {[
-                  { date: "Apr 12", preview: "Good day overall. Remembered to call the dentist..." },
-                  { date: "Apr 11", preview: "Grocery run felt manageable this week. Under budget..." },
-                ].map((e) => (
-                  <div key={e.date} className="py-2.5 border-b border-white/[0.04]">
-                    <p className="text-[0.62rem] text-white/30">{e.date}</p>
-                    <p className="text-[0.75rem] text-white/65 mt-0.5 leading-snug">{e.preview}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* ── Breathe panel (slides in from right, like dashboard) ── */}
-        <div className="absolute top-0 right-0 h-full z-[60] flex flex-col"
-          style={{ width: "95%", transform: breatheOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full flex flex-col overflow-hidden rounded-l-2xl shadow-2xl"
-            style={{ background: "linear-gradient(180deg,#0a1e2e 0%,#0c1a28 40%,#0f0f0f 100%)" }}>
-
-            <div className="flex-1 flex flex-col items-center justify-center px-8">
-              <div
-                className="rounded-full mb-6"
-                style={{
-                  width: 72, height: 72,
-                  background: "linear-gradient(135deg,hsl(200,45%,68%) 0%,hsl(205,40%,52%) 50%,hsl(210,38%,38%) 100%)",
-                  animation: breatheOpen ? "breatheOrb 4.2s ease-in-out infinite" : "none",
-                  boxShadow: "0 0 40px rgba(100,170,220,0.25)",
-                }}
-              />
-              <p className="text-[1.1rem] font-semibold text-white/80 leading-tight tracking-tight">Take a breath</p>
-              <p className="text-[0.65rem] text-white/30 tracking-widest uppercase mt-2">Box Breathing · 4–4–4–4</p>
-              <div className="mt-6 flex items-center gap-4 text-[0.6rem] text-white/20">
-                <span>Inhale</span>
-                <span>·</span>
-                <span>Hold</span>
-                <span>·</span>
-                <span>Exhale</span>
-                <span>·</span>
-                <span>Hold</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* ── Dashboard panel (slides in from right) ── */}
-        <div className="absolute top-0 right-0 h-full z-50 flex flex-col"
-          style={{ width: "95%", transform: panelOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
-          <div className="h-full bg-[#141414] rounded-l-2xl shadow-2xl flex flex-col overflow-hidden">
-
-            {/* Dashboard header */}
-            <div className="px-5 pt-6 pb-4 border-b border-white/5 shrink-0">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl font-extrabold">Dashboard</h1>
-                <button className="text-white/60 hover:text-white transition"><X className="h-4 w-4" strokeWidth={1.5} /></button>
-              </div>
-              {/* Stat cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                  <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-1">Net Balance</p>
-                  <p className="text-xl font-bold text-white/85">$5,500</p>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                  <p className="text-[0.6rem] uppercase tracking-wide text-white/30 mb-1">This Month</p>
-                  <p className="text-xl font-bold text-white/85">$2,862</p>
-                  <p className="text-[0.65rem] text-white/30 mt-0.5">spent</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Tab bar */}
-            <div className="px-5 pt-4 shrink-0">
-              <div className="flex overflow-x-auto rounded-full border border-white/5 bg-[#111] p-0.5 gap-0.5" style={{ scrollbarWidth: "none" }}>
-                {TOUR_TABS.map((tab) => (
-                  <button key={tab}
-                    className="shrink-0 rounded-full px-2.5 py-1.5 text-[0.62rem] font-medium whitespace-nowrap transition-all duration-200"
-                    style={{ background: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent", color: activeTab === tab ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)" }}>
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tab content */}
-            <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
-              {activeTab === "Insights" && <TourInsightsTab />}
-              {activeTab === "Budget"   && <TourBudgetTab />}
-              {activeTab === "Bills"    && <TourBillsTab />}
-              {activeTab === "Forecast" && <TourForecastTab />}
-              {activeTab === "Goals"    && <TourGoalsTab />}
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   );
@@ -1366,10 +759,10 @@ const FINANCE_CARDS: FeatureCardData[] = [
 
 function TasksPreview() {
   const items = [
-    { label: "Review Q2 budget report", done: false, color: "#f87171" },
-    { label: "Call dentist",            done: true,  color: "rgba(255,255,255,0.2)" },
-    { label: "Book flights to NYC",     done: false, color: "#fb923c" },
-    { label: "Pick up dry cleaning",    done: false, color: "rgba(255,255,255,0.2)" },
+    { label: "Review monthly report",     done: false, color: "#f87171" },
+    { label: "Personal errand",           done: true,  color: "rgba(255,255,255,0.2)" },
+    { label: "Review goals",              done: false, color: "#fb923c" },
+    { label: "Follow up on pending item", done: false, color: "rgba(255,255,255,0.2)" },
   ];
   return (
     <div className="w-full px-1 space-y-2">
@@ -1390,15 +783,15 @@ function TasksPreview() {
 
 function ListsPreview() {
   const items = [
-    { name: "Oat milk",        done: false },
-    { name: "Sourdough",       done: false },
-    { name: "Cherry tomatoes", done: false },
-    { name: "Avocados",        done: false },
-    { name: "Olive oil",       done: true  },
+    { name: "Dairy item",    done: false },
+    { name: "Bakery item",   done: false },
+    { name: "Fresh produce", done: false },
+    { name: "Pantry staple", done: false },
+    { name: "Pantry staple", done: true  },
   ];
   return (
     <div className="w-full px-1 space-y-1.5">
-      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2">Grocery · 8 items</p>
+      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2">Grocery list</p>
       {items.map((item) => (
         <div key={item.name} className="flex items-center gap-2.5 py-0.5">
           <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${item.done ? "border-green-400/50 bg-green-400/10" : "border-white/20"}`}>
@@ -1413,10 +806,10 @@ function ListsPreview() {
 
 function CalendarPreview() {
   const events: { Icon: React.FC<{ className?: string; strokeWidth?: number }>; title: string; date: string; urgent: boolean }[] = [
-    { Icon: Bell,     title: "Doctor appointment", date: "Apr 14", urgent: true  },
-    { Icon: Calendar, title: "Lunch with Sarah",   date: "Apr 16", urgent: false },
-    { Icon: Receipt,  title: "Pay rent",            date: "Apr 20", urgent: false },
-    { Icon: Calendar, title: "Birthday party",      date: "Apr 25", urgent: false },
+    { Icon: Bell,     title: "Health appointment", date: "Soon",     urgent: true  },
+    { Icon: Calendar, title: "Team catch-up",       date: "This week",urgent: false },
+    { Icon: Receipt,  title: "Bill due",             date: "Upcoming", urgent: false },
+    { Icon: Calendar, title: "Personal event",       date: "Upcoming", urgent: false },
   ];
   return (
     <div className="w-full px-1 space-y-1">
@@ -1439,19 +832,19 @@ function CalendarPreview() {
 function JournalPreview() {
   return (
     <div className="w-full px-1">
-      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2.5">Today&rsquo;s entry · Apr 14</p>
-      <p className="text-[0.75rem] text-white/60 leading-relaxed mb-4">
-        Stayed within budget today. Logged coffee and breakfast — small win. Feeling more in control lately.
+      <p className="text-[0.5rem] uppercase tracking-widest text-white/20 mb-2.5">Today&rsquo;s entry · private</p>
+      <p className="text-[0.75rem] text-white/60 leading-relaxed mb-4 italic">
+        Private reflection…
         <span className="inline-block w-[1.5px] h-[0.8em] bg-white/35 ml-0.5 align-middle animate-pulse" />
       </p>
       <div className="border-t border-white/[0.06] pt-3 space-y-2">
         {[
-          { date: "Apr 13", preview: "Good day overall. Remembered to call the dentist…" },
-          { date: "Apr 12", preview: "Grocery run felt manageable this week…" },
-        ].map((e) => (
-          <div key={e.date}>
+          { date: "—", preview: "Private reflection…" },
+          { date: "—", preview: "Private reflection…" },
+        ].map((e, i) => (
+          <div key={i}>
             <p className="text-[0.55rem] text-white/25">{e.date}</p>
-            <p className="text-[0.65rem] text-white/35 leading-snug mt-0.5">{e.preview}</p>
+            <p className="text-[0.65rem] text-white/25 leading-snug mt-0.5 italic">{e.preview}</p>
           </div>
         ))}
       </div>
@@ -1463,9 +856,9 @@ function StreaksPreview() {
   const ACCENT = "#ff9a14";
 
   const habits = [
-    { Icon: Dumbbell,  name: "Workout",      count: 14, target: 30 },
-    { Icon: BookOpen,  name: "Read 30 mins", count: 7,  target: 21 },
-    { Icon: Droplets,  name: "Drink water",  count: 21, target: 30 },
+    { Icon: Dumbbell,  name: "Movement",   count: 14, target: 30 },
+    { Icon: BookOpen,  name: "Reading",    count: 7,  target: 21 },
+    { Icon: Droplets,  name: "Hydration",  count: 21, target: 30 },
   ];
 
   const totalDots = 21;
@@ -1484,7 +877,7 @@ function StreaksPreview() {
             {/* Name + progress */}
             <div className="flex-1 min-w-0">
               <p className="text-[0.7rem] font-semibold text-white/85 truncate">{h.name}</p>
-              <p className="text-[0.55rem] text-white/30 mt-0.5">{h.count} / {h.target} days</p>
+              <p className="text-[0.55rem] text-white/30 mt-0.5">— / — days</p>
             </div>
             {/* Dot mini-grid: 7 dots showing last week */}
             <div className="flex gap-1 shrink-0">
