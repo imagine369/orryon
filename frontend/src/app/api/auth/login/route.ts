@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeCsrf, setAuthCookies } from "@/lib/server/auth-cookies";
+import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
 
 /**
  * POST /api/auth/login
@@ -23,6 +24,12 @@ function backendBase(): string {
 }
 
 export async function POST(req: NextRequest) {
+  // 10 OTP redemption attempts per IP per minute. Tight enough to make
+  // brute-forcing a 6-digit code impractical (10⁶ / 10·60 ≈ 1.9 years),
+  // generous enough to tolerate a typo or two.
+  const rl = await checkRateLimit(req, { tier: "login", limit: 10, windowSeconds: 60 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfter, "Too many login attempts. Please wait a moment.");
+
   let body: unknown;
   try {
     body = await req.json();

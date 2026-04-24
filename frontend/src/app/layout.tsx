@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +52,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Opt the entire tree into dynamic rendering so `src/proxy.ts` can inject a
+  // fresh per-request CSP nonce and Next.js attaches it to every <script> it
+  // emits. Without this the statically pre-rendered chunks would be blocked
+  // by `'strict-dynamic'` (which ignores `'self'`).
+  await headers();
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} dark h-full antialiased`}>
       <body className="min-h-full bg-black text-white">

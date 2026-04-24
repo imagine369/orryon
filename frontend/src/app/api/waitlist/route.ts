@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
 
 /**
  * Thin proxy for the public waitlist signup. The real implementation lives
@@ -32,6 +33,12 @@ function backendBase(): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Edge rate limit: 5 signups per IP per hour. Matches the backend ceiling in
+  // `backend/routers/waitlist.py` so we fail the caller fast without eating a
+  // Railway round-trip.
+  const rl = await checkRateLimit(req, { tier: "waitlist", limit: 5, windowSeconds: 3600 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
+
   let email: string;
   try {
     const body = await req.json();

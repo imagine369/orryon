@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeCsrf, setAuthCookies } from "@/lib/server/auth-cookies";
+import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
 
 /** POST /api/auth/demo-login — cookie-setting wrapper around FastAPI /api/auth/demo. */
 
@@ -13,6 +14,11 @@ function backendBase(): string {
 }
 
 export async function POST(req: NextRequest) {
+  // 5 demo logins per IP per minute — demo mode is gated to NODE_ENV=local on
+  // the backend anyway, but we still want to cap edge-level abuse.
+  const rl = await checkRateLimit(req, { tier: "demo-login", limit: 5, windowSeconds: 60 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
+
   let upstream: Response;
   try {
     upstream = await fetch(`${backendBase()}/api/auth/demo`, {

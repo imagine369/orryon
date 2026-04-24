@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
 
 export async function POST(req: NextRequest) {
+  // 3 contact submissions per IP per 10 minutes — matches the backend ceiling
+  // and makes form-spam brute force uneconomic at the edge.
+  const rl = await checkRateLimit(req, { tier: "contact", limit: 3, windowSeconds: 600 });
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
+
   try {
     const body = await req.json();
     const { name, email, subject, message } = body ?? {};
