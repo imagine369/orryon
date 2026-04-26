@@ -132,10 +132,10 @@ function BreathingOrb({
     <div
       style={{
         position: "relative",
-        width: "86vw",
-        height: "86vw",
-        maxWidth: 360,
-        maxHeight: 360,
+        width: "clamp(200px, 62vw, 320px)",
+        height: "clamp(200px, 62vw, 320px)",
+        maxWidth: "min(62vw, 42vh)",
+        maxHeight: "min(62vw, 42vh)",
         borderRadius: "50%",
         overflow: "hidden",
         transform: `scale(${scale})`,
@@ -475,26 +475,25 @@ function SessionScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "16px 32px 36px",
+        padding: "12px 24px 28px",
         fontFamily: FONT,
+        minHeight: 0,
       }}
     >
-      {/* Orb + step text */}
+      {/* Orb + step text — flex-shrink so they compress on short screens */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 105,
           flex: 1,
           justifyContent: "center",
-          paddingBottom: 60,
+          gap: "clamp(32px, 6vh, 80px)",
+          minHeight: 0,
+          paddingBottom: "clamp(16px, 3vh, 48px)",
         }}
       >
-        <div style={{ marginTop: -20 }}>
-          <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
-        </div>
-
+        <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -503,18 +502,16 @@ function SessionScreen({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35 }}
-            style={{
-              textAlign: "center",
-              maxWidth: 300,
-            }}
+            style={{ textAlign: "center", maxWidth: 300, padding: "0 8px" }}
           >
             <p
               style={{
-                fontSize: 18,
+                fontSize: "clamp(15px, 4vw, 18px)",
                 fontWeight: 500,
                 color: "rgba(255,255,255,0.29)",
                 lineHeight: 1.5,
                 letterSpacing: "-0.01em",
+                margin: 0,
               }}
             >
               {stepText}
@@ -523,8 +520,9 @@ function SessionScreen({
         </AnimatePresence>
       </div>
 
-      {/* Progress + timer */}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+      {/* Progress + bottom bar */}
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        {/* Progress bar */}
         <div
           style={{
             width: "100%",
@@ -540,8 +538,9 @@ function SessionScreen({
             transition={{ duration: 0.8, ease: "linear" }}
           />
         </div>
-        {/* Back + title + duration picker */}
-        <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+
+        {/* Row 1: Back ←→ Title + mute */}
+        <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button
             onClick={onBack}
             style={{
@@ -554,25 +553,30 @@ function SessionScreen({
               cursor: "pointer",
               fontSize: 13,
               fontFamily: FONT,
-              padding: "8px 0",
+              padding: "6px 0",
               WebkitTapHighlightColor: "transparent",
+              flexShrink: 0,
             }}
           >
             <ChevronLeft size={16} strokeWidth={1.5} />
             Back
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 14, color: "rgba(255,255,255,0.28)", fontWeight: 600, fontFamily: FONT }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.28)",
+                fontWeight: 600,
+                fontFamily: FONT,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "40vw",
+              }}
+            >
               {anchor.title}
             </span>
-            {anchor.durationOptions && durationOptIdx !== undefined && onDurationSelect && (
-              <DurationPicker
-                options={anchor.durationOptions}
-                selectedIdx={durationOptIdx}
-                onSelect={onDurationSelect}
-              />
-            )}
             <button
               onClick={() => setSoundEnabled((v) => !v)}
               title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
@@ -588,6 +592,7 @@ function SessionScreen({
                 color: soundEnabled ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.18)",
                 cursor: "pointer",
                 padding: 0,
+                flexShrink: 0,
                 WebkitTapHighlightColor: "transparent",
               }}
             >
@@ -596,6 +601,16 @@ function SessionScreen({
           </div>
         </div>
 
+        {/* Row 2: Duration picker on its own line so pills never overflow */}
+        {anchor.durationOptions && durationOptIdx !== undefined && onDurationSelect && (
+          <div style={{ width: "100%", display: "flex", justifyContent: "flex-end" }}>
+            <DurationPicker
+              options={anchor.durationOptions}
+              selectedIdx={durationOptIdx}
+              onSelect={onDurationSelect}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -839,13 +854,13 @@ function DurationPicker({
   const toLabel = (secs: number) => secs < 60 ? `${secs}s` : `${secs / 60} min`;
 
   return (
-    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
       {options.map((secs, idx) => (
         <button
           key={idx}
           onClick={() => handleSelect(idx)}
           style={{
-            padding: "5px 14px",
+            padding: "5px 12px",
             borderRadius: 999,
             border: "1px solid rgba(255,255,255,0.18)",
             background: "transparent",
@@ -857,6 +872,8 @@ function DurationPicker({
             opacity: chosen && idx !== selectedIdx ? 0.25 : 1,
             transition: "opacity 0.3s ease",
             WebkitTapHighlightColor: "transparent",
+            minWidth: 44,
+            textAlign: "center",
           }}
         >
           {toLabel(secs)}
