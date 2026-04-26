@@ -495,27 +495,6 @@ function SessionScreen({
           <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
         </div>
 
-        {/* Sound & Haptics Controls */}
-        <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setSoundEnabled((v) => !v)}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              color: soundEnabled ? "#a5f3fc" : "#64748b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-            title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
-          >
-            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-          </button>
-        </div>
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -594,6 +573,26 @@ function SessionScreen({
                 onSelect={onDurationSelect}
               />
             )}
+            <button
+              onClick={() => setSoundEnabled((v) => !v)}
+              title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "transparent",
+                border: "none",
+                color: soundEnabled ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.18)",
+                cursor: "pointer",
+                padding: 0,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {soundEnabled ? <Volume2 size={14} strokeWidth={1.5} /> : <VolumeX size={14} strokeWidth={1.5} />}
+            </button>
           </div>
         </div>
 
