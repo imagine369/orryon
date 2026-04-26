@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical, SlidersHorizontal, Flame, Feather,
 } from "lucide-react";
-import { BreathingWidget } from "@/components/dashboard/breathing-widget";
+import { UpgradeButton } from "@/components/subscription";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
@@ -265,6 +265,26 @@ export function NavBar() {
           ORRYON
         </Link>
         <div className="flex items-center gap-1">
+          {/* Always-visible upgrade entry point. Hidden automatically for
+              users on the active Pro plan; shown for trial / free / lapsed.
+              Sits before the icon row so it's the first thing the eye
+              lands on after the brand. */}
+          <UpgradeButton
+            variant="pill"
+            reason="navbar"
+            className="hidden sm:inline-flex mr-1.5"
+          >
+            Upgrade
+          </UpgradeButton>
+          <UpgradeButton
+            variant="icon"
+            reason="navbar-mobile"
+            className="sm:hidden mr-0.5"
+            ariaLabel="Upgrade"
+          >
+            Pro
+          </UpgradeButton>
+
           <button
             onClick={() => setSearchOpen(true)}
             className="flex items-center justify-center rounded-lg p-2 transition-colors text-white/60 hover:text-white hover:bg-white/5"
@@ -394,11 +414,6 @@ export function NavBar() {
                   <button onClick={() => setNotifOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                     <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />
                   </button>
-                </div>
-
-                {/* Breathing widget */}
-                <div className="px-5 pt-0 pb-2 shrink-0">
-                  <BreathingWidget />
                 </div>
 
                 {/* Tab bar */}

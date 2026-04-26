@@ -16,11 +16,15 @@ from pydantic import BaseModel
 
 class SendCodeReq(BaseModel):
     email: str
+    # Set by the Orryon web app for the public "free breathing" signup only.
+    # Skips invite-only waitlist gating; OTP + rate limits still apply.
+    free_breathing_signup: bool = False
 
 class VerifyReq(BaseModel):
     email: str
     code: str
     display_name: Optional[str] = None
+    free_breathing_signup: bool = False
 
 class SignupCheckoutReq(BaseModel):
     price_id: str

@@ -8,6 +8,8 @@ interface User {
   id: string;
   email: string;
   display_name: string;
+  plan?: string;
+  segment?: string;
 }
 
 interface AuthState {
@@ -49,10 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u);
         migrateHabitsToServer().catch(() => {});
       })
-      .catch(() => {
+      .catch((err) => {
+        // Don't fire /api/auth/logout here. That used to be "best-effort
+        // cookie clear" but in practice it created a self-inflicted bounce:
+        // a single transient 401 (e.g. backend cold-start race against the
+        // cookie) wiped the freshly-issued session and forced the user back
+        // to /login forever. Just clear local React state — if the cookie
+        // really is invalid, the very next request will 401 again and the
+        // user can manually re-auth.
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("[auth] /api/auth/me failed:", (err as Error)?.message);
+        }
         clearToken();
-        // Cookies may be stale; best-effort clear.
-        fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
       })
       .finally(() => setLoading(false));
   }, []);

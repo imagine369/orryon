@@ -151,9 +151,13 @@ async function request<T = unknown>(
     // the local-only UI (streaks, journal, etc.) stays usable.
     if (isDemoMode()) throw new Error("Unauthorized");
     clearToken();
-    // Best-effort cookie wipe; ignore failures (e.g. offline).
-    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
-    if (typeof window !== "undefined") window.location.href = "/login";
+    // We deliberately do NOT redirect to /login from here. A single stray
+    // 401 from any background fetch (subscription, dashboard stats, etc.)
+    // would otherwise yank the user mid-flow — including bouncing them
+    // back to /login the very moment they sign in if any of /home's
+    // useEffect-triggered fetches happens to race ahead of the cookie.
+    // Auth state lives in AuthProvider; the (app) layout already redirects
+    // to /login when `user` is null, which is the single source of truth.
     throw new Error("Unauthorized");
   }
   if (!res.ok) {
@@ -201,8 +205,7 @@ async function uploadFile<T = unknown>(
   if (res.status === 401) {
     if (isDemoMode()) throw new Error("Unauthorized");
     clearToken();
-    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
-    if (typeof window !== "undefined") window.location.href = "/login";
+    // No auto-redirect — see request() above for rationale.
     throw new Error("Unauthorized");
   }
   if (!res.ok) {
@@ -281,8 +284,9 @@ export async function* streamChat(
     }
     clearToken();
     invalidateSigningKey();
-    fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
-    if (typeof window !== "undefined") window.location.href = "/login";
+    // Don't force-navigate here either — yield the error and let the UI
+    // surface it. AuthProvider will reconcile via /api/auth/me on next
+    // mount; (app) layout redirects when user becomes null.
     yield { type: "error", message: "Session expired — please log in again." };
     return;
   }

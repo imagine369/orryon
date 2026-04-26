@@ -15,6 +15,7 @@ import { BillsTab } from "@/components/dashboard/bills-tab";
 import { YearlyTab } from "@/components/dashboard/yearly-tab";
 import { OverviewTab } from "@/components/dashboard/overview-tab";
 import { BankTab } from "@/components/dashboard/bank-tab";
+import { PaywallGuard } from "@/components/subscription";
 
 interface DashboardData {
   balance: number;
@@ -164,7 +165,19 @@ export function DashboardPanel() {
                       <TabsContent value="yearly"><YearlyTab /></TabsContent>
                       <TabsContent value="budget"><BudgetTab /></TabsContent>
                       <TabsContent value="bills"><BillsTab /></TabsContent>
-                      <TabsContent value="forecast"><ForecastTab /></TabsContent>
+                      {/* Example of a paywall-guarded money screen.
+                          Pro / trial users see ForecastTab; everyone else
+                          sees a soft preview behind a lock card with the
+                          "Breathing stays free" reassurance. */}
+                      <TabsContent value="forecast">
+                        <PaywallGuard
+                          feature="forecast"
+                          title="Cash flow forecast is part of Pro"
+                          description="See where your money is heading after bills and goals — clearly, calmly, monthly."
+                        >
+                          <ForecastTab />
+                        </PaywallGuard>
+                      </TabsContent>
                       <TabsContent value="goals"><GoalsTab /></TabsContent>
                     </Tabs>
                   </>

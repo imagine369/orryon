@@ -7,12 +7,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useSubscription } from "@/lib/use-subscription";
 import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
 import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
+import { BreathingWidget } from "@/components/breathing";
+import { PostBreathingUpgradeCard } from "@/components/subscription";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -69,7 +72,14 @@ const CONTAINER = "mx-auto w-full max-w-3xl px-4";
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { sub, loading: subLoading } = useSubscription();
   const searchParams = useSearchParams();
+
+  // Home empty-state "Take a breath" is a free-user entry + upgrade nudge.
+  // Pro and active-trial users already have the full app; hide it to reduce noise.
+  const showBreathingOnHome =
+    !subLoading &&
+    (sub == null || (!sub.is_active_pro && sub.plan !== "pro" && sub.plan !== "trial"));
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -643,6 +653,17 @@ export default function HomePage() {
                     {tasksDueToday !== 1 ? "s" : ""} due today.
                   </span>
                 </Link>
+              )}
+
+              {showBreathingOnHome && (
+                <div className={`${CONTAINER} mt-4 w-full`}>
+                  <BreathingWidget
+                    doneFooterSlot={<PostBreathingUpgradeCard />}
+                  />
+                  <p className="mt-2 text-center text-[0.62rem] uppercase tracking-[2.5px] text-white/25">
+                    Always free · works offline
+                  </p>
+                </div>
               )}
             </div>
 

@@ -36,7 +36,7 @@ _PUBLIC_USER_FIELDS = {
     "id", "email", "display_name", "created_at", "plan", "trial_ends_at",
     "currency", "budget_cycle_start", "spending_alert_pct",
     "default_reminder_minutes", "daily_digest_enabled", "daily_digest_time",
-    "weekly_report_enabled", "bill_due_alert_days",
+    "weekly_report_enabled", "bill_due_alert_days", "segment",
 }
 
 
@@ -59,7 +59,8 @@ async def auth_send_code(body: SendCodeReq, request: Request):
     admin_email = (CONTACT_EMAIL or "").strip().lower()
     is_admin = admin_email and email == admin_email
 
-    if not is_admin:
+    # Public "free breathing" signup from marketing — no waitlist required.
+    if not is_admin and not body.free_breathing_signup:
         with get_connection() as conn:
             wl = conn.execute(
                 "SELECT approved FROM waitlist WHERE email = ?", (email,)
@@ -125,7 +126,8 @@ async def auth_verify(body: VerifyReq, request: Request):
     if not verify_code(email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
     display_name = (body.display_name or "").strip()
-    user = get_or_create_user_by_email(email, display_name=display_name)
+    segment = "free_breathe" if body.free_breathing_signup else ""
+    user = get_or_create_user_by_email(email, display_name=display_name, segment=segment)
     if display_name and user.get("display_name") != display_name:
         update_row("users", {"display_name": display_name}, {"id": user["id"]})
         user["display_name"] = display_name

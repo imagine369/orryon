@@ -25,14 +25,14 @@ from pydantic import BaseModel, Field
 
 from backend.auth import get_current_user
 from backend.cache import check_rate_limit_async
-from backend.deps import MONTHLY_SPEND_CAP_USD
+from backend.deps import MONTHLY_SPEND_CAP_USD, require_active_plan
 from backend.signing import require_signed_request
 from config import XAI_API_KEY
 from db import get_monthly_spend
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["voice"])
+router = APIRouter(tags=["voice"], dependencies=[Depends(require_active_plan)])
 
 
 # ── Config ────────────────────────────────────────────────────────────────────

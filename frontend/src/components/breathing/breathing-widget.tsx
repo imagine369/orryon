@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * Breathing — fully local, fully free, fully self-contained.
+ *
+ * STRICT separation rule:
+ *   This file MUST NOT import anything from `@/lib/subscription-service`,
+ *   `@/lib/use-subscription`, or any module under `@/components/subscription`.
+ *   If you need to add an upgrade nudge, do it through the `doneFooterSlot`
+ *   prop on `<BreathingWidget>` — the *caller* supplies the subscription-aware
+ *   UI. Breathing must keep working if the entire subscription folder is
+ *   deleted.
+ *
+ * Belief: tools that support breathing, meditation, and human wellbeing
+ * should be free for everyone. The philosophy footer below is part of the
+ * product, not an upsell mechanism.
+ */
+
 import { useState, useEffect, useCallback, type ReactNode, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -109,7 +125,30 @@ function BackBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-function DoneFooter({ label, onRestart, onBack }: { label: string; onRestart: () => void; onBack: () => void }) {
+/**
+ * DoneFooter
+ *
+ * Shown after a session completes. Breathing-owned content lives here
+ * directly; anything that depends on the rest of the app (e.g. a paid
+ * feature upsell) is rendered via the `extra` slot which the caller
+ * provides at the top level. Breathing knows nothing about that slot's
+ * contents — it just renders whatever React node is passed in.
+ *
+ * The "Thank you for taking care of your wellbeing. Breathing will
+ * always be free." line is intentionally kept inside breathing because
+ * it's a philosophical statement, not a subscription concern.
+ */
+function DoneFooter({
+  label,
+  onRestart,
+  onBack,
+  extra,
+}: {
+  label: string;
+  onRestart: () => void;
+  onBack: () => void;
+  extra?: ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center mt-10 px-8 text-center">
       <p style={{ color: "rgba(255,255,255,.38)", fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.35rem" }}>
@@ -121,6 +160,37 @@ function DoneFooter({ label, onRestart, onBack }: { label: string; onRestart: ()
       <div style={{ display: "flex", gap: "0.65rem" }}>
         <button onClick={onRestart} style={ghostBtn}>Start again</button>
         <button onClick={onBack}    style={{ ...ghostBtn, background: "rgba(255,255,255,.06)" }}>Change</button>
+      </div>
+
+      {/* Wellbeing thank-you — pure breathing copy, no subscription
+          knowledge. Stays even if the subscription module is removed. */}
+      <div
+        className="mt-9 max-w-[320px] flex flex-col items-center text-center"
+        style={{ fontFamily: FONT }}
+      >
+        <p
+          style={{
+            color: "rgba(255,255,255,.50)",
+            fontSize: "0.86rem",
+            lineHeight: 1.6,
+            marginBottom: "0.5rem",
+          }}
+        >
+          Thank you for taking care of your wellbeing.
+        </p>
+        <p
+          style={{
+            color: "rgba(255,255,255,.32)",
+            fontSize: "0.74rem",
+            lineHeight: 1.6,
+          }}
+        >
+          Breathing will always be free.
+        </p>
+
+        {/* External slot — caller decides what (if anything) to render
+            below the wellbeing message. Breathing never inspects it. */}
+        {extra ? <div className="mt-4 w-full">{extra}</div> : null}
       </div>
     </div>
   );
@@ -142,7 +212,7 @@ const BOX_PHASES = [
 const BOX_PHASE_TICKS = 4;
 const BOX_CYCLE_LEN   = BOX_PHASE_TICKS * BOX_PHASES.length; // 16 s
 
-function BoxSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => void }) {
+function BoxSession({ totalSecs, onBack, doneFooterSlot }: { totalSecs: number; onBack: () => void; doneFooterSlot?: ReactNode }) {
   const [tick,    setTick]    = useState(0);
   const [done,    setDone]    = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -219,7 +289,7 @@ function BoxSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => vo
         </div>
       </div>
 
-      {done && <DoneFooter label="Session complete. Take a quiet moment." onRestart={restart} onBack={onBack} />}
+      {done && <DoneFooter label="Session complete. Take a quiet moment." onRestart={restart} onBack={onBack} extra={doneFooterSlot} />}
     </Session>
   );
 }
@@ -237,7 +307,7 @@ const SIGH_CYCLE  = 14;   // sum of durations
 const SIGH_COUNT  = 5;
 const SIGH_TOTAL  = SIGH_CYCLE * SIGH_COUNT; // 70 s
 
-function SighSession({ onBack }: { onBack: () => void }) {
+function SighSession({ onBack, doneFooterSlot }: { onBack: () => void; doneFooterSlot?: ReactNode }) {
   const [tick,    setTick]    = useState(0);
   const [done,    setDone]    = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -348,14 +418,14 @@ function SighSession({ onBack }: { onBack: () => void }) {
         </p>
       )}
 
-      {done && <DoneFooter label="5 sighs complete. You reset your nervous system." onRestart={restart} onBack={onBack} />}
+      {done && <DoneFooter label="5 sighs complete. You reset your nervous system." onRestart={restart} onBack={onBack} extra={doneFooterSlot} />}
     </Session>
   );
 }
 
 // ── Do Nothing session ────────────────────────────────────────────────────────
 
-function DoNothingSession({ totalSecs, onBack }: { totalSecs: number; onBack: () => void }) {
+function DoNothingSession({ totalSecs, onBack, doneFooterSlot }: { totalSecs: number; onBack: () => void; doneFooterSlot?: ReactNode }) {
   const [tick, setTick]   = useState(0);
   const [done, setDone]   = useState(false);
 
@@ -426,7 +496,7 @@ function DoNothingSession({ totalSecs, onBack }: { totalSecs: number; onBack: ()
         </div>
       </motion.div>
 
-      {done && <DoneFooter label="Rest complete." onRestart={restart} onBack={onBack} />}
+      {done && <DoneFooter label="Rest complete." onRestart={restart} onBack={onBack} extra={doneFooterSlot} />}
     </Session>
   );
 }
@@ -588,6 +658,47 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
             <PillButton onClick={() => onSelectNothing(nothingMins * 60)} variant="calm" size="sm">Start</PillButton>
           </div>
         </div>
+
+        {/* Philosophy footer — visible reminder that wellbeing tools are free.
+            Kept gentle and unobtrusive: a thin divider above, soft body copy,
+            no CTA. The belief should feel like a quiet promise, not a pitch. */}
+        <div
+          className="w-full flex flex-col items-center text-center"
+          style={{ maxWidth: 440, marginTop: "0.6rem" }}
+        >
+          <div
+            aria-hidden
+            style={{
+              width: "40%",
+              height: 1,
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)",
+              marginBottom: "1.1rem",
+            }}
+          />
+          <p
+            style={{
+              fontSize: "0.6rem",
+              textTransform: "uppercase",
+              letterSpacing: "2.5px",
+              color: "rgba(255,255,255,.38)",
+              marginBottom: "0.55rem",
+            }}
+          >
+            Free for everyone
+          </p>
+          <p
+            style={{
+              fontSize: "0.78rem",
+              lineHeight: 1.6,
+              color: "rgba(255,255,255,.42)",
+              padding: "0 0.5rem",
+            }}
+          >
+            Breathing exercises are free for everyone. We believe tools that
+            improve human wellbeing and peace should be available to all.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -597,7 +708,23 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
 
 type Screen = "idle" | "select" | "box" | "sigh" | "nothing";
 
-export function BreathingWidget() {
+/**
+ * Props for the public widget. `doneFooterSlot` is the only escape hatch
+ * for callers that want to surface app-specific UI at the end of a session
+ * (e.g. an upgrade nudge from the subscription module). The slot is opaque
+ * to breathing — pass any ReactNode and it will be rendered below the
+ * wellbeing thank-you message inside the DoneFooter.
+ */
+export interface BreathingWidgetProps {
+  /**
+   * Optional ReactNode rendered at the bottom of the post-session footer.
+   * Pass nothing → no extra UI is shown. Pass a subscription-aware
+   * component → it appears, but breathing knows nothing about it.
+   */
+  doneFooterSlot?: ReactNode;
+}
+
+export function BreathingWidget({ doneFooterSlot }: BreathingWidgetProps = {}) {
   const [screen,          setScreen]          = useState<Screen>("idle");
   const [boxDuration,     setBoxDuration]     = useState(60);
   const [nothingDuration, setNothingDuration] = useState(180);
@@ -655,13 +782,24 @@ export function BreathingWidget() {
                 />
               )}
               {screen === "box" && (
-                <BoxSession totalSecs={boxDuration} onBack={() => setScreen("select")} />
+                <BoxSession
+                  totalSecs={boxDuration}
+                  onBack={() => setScreen("select")}
+                  doneFooterSlot={doneFooterSlot}
+                />
               )}
               {screen === "sigh" && (
-                <SighSession onBack={() => setScreen("select")} />
+                <SighSession
+                  onBack={() => setScreen("select")}
+                  doneFooterSlot={doneFooterSlot}
+                />
               )}
               {screen === "nothing" && (
-                <DoNothingSession totalSecs={nothingDuration} onBack={() => setScreen("select")} />
+                <DoNothingSession
+                  totalSecs={nothingDuration}
+                  onBack={() => setScreen("select")}
+                  doneFooterSlot={doneFooterSlot}
+                />
               )}
             </motion.div>
           )}

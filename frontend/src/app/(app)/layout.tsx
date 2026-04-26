@@ -14,6 +14,7 @@ import { ResetAnchorPanel } from "@/components/reset-anchor-panel";
 import { TrialBanner } from "@/components/trial-banner";
 import { InstallPrompt } from "@/components/install-prompt";
 import { useSubscription } from "@/lib/use-subscription";
+import { SubscriptionProvider } from "@/lib/subscription-service";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -22,18 +23,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const isPanelOpen = openPanel !== null;
   const { sub } = useSubscription();
 
+  const isFreeBreathe = !loading && !!user && (user.segment === "free_breathe" || user.plan === "free");
+
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (isFreeBreathe) router.replace("/breathe");
+  }, [loading, user, router, isFreeBreathe]);
 
-  if (loading) {
+  // Show spinner while loading OR while about to redirect — never flash the app shell.
+  if (loading || !user || isFreeBreathe) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-black">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
       </div>
     );
   }
-  if (!user) return null;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -67,7 +71,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PanelProvider>
-      <AppShell>{children}</AppShell>
+      <SubscriptionProvider>
+        <AppShell>{children}</AppShell>
+      </SubscriptionProvider>
     </PanelProvider>
   );
 }

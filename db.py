@@ -587,6 +587,8 @@ _USERS_EXTRA_COLS = {
     "trial_ends_at": "TEXT DEFAULT ''",
     "stripe_customer_id": "TEXT DEFAULT ''",
     "stripe_subscription_id": "TEXT DEFAULT ''",
+    "segment": "TEXT DEFAULT ''",
+    "billing_interval": "TEXT DEFAULT ''",
 }
 
 _TRANSACTIONS_EXTRA_COLS = {
@@ -802,8 +804,15 @@ def _hash_code(code: str) -> str:
 
 # ── User auth (email OTP — no passwords stored) ───────────────────────────────
 
-def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
-    """Return the existing user for *email*, or create a new one."""
+def get_or_create_user_by_email(
+    email: str, display_name: str = "", segment: str = ""
+) -> dict:
+    """Return the existing user for *email*, or create a new one.
+
+    Free-breathing signups (segment='free_breathe') get plan='free' with no
+    trial period — they are stored under the 'Free Breathe Users' segment and
+    never automatically promoted to trial.
+    """
     email = email.strip().lower()
     try:
         conn = get_connection()
@@ -816,19 +825,36 @@ def get_or_create_user_by_email(email: str, display_name: str = "") -> dict:
     except Exception as exc:
         logger.error("get_or_create_user_by_email lookup error: %s", exc)
 
-    from config import TRIAL_DAYS
     name = display_name.strip() or email.split("@")[0]
-    trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
-    user = {
-        "id": str(uuid.uuid4()),
-        "email": email,
-        "display_name": name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "plan": "trial",
-        "trial_ends_at": trial_ends_at,
-    }
-    insert_row("users", user)
-    logger.info("Created user: %s (%s) — trial until %s", email, user["id"], trial_ends_at)
+    is_free_breathe = segment == "free_breathe"
+
+    if is_free_breathe:
+        user = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "display_name": name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "plan": "free",
+            "trial_ends_at": "",
+            "segment": "free_breathe",
+        }
+        insert_row("users", user)
+        logger.info("Created Free Breathe user: %s (%s)", email, user["id"])
+    else:
+        from config import TRIAL_DAYS
+        trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
+        user = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "display_name": name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "plan": "trial",
+            "trial_ends_at": trial_ends_at,
+            "segment": segment,
+        }
+        insert_row("users", user)
+        logger.info("Created user: %s (%s) — trial until %s", email, user["id"], trial_ends_at)
+
     return user
 
 

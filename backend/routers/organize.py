@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth import get_current_user
+from backend.deps import require_active_plan
 from backend.schemas import (
     EventReq,
     GoalReq,
@@ -32,7 +33,7 @@ from backend.schemas import (
 )
 from db import get_connection, insert_row, update_row
 
-router = APIRouter(tags=["organize"])
+router = APIRouter(tags=["organize"], dependencies=[Depends(require_active_plan)])
 
 
 # ── Events ────────────────────────────────────────────────────────────────────

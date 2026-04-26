@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth import get_current_user
+from backend.deps import require_active_plan
 from backend.schemas import BillReq, BudgetReq, TransactionReq
 from db import (
     adjust_balance,
@@ -31,7 +32,7 @@ from core.tools import (
     _get_category_spending_cycle, _get_category_budget,
 )
 
-router = APIRouter(tags=["finance"])
+router = APIRouter(tags=["finance"], dependencies=[Depends(require_active_plan)])
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────

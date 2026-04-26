@@ -1631,7 +1631,6 @@ export default function LandingPage() {
 
       <FeatureSection />
 
-
       <style>{`
         @keyframes bounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -1666,6 +1665,42 @@ export default function LandingPage() {
       <div className="max-w-lg lg:max-w-2xl mx-auto px-4 sm:px-6 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
         {!loggedIn && (
           <>
+            {/* Breathing orb + belief statement */}
+            <motion.div
+              animate={{ scale: [1, 1.1, 1], opacity: [0.75, 0.92, 0.75] }}
+              transition={{ duration: 5.5, ease: "easeInOut", repeat: Infinity }}
+              className="mb-8 lg:mb-10"
+              style={{
+                width: 192,
+                height: 192,
+                borderRadius: "50%",
+                background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
+                boxShadow: "0 0 80px rgba(62,207,190,0.28), 0 0 160px rgba(100,170,220,0.14)",
+              }}
+            />
+
+            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
+              Wellbeing should be free.<br />For everyone.
+            </h2>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
+              We believe breathing, meditation, and wellbeing tools should be free
+              for all humans. That&rsquo;s why this is always free. Subscribe anytime
+              when you&rsquo;re ready for the other features.
+            </p>
+
+            <PillLink href="/login?next=/breathe&flow=breathe" size="sm">Sign up — it&rsquo;s free</PillLink>
+            <Link
+              href="/login"
+              className="mt-4 mb-8 sm:mb-10 lg:mb-12 inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
+            >
+              Already have an account?{" "}
+              <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
+            </Link>
+
+            {/* Divider */}
+            <div className="w-px h-12 bg-white/10 mb-8 sm:mb-10 lg:mb-12" />
+
+            {/* Orryon avatar + Early Access */}
             <motion.div
               className="mb-8"
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
@@ -1674,7 +1709,6 @@ export default function LandingPage() {
               <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
             </motion.div>
             <p className="text-[0.6rem] sm:text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
-
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
               Less noise. More you.
             </h2>
@@ -1713,7 +1747,7 @@ export default function LandingPage() {
                     size="sm"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
+                    {waitlistStatus === "loading" ? "Joining…" : "Access All Features"}
                   </PillButton>
                 </div>
                 {waitlistStatus === "error" && (
@@ -1728,6 +1762,32 @@ export default function LandingPage() {
 
         {loggedIn && (
           <>
+            {/* Breathing orb + belief statement */}
+            <motion.div
+              animate={{ scale: [1, 1.1, 1], opacity: [0.75, 0.92, 0.75] }}
+              transition={{ duration: 5.5, ease: "easeInOut", repeat: Infinity }}
+              className="mb-8 lg:mb-10"
+              style={{
+                width: 192,
+                height: 192,
+                borderRadius: "50%",
+                background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
+                boxShadow: "0 0 80px rgba(62,207,190,0.28), 0 0 160px rgba(100,170,220,0.14)",
+              }}
+            />
+            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Wellbeing should be free.<br />For everyone.</h2>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
+              We believe breathing, meditation, and wellbeing tools should be free
+              for all humans. That&rsquo;s why this is always free. Subscribe anytime
+              when you&rsquo;re ready for the other features.
+            </p>
+
+            <PillLink href="/breathe" size="sm">Try breathing — it&rsquo;s free</PillLink>
+
+            {/* Divider */}
+            <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
+
+            {/* Orryon avatar + CTA */}
             <motion.div
               className="mb-6 lg:mb-8"
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
@@ -1737,7 +1797,7 @@ export default function LandingPage() {
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
-            <PillLink href="/home" size="sm">Go to app</PillLink>
+            <PillLink href="/home" size="sm">Access All Features</PillLink>
             <StoreBadges className="mt-8" />
           </>
         )}

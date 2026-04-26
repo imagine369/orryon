@@ -21,7 +21,7 @@ from fastapi.responses import Response
 
 from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import check_rate_limit_async
-from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION, MONTHLY_SPEND_CAP_USD, resolve_plan
+from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION, MONTHLY_SPEND_CAP_USD, require_active_plan, resolve_plan
 from backend.schemas import (
     CheckoutReq,
     EmailChangeSendReq,
@@ -180,7 +180,7 @@ async def delete_account(user: dict = Depends(get_current_user)):
 # ── Export ────────────────────────────────────────────────────────────────────
 
 @router.get("/api/export")
-async def export_data(user: dict = Depends(get_current_user)):
+async def export_data(user: dict = Depends(require_active_plan)):
     """Download all user data as a ZIP file containing the SQLite DB and JSON."""
     from core.export import build_user_export_zip
 
@@ -195,7 +195,7 @@ async def export_data(user: dict = Depends(get_current_user)):
 # ── Share ─────────────────────────────────────────────────────────────────────
 
 @router.post("/api/share")
-async def create_share_link(user: dict = Depends(get_current_user)):
+async def create_share_link(user: dict = Depends(require_active_plan)):
     uid = user["user_id"]
     with get_connection() as conn:
         existing = conn.execute(
@@ -263,7 +263,7 @@ _RECEIPT_ALLOWED_MIME = {
 
 
 @router.post("/api/receipts/scan")
-async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(require_active_plan)):
     """Use Grok Vision to extract structured data from a receipt image."""
     import base64
     import re as re_module
@@ -505,7 +505,7 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
 
 
 @router.post("/api/subscription/portal")
-async def billing_portal(user: dict = Depends(get_current_user)):
+async def billing_portal(user: dict = Depends(require_active_plan)):
     from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, APP_URL as _APP_URL
     if not STRIPE_ENABLED:
         raise HTTPException(503, "Stripe is not configured")

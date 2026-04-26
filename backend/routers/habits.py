@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth import get_current_user
+from backend.deps import require_active_plan
 from backend.schemas import (
     HabitsImportReq,
     ResetCompletionReq,
@@ -26,7 +27,7 @@ from backend.schemas import (
 )
 from db import delete_row, get_connection, insert_row, update_row
 
-router = APIRouter(tags=["habits"])
+router = APIRouter(tags=["habits"], dependencies=[Depends(require_active_plan)])
 
 
 def _now() -> str:

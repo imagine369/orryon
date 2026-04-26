@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,15 +43,36 @@ const PRO_FEATURES = [
   "Bill due & event reminder alerts",
 ];
 
-type Step = "tiers" | "email" | "code" | "name";
+type Step = "breathe" | "tiers" | "email" | "code" | "name";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const { login } = useAuth();
+  const searchParams = useNextSearchParams();
 
-  const initialStep = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("step") === "tiers" ? "tiers" : "email";
-  const [step, setStep] = useState<Step>(initialStep);
-  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">("monthly");
+  const flow       = searchParams.get("flow");
+  const stepParam  = searchParams.get("step");
+  const planParam  = searchParams.get("plan");
+  const nextParam  = searchParams.get("next") || "/home";
+
+  // Store breatheFlow in state so it survives re-renders and is reliably
+  // available inside async callbacks like sendCode().
+  const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
+  const [step, setStep] = useState<Step>(() => {
+    if (flow === "breathe") return "breathe";
+    if (stepParam === "tiers") return "tiers";
+    return "email";
+  });
+
+  // Sync breatheFlow if searchParams resolve after hydration
+  useEffect(() => {
+    if (flow === "breathe") {
+      setBreatheFlow(true);
+      setStep((s) => (s === "email" ? "breathe" : s));
+    }
+  }, [flow]);
+
+  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState("");
@@ -69,10 +90,17 @@ export default function LoginPage() {
       setError("Please enter a valid email address.");
       return;
     }
+    if (breatheFlow && !displayName.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const res = await api.post<{ sent: boolean; dev_code: string; smtp_configured: boolean }>("/api/auth/send-code", { email: val });
+      const res = await api.post<{ sent: boolean; dev_code: string; smtp_configured: boolean }>("/api/auth/send-code", {
+        email: val,
+        ...(breatheFlow ? { free_breathing_signup: true } : {}),
+      });
       setDevCode(res.sent ? "" : res.dev_code);
       setSmtpConfigured(res.smtp_configured);
       setStep("code");
@@ -106,24 +134,81 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      // Cookie-setting proxy route: the JWT is stored in an HttpOnly cookie
-      // and never reaches this page's JS. Response only carries the user.
-      const res = await api.post<{ user: { id: string; email: string; display_name: string; stripe_subscription_id?: string } }>(
-        "/api/auth/login",
-        { email: email.trim().toLowerCase(), code: code.trim() },
-      );
-      setAuthUser(res.user);
-      setDisplayName(res.user.display_name || "");
+      // We use raw fetch here (rather than the api.ts wrapper) so we can
+      // inspect the response status and Set-Cookie behaviour directly.
+      // The api.ts wrapper would mask a 401 as a generic Unauthorized,
+      // which is exactly what we *don't* want at the moment of sign-in.
+      const resp = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          code: code.trim(),
+          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+          ...(breatheFlow ? { free_breathing_signup: true } : {}),
+        }),
+      });
 
-      if (res.user && res.user.stripe_subscription_id) {
-        login(res.user);
-        router.push("/home");
-      } else {
-        setStep("name");
+      const payload = (await resp.json().catch(() => ({}))) as {
+        user?: { id: string; email: string; display_name: string };
+        detail?: string;
+      };
+
+      if (!resp.ok) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("[login] verify failed", resp.status, payload);
+        }
+        setError(payload.detail || `Sign in failed (${resp.status}).`);
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError("Invalid or expired code. Please try again.");
-    } finally {
+
+      if (!payload.user) {
+        setError("Sign in succeeded but the server didn't return a user. Try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Sanity-check the cookie actually landed before we navigate. If it
+      // didn't (e.g. SameSite/Secure misconfig, mixed origin, browser
+      // blocking third-party cookies on the dev port, etc.), kicking the
+      // user to /home would just bounce them straight back here.
+      const hasSignal =
+        typeof document !== "undefined" &&
+        /(?:^|;\s*)orryon_auth=1/.test(document.cookie);
+
+      if (!hasSignal) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error(
+            "[login] /api/auth/login returned 200 but no orryon_auth cookie was set. " +
+              "document.cookie = ", document.cookie,
+          );
+        }
+        setError(
+          "Signed in, but your browser didn't accept the session cookie. " +
+            "Disable any cookie/tracking blocker for this site and try again.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      setAuthUser(payload.user);
+      setDisplayName(payload.user.display_name || "");
+      login(payload.user);
+      // Hard navigation so the freshly-set HttpOnly session cookie is in
+      // place for the very first request /home makes — a soft router.push
+      // has, in practice, raced ahead of the cookie write.
+      window.location.assign(nextParam);
+    } catch (e: unknown) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error("[login] verify threw", e);
+      }
+      const msg = e instanceof Error ? e.message : "";
+      setError(msg || "Couldn't reach the server. Please try again.");
       setLoading(false);
     }
   };
@@ -208,6 +293,54 @@ export default function LoginPage() {
           <X className="h-5 w-5" strokeWidth={1.5} />
         </Link>
       </div>
+
+      {/* ── Free breathing signup: name + email (skips waitlist on backend) ── */}
+      {step === "breathe" && (
+        <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
+          <h1 className="text-2xl font-bold text-white mb-1 text-center font-[family-name:var(--font-playfair)]">
+            Free breathing &amp; calm
+          </h1>
+          <p className="text-sm text-white/50 mb-6 text-center max-w-xs">
+            Create a free account. We&rsquo;ll email a 6-digit code to sign you in — no waitlist.
+          </p>
+          <Input
+            type="text"
+            placeholder="Your name"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void sendCode()}
+            className="mb-3 bg-[#111] border-white/10 text-white"
+            autoFocus
+            autoComplete="name"
+          />
+          <Input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void sendCode()}
+            className="mb-1 bg-[#111] border-white/10 text-white"
+            autoComplete="email"
+          />
+          <p className="text-[0.7rem] text-white/30 mb-4 self-start">
+            Works with Gmail · Outlook · iCloud · any email
+          </p>
+          {error && <p className="text-red-400 text-sm mb-3 w-full">{error}</p>}
+          <PillButton
+            onClick={() => { void sendCode(); }}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? "Sending…" : "Send code"}
+          </PillButton>
+          <Link
+            href="/"
+            className="mt-5 w-full text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200 text-center block"
+          >
+            &larr; Back to home
+          </Link>
+        </div>
+      )}
 
       {/* ── Step 1: Plan selection ── */}
       {step === "tiers" && (
@@ -369,7 +502,12 @@ export default function LoginPage() {
           </PillButton>
           <div className="flex items-center justify-center gap-4 mt-3 w-full">
             <button
-              onClick={() => { setStep("email"); setCode(""); setDevCode(""); setError(""); }}
+              onClick={() => {
+                setStep(breatheFlow ? "breathe" : "email");
+                setCode("");
+                setDevCode("");
+                setError("");
+              }}
               className="text-xs text-white/30 hover:text-white/60 uppercase tracking-[3px] transition-colors duration-200"
             >
               &larr; Back
@@ -412,5 +550,13 @@ export default function LoginPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   );
 }

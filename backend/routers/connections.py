@@ -38,13 +38,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from backend.auth import get_current_user
 from backend.cache import cache_get, cache_set
+from backend.deps import require_active_plan
 from backend.schemas import CSVColumnMapping, CSVImportConfirmReq
 from config import PLAID_CLIENT_ID, PLAID_ENABLED, PLAID_SECRET
 from db import adjust_balance, get_connection, insert_row
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["connections"])
+router = APIRouter(tags=["connections"], dependencies=[Depends(require_active_plan)])
 
 # CSV previews are staged in Redis (when configured) so preview and confirm
 # can land on different workers. Falls back to an in-process dict in dev.
