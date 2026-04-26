@@ -462,7 +462,7 @@ function SessionScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "12px clamp(16px, 5vw, 24px) max(98px, calc(72px + env(safe-area-inset-bottom, 0px)))",
+        padding: "12px clamp(16px, 5vw, 24px) max(50px, calc(50px + env(safe-area-inset-bottom, 0px)))",
         fontFamily: FONT,
         minHeight: 0,
       }}
@@ -477,7 +477,7 @@ function SessionScreen({
           justifyContent: "center",
           gap: "clamp(32px, 6vh, 80px)",
           minHeight: 0,
-          paddingBottom: "clamp(66px, 3vh, 98px)",
+          paddingBottom: "clamp(16px, 2vh, 32px)",
         }}
       >
         <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
@@ -510,7 +510,7 @@ function SessionScreen({
       </div>
 
       {/* Progress + bottom bar */}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0, marginTop: 50 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0, marginTop: 16 }}>
         {/* Progress bar */}
         <div
           style={{
