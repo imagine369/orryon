@@ -27,7 +27,7 @@ from backend.auth import get_current_user
 from backend.cache import check_rate_limit_async
 from backend.deps import MONTHLY_SPEND_CAP_USD, require_active_plan
 from backend.signing import require_signed_request
-from config import XAI_API_KEY
+from config import XAI_API_KEY, ELEVENLABS_API_KEY
 from db import get_monthly_spend
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,12 @@ router = APIRouter(tags=["voice"], dependencies=[Depends(require_active_plan)])
 _XAI_BASE = "https://api.x.ai/v1"
 _STT_URL = f"{_XAI_BASE}/stt"
 _TTS_URL = f"{_XAI_BASE}/tts"
+
+# ElevenLabs — used for orb/breathing voice only.
+# "Erin - Meditation Guide": soft, peaceful, purpose-built for guided meditation.
+_EL_BASE = "https://api.elevenlabs.io/v1"
+_EL_ORB_VOICE_ID = os.getenv("ELEVENLABS_ORB_VOICE_ID", "DKfKzHbGIi7qsCsZWN8G")
+_EL_MODEL = "eleven_multilingual_v2"
 
 # xAI STT has a single global model — it does NOT accept a `model` request
 # field (unlike OpenAI's Whisper API). Sending one returns 400.
@@ -68,6 +74,10 @@ _STT_ALLOWED_MIME_PREFIXES = ("audio/", "video/webm", "video/mp4")
 class TTSReq(BaseModel):
     text: str = Field(min_length=1, max_length=_TTS_MAX_CHARS)
     voice: str | None = None
+
+
+class OrbTTSReq(BaseModel):
+    text: str = Field(min_length=1, max_length=_TTS_MAX_CHARS)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -230,5 +240,100 @@ async def text_to_speech(
         raise HTTPException(status_code=502, detail="Voice synthesis failed. Please try again.")
 
     # Stream audio bytes straight back to the client.
+    audio_type = resp.headers.get("content-type", "audio/mpeg")
+    return Response(content=resp.content, media_type=audio_type)
+
+
+# ── Orb TTS (ElevenLabs — Erin, Meditation Guide) ────────────────────────────
+
+@router.post("/api/voice/orb-tts")
+async def orb_text_to_speech(
+    body: OrbTTSReq,
+    user: dict = Depends(get_current_user),
+    _signed: dict = Depends(require_signed_request),
+) -> Response:
+    """
+    Synthesize orb / breathing cues using ElevenLabs Erin (Meditation Guide).
+
+    Falls back to xAI TTS (eve voice) if ELEVENLABS_API_KEY is not configured,
+    so the orb still works during local dev without an ElevenLabs key.
+
+    Body: {"text": "Breathe in."}
+    Returns: audio/mpeg (MP3 bytes)
+    """
+    uid = user["user_id"]
+    await _enforce_voice_quota(uid, "tts")
+
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty text.")
+
+    # ── ElevenLabs path ───────────────────────────────────────────────────────
+    if ELEVENLABS_API_KEY:
+        url = f"{_EL_BASE}/text-to-speech/{_EL_ORB_VOICE_ID}?output_format=mp3_44100_128"
+        payload = {
+            "text": text,
+            "model_id": _EL_MODEL,
+            "voice_settings": {
+                # High stability = consistent, calm tone across every cue.
+                # Low style exaggeration = no dramatic flourishes.
+                # Speed slightly below 1.0 = unhurried, meditative pace.
+                "stability": 0.82,
+                "similarity_boost": 0.75,
+                "style": 0.0,
+                "use_speaker_boost": False,
+                "speed": 0.88,
+            },
+        }
+        headers = {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+        except httpx.TimeoutException:
+            logger.warning("ElevenLabs orb TTS timed out for user=%s", uid)
+            raise HTTPException(status_code=504, detail="Voice synthesis timed out. Please try again.")
+        except httpx.HTTPError as exc:
+            logger.exception("ElevenLabs orb TTS network error for user=%s: %s", uid, exc)
+            raise HTTPException(status_code=502, detail="Could not reach the voice service.")
+
+        if resp.status_code >= 400:
+            logger.error("ElevenLabs orb TTS error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
+            if resp.status_code == 401:
+                raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+            if resp.status_code == 429:
+                raise HTTPException(status_code=429, detail="Voice service is busy — please try again in a moment.")
+            raise HTTPException(status_code=502, detail="Voice synthesis failed. Please try again.")
+
+        audio_type = resp.headers.get("content-type", "audio/mpeg")
+        return Response(content=resp.content, media_type=audio_type)
+
+    # ── xAI fallback (no ElevenLabs key configured) ───────────────────────────
+    if not XAI_API_KEY:
+        raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+
+    payload_xai = {
+        "text": text,
+        "voice_id": "eve",
+        "language": _DEFAULT_LANGUAGE,
+    }
+    headers_xai = {
+        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(_TTS_URL, headers=headers_xai, json=payload_xai)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Voice synthesis timed out. Please try again.")
+    except httpx.HTTPError as exc:
+        logger.exception("xAI fallback orb TTS error for user=%s: %s", uid, exc)
+        raise HTTPException(status_code=502, detail="Could not reach the voice service.")
+
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Voice synthesis failed. Please try again.")
+
     audio_type = resp.headers.get("content-type", "audio/mpeg")
     return Response(content=resp.content, media_type=audio_type)

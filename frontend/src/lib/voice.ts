@@ -1,11 +1,14 @@
 /**
- * Voice helpers for orryon — xAI Speech-to-Text and Text-to-Speech.
+ * Voice helpers for orryon.
  *
- * These call our same-origin `/api/voice/*` proxy, which forwards to
- * https://api.x.ai/v1/stt and https://api.x.ai/v1/tts with the server-side
- * XAI_API_KEY injected. The browser never sees the key.
+ * Two TTS paths:
+ *   textToSpeech()    — xAI `sal`, used for chat assistant replies.
+ *   orbTextToSpeech() — ElevenLabs "Erin - Meditation Guide" (gentle female),
+ *                       used exclusively for breathing / Reset Anchor cues.
+ *                       Falls back to xAI `eve` if no ElevenLabs key is set.
  *
- * See `backend/routers/voice.py` for the server implementation.
+ * Neither key is ever exposed to the browser — both are injected server-side.
+ * See `backend/routers/voice.py`.
  */
 
 import { clientHeaders, getApiBase, getCsrfToken, isDemoMode } from "@/lib/api";
@@ -65,8 +68,8 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
 }
 
 /**
- * Synthesize speech. Uses xAI TTS in production, falls back to browser
- * SpeechSynthesis API in demo mode so the Orb voice works immediately.
+ * Synthesize chat assistant speech via xAI TTS (`sal` voice).
+ * Falls back to browser SpeechSynthesis in demo mode.
  */
 export async function textToSpeech(
   text: string,
@@ -75,70 +78,10 @@ export async function textToSpeech(
 ): Promise<Blob> {
   const shaped = shapeForVoice(text, mode);
 
-  // Demo mode: use browser's built-in speech synthesis (no backend needed)
   if (isDemoMode()) {
-    return new Promise((resolve, reject) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        reject(new Error("Speech synthesis not available"));
-        return;
-      }
-
-      const synth = window.speechSynthesis;
-      const utterance = new SpeechSynthesisUtterance(shaped);
-
-      utterance.rate = mode === "anchor" ? 0.78 : 0.92;   // slower, more deliberate for Orb
-      utterance.pitch = mode === "anchor" ? 0.88 : 0.96;  // lower, softer
-      utterance.volume = mode === "anchor" ? 0.72 : 0.85; // quieter for breathing guidance
-
-      // Load voices if not already available (they load asynchronously)
-      let voicesLoaded = synth.getVoices().length > 0;
-      if (!voicesLoaded) {
-        const onVoicesChanged = () => {
-          synth.removeEventListener("voiceschanged", onVoicesChanged);
-          voicesLoaded = true;
-          assignVoice();
-        };
-        synth.addEventListener("voiceschanged", onVoicesChanged);
-        // Some browsers need a small delay before voices are populated
-        setTimeout(() => {
-          if (!voicesLoaded) assignVoice();
-        }, 120);
-      } else {
-        assignVoice();
-      }
-
-      function assignVoice() {
-        const voices = synth.getVoices();
-        // Prefer calm, warm female voices — ordered by quality for Orb voice
-        const preferredVoices = [
-          ...voices.filter((v) => v.name.toLowerCase().includes("samantha")),
-          ...voices.filter((v) => v.name.toLowerCase().includes("karen")),
-          ...voices.filter((v) => v.name.toLowerCase().includes("ava")),
-          ...voices.filter((v) => v.name.toLowerCase().includes("female")),
-          ...voices.filter((v) => v.name.toLowerCase().includes("victoria")),
-        ];
-
-        if (preferredVoices.length > 0) {
-          utterance.voice = preferredVoices[0];
-        }
-      }
-
-      utterance.onend = () => {
-        // Return a silent blob so the Audio() element in SessionScreen doesn't break
-        resolve(new Blob([], { type: "audio/mpeg" }));
-      };
-
-      utterance.onerror = (event) => {
-        console.warn("SpeechSynthesis error:", event);
-        // Still resolve with silent blob so UI doesn't break
-        resolve(new Blob([], { type: "audio/mpeg" }));
-      };
-
-      synth.speak(utterance);
-    });
+    return _browserTTS(shaped, mode);
   }
 
-  // Production: call backend proxy to xAI TTS
   const bodyStr = JSON.stringify({ text: shaped, voice: voiceId });
   const sigHeaders = await signRequest("POST", "/api/voice/tts", bodyStr);
 
@@ -155,6 +98,85 @@ export async function textToSpeech(
   }
 
   return res.blob();
+}
+
+/**
+ * Synthesize orb / breathing cues via ElevenLabs "Erin - Meditation Guide"
+ * (gentle, peaceful female voice). Falls back to browser SpeechSynthesis in
+ * demo mode. Server falls back to xAI `eve` if no ElevenLabs key is set.
+ *
+ * Always sends plain text — prosody shaping is handled server-side via
+ * ElevenLabs voice_settings (stability, speed) rather than SSML tags.
+ */
+export async function orbTextToSpeech(text: string): Promise<Blob> {
+  if (isDemoMode()) {
+    return _browserTTS(text, "anchor");
+  }
+
+  const bodyStr = JSON.stringify({ text: text.trim() });
+  const sigHeaders = await signRequest("POST", "/api/voice/orb-tts", bodyStr);
+
+  const res = await fetch(`${getApiBase()}/api/voice/orb-tts`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json", ...sigHeaders }),
+    body: bodyStr,
+    credentials: "same-origin",
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Orb voice synthesis failed (${res.status})`);
+  }
+
+  return res.blob();
+}
+
+/**
+ * Browser SpeechSynthesis fallback for demo mode.
+ * Picks the softest available female voice.
+ */
+function _browserTTS(text: string, mode: VoiceMode): Promise<Blob> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      resolve(new Blob([], { type: "audio/mpeg" }));
+      return;
+    }
+
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    utterance.rate   = mode === "anchor" ? 0.78 : 0.92;
+    utterance.pitch  = mode === "anchor" ? 0.88 : 0.96;
+    utterance.volume = mode === "anchor" ? 0.72 : 0.85;
+
+    const assignVoice = () => {
+      const voices = synth.getVoices();
+      // Prefer soft female voices — Samantha (macOS) is the closest to Erin
+      const preferred = [
+        ...voices.filter((v) => v.name.toLowerCase().includes("samantha")),
+        ...voices.filter((v) => v.name.toLowerCase().includes("karen")),
+        ...voices.filter((v) => v.name.toLowerCase().includes("ava")),
+        ...voices.filter((v) => v.name.toLowerCase().includes("victoria")),
+        ...voices.filter((v) => v.name.toLowerCase().includes("female")),
+      ];
+      if (preferred.length > 0) utterance.voice = preferred[0];
+    };
+
+    if (synth.getVoices().length > 0) {
+      assignVoice();
+    } else {
+      const onChanged = () => {
+        synth.removeEventListener("voiceschanged", onChanged);
+        assignVoice();
+      };
+      synth.addEventListener("voiceschanged", onChanged);
+      setTimeout(assignVoice, 120);
+    }
+
+    utterance.onend = () => resolve(new Blob([], { type: "audio/mpeg" }));
+    utterance.onerror = () => resolve(new Blob([], { type: "audio/mpeg" }));
+    synth.speak(utterance);
+  });
 }
 
 /**

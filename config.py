@@ -121,6 +121,18 @@ CONTACT_EMAIL: str = os.getenv("CONTACT_EMAIL", "") or SMTP_USER
 SMTP_FROM: str = os.getenv("SMTP_FROM", "") or SMTP_USER or CONTACT_EMAIL
 
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
+# ── ElevenLabs (orb / breathing voice) ───────────────────────────────────────
+# Used exclusively for the breathing orb and Reset Anchor session cues.
+# Get your key at https://elevenlabs.io — free tier includes 10k chars/month.
+ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+
+# ── ElevenLabs (orb / breathing voice) ───────────────────────────────────────
+# Used exclusively for the breathing orb and Reset Anchor session cues.
+# Get your key at https://elevenlabs.io — free tier includes 10k chars/month.
+# Voice used: "Erin - Meditation Guide" (ID: DKfKzHbGIi7qsCsZWN8G)
+# A soft, gentle, peaceful female voice purpose-built for guided meditation.
+ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+
 # ── Stripe (billing) ──────────────────────────────────────────────────────────
 # Set up at https://dashboard.stripe.com
 # Test keys start with sk_test_ / pk_test_

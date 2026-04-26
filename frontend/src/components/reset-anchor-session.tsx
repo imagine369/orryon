@@ -7,8 +7,7 @@ import { X, ChevronLeft, Check, Volume2, VolumeX } from "lucide-react";
 import type { ResetAnchor, ResetAnimation } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
-import { textToSpeech } from "@/lib/voice";
-import { ORB_VOICE_ID } from "@/lib/voice-config";
+import { orbTextToSpeech } from "@/lib/voice";
 import {
   playBackgroundSound,
   stopBackgroundSound,
@@ -404,14 +403,14 @@ function SessionScreen({
 
     (async () => {
       try {
-        const blob = await textToSpeech(text, ORB_VOICE_ID, "anchor");
+        const blob = await orbTextToSpeech(text);
         if (ctrl.signal.aborted) return;
 
         const url = URL.createObjectURL(blob);
         orbBlobUrl.current = url;
 
         const audio = new Audio(url);
-        audio.volume = 0.62;
+        audio.volume = 0;
         orbAudio.current = audio;
         audio.onended = () => {
           URL.revokeObjectURL(url);
@@ -419,6 +418,18 @@ function SessionScreen({
           if (orbAudio.current === audio) orbAudio.current = null;
         };
         await audio.play();
+        // Fade in over ~120ms to avoid abrupt start
+        const target = 0.55;
+        const steps = 12;
+        const stepMs = 10;
+        let step = 0;
+        const fade = setInterval(() => {
+          step++;
+          if (orbAudio.current === audio) {
+            audio.volume = Math.min(target, (step / steps) * target);
+          }
+          if (step >= steps) clearInterval(fade);
+        }, stepMs);
       } catch { /* audio unavailable or aborted — fail silently */ }
     })();
 
