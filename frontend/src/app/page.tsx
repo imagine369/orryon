@@ -1685,8 +1685,10 @@ export default function LandingPage() {
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
               We believe breathing, meditation, and wellbeing tools should be free for everyone.
               That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever.
-              No limits, no trial, no catch. Use them as much as you like.
-              The budgeting tools and other advanced features are optional. Only pay if you use them.
+              No limits, no trial, no catch.
+            </p>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
+              Use them as much as you like. The budgeting tools and other advanced features are optional. Only pay if you use them.
             </p>
 
             <PillLink href="/login?next=/breathe&flow=breathe" size="sm">Sign up — it&rsquo;s free</PillLink>
@@ -1780,8 +1782,10 @@ export default function LandingPage() {
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
               We believe breathing, meditation, and wellbeing tools should be free for everyone.
               That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever.
-              No limits, no trial, no catch. Use them as much as you like.
-              The budgeting tools and other advanced features are optional. Only pay if you use them.
+              No limits, no trial, no catch.
+            </p>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
+              Use them as much as you like. The budgeting tools and other advanced features are optional. Only pay if you use them.
             </p>
 
             <PillLink href="/breathe" size="sm">Try breathing — it&rsquo;s free</PillLink>
