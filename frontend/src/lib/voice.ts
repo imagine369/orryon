@@ -86,9 +86,9 @@ export async function textToSpeech(
       const synth = window.speechSynthesis;
       const utterance = new SpeechSynthesisUtterance(shaped);
 
-      utterance.rate = mode === "anchor" ? 0.82 : 0.95;   // slower, more deliberate for Orb
-      utterance.pitch = mode === "anchor" ? 0.92 : 1.0;   // slightly lower, calmer
-      utterance.volume = 0.92;
+      utterance.rate = mode === "anchor" ? 0.78 : 0.92;   // slower, more deliberate for Orb
+      utterance.pitch = mode === "anchor" ? 0.88 : 0.96;  // lower, softer
+      utterance.volume = mode === "anchor" ? 0.72 : 0.85; // quieter for breathing guidance
 
       // Load voices if not already available (they load asynchronously)
       let voicesLoaded = synth.getVoices().length > 0;

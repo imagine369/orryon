@@ -3,12 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, Check } from "lucide-react";
+import { X, ChevronLeft, Check, Volume2, VolumeX } from "lucide-react";
 import type { ResetAnchor, ResetAnimation } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
 import { textToSpeech } from "@/lib/voice";
 import { ORB_VOICE_ID } from "@/lib/voice-config";
+import {
+  playBackgroundSound,
+  stopBackgroundSound,
+  triggerHaptics,
+  getHapticPatternForStep,
+  getSoundForAnchor,
+  isSoundPlaying,
+} from "@/lib/breathing-sounds";
 
 // ── Design tokens (consistent with breathing-widget.tsx) ─────────────────────
 
@@ -331,6 +339,10 @@ function SessionScreen({
   const [fadeKey,      setFadeKey]     = useState(0);
   const [stepStartSec, setStepStartSec] = useState(0);
 
+  // Sound & haptics
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const soundConfig = getSoundForAnchor(anchor.id);
+
   const steps = anchor.steps;
 
   const isVariable = !!anchor.durationOptions;
@@ -356,10 +368,35 @@ function SessionScreen({
 
   const ORB_VOICE_ENABLED = true;
 
+  // Initialize sound for this anchor when session starts
+  useEffect(() => {
+    if (soundEnabled) {
+      playBackgroundSound(anchor.id, 0.25);
+    } else {
+      stopBackgroundSound();
+      stopOrbAudio();
+    }
+    return () => {
+      stopBackgroundSound();
+    };
+  }, [anchor.id, soundEnabled, stopOrbAudio]);
+
+  // Haptics on step changes — short phase-specific pulse at each transition
+  useEffect(() => {
+    if (done || !mounted) return;
+
+    const text = steps[stepIdx]?.text ?? "";
+    const pattern = getHapticPatternForStep(anchor.id, stepIdx, text);
+    triggerHaptics(pattern);
+  }, [stepIdx, anchor.id, done, mounted, steps]);
+
   // Speak the cue for the current step via Orb voice (ara, anchor mode).
   useEffect(() => {
     const text = steps[stepIdx]?.text?.trim();
-    if (!text || !mounted || !ORB_VOICE_ENABLED) return;
+    if (!text || !mounted || !ORB_VOICE_ENABLED || !soundEnabled) {
+      if (!soundEnabled) stopOrbAudio();
+      return;
+    }
 
     stopOrbAudio();
     const ctrl = new AbortController();
@@ -374,6 +411,7 @@ function SessionScreen({
         orbBlobUrl.current = url;
 
         const audio = new Audio(url);
+        audio.volume = 0.62;
         orbAudio.current = audio;
         audio.onended = () => {
           URL.revokeObjectURL(url);
@@ -386,7 +424,7 @@ function SessionScreen({
 
     return () => { ctrl.abort(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIdx, mounted]);
+  }, [stepIdx, mounted, soundEnabled]);
 
   useEffect(() => {
     return () => stopOrbAudio();
@@ -521,6 +559,28 @@ function SessionScreen({
       >
         <div style={{ marginTop: -20 }}>
           <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
+        </div>
+
+        {/* Sound & Haptics Controls */}
+        <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setSoundEnabled((v) => !v)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: soundEnabled ? "#a5f3fc" : "#64748b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+            title={soundEnabled ? "Sound on (scientific choice)" : "Sound off"}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
         </div>
 
         <AnimatePresence mode="wait">
