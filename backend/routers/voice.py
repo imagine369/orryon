@@ -77,6 +77,20 @@ def _require_key() -> None:
         raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
 
 
+import re as _re
+
+# STT phonetic variants of "Orryon" that the model produces instead of the
+# correct spelling. Applied case-insensitively; preserves surrounding context.
+_ORRYON_VARIANTS = _re.compile(
+    r"\b(orr?i[ao]n|or[iy][ao]n|ori[ao]n|oryon|ory[ao]n|orrian|orrion|or\s*yon)\b",
+    _re.IGNORECASE,
+)
+
+def _fix_brand_names(text: str) -> str:
+    """Correct STT mis-transcriptions of the Orryon brand name."""
+    return _ORRYON_VARIANTS.sub("Orryon", text)
+
+
 async def _enforce_voice_quota(uid: str, kind: str) -> None:
     """Per-user + global rate limits; monthly spend cap shared with chat."""
     # 20 voice calls/min per user, 600/hour globally. Tuned to prevent runaway costs
@@ -161,7 +175,7 @@ async def speech_to_text(
         logger.error("xAI STT returned non-JSON for user=%s: %s", uid, resp.text[:500])
         raise HTTPException(status_code=502, detail="Voice service returned an unexpected response.")
 
-    text = (body.get("text") or body.get("transcript") or "").strip()
+    text = _fix_brand_names((body.get("text") or body.get("transcript") or "").strip())
     return {"text": text}
 
 
