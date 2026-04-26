@@ -108,8 +108,12 @@ async function proxy(req: NextRequest, pathSegments: string[] | undefined): Prom
   // client sending `Authorization: Bearer` directly (Capacitor mobile) will
   // not have an orryon_csrf cookie and is not subject to this check — the
   // bearer token itself proves intent.
+  // Auth endpoints (send-code, verify) are pre-authentication — exempt them
+  // so a stale orryon_session cookie from a previous session never blocks login.
+  const pathStr = pathSegments?.join("/") ?? "";
+  const isAuthEndpoint = pathStr === "auth/send-code" || pathStr === "auth/verify";
   const viaCookie = !!req.headers.get("cookie")?.match(/(?:^|;\s*)orryon_session=/);
-  if (viaCookie && isMutating(method)) {
+  if (viaCookie && isMutating(method) && !isAuthEndpoint) {
     const expected = getCsrfCookie(req);
     const got = req.headers.get("x-csrf-token");
     if (!expected || !got || expected !== got) {
