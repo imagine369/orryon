@@ -303,6 +303,19 @@ export function getSoundForAnchor(anchorId: string): SoundConfig {
   return ANCHOR_SOUNDS[anchorId] || ANCHOR_SOUNDS["quick-box-reset"];
 }
 
+/**
+ * Call this synchronously inside a tap/click handler (a user gesture) before
+ * opening the session. Browsers require a gesture to resume an AudioContext —
+ * calling resume() inside a useEffect (outside the gesture) silently fails.
+ */
+export function primeAudioContext(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const ctx = getCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  } catch { /* ignore */ }
+}
+
 export function playBackgroundSound(anchorId: string, volume: number = 0.12): void {
   // Cancel any pending deferred stop from a previous fade-out
   stopBackgroundSound();

@@ -7,6 +7,7 @@ import { Play, ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, 
 import { useResetAnchors } from "@/lib/use-reset-anchors";
 import { RESET_ANCHORS, getRecommendedAnchor, type ResetAnchor } from "@/lib/reset-scripts";
 import { ResetAnchorSession } from "@/components/reset-anchor-session";
+import { primeAudioContext } from "@/lib/breathing-sounds";
 import type { MoodState } from "@/lib/use-reset-anchors";
 
 // ── Per-anchor icon ────────────────────────────────────────────────────────────
@@ -283,6 +284,11 @@ export default function BreathePage() {
   const { lastUsedId, markedToday, streakCount, addCompletion, updateCompletion, markStreakForCompletion } = useResetAnchors();
 
   const [activeAnchor,    setActiveAnchor]    = useState<ResetAnchor | null>(null);
+
+  const handleStartAnchor = useCallback((anchor: ResetAnchor) => {
+    primeAudioContext(); // must be called inside a user gesture
+    setActiveAnchor(anchor);
+  }, []);
   const [checkoutPending, setCheckoutPending] = useState<"monthly" | "annual" | null>(null);
 
   const startCheckout = useCallback(async (plan: "monthly" | "annual") => {
@@ -348,7 +354,7 @@ export default function BreathePage() {
         </p>
 
         {/* Recommended */}
-        <RecommendedCard anchor={recommended} onStart={setActiveAnchor} />
+        <RecommendedCard anchor={recommended} onStart={handleStartAnchor} />
 
         {/* All anchors */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "24px 0 4px" }}>
@@ -363,7 +369,7 @@ export default function BreathePage() {
             key={anchor.id}
             anchor={anchor}
             isRecommended={anchor.id === recommended.id}
-            onStart={setActiveAnchor}
+            onStart={handleStartAnchor}
           />
         ))}
 

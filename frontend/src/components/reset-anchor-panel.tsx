@@ -7,6 +7,7 @@ import { usePanels } from "@/lib/panel-context";
 import { useResetAnchors } from "@/lib/use-reset-anchors";
 import { RESET_ANCHORS, getRecommendedAnchor, type ResetAnchor } from "@/lib/reset-scripts";
 import { ResetAnchorSession } from "@/components/reset-anchor-session";
+import { primeAudioContext } from "@/lib/breathing-sounds";
 import type { MoodState } from "@/lib/use-reset-anchors";
 
 // ── Per-anchor icon ───────────────────────────────────────────────────────────
@@ -401,6 +402,7 @@ export function ResetAnchorPanel() {
   const recommended = getRecommendedAnchor(lastUsedId);
 
   const handleStart = (anchor: ResetAnchor) => {
+    primeAudioContext(); // must be called inside a user gesture
     setActiveAnchor(anchor);
   };
 
