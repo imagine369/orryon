@@ -1682,17 +1682,11 @@ export default function LandingPage() {
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
               Wellbeing should be free.<br />For everyone.
             </h2>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
-              We believe breathing, meditation, and wellbeing tools should be free for everyone.
-              That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever.
-              No limits, no trial, no catch.
-            </p>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-3 max-w-[460px] leading-relaxed">
-              Use them as much as you like.
-            </p>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
-              The budgeting tools and other advanced features are optional. Only pay if you use them.
-            </p>
+            <div className="space-y-4 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] text-[0.82rem] sm:text-sm lg:text-base text-white/50 leading-relaxed">
+              <p>We believe breathing, meditation, and wellbeing tools should be free for everyone. That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever. No limits, no trial, no catch.</p>
+              <p className="font-semibold text-white/70">Use them as much as you like.</p>
+              <p>The budgeting tools and other advanced features are optional. Only pay if you use them.</p>
+            </div>
 
             <PillLink href="/login?next=/breathe&flow=breathe" size="sm">Sign up — it&rsquo;s free</PillLink>
             <Link
@@ -1782,17 +1776,11 @@ export default function LandingPage() {
               }}
             />
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Wellbeing should be free.<br />For everyone.</h2>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
-              We believe breathing, meditation, and wellbeing tools should be free for everyone.
-              That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever.
-              No limits, no trial, no catch.
-            </p>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-3 max-w-[460px] leading-relaxed">
-              Use them as much as you like.
-            </p>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] leading-relaxed">
-              The budgeting tools and other advanced features are optional. Only pay if you use them.
-            </p>
+            <div className="space-y-4 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] text-[0.82rem] sm:text-sm lg:text-base text-white/50 leading-relaxed">
+              <p>We believe breathing, meditation, and wellbeing tools should be free for everyone. That&rsquo;s why we made the full breathing exercises and guided meditations completely free — forever. No limits, no trial, no catch.</p>
+              <p className="font-semibold text-white/70">Use them as much as you like.</p>
+              <p>The budgeting tools and other advanced features are optional. Only pay if you use them.</p>
+            </div>
 
             <PillLink href="/breathe" size="sm">Try breathing — it&rsquo;s free</PillLink>
 
