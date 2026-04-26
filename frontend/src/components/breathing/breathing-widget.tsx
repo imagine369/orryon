@@ -104,8 +104,15 @@ const ghostBtn: CSSProperties = {
 function Session({ children }: { children: ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center select-none"
-      style={{ background: BG, fontFamily: FONT }}
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center select-none min-h-0 overflow-y-auto"
+      style={{
+        background: BG,
+        fontFamily: FONT,
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+      }}
     >
       {children}
     </div>
@@ -150,14 +157,17 @@ function DoneFooter({
   extra?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center mt-10 px-8 text-center">
+    <div
+      className="flex flex-col items-center mt-10 px-8 text-center"
+      style={{ paddingBottom: "max(0px, env(safe-area-inset-bottom, 0px))" }}
+    >
       <p style={{ color: "rgba(255,255,255,.38)", fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.35rem" }}>
         Well done
       </p>
       <p style={{ color: "rgba(255,255,255,.24)", fontSize: "0.82rem", lineHeight: 1.55, marginBottom: "1.5rem" }}>
         {label}
       </p>
-      <div style={{ display: "flex", gap: "0.65rem" }}>
+      <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={onRestart} style={ghostBtn}>Start again</button>
         <button onClick={onBack}    style={{ ...ghostBtn, background: "rgba(255,255,255,.06)" }}>Change</button>
       </div>
@@ -533,7 +543,7 @@ function SelectionScreen({ onClose, onSelectBox, onSelectSigh, onSelectNothing }
       {/* Content */}
       <div
         className="flex flex-col items-center px-5 w-full"
-        style={{ paddingTop: "max(4.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))", paddingBottom: "2.5rem" }}
+        style={{ paddingTop: "max(4.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))", paddingBottom: "max(2.5rem, calc(2.5rem + env(safe-area-inset-bottom, 0px)))" }}
       >
         <p style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "2.5px", color: "rgba(255,255,255,.40)", marginBottom: "0.5rem" }}>
           Choose your session

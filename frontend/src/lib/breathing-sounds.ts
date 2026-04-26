@@ -401,6 +401,15 @@ export function isSoundPlaying(): boolean {
 
 // ── Haptics ───────────────────────────────────────────────────────────────────
 
+/**
+ * Phase cues via the Vibration API. Requires a prior user gesture in the tab
+ * (sticky activation); opening a Reset Anchor from a tap satisfies that.
+ *
+ * - Android Chrome / most Android browsers: works when vibration is enabled
+ *   and the device is not in DND / some silent modes.
+ * - iPhone / iPad Safari: WebKit does not implement navigator.vibrate — no-op.
+ * - Desktop: usually no vibration hardware — no-op.
+ */
 export function triggerHaptics(pattern: number[] = [100, 50, 100]): void {
   if (typeof navigator === "undefined" || !("vibrate" in navigator)) return;
   try {

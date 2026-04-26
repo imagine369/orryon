@@ -430,9 +430,7 @@ export function ChatInput({
         ? "Transcribing…"
         : effectiveStatus === "thinking"
           ? "Thinking…"
-          : effectiveStatus === "speaking"
-            ? "Speaking…"
-            : "Tap to talk";
+          : "Tap to talk";
 
   const isMultiline = value.includes("\n") || value.length > 80;
 
@@ -458,9 +456,7 @@ export function ChatInput({
               ? "Transcribing…"
               : effectiveStatus === "thinking"
                 ? "Thinking…"
-                : effectiveStatus === "speaking"
-                  ? "Speaking…"
-                  : placeholder
+                : placeholder
         }
         disabled={disabled}
         rows={1}
@@ -483,9 +479,7 @@ export function ChatInput({
             ? "bg-white text-black scale-110"
             : effectiveStatus === "transcribing" || effectiveStatus === "thinking"
               ? "text-white/70"
-              : effectiveStatus === "speaking"
-                ? "text-white/80"
-                : "text-white/35 hover:text-white/65",
+              : "text-white/35 hover:text-white/65",
           disabled && "pointer-events-none opacity-25"
         )}
       >
@@ -498,16 +492,9 @@ export function ChatInput({
           </>
         )}
 
-        {/* Subtle ring while transcribing / thinking / speaking */}
+        {/* Subtle ring while transcribing / thinking */}
         {!isRecording && isBusy && (
-          <span
-            className={cn(
-              "pointer-events-none absolute inset-[-2px] rounded-full border",
-              effectiveStatus === "speaking"
-                ? "border-white/25 animate-[ping_1.8s_ease-out_infinite]"
-                : "border-white/15 animate-pulse"
-            )}
-          />
+          <span className="pointer-events-none absolute inset-[-2px] rounded-full border border-white/15 animate-pulse" />
         )}
 
         {isRecording ? (

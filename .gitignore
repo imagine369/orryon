@@ -28,3 +28,5 @@ token.json
 
 # macOS
 .DS_Store
+.vercel
+.env*.local

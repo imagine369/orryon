@@ -12,7 +12,6 @@ import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } 
 import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { BreathingWidget } from "@/components/breathing";
 import { PostBreathingUpgradeCard } from "@/components/subscription";
@@ -97,76 +96,10 @@ export default function HomePage() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
   // ── Voice ───────────────────────────────────────────────────────────────────
-  // Voice is always available via the mic icon. When a user sends a message by
-  // voice, we also play the assistant's reply aloud (TTS). Text-typed messages
-  // get text-only replies — no audio — so typing stays silent by design.
-  //
-  // TTS playback uses the Web Audio API rather than an <audio> element.
-  // iOS WebKit (Safari, Chrome on iOS, Brave on iOS — all share the same
-  // engine) blocks non-gesture `HTMLAudioElement.play()` even after
-  // "unlock tricks" with silent WAVs. The Web Audio API does not have this
-  // restriction: once an AudioContext is resumed inside a real user gesture,
-  // it can play any decoded AudioBuffer any time afterwards with zero
-  // additional gesture requirements. This is the same technique used by
-  // Howler.js, tone.js, and every reliable browser audio library.
+  // The mic button lets users speak their messages (STT). The assistant replies
+  // in text only — TTS (speaking replies aloud) is disabled.
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const ttsAbortRef = useRef<AbortController | null>(null);
-
-  const getOrCreateAudioContext = useCallback((): AudioContext | null => {
-    if (audioCtxRef.current) return audioCtxRef.current;
-    if (typeof window === "undefined") return null;
-    type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
-    const AC = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
-    if (!AC) return null;
-    const ctx = new AC();
-    audioCtxRef.current = ctx;
-    return ctx;
-  }, []);
-
-  /**
-   * Called synchronously inside the mic-button tap. Creates (if needed)
-   * and resumes the AudioContext while we're still inside the user gesture.
-   * Once resumed, iOS WebKit will let us play decoded buffers at any time
-   * afterwards without further gesture requirements.
-   */
-  const primeAudioUnlock = useCallback(() => {
-    const ctx = getOrCreateAudioContext();
-    if (!ctx) return;
-    // Resume is safe to call repeatedly; it's a no-op if already running.
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {
-        /* ignore — next gesture will try again */
-      });
-    }
-  }, [getOrCreateAudioContext]);
-
-  const stopAudioPlayback = useCallback(() => {
-    ttsAbortRef.current?.abort();
-    ttsAbortRef.current = null;
-    const src = currentSourceRef.current;
-    if (src) {
-      try {
-        src.onended = null;
-        src.stop();
-      } catch {
-        /* already stopped */
-      }
-      try {
-        src.disconnect();
-      } catch {
-        /* ignore */
-      }
-      currentSourceRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    // Don't leave audio playing after navigation.
-    return () => stopAudioPlayback();
-  }, [stopAudioPlayback]);
 
   // Auto-clear voice errors so they don't linger.
   useEffect(() => {
@@ -276,104 +209,10 @@ export default function HomePage() {
 
   // ── AI streaming ────────────────────────────────────────────────────────────
 
-  // Strip markdown so TTS doesn't read "asterisk" / "pound" / URL junk aloud.
-  const stripMarkdownForSpeech = (md: string): string => {
-    return md
-      .replace(/```[\s\S]*?```/g, " ")
-      .replace(/`([^`]+)`/g, "$1")
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      .replace(/[#>*_~]+/g, " ")
-      .replace(/\|/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  };
-
-  const playAssistantReply = useCallback(
-    async (reply: string) => {
-      if (!reply) return;
-      const spoken = stripMarkdownForSpeech(reply);
-      if (!spoken) return;
-
-      stopAudioPlayback();
-      const controller = new AbortController();
-      ttsAbortRef.current = controller;
-
-      setVoiceStatus("speaking");
-      try {
-        // Fetch + decode the MP3 into an AudioBuffer, then play via an
-        // AudioBufferSourceNode. This path is immune to iOS autoplay rules
-        // as long as the AudioContext was resumed inside a prior user
-        // gesture (done in primeAudioUnlock when the user tapped the mic).
-        const blob = await textToSpeech(spoken);
-        if (controller.signal.aborted) return;
-        const arrayBuffer = await blob.arrayBuffer();
-        if (controller.signal.aborted) return;
-
-        const ctx = getOrCreateAudioContext();
-        if (!ctx) {
-          setVoiceStatus("idle");
-          setVoiceError("Audio is not supported on this device.");
-          return;
-        }
-        // Defensive: if the context went back to suspended (rare — can
-        // happen after browser backgrounding), try to resume. Worst case
-        // it stays suspended and start() silently drops, handled below.
-        if (ctx.state === "suspended") {
-          try {
-            await ctx.resume();
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // Safari's decodeAudioData still uses the older callback form; wrap
-        // defensively so it works across engines.
-        const audioBuffer: AudioBuffer = await new Promise((resolve, reject) => {
-          const maybePromise = ctx.decodeAudioData(
-            arrayBuffer,
-            (buf) => resolve(buf),
-            (err) => reject(err),
-          );
-          if (maybePromise && typeof (maybePromise as Promise<AudioBuffer>).then === "function") {
-            (maybePromise as Promise<AudioBuffer>).then(resolve, reject);
-          }
-        });
-        if (controller.signal.aborted) return;
-
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        source.onended = () => {
-          if (currentSourceRef.current === source) {
-            currentSourceRef.current = null;
-          }
-          try {
-            source.disconnect();
-          } catch {
-            /* ignore */
-          }
-          setVoiceStatus("idle");
-        };
-        currentSourceRef.current = source;
-        source.start(0);
-      } catch (err) {
-        if ((err as Error)?.name === "AbortError") return;
-        setVoiceStatus("idle");
-        setVoiceError(err instanceof Error ? err.message : "Voice playback failed.");
-      }
-    },
-    [stopAudioPlayback, getOrCreateAudioContext],
-  );
-
-  const runAI = async (text: string, speakReply: boolean) => {
+  const runAI = async (text: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-
-    // Any audio currently playing is interrupted by the new turn.
-    stopAudioPlayback();
-    if (speakReply) setVoiceStatus("thinking");
 
     setStreaming(true);
     setThinking(true);
@@ -404,7 +243,6 @@ export default function HomePage() {
             return updated;
           });
           setToolLabel("");
-          if (speakReply) void playAssistantReply(final);
 
           // Notify every dashboard panel that its data may have changed so
           // any tab the user happens to have open refetches itself —
@@ -421,7 +259,6 @@ export default function HomePage() {
             };
             return updated;
           });
-          if (speakReply) setVoiceStatus("idle");
         }
       }
     } catch (err) {
@@ -435,7 +272,6 @@ export default function HomePage() {
         };
         return updated;
       });
-      if (speakReply) setVoiceStatus("idle");
     } finally {
       setStreaming(false);
       setThinking(false);
@@ -444,15 +280,9 @@ export default function HomePage() {
     }
   };
 
-  // TTS (Orryon speaking back) is currently disabled — users asked for
-  // text-only replies while we pick a different voice character. The mic
-  // (STT / speaking *to* Orryon) is untouched and still works. To re-enable,
-  // flip SPEAK_REPLIES back to `source === "voice"` / `lastUserMsg.source === "voice"`.
-  const SPEAK_REPLIES = false;
-
   const handleSend = (text: string, source: MessageSource = "text") => {
     setMessages((prev) => [...prev, { role: "user", content: text, source }]);
-    runAI(text, SPEAK_REPLIES && source === "voice");
+    runAI(text);
   };
 
   const handleRetry = () => {
@@ -460,7 +290,7 @@ export default function HomePage() {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
     setMessages((prev) => prev.slice(0, -1));
-    runAI(lastUserMsg.content, SPEAK_REPLIES && lastUserMsg.source === "voice");
+    runAI(lastUserMsg.content);
   };
 
   const handleCopy = (content: string, index: number) => {
@@ -684,7 +514,6 @@ export default function HomePage() {
                   externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={setVoiceError}
-                  onVoiceUserGesture={primeAudioUnlock}
                 />
               </div>
             </div>
@@ -758,7 +587,6 @@ export default function HomePage() {
                 externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={setVoiceError}
-                onVoiceUserGesture={primeAudioUnlock}
               />
             </div>
           </div>

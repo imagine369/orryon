@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, Check, Volume2, VolumeX } from "lucide-react";
+import { X, ChevronLeft, Check } from "lucide-react";
 import type { ResetAnchor, ResetAnimation } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
 import {
-  playBackgroundSound,
   stopBackgroundSound,
   triggerHaptics,
   getHapticPatternForStep,
-  getSoundForAnchor,
 } from "@/lib/breathing-sounds";
 
 // ── Design tokens (consistent with breathing-widget.tsx) ─────────────────────
@@ -321,8 +319,6 @@ function SessionScreen({
   onDurationSelect,
   onComplete,
   onBack,
-  soundEnabled,
-  onToggleSound,
 }: {
   anchor: ResetAnchor;
   durationSecs: number;
@@ -330,8 +326,6 @@ function SessionScreen({
   onDurationSelect?: (idx: number) => void;
   onComplete: (elapsed: number) => void;
   onBack: () => void;
-  soundEnabled: boolean;
-  onToggleSound: () => void;
 }) {
   const [elapsed,      setElapsed]     = useState(0);
   const [done,         setDone]        = useState(false);
@@ -339,26 +333,19 @@ function SessionScreen({
   const [stepIdx,      setStepIdx]     = useState(0);
   const [fadeKey,      setFadeKey]     = useState(0);
   const [stepStartSec, setStepStartSec] = useState(0);
+  const lastHapticStepRef = useRef<number>(-999);
 
   const steps = anchor.steps;
 
   const isVariable = !!anchor.durationOptions;
 
-  // Initialize background sound for this anchor when session starts
-  useEffect(() => {
-    if (soundEnabled) {
-      playBackgroundSound(anchor.id, 0.12);
-    } else {
-      stopBackgroundSound();
-    }
-    return () => {
-      stopBackgroundSound();
-    };
-  }, [anchor.id, soundEnabled]);
-
-  // Haptics on step changes — short phase-specific pulse at each transition
+  // Haptics on step changes — short phase-specific pulse at each transition.
+  // Uses Navigator.vibrate (sticky user activation after the user taps to start).
+  // Ref avoids double-fire in React Strict Mode for the same stepIdx.
   useEffect(() => {
     if (done || !mounted) return;
+    if (lastHapticStepRef.current === stepIdx) return;
+    lastHapticStepRef.current = stepIdx;
     const text = steps[stepIdx]?.text ?? "";
     const pattern = getHapticPatternForStep(anchor.id, stepIdx, text);
     triggerHaptics(pattern);
@@ -475,7 +462,7 @@ function SessionScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "12px 24px 28px",
+        padding: "12px clamp(16px, 5vw, 24px) max(98px, calc(72px + env(safe-area-inset-bottom, 0px)))",
         fontFamily: FONT,
         minHeight: 0,
       }}
@@ -512,6 +499,8 @@ function SessionScreen({
                 lineHeight: 1.5,
                 letterSpacing: "-0.01em",
                 margin: 0,
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
               }}
             >
               {stepText}
@@ -551,7 +540,7 @@ function SessionScreen({
               background: "none",
               border: "none",
               cursor: "pointer",
-              fontSize: 13,
+              fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
               fontFamily: FONT,
               padding: "6px 0",
               WebkitTapHighlightColor: "transparent",
@@ -564,7 +553,7 @@ function SessionScreen({
 
           <span
             style={{
-              fontSize: 13,
+              fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
               color: "rgba(255,255,255,0.28)",
               fontWeight: 600,
               fontFamily: FONT,
@@ -616,17 +605,17 @@ function PostMoodScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "0 32px 24px",
+        padding: `0 clamp(16px, 5vw, 32px) max(24px, calc(24px + env(safe-area-inset-bottom, 0px)))`,
         gap: 0,
         fontFamily: FONT,
       }}
     >
-      <p style={{ fontSize: 11, color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>
+      <p style={{ fontSize: "clamp(0.625rem, 2.8vw, 0.6875rem)", color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>
         Reset complete
       </p>
       <p
         style={{
-          fontSize: 22,
+          fontSize: "clamp(1.125rem, 5.5vw, 1.375rem)",
           fontWeight: 700,
           color: ACCENT_TEXT,
           marginBottom: 6,
@@ -636,7 +625,7 @@ function PostMoodScreen({
       >
         How do you feel now?
       </p>
-      <p style={{ fontSize: 13, color: MUTED_TEXT, marginBottom: 28, textAlign: "center" }}>
+      <p style={{ fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)", color: MUTED_TEXT, marginBottom: 28, textAlign: "center" }}>
         Optional.
       </p>
 
@@ -652,13 +641,13 @@ function PostMoodScreen({
         style={{
           marginTop: 16,
           width: "100%",
-          maxWidth: 320,
+          maxWidth: "min(100%, 320px)",
           background: "rgba(255,255,255,0.06)",
           border: "1px solid rgba(255,255,255,0.10)",
           borderRadius: 12,
           padding: "12px 14px",
           color: "rgba(255,255,255,0.75)",
-          fontSize: 13,
+          fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
           fontFamily: FONT,
           resize: "none",
           outline: "none",
@@ -676,7 +665,7 @@ function PostMoodScreen({
             alignItems: "center",
             gap: 10,
             width: "100%",
-            maxWidth: 320,
+            maxWidth: "min(100%, 320px)",
             padding: "12px 14px",
             borderRadius: 12,
             border: markStreak
@@ -685,7 +674,7 @@ function PostMoodScreen({
             background: markStreak ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.02)",
             color: markStreak ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.38)",
             fontFamily: FONT,
-            fontSize: 13,
+            fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
             cursor: "pointer",
             textAlign: "left",
           }}
@@ -720,13 +709,13 @@ function PostMoodScreen({
         style={{
           marginTop: 20,
           width: "100%",
-          maxWidth: 320,
+          maxWidth: "min(100%, 320px)",
           padding: "14px 0",
           borderRadius: 12,
           border: "none",
           background: "rgba(255,255,255,0.92)",
           color: "#1e2540",
-          fontSize: 13,
+          fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
           fontWeight: 600,
           fontFamily: FONT,
           cursor: "pointer",
@@ -759,26 +748,27 @@ function CompletionScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "0 32px",
+        padding: `0 clamp(16px, 5vw, 32px) max(32px, calc(32px + env(safe-area-inset-bottom, 0px)))`,
         gap: 0,
         fontFamily: FONT,
         textAlign: "center",
       }}
     >
       {markedStreak && streakCount > 0 && (
-        <p style={{ fontSize: 11, color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
+        <p style={{ fontSize: "clamp(0.625rem, 2.8vw, 0.6875rem)", color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
           {streakCount === 1 ? "Day 1" : `${streakCount}-day streak`}
         </p>
       )}
 
       <p
         style={{
-          fontSize: 26,
+          fontSize: "clamp(1.25rem, 6vw, 1.625rem)",
           fontWeight: 700,
           color: ACCENT_TEXT,
           letterSpacing: "-0.02em",
           lineHeight: 1.3,
           marginBottom: 10,
+          wordBreak: "break-word",
         }}
       >
         {anchor.id === "evening-release-7min"
@@ -787,14 +777,14 @@ function CompletionScreen({
           ? "You're clear. Begin."
           : "Your system has reset."}
       </p>
-      <p style={{ fontSize: 14, color: MUTED_TEXT, maxWidth: 260, lineHeight: 1.6, marginBottom: 48 }}>
+      <p style={{ fontSize: "clamp(0.8125rem, 3.5vw, 0.875rem)", color: MUTED_TEXT, maxWidth: "min(100%, 260px)", lineHeight: 1.6, marginBottom: "clamp(2rem, 8vw, 3rem)", wordBreak: "break-word" }}>
         {anchor.tagline}
       </p>
 
       <button
         onClick={onClose}
         style={{
-          padding: "13px 40px",
+          padding: "13px clamp(1.5rem, 8vw, 2.5rem)",
           borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.14)",
           background: "transparent",
@@ -887,9 +877,11 @@ export function ResetAnchorSession({
   const [durationOptIdx,  setDurationOptIdx]  = useState(anchor.defaultDurationIndex ?? 0);
   const [markedStreak,    setMarkedStreak]    = useState(false);
   const [container,       setContainer]       = useState<HTMLElement | null>(null);
-  const [soundEnabled,    setSoundEnabled]    = useState(true);
 
   useEffect(() => { setContainer(document.body); }, []);
+
+  // Ensure any prior session ambience is stopped when the overlay closes.
+  useEffect(() => () => stopBackgroundSound(), []);
 
   const durationSecs = resolvedDuration(anchor, durationOptIdx);
 
@@ -930,42 +922,18 @@ export function ResetAnchorSession({
           flexDirection: "column",
           background: SESSION_BG,
           fontFamily: FONT,
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingLeft: "env(safe-area-inset-left, 0px)",
+          paddingRight: "env(safe-area-inset-right, 0px)",
         }}
       >
-        {/* Header — X on right, mute on left, well separated */}
+        {/* Header — close */}
         <div style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           padding: "14px 20px",
         }}>
-          {/* Mute button — left side, only visible during active session */}
-          {screen === "session" ? (
-            <button
-              onClick={() => setSoundEnabled((v) => !v)}
-              title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: "none",
-                border: "none",
-                color: soundEnabled ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.14)",
-                cursor: "pointer",
-                padding: 0,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {soundEnabled ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
-            </button>
-          ) : (
-            <div style={{ width: 32 }} />
-          )}
-
-          {/* Close button — right side */}
           <button
             onClick={onClose}
             style={{
@@ -993,7 +961,7 @@ export function ResetAnchorSession({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25 }}
-              style={{ display: "flex", flex: 1 }}
+              style={{ display: "flex", flex: 1, minHeight: 0 }}
             >
               <SessionScreen
                 anchor={anchor}
@@ -1002,8 +970,6 @@ export function ResetAnchorSession({
                 onDurationSelect={setDurationOptIdx}
                 onComplete={handleSessionComplete}
                 onBack={onClose}
-                soundEnabled={soundEnabled}
-                onToggleSound={() => setSoundEnabled((v) => !v)}
               />
             </motion.div>
           )}
@@ -1015,7 +981,7 @@ export function ResetAnchorSession({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25 }}
-              style={{ display: "flex", flex: 1 }}
+              style={{ display: "flex", flex: 1, minHeight: 0, overflowY: "auto" }}
             >
               <PostMoodScreen
                 anchor={anchor}
@@ -1032,7 +998,7 @@ export function ResetAnchorSession({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              style={{ display: "flex", flex: 1 }}
+              style={{ display: "flex", flex: 1, minHeight: 0, overflowY: "auto" }}
             >
               <CompletionScreen
                 anchor={anchor}
