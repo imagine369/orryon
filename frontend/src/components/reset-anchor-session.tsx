@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, Check, Volume2, VolumeX } from "lucide-react";
 import type { ResetAnchor, ResetAnimation } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
-import { orbTextToSpeech } from "@/lib/voice";
 import {
   playBackgroundSound,
   stopBackgroundSound,
   triggerHaptics,
   getHapticPatternForStep,
   getSoundForAnchor,
-  isSoundPlaying,
 } from "@/lib/breathing-sounds";
 
 // ── Design tokens (consistent with breathing-widget.tsx) ─────────────────────
@@ -346,100 +344,25 @@ function SessionScreen({
 
   const isVariable = !!anchor.durationOptions;
 
-  // ── Orb voice playback ────────────────────────────────────────────────────
-  const orbAudio = useRef<HTMLAudioElement | null>(null);
-  const orbBlobUrl = useRef<string | null>(null);
-  const orbAbort  = useRef<AbortController | null>(null);
-
-  const stopOrbAudio = useCallback(() => {
-    orbAbort.current?.abort();
-    orbAbort.current = null;
-    if (orbAudio.current) {
-      orbAudio.current.pause();
-      orbAudio.current.src = "";
-      orbAudio.current = null;
-    }
-    if (orbBlobUrl.current) {
-      URL.revokeObjectURL(orbBlobUrl.current);
-      orbBlobUrl.current = null;
-    }
-  }, []);
-
-  const ORB_VOICE_ENABLED = true;
-
-  // Initialize sound for this anchor when session starts
+  // Initialize background sound for this anchor when session starts
   useEffect(() => {
     if (soundEnabled) {
       playBackgroundSound(anchor.id, 0.25);
     } else {
       stopBackgroundSound();
-      stopOrbAudio();
     }
     return () => {
       stopBackgroundSound();
     };
-  }, [anchor.id, soundEnabled, stopOrbAudio]);
+  }, [anchor.id, soundEnabled]);
 
   // Haptics on step changes — short phase-specific pulse at each transition
   useEffect(() => {
     if (done || !mounted) return;
-
     const text = steps[stepIdx]?.text ?? "";
     const pattern = getHapticPatternForStep(anchor.id, stepIdx, text);
     triggerHaptics(pattern);
   }, [stepIdx, anchor.id, done, mounted, steps]);
-
-  // Speak the cue for the current step via Orb voice (ara, anchor mode).
-  useEffect(() => {
-    const text = steps[stepIdx]?.text?.trim();
-    if (!text || !mounted || !ORB_VOICE_ENABLED || !soundEnabled) {
-      if (!soundEnabled) stopOrbAudio();
-      return;
-    }
-
-    stopOrbAudio();
-    const ctrl = new AbortController();
-    orbAbort.current = ctrl;
-
-    (async () => {
-      try {
-        const blob = await orbTextToSpeech(text);
-        if (ctrl.signal.aborted) return;
-
-        const url = URL.createObjectURL(blob);
-        orbBlobUrl.current = url;
-
-        const audio = new Audio(url);
-        audio.volume = 0;
-        orbAudio.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          if (orbBlobUrl.current === url) orbBlobUrl.current = null;
-          if (orbAudio.current === audio) orbAudio.current = null;
-        };
-        await audio.play();
-        // Fade in over ~120ms to avoid abrupt start
-        const target = 0.55;
-        const steps = 12;
-        const stepMs = 10;
-        let step = 0;
-        const fade = setInterval(() => {
-          step++;
-          if (orbAudio.current === audio) {
-            audio.volume = Math.min(target, (step / steps) * target);
-          }
-          if (step >= steps) clearInterval(fade);
-        }, stepMs);
-      } catch { /* audio unavailable or aborted — fail silently */ }
-    })();
-
-    return () => { ctrl.abort(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIdx, mounted, soundEnabled]);
-
-  useEffect(() => {
-    return () => stopOrbAudio();
-  }, [stopOrbAudio]);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100);
