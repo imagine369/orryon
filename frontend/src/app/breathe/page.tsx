@@ -221,10 +221,6 @@ function UpgradeCard({
       <h2 className="text-2xl font-bold text-white font-[family-name:var(--font-playfair)]">
         Unlock financial peace.
       </h2>
-      <p className="text-sm text-white/40 pb-2">
-        14-day free trial. Cancel anytime before it ends — you won&apos;t be charged.
-      </p>
-
       {/* Plan toggle */}
       <div className="flex rounded-full border border-white/8 bg-[#111] p-0.5">
         {(["monthly", "annual"] as const).map((opt) => (
@@ -250,19 +246,6 @@ function UpgradeCard({
         ))}
       </div>
 
-      {/* Trial callout */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-5 py-4 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 text-black text-xs font-bold">14</div>
-        <div>
-          <p className="text-sm font-semibold text-white">14-day free trial</p>
-          <p className="text-xs text-white/40">
-            {selected === "monthly"
-              ? "Then $8/month. Cancel anytime."
-              : "Then $72/year (save 25%). Billed annually. Cancel to stop renewal."}
-          </p>
-        </div>
-      </div>
-
       {/* Feature list */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
         <p className="text-[0.6rem] uppercase tracking-[3px] text-white/30 mb-3">Everything included</p>
@@ -282,7 +265,7 @@ function UpgradeCard({
         disabled={checkoutPending !== null}
         className="flex items-center justify-center w-full rounded-full bg-white py-3.5 text-[0.85rem] font-semibold text-black hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-60"
       >
-        {checkoutPending ? "Redirecting…" : "Start 14-day free trial"}
+        {checkoutPending ? "Redirecting to payment…" : "UPGRADE"}
       </button>
       <p className="text-center text-xs text-white/25">
         Breathing stays free forever — even if you never upgrade.

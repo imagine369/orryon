@@ -480,7 +480,8 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
             "cancel_url": cancel_url,
             "metadata": {"user_id": row["id"]},
         }
-        if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id"):
+        is_free_breathe = row.get("segment") == "free_breathe"
+        if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe:
             effective_trial = (
                 max(current_plan.get("trial_days_remaining", 0), 1)
                 if current_plan["plan"] == "trial"
