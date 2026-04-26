@@ -321,6 +321,8 @@ function SessionScreen({
   onDurationSelect,
   onComplete,
   onBack,
+  soundEnabled,
+  onToggleSound,
 }: {
   anchor: ResetAnchor;
   durationSecs: number;
@@ -328,6 +330,8 @@ function SessionScreen({
   onDurationSelect?: (idx: number) => void;
   onComplete: (elapsed: number) => void;
   onBack: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }) {
   const [elapsed,      setElapsed]     = useState(0);
   const [done,         setDone]        = useState(false);
@@ -335,10 +339,6 @@ function SessionScreen({
   const [stepIdx,      setStepIdx]     = useState(0);
   const [fadeKey,      setFadeKey]     = useState(0);
   const [stepStartSec, setStepStartSec] = useState(0);
-
-  // Sound & haptics
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const soundConfig = getSoundForAnchor(anchor.id);
 
   const steps = anchor.steps;
 
@@ -562,43 +562,20 @@ function SessionScreen({
             Back
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: 13,
-                color: "rgba(255,255,255,0.28)",
-                fontWeight: 600,
-                fontFamily: FONT,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: "40vw",
-              }}
-            >
-              {anchor.title}
-            </span>
-            <button
-              onClick={() => setSoundEnabled((v) => !v)}
-              title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "transparent",
-                border: "none",
-                color: soundEnabled ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.18)",
-                cursor: "pointer",
-                padding: 0,
-                flexShrink: 0,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {soundEnabled ? <Volume2 size={14} strokeWidth={1.5} /> : <VolumeX size={14} strokeWidth={1.5} />}
-            </button>
-          </div>
+          <span
+            style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.28)",
+              fontWeight: 600,
+              fontFamily: FONT,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "50vw",
+            }}
+          >
+            {anchor.title}
+          </span>
         </div>
 
         {/* Row 2: Duration picker on its own line so pills never overflow */}
@@ -910,6 +887,7 @@ export function ResetAnchorSession({
   const [durationOptIdx,  setDurationOptIdx]  = useState(anchor.defaultDurationIndex ?? 0);
   const [markedStreak,    setMarkedStreak]    = useState(false);
   const [container,       setContainer]       = useState<HTMLElement | null>(null);
+  const [soundEnabled,    setSoundEnabled]    = useState(true);
 
   useEffect(() => { setContainer(document.body); }, []);
 
@@ -954,32 +932,56 @@ export function ResetAnchorSession({
           fontFamily: FONT,
         }}
       >
-        {/* Header */}
-        <div
-        style={{
+        {/* Header — X on right, mute on left, well separated */}
+        <div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "16px 20px",
-        }}
-      >
-        <div />
-        <button
-          onClick={onClose}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "rgba(255,255,255,0.22)",
-            padding: 8,
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          <X size={15} strokeWidth={1.5} />
-        </button>
+          padding: "14px 20px",
+        }}>
+          {/* Mute button — left side, only visible during active session */}
+          {screen === "session" ? (
+            <button
+              onClick={() => setSoundEnabled((v) => !v)}
+              title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "none",
+                border: "none",
+                color: soundEnabled ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.14)",
+                cursor: "pointer",
+                padding: 0,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {soundEnabled ? <Volume2 size={15} strokeWidth={1.5} /> : <VolumeX size={15} strokeWidth={1.5} />}
+            </button>
+          ) : (
+            <div style={{ width: 32 }} />
+          )}
+
+          {/* Close button — right side */}
+          <button
+            onClick={onClose}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(255,255,255,0.22)",
+              padding: 8,
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <X size={15} strokeWidth={1.5} />
+          </button>
         </div>
 
         {/* Screen content */}
@@ -1000,6 +1002,8 @@ export function ResetAnchorSession({
                 onDurationSelect={setDurationOptIdx}
                 onComplete={handleSessionComplete}
                 onBack={onClose}
+                soundEnabled={soundEnabled}
+                onToggleSound={() => setSoundEnabled((v) => !v)}
               />
             </motion.div>
           )}

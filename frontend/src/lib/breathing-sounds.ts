@@ -94,6 +94,10 @@ function getCtx(): AudioContext {
     const AC = window.AudioContext || (window as W).webkitAudioContext!;
     _ctx = new AC();
   }
+  // Always try to resume — browsers re-suspend on page background/foreground
+  if (_ctx.state === "suspended") {
+    _ctx.resume().catch(() => {});
+  }
   return _ctx;
 }
 
@@ -307,12 +311,14 @@ export function getSoundForAnchor(anchorId: string): SoundConfig {
  * Call this synchronously inside a tap/click handler (a user gesture) before
  * opening the session. Browsers require a gesture to resume an AudioContext —
  * calling resume() inside a useEffect (outside the gesture) silently fails.
+ * iOS Safari sometimes needs the context created AND resumed in the same tick.
  */
 export function primeAudioContext(): void {
   if (typeof window === "undefined") return;
   try {
     const ctx = getCtx();
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    // Resume synchronously in the gesture tick
+    ctx.resume().catch(() => {});
   } catch { /* ignore */ }
 }
 
