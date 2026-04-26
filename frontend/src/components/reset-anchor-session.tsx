@@ -347,7 +347,7 @@ function SessionScreen({
   // Initialize background sound for this anchor when session starts
   useEffect(() => {
     if (soundEnabled) {
-      playBackgroundSound(anchor.id, 0.25);
+      playBackgroundSound(anchor.id, 0.12);
     } else {
       stopBackgroundSound();
     }
@@ -511,7 +511,7 @@ function SessionScreen({
               justifyContent: "center",
               cursor: "pointer",
             }}
-            title={soundEnabled ? "Sound on (scientific choice)" : "Sound off"}
+            title={soundEnabled ? "Mute background sound" : "Unmute background sound"}
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>

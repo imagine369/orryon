@@ -85,6 +85,8 @@ let _ctx: AudioContext | null = null;
 let _masterGain: GainNode | null = null;
 let _stopFn: (() => void) | null = null;
 let _currentSoundscape: Soundscape | null = null;
+let _stopTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let _generation = 0; // incremented each time we start a new sound; stops are self-invalidating
 
 function getCtx(): AudioContext {
   if (!_ctx || _ctx.state === "closed") {
@@ -113,42 +115,48 @@ function noiseSource(ctx: AudioContext): AudioBufferSourceNode {
 
 // ── Soundscape synthesizers ───────────────────────────────────────────────────
 
+// All synth functions output at a normalised ~0.25 level into the master gain.
+// The master itself is then set to 0.12 so the result is genuinely background-
+// level — present but never distracting.
+
 function synthPinkNoise(ctx: AudioContext, gain: GainNode): () => void {
-  // Approximate pink noise with a chain of shelving/peaking filters
   const src = noiseSource(ctx);
 
   const lp = ctx.createBiquadFilter();
   lp.type = "lowshelf";
   lp.frequency.value = 1000;
-  lp.gain.value = 10;
+  lp.gain.value = 6;        // was 10 — softer boost
 
   const hp = ctx.createBiquadFilter();
   hp.type = "highshelf";
   hp.frequency.value = 4000;
-  hp.gain.value = -14;
+  hp.gain.value = -18;      // was -14 — more high-end rolloff
+
+  const lvl = ctx.createGain();
+  lvl.gain.value = 0.22;    // normalise output level
 
   src.connect(lp);
   lp.connect(hp);
-  hp.connect(gain);
+  hp.connect(lvl);
+  lvl.connect(gain);
   src.start();
   return () => { try { src.stop(); } catch { /* ignore */ } };
 }
 
 function synthBrownNoise(ctx: AudioContext, gain: GainNode): () => void {
-  // Brown noise: integrate white noise (leaky integrator)
   const src = noiseSource(ctx);
 
   const lp = ctx.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 200;
+  lp.frequency.value = 180;
   lp.Q.value = 0.5;
 
-  const boost = ctx.createGain();
-  boost.gain.value = 3.5;
+  const lvl = ctx.createGain();
+  lvl.gain.value = 0.28;    // was 3.5× — brought right down
 
   src.connect(lp);
-  lp.connect(boost);
-  boost.connect(gain);
+  lp.connect(lvl);
+  lvl.connect(gain);
   src.start();
   return () => { try { src.stop(); } catch { /* ignore */ } };
 }
@@ -156,32 +164,28 @@ function synthBrownNoise(ctx: AudioContext, gain: GainNode): () => void {
 function synthGentleRain(ctx: AudioContext, gain: GainNode): () => void {
   const now = ctx.currentTime;
 
-  // Base hiss layer — mid-frequency filtered noise
   const hiss = noiseSource(ctx);
   const hissFilter = ctx.createBiquadFilter();
   hissFilter.type = "bandpass";
   hissFilter.frequency.value = 2800;
   hissFilter.Q.value = 0.6;
   const hissGain = ctx.createGain();
-  hissGain.gain.value = 0.55;
+  hissGain.gain.value = 0.18;  // was 0.55
 
-  // Low rumble layer — gives the "body" of rain
   const rumble = noiseSource(ctx);
   const rumbleFilter = ctx.createBiquadFilter();
   rumbleFilter.type = "lowpass";
   rumbleFilter.frequency.value = 320;
   rumbleFilter.Q.value = 0.4;
   const rumbleGain = ctx.createGain();
-  rumbleGain.gain.value = 0.45;
+  rumbleGain.gain.value = 0.12;  // was 0.45
 
-  // Subtle flutter — very slow amplitude modulation (~0.8Hz) simulates rain intensity variation
+  // Subtle flutter ~0.8Hz
   const lfo = ctx.createOscillator();
   lfo.frequency.value = 0.8;
   lfo.type = "sine";
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 0.08;
-  const lfoOffset = ctx.createGain();
-  lfoOffset.gain.value = 1;
+  lfoGain.gain.value = 0.03;  // was 0.08
 
   lfo.connect(lfoGain);
   lfoGain.connect(hissGain.gain);
@@ -208,30 +212,28 @@ function synthGentleRain(ctx: AudioContext, gain: GainNode): () => void {
 function synthForest(ctx: AudioContext, gain: GainNode): () => void {
   const now = ctx.currentTime;
 
-  // Soft air layer — gentle broadband hiss
   const air = noiseSource(ctx);
   const airFilter = ctx.createBiquadFilter();
   airFilter.type = "bandpass";
   airFilter.frequency.value = 1800;
   airFilter.Q.value = 0.4;
   const airGain = ctx.createGain();
-  airGain.gain.value = 0.5;
+  airGain.gain.value = 0.18;  // was 0.5
 
-  // Low rustle layer
   const rustle = noiseSource(ctx);
   const rustleFilter = ctx.createBiquadFilter();
   rustleFilter.type = "bandpass";
   rustleFilter.frequency.value = 600;
   rustleFilter.Q.value = 0.5;
   const rustleGain = ctx.createGain();
-  rustleGain.gain.value = 0.35;
+  rustleGain.gain.value = 0.10;  // was 0.35
 
-  // Very slow swell (~0.15Hz) — wind-through-trees texture
+  // Very slow swell ~0.15Hz
   const lfo = ctx.createOscillator();
   lfo.frequency.value = 0.15;
   lfo.type = "sine";
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 0.12;
+  lfoGain.gain.value = 0.04;  // was 0.12
 
   lfo.connect(lfoGain);
   lfoGain.connect(airGain.gain);
@@ -258,25 +260,23 @@ function synthForest(ctx: AudioContext, gain: GainNode): () => void {
 function synthOcean(ctx: AudioContext, gain: GainNode): () => void {
   const now = ctx.currentTime;
 
-  // Broadband surf noise
   const surf = noiseSource(ctx);
   const surfFilter = ctx.createBiquadFilter();
   surfFilter.type = "lowpass";
-  surfFilter.frequency.value = 1200;
+  surfFilter.frequency.value = 900;  // was 1200 — less harsh
   surfFilter.Q.value = 0.7;
   const surfGain = ctx.createGain();
-  surfGain.gain.value = 0.7;
+  surfGain.gain.value = 0.20;  // was 0.7
 
   // ~0.1Hz wave LFO — one swell every ~10 seconds
   const waveLfo = ctx.createOscillator();
   waveLfo.frequency.value = 0.1;
   waveLfo.type = "sine";
   const waveLfoGain = ctx.createGain();
-  waveLfoGain.gain.value = 0.3;
+  waveLfoGain.gain.value = 0.08;  // was 0.3 — gentler swell
 
-  // Offset so LFO rides around 1.0 (never goes silent)
   const waveOffset = ctx.createConstantSource();
-  waveOffset.offset.value = 0.7;
+  waveOffset.offset.value = 0.20;  // keep base level consistent
 
   waveLfo.connect(waveLfoGain);
   waveLfoGain.connect(surfGain.gain);
@@ -303,7 +303,8 @@ export function getSoundForAnchor(anchorId: string): SoundConfig {
   return ANCHOR_SOUNDS[anchorId] || ANCHOR_SOUNDS["quick-box-reset"];
 }
 
-export function playBackgroundSound(anchorId: string, volume: number = 0.25): void {
+export function playBackgroundSound(anchorId: string, volume: number = 0.12): void {
+  // Cancel any pending deferred stop from a previous fade-out
   stopBackgroundSound();
 
   if (typeof window === "undefined") return;
@@ -319,7 +320,7 @@ export function playBackgroundSound(anchorId: string, volume: number = 0.25): vo
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
     const masterGain = ctx.createGain();
-    // Fade in over 1.2s to avoid abrupt start
+    // Fade in over 1.2s — never jarring
     masterGain.gain.setValueAtTime(0, ctx.currentTime);
     masterGain.gain.linearRampToValueAtTime(
       Math.max(0, Math.min(1, volume)),
@@ -327,6 +328,7 @@ export function playBackgroundSound(anchorId: string, volume: number = 0.25): vo
     );
     masterGain.connect(ctx.destination);
     _masterGain = masterGain;
+    _generation++;
 
     let stopNodes: () => void;
     switch (config.default) {
@@ -346,17 +348,29 @@ export function playBackgroundSound(anchorId: string, volume: number = 0.25): vo
 }
 
 export function stopBackgroundSound(): void {
+  // Cancel any previously scheduled deferred stop so nodes don't stack
+  if (_stopTimeoutId !== null) {
+    clearTimeout(_stopTimeoutId);
+    _stopTimeoutId = null;
+  }
+
   if (_masterGain && _ctx) {
-    // Fade out over 0.6s before stopping nodes
     const gain = _masterGain;
-    const ctx = _ctx;
-    gain.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
     const stop = _stopFn;
-    setTimeout(() => {
+    const gen = _generation;
+    const ctx = _ctx;
+
+    // Fade out over ~0.5s, then stop nodes — but only if no new sound has
+    // started in the meantime (generation guard prevents stacking)
+    gain.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
+    _stopTimeoutId = setTimeout(() => {
+      _stopTimeoutId = null;
+      if (_generation !== gen) return; // a new sound started — leave it alone
       try { stop?.(); } catch { /* ignore */ }
       try { gain.disconnect(); } catch { /* ignore */ }
-    }, 700);
+    }, 600);
   }
+
   _stopFn = null;
   _masterGain = null;
   _currentSoundscape = null;
