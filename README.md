@@ -1,6 +1,6 @@
 # orryon
 
-Your intelligent personal concierge. Track expenses, manage your schedule, set savings goals, and ask anything — all in natural language.
+Our guide to organized life and calmer days.
 
 > **Local-first.** All data stays on your device in a single SQLite file. No cloud. No accounts required for the demo.
 
