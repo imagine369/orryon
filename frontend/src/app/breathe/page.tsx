@@ -3,12 +3,93 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { Play, ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, Zap, Waves, Check, type LucideProps } from "lucide-react";
 import { useResetAnchors } from "@/lib/use-reset-anchors";
 import { RESET_ANCHORS, getRecommendedAnchor, type ResetAnchor } from "@/lib/reset-scripts";
 import { ResetAnchorSession } from "@/components/reset-anchor-session";
 import { primeAudioContext } from "@/lib/breathing-sounds";
+import { FreeSettingsSheet } from "@/components/free-settings-sheet";
 import type { MoodState } from "@/lib/use-reset-anchors";
+
+// ── Free-tier nav ──────────────────────────────────────────────────────────────
+
+function FreeTierNav({ onUpgrade, onSettings, checkoutPending }: {
+  onUpgrade: () => void;
+  onSettings: () => void;
+  checkoutPending: boolean;
+}) {
+  const { user } = useAuth();
+
+  if (!user) return null;
+
+  const initials = (user.display_name || user.email || "?")
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div style={{
+      position: "sticky",
+      top: 0,
+      zIndex: 30,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "14px 20px",
+      background: "rgba(0,0,0,0.85)",
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
+      borderBottom: "1px solid rgba(255,255,255,0.05)",
+    }}>
+      {/* Wordmark */}
+      <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.02em" }}>
+        orryon
+      </span>
+
+      {/* Right side */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Upgrade pill */}
+        <button
+          onClick={onUpgrade}
+          disabled={checkoutPending}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.9)",
+            color: "#000",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.03em",
+            border: "none",
+            cursor: "pointer",
+            opacity: checkoutPending ? 0.6 : 1,
+          }}
+        >
+          {checkoutPending ? "Opening…" : "Upgrade"}
+        </button>
+
+        {/* Avatar → opens settings sheet */}
+        <button
+          onClick={onSettings}
+          style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)",
+            cursor: "pointer",
+          }}
+          aria-label="Account settings"
+        >
+          {initials}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Per-anchor icon ────────────────────────────────────────────────────────────
 
@@ -294,7 +375,6 @@ export default function BreathePage() {
   const startCheckout = useCallback(async (plan: "monthly" | "annual") => {
     const priceId = plan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
     if (!priceId) {
-      // No Stripe configured — fall back to login tiers page
       window.location.href = `/login?step=tiers&plan=${plan}`;
       return;
     }
@@ -312,6 +392,12 @@ export default function BreathePage() {
     }
   }, []);
 
+  // Default upgrade path from the nav: monthly checkout
+  const handleNavUpgrade = useCallback(() => startCheckout("monthly"), [startCheckout]);
+
+  // Settings sheet
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const recommended = getRecommendedAnchor(lastUsedId);
 
   const handleAddCompletion = (anchorId: string, duration: number, preMood?: MoodState): string =>
@@ -322,6 +408,21 @@ export default function BreathePage() {
 
   return (
     <div className="min-h-full bg-black text-white">
+
+      {/* Nav — only visible to signed-in free users */}
+      <FreeTierNav
+        onUpgrade={handleNavUpgrade}
+        onSettings={() => setSettingsOpen(true)}
+        checkoutPending={checkoutPending !== null}
+      />
+
+      {/* Account settings sheet for free-tier users */}
+      <FreeSettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onUpgrade={handleNavUpgrade}
+      />
+
       <div className="max-w-2xl mx-auto px-5 pt-8 pb-16">
 
         {/* Header */}

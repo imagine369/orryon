@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { ArrowUp, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { pickRecorderMimeType, speechToText } from "@/lib/voice";
+import { pickRecorderMimeType, speechToText, VoiceLimitError } from "@/lib/voice";
 
 export type VoiceStatus =
   | "idle"
@@ -24,7 +24,7 @@ interface ChatInputProps {
    */
   externalStatus?: VoiceStatus;
   onVoiceStatusChange?: (status: VoiceStatus) => void;
-  onVoiceError?: (message: string) => void;
+  onVoiceError?: (errorOrMessage: string | Error) => void;
   /**
    * Fires synchronously on the very first mic tap of a session. The parent
    * can use it to "unlock" a persistent HTMLAudioElement while we're still
@@ -385,7 +385,12 @@ export function ChatInput({
         onSend(text, "voice");
       } catch (err) {
         updateStatus("idle");
-        onVoiceError?.(err instanceof Error ? err.message : "Transcription failed.");
+        if (err instanceof VoiceLimitError) {
+          // Pass the typed error object so the parent can show the limit modal.
+          onVoiceError?.(err);
+        } else {
+          onVoiceError?.(err instanceof Error ? err.message : "Transcription failed.");
+        }
       }
     };
 

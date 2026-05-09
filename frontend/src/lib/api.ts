@@ -237,6 +237,7 @@ export interface ChatEvent {
   tabs?: string[];
   undo_info?: { table: string; id: string; tool: string; label: string } | null;
   session_id?: string;
+  voice_overlay?: boolean;
 }
 
 

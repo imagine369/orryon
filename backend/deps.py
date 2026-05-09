@@ -45,6 +45,26 @@ MONTHLY_SPEND_CAP_USD = 1.80
 RATE_LIMIT_OTP = 5
 RATE_LIMIT_OTP_IP = 10
 
+# ── Voice minute caps by plan ─────────────────────────────────────────────────
+# Starter: 30 min | Pro / Trial: 150 min | Premium: 350 min | Free: 0
+VOICE_LIMITS_MINUTES: dict[str, int] = {
+    "free":     0,
+    "starter":  30,
+    "trial":    150,
+    "pro":      150,
+    "premium":  350,
+}
+
+# On-demand top-up pricing
+VOICE_TOPUP_MINUTES = 60
+VOICE_TOPUP_PRICE_USD = 6.00
+VOICE_TOPUP_PRICE_CENTS = 600  # for Stripe
+
+
+def get_voice_limit_minutes(plan: str) -> int:
+    """Return included voice minutes for *plan*. Unknown plans default to 0."""
+    return VOICE_LIMITS_MINUTES.get(plan, 0)
+
 
 def check_rate_limit(user_id: str, limit: int = RATE_LIMIT_DEFAULT) -> None:
     """Raise HTTP 429 if the user has exceeded their per-minute request quota."""
@@ -100,7 +120,8 @@ def resolve_plan(user_row: dict) -> dict:
         "plan": plan,
         "trial_ends_at": trial_ends_at_str or None,
         "trial_days_remaining": trial_days_remaining,
-        "is_active_pro": plan in ("trial", "pro"),
+        "is_active_pro": plan in ("trial", "pro", "starter", "premium"),
+        "is_free_tier": plan == "free",
     }
 
 
@@ -123,3 +144,55 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
             "Your Pro trial has ended. Upgrade to continue using this feature.",
         )
     return user
+
+
+# ── Chat message quota ────────────────────────────────────────────────────────
+
+CHAT_LIMITS: dict[str, int] = {
+    "free":    0,
+    "starter": 150,
+    "trial":   500,
+    "pro":     500,
+    "premium": -1,   # -1 = unlimited
+}
+
+TIER_RANK: dict[str, int] = {
+    "free": 0,
+    "starter": 1,
+    "trial": 2,
+    "pro": 2,
+    "premium": 3,
+}
+
+
+def get_chat_limit(plan: str) -> int:
+    """Return monthly chat message limit for plan. -1 = unlimited."""
+    return CHAT_LIMITS.get(plan, 0)
+
+
+def get_tier_rank(plan: str) -> int:
+    """Numeric rank for tier comparisons. Higher = more access."""
+    return TIER_RANK.get(plan, 0)
+
+
+def check_chat_quota(user_id: str, plan: str) -> None:
+    """Raise HTTP 429 with code=chat_limit_reached if monthly message cap is hit."""
+    limit = get_chat_limit(plan)
+    if limit == -1:
+        return  # unlimited
+    from db import get_chat_message_count
+    count = get_chat_message_count(user_id)
+    if count >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "chat_limit_reached",
+                "messages_used": count,
+                "limit": limit,
+                "plan": plan,
+                "message": (
+                    f"You've used all {limit} messages included in your {plan.title()} plan this month. "
+                    "Upgrade to Pro for 500 messages, or to Premium for unlimited."
+                ),
+            },
+        )

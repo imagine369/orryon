@@ -531,8 +531,98 @@ CREATE TABLE IF NOT EXISTS reset_completions (
 );
 
 CREATE TABLE IF NOT EXISTS user_preferences (
-    user_id           TEXT PRIMARY KEY,
-    last_reset_anchor TEXT
+    user_id               TEXT PRIMARY KEY,
+    last_reset_anchor     TEXT,
+    voice_overlay_enabled INTEGER DEFAULT 0,
+    golden_mode_enabled   INTEGER DEFAULT 0,
+    briefing_time         TEXT DEFAULT '07:00',
+    briefing_includes     TEXT DEFAULT 'finance,health,calendar,goals',
+    onboarding_complete   INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS health_vitals (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    type        TEXT NOT NULL,
+    value       REAL NOT NULL,
+    unit        TEXT DEFAULT '',
+    source      TEXT DEFAULT 'manual',
+    note        TEXT DEFAULT '',
+    recorded_at TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS medications (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    dose         TEXT DEFAULT '',
+    frequency    TEXT DEFAULT 'daily',
+    next_dose_at TEXT DEFAULT '',
+    notes        TEXT DEFAULT '',
+    active       INTEGER DEFAULT 1,
+    created_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS health_appointments (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    type         TEXT DEFAULT '',
+    provider     TEXT DEFAULT '',
+    date         TEXT NOT NULL,
+    location     TEXT DEFAULT '',
+    notes        TEXT DEFAULT '',
+    created_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_places (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    label      TEXT NOT NULL,
+    address    TEXT DEFAULT '',
+    lat        REAL DEFAULT 0,
+    lng        REAL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS commute_patterns (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    from_place  TEXT DEFAULT '',
+    to_place    TEXT DEFAULT '',
+    days        TEXT DEFAULT '',
+    depart_time TEXT DEFAULT '',
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS briefings (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    date         TEXT NOT NULL,
+    content_json TEXT DEFAULT '{}',
+    delivered_at TEXT DEFAULT '',
+    read_at      TEXT DEFAULT '',
+    UNIQUE(user_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS approval_requests (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    action_type  TEXT NOT NULL,
+    description  TEXT NOT NULL,
+    payload_json TEXT DEFAULT '{}',
+    status       TEXT DEFAULT 'pending',
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT DEFAULT '',
+    resolved_at  TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS chat_message_counts (
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL,
+    month    TEXT NOT NULL,
+    count    INTEGER DEFAULT 0,
+    UNIQUE(user_id, month)
 );
 
 CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -543,6 +633,24 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     created_at  TEXT NOT NULL,
     last_active TEXT NOT NULL,
     revoked     INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS voice_minute_usage (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    month        TEXT NOT NULL,
+    seconds_used REAL DEFAULT 0,
+    updated_at   TEXT NOT NULL,
+    UNIQUE(user_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS voice_topups (
+    id                    TEXT PRIMARY KEY,
+    user_id               TEXT NOT NULL,
+    minutes_added         INTEGER NOT NULL,
+    price_usd             REAL NOT NULL,
+    stripe_payment_intent TEXT DEFAULT '',
+    created_at            TEXT NOT NULL
 );
 """
 
@@ -568,6 +676,16 @@ CREATE INDEX IF NOT EXISTS idx_streak_days_user_date ON streak_days(user_id, dat
 CREATE INDEX IF NOT EXISTS idx_reset_completions_user ON reset_completions(user_id);
 CREATE INDEX IF NOT EXISTS idx_reset_completions_user_date ON reset_completions(user_id, date_key);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_revoked ON auth_sessions(user_id, revoked);
+CREATE INDEX IF NOT EXISTS idx_voice_usage_user_month ON voice_minute_usage(user_id, month);
+CREATE INDEX IF NOT EXISTS idx_voice_topups_user ON voice_topups(user_id);
+CREATE INDEX IF NOT EXISTS idx_health_vitals_user ON health_vitals(user_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_medications_user ON medications(user_id);
+CREATE INDEX IF NOT EXISTS idx_health_appts_user ON health_appointments(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_user_places_user ON user_places(user_id);
+CREATE INDEX IF NOT EXISTS idx_commute_user ON commute_patterns(user_id);
+CREATE INDEX IF NOT EXISTS idx_briefings_user_date ON briefings(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_approvals_user ON approval_requests(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_chat_counts_user_month ON chat_message_counts(user_id, month);
 """
 
 # Additional columns that may be missing on older databases.
@@ -697,6 +815,10 @@ _ALLOWED_TABLES: frozenset[str] = frozenset({
     "user_calendar_tokens", "goal_contributions", "user_lists", "list_items",
     "auth_sessions", "streaks", "streak_days", "reset_completions",
     "user_preferences", "waitlist", "contact_submissions",
+    "voice_minute_usage", "voice_topups",
+    "health_vitals", "medications", "health_appointments",
+    "user_places", "commute_patterns", "briefings", "approval_requests",
+    "chat_message_counts",
 })
 
 
@@ -1327,6 +1449,618 @@ def get_monthly_spend(user_id: str) -> float:
     except Exception as exc:
         logger.error("get_monthly_spend error: %s", exc)
         return 0.0
+
+
+# ── Voice minute usage helpers ────────────────────────────────────────────────
+
+def get_voice_seconds_used(user_id: str, month: str | None = None) -> float:
+    """Return total voice seconds consumed by *user_id* in *month* (YYYY-MM)."""
+    if month is None:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT seconds_used FROM voice_minute_usage WHERE user_id=? AND month=?",
+            (user_id, month),
+        ).fetchone()
+        conn.close()
+        return float(row["seconds_used"]) if row else 0.0
+    except Exception as exc:
+        logger.error("get_voice_seconds_used error: %s", exc)
+        return 0.0
+
+
+def record_voice_seconds(user_id: str, seconds: float) -> None:
+    """Atomically add *seconds* to the current month's voice usage bucket."""
+    if seconds <= 0:
+        return
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        conn = get_connection()
+        if _USE_PG:
+            conn.execute(
+                "INSERT INTO voice_minute_usage (id, user_id, month, seconds_used, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET "
+                "  seconds_used = voice_minute_usage.seconds_used + EXCLUDED.seconds_used, "
+                "  updated_at = EXCLUDED.updated_at",
+                (str(uuid.uuid4()), user_id, month, seconds, now),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO voice_minute_usage (id, user_id, month, seconds_used, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET "
+                "  seconds_used = seconds_used + excluded.seconds_used, "
+                "  updated_at = excluded.updated_at",
+                (str(uuid.uuid4()), user_id, month, seconds, now),
+            )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        logger.error("record_voice_seconds error: %s", exc)
+
+
+def get_voice_topup_minutes(user_id: str, month: str | None = None) -> int:
+    """Return total bonus minutes purchased via top-ups this calendar month."""
+    if month is None:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    month_start = f"{month}-01"
+    # End of month: first day of next month
+    y, m = int(month[:4]), int(month[5:7])
+    if m == 12:
+        month_end = f"{y + 1}-01-01"
+    else:
+        month_end = f"{y}-{m + 1:02d}-01"
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT COALESCE(SUM(minutes_added), 0) as total "
+            "FROM voice_topups WHERE user_id=? AND created_at>=? AND created_at<?",
+            (user_id, month_start, month_end),
+        ).fetchone()
+        conn.close()
+        return int(row["total"]) if row else 0
+    except Exception as exc:
+        logger.error("get_voice_topup_minutes error: %s", exc)
+        return 0
+
+
+def add_voice_topup(
+    user_id: str,
+    minutes_added: int,
+    price_usd: float,
+    stripe_payment_intent: str = "",
+) -> bool:
+    """Record a voice-minute top-up purchase."""
+    return insert_row("voice_topups", {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "minutes_added": minutes_added,
+        "price_usd": price_usd,
+        "stripe_payment_intent": stripe_payment_intent,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+# ── User preferences ──────────────────────────────────────────────────────────
+
+def get_user_preferences(user_id: str) -> dict:
+    try:
+        conn = get_connection()
+        row = conn.execute("SELECT * FROM user_preferences WHERE user_id=?", (user_id,)).fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+        return {
+            "user_id": user_id,
+            "last_reset_anchor": None,
+            "voice_overlay_enabled": 0,
+            "golden_mode_enabled": 0,
+            "briefing_time": "07:00",
+            "briefing_includes": "finance,health,calendar,goals",
+            "onboarding_complete": 0,
+        }
+    except Exception as exc:
+        logger.error("get_user_preferences error: %s", exc)
+        return {"user_id": user_id}
+
+
+def upsert_user_preferences(user_id: str, updates: dict) -> bool:
+    try:
+        conn = get_connection()
+        existing = conn.execute("SELECT user_id FROM user_preferences WHERE user_id=?", (user_id,)).fetchone()
+        if existing:
+            sets = ", ".join(f"{k}=?" for k in updates)
+            conn.execute(f"UPDATE user_preferences SET {sets} WHERE user_id=?", (*updates.values(), user_id))
+        else:
+            row = {"user_id": user_id, **updates}
+            cols = ", ".join(row.keys())
+            placeholders = ", ".join("?" for _ in row)
+            conn.execute(f"INSERT INTO user_preferences ({cols}) VALUES ({placeholders})", tuple(row.values()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("upsert_user_preferences error: %s", exc)
+        return False
+
+
+# ── Chat message quota ────────────────────────────────────────────────────────
+
+def get_chat_message_count(user_id: str, month: str | None = None) -> int:
+    if month is None:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT count FROM chat_message_counts WHERE user_id=? AND month=?",
+            (user_id, month),
+        ).fetchone()
+        conn.close()
+        return int(row["count"]) if row else 0
+    except Exception as exc:
+        logger.error("get_chat_message_count error: %s", exc)
+        return 0
+
+
+def increment_chat_message_count(user_id: str) -> int:
+    """Increment and return the new count for this month."""
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_connection()
+        if _USE_PG:
+            row = conn.execute(
+                "INSERT INTO chat_message_counts (id, user_id, month, count) VALUES (%s, %s, %s, 1) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET count = chat_message_counts.count + 1 "
+                "RETURNING count",
+                (str(uuid.uuid4()), user_id, month),
+            ).fetchone()
+        else:
+            conn.execute(
+                "INSERT INTO chat_message_counts (id, user_id, month, count) VALUES (?, ?, ?, 1) "
+                "ON CONFLICT(user_id, month) DO UPDATE SET count = count + 1",
+                (str(uuid.uuid4()), user_id, month),
+            )
+            row = conn.execute(
+                "SELECT count FROM chat_message_counts WHERE user_id=? AND month=?",
+                (user_id, month),
+            ).fetchone()
+        conn.commit()
+        conn.close()
+        return int(row["count"]) if row else 1
+    except Exception as exc:
+        logger.error("increment_chat_message_count error: %s", exc)
+        return 0
+
+
+# ── Health vitals ─────────────────────────────────────────────────────────────
+
+def add_health_vital(user_id: str, vital_type: str, value: float, unit: str = "",
+                     note: str = "", recorded_at: str = "", source: str = "manual") -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": vital_type,
+        "value": value,
+        "unit": unit,
+        "note": note,
+        "source": source,
+        "recorded_at": recorded_at or now,
+        "created_at": now,
+    }
+    insert_row("health_vitals", row)
+    return row
+
+
+def get_health_vitals(user_id: str, vital_type: str | None = None,
+                      limit: int = 50) -> list[dict]:
+    try:
+        conn = get_connection()
+        if vital_type:
+            rows = conn.execute(
+                "SELECT * FROM health_vitals WHERE user_id=? AND type=? ORDER BY recorded_at DESC LIMIT ?",
+                (user_id, vital_type, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM health_vitals WHERE user_id=? ORDER BY recorded_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_health_vitals error: %s", exc)
+        return []
+
+
+def delete_health_vital(user_id: str, vital_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM health_vitals WHERE id=? AND user_id=?", (vital_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_health_vital error: %s", exc)
+        return False
+
+
+# ── Medications ───────────────────────────────────────────────────────────────
+
+def add_medication(user_id: str, name: str, dose: str = "", frequency: str = "daily",
+                   next_dose_at: str = "", notes: str = "") -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "name": name,
+        "dose": dose,
+        "frequency": frequency,
+        "next_dose_at": next_dose_at,
+        "notes": notes,
+        "active": 1,
+        "created_at": now,
+    }
+    insert_row("medications", row)
+    return row
+
+
+def get_medications(user_id: str, active_only: bool = True) -> list[dict]:
+    try:
+        conn = get_connection()
+        q = "SELECT * FROM medications WHERE user_id=?"
+        params: list = [user_id]
+        if active_only:
+            q += " AND active=1"
+        q += " ORDER BY name"
+        rows = conn.execute(q, params).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_medications error: %s", exc)
+        return []
+
+
+def update_medication(user_id: str, med_id: str, updates: dict) -> bool:
+    allowed = {"name", "dose", "frequency", "next_dose_at", "notes", "active"}
+    filtered = {k: v for k, v in updates.items() if k in allowed}
+    if not filtered:
+        return False
+    try:
+        conn = get_connection()
+        sets = ", ".join(f"{k}=?" for k in filtered)
+        conn.execute(f"UPDATE medications SET {sets} WHERE id=? AND user_id=?",
+                     (*filtered.values(), med_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("update_medication error: %s", exc)
+        return False
+
+
+def delete_medication(user_id: str, med_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("UPDATE medications SET active=0 WHERE id=? AND user_id=?", (med_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_medication error: %s", exc)
+        return False
+
+
+# ── Health appointments ───────────────────────────────────────────────────────
+
+def add_health_appointment(user_id: str, appt_type: str = "", provider: str = "",
+                            date: str = "", location: str = "", notes: str = "") -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": appt_type,
+        "provider": provider,
+        "date": date,
+        "location": location,
+        "notes": notes,
+        "created_at": now,
+    }
+    insert_row("health_appointments", row)
+    return row
+
+
+def get_health_appointments(user_id: str, upcoming_only: bool = False) -> list[dict]:
+    try:
+        conn = get_connection()
+        if upcoming_only:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            rows = conn.execute(
+                "SELECT * FROM health_appointments WHERE user_id=? AND date>=? ORDER BY date",
+                (user_id, today),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM health_appointments WHERE user_id=? ORDER BY date DESC LIMIT 50",
+                (user_id,),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_health_appointments error: %s", exc)
+        return []
+
+
+def delete_health_appointment(user_id: str, appt_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM health_appointments WHERE id=? AND user_id=?", (appt_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_health_appointment error: %s", exc)
+        return False
+
+
+# ── User places / location ────────────────────────────────────────────────────
+
+def add_user_place(user_id: str, label: str, address: str = "",
+                   lat: float = 0, lng: float = 0) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "label": label,
+        "address": address,
+        "lat": lat,
+        "lng": lng,
+        "created_at": now,
+    }
+    insert_row("user_places", row)
+    return row
+
+
+def get_user_places(user_id: str) -> list[dict]:
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM user_places WHERE user_id=? ORDER BY label",
+            (user_id,),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_user_places error: %s", exc)
+        return []
+
+
+def delete_user_place(user_id: str, place_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM user_places WHERE id=? AND user_id=?", (place_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_user_place error: %s", exc)
+        return False
+
+
+def upsert_commute_pattern(user_id: str, from_place: str, to_place: str,
+                            days: str, depart_time: str) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        conn = get_connection()
+        existing = conn.execute(
+            "SELECT id FROM commute_patterns WHERE user_id=?", (user_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE commute_patterns SET from_place=?, to_place=?, days=?, depart_time=? WHERE user_id=?",
+                (from_place, to_place, days, depart_time, user_id),
+            )
+            row = {"id": existing["id"], "user_id": user_id, "from_place": from_place,
+                   "to_place": to_place, "days": days, "depart_time": depart_time}
+        else:
+            row_id = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO commute_patterns (id, user_id, from_place, to_place, days, depart_time, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (row_id, user_id, from_place, to_place, days, depart_time, now),
+            )
+            row = {"id": row_id, "user_id": user_id, "from_place": from_place,
+                   "to_place": to_place, "days": days, "depart_time": depart_time}
+        conn.commit()
+        conn.close()
+        return row
+    except Exception as exc:
+        logger.error("upsert_commute_pattern error: %s", exc)
+        return {}
+
+
+def get_commute_pattern(user_id: str) -> dict | None:
+    try:
+        conn = get_connection()
+        row = conn.execute("SELECT * FROM commute_patterns WHERE user_id=?", (user_id,)).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception as exc:
+        logger.error("get_commute_pattern error: %s", exc)
+        return None
+
+
+# ── Briefings ─────────────────────────────────────────────────────────────────
+
+def get_briefing(user_id: str, date: str) -> dict | None:
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT * FROM briefings WHERE user_id=? AND date=?", (user_id, date)
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception as exc:
+        logger.error("get_briefing error: %s", exc)
+        return None
+
+
+def save_briefing(user_id: str, date: str, content: dict) -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        conn = get_connection()
+        if _USE_PG:
+            conn.execute(
+                "INSERT INTO briefings (id, user_id, date, content_json, delivered_at) "
+                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT(user_id, date) DO UPDATE SET "
+                "content_json=EXCLUDED.content_json, delivered_at=EXCLUDED.delivered_at",
+                (str(uuid.uuid4()), user_id, date, json.dumps(content), now),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO briefings (id, user_id, date, content_json, delivered_at) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, date) DO UPDATE SET "
+                "content_json=excluded.content_json, delivered_at=excluded.delivered_at",
+                (str(uuid.uuid4()), user_id, date, json.dumps(content), now),
+            )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("save_briefing error: %s", exc)
+        return False
+
+
+def mark_briefing_read(user_id: str, date: str) -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        conn = get_connection()
+        conn.execute(
+            "UPDATE briefings SET read_at=? WHERE user_id=? AND date=?",
+            (now, user_id, date),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("mark_briefing_read error: %s", exc)
+        return False
+
+
+# ── Approval requests ─────────────────────────────────────────────────────────
+
+def create_approval_request(user_id: str, action_type: str, description: str,
+                             payload: dict, expires_hours: int = 48) -> dict:
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    expires = (now + timedelta(hours=expires_hours)).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "action_type": action_type,
+        "description": description,
+        "payload_json": json.dumps(payload),
+        "status": "pending",
+        "created_at": now.isoformat(),
+        "expires_at": expires,
+        "resolved_at": "",
+    }
+    insert_row("approval_requests", row)
+    return row
+
+
+def get_approval_requests(user_id: str, status: str | None = "pending") -> list[dict]:
+    try:
+        conn = get_connection()
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM approval_requests WHERE user_id=? AND status=? ORDER BY created_at DESC",
+                (user_id, status),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM approval_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 50",
+                (user_id,),
+            ).fetchall()
+        conn.close()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["payload"] = json.loads(d.get("payload_json") or "{}")
+            except Exception:
+                d["payload"] = {}
+            result.append(d)
+        return result
+    except Exception as exc:
+        logger.error("get_approval_requests error: %s", exc)
+        return []
+
+
+def resolve_approval_request(user_id: str, approval_id: str, status: str) -> bool:
+    if status not in ("approved", "rejected"):
+        return False
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        conn = get_connection()
+        conn.execute(
+            "UPDATE approval_requests SET status=?, resolved_at=? WHERE id=? AND user_id=? AND status='pending'",
+            (status, now, approval_id, user_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("resolve_approval_request error: %s", exc)
+        return False
+
+
+# ── Memory helpers (extended) ─────────────────────────────────────────────────
+
+def get_user_memory(user_id: str, category: str | None = None, limit: int = 100) -> list[dict]:
+    try:
+        conn = get_connection()
+        if category:
+            rows = conn.execute(
+                "SELECT * FROM user_memory WHERE user_id=? AND category=? ORDER BY created_at DESC LIMIT ?",
+                (user_id, category, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM user_memory WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("get_user_memory error: %s", exc)
+        return []
+
+
+def delete_memory_fact(user_id: str, memory_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM user_memory WHERE id=? AND user_id=?", (memory_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_memory_fact error: %s", exc)
+        return False
+
+
+def count_user_memory(user_id: str) -> int:
+    try:
+        conn = get_connection()
+        row = conn.execute("SELECT COUNT(*) as c FROM user_memory WHERE user_id=?", (user_id,)).fetchone()
+        conn.close()
+        return int(row["c"]) if row else 0
+    except Exception as exc:
+        logger.error("count_user_memory error: %s", exc)
+        return 0
 
 
 # ── Auto-initialise (SQLite only — Postgres init is done in FastAPI lifespan) ─

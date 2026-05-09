@@ -15,6 +15,7 @@ import { TrialBanner } from "@/components/trial-banner";
 import { InstallPrompt } from "@/components/install-prompt";
 import { useSubscription } from "@/lib/use-subscription";
 import { SubscriptionProvider } from "@/lib/subscription-service";
+import { usePreferences } from "@/lib/use-preferences";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -24,11 +25,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const { sub } = useSubscription();
 
   const isFreeBreathe = !loading && !!user && (user.segment === "free_breathe" || user.plan === "free");
+  const { prefs } = usePreferences();
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
     if (isFreeBreathe) router.replace("/breathe");
   }, [loading, user, router, isFreeBreathe]);
+
+  // Apply Golden Mode class to <html> for app-wide font/size scaling
+  useEffect(() => {
+    const html = document.documentElement;
+    if (prefs.golden_mode_enabled) {
+      html.classList.add("golden-mode");
+    } else {
+      html.classList.remove("golden-mode");
+    }
+  }, [prefs.golden_mode_enabled]);
 
   // Show spinner while loading OR while about to redirect — never flash the app shell.
   if (loading || !user || isFreeBreathe) {

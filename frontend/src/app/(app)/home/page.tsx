@@ -5,16 +5,21 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import { Clock, X, SquarePen, Trash2, MessageSquare } from "lucide-react";
+import { Clock, X, SquarePen, Trash2, MessageSquare, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/use-subscription";
 import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
+import { VoiceLimitError, textToSpeech } from "@/lib/voice";
 import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
+import { VoiceLimitModal } from "@/components/voice-limit-modal";
+import { ChatLimitModal } from "@/components/chat-limit-modal";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { BreathingWidget } from "@/components/breathing";
 import { PostBreathingUpgradeCard } from "@/components/subscription";
+import { usePreferences } from "@/lib/use-preferences";
+import { DailyBriefingCard } from "@/components/daily-briefing-card";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -95,11 +100,28 @@ export default function HomePage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
+  // ── Preferences (voice overlay, golden mode) ────────────────────────────────
+  const { prefs, update: updatePrefs } = usePreferences();
+  const voiceOverlayOn = prefs.voice_overlay_enabled && sub?.is_active_pro && sub?.plan !== "starter";
+
   // ── Voice ───────────────────────────────────────────────────────────────────
-  // The mic button lets users speak their messages (STT). The assistant replies
-  // in text only — TTS (speaking replies aloud) is disabled.
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Voice limit modal — shown when the user exhausts their monthly minute cap.
+  const [voiceLimitOpen, setVoiceLimitOpen] = useState(false);
+  const [voiceLimitInfo, setVoiceLimitInfo] = useState<{
+    minutesUsed: number;
+    limitMinutes: number;
+  } | null>(null);
+
+  // ── Chat limit modal ─────────────────────────────────────────────────────────
+  const [chatLimitOpen, setChatLimitOpen] = useState(false);
+  const [chatLimitInfo, setChatLimitInfo] = useState<{
+    messagesUsed: number;
+    limit: number;
+    plan: string;
+  } | null>(null);
 
   // Auto-clear voice errors so they don't linger.
   useEffect(() => {
@@ -107,6 +129,19 @@ export default function HomePage() {
     const t = setTimeout(() => setVoiceError(null), 3200);
     return () => clearTimeout(t);
   }, [voiceError]);
+
+  // Handle voice errors — detect the minute-cap error and show the modal.
+  const handleVoiceError = useCallback((errOrMsg: string | Error) => {
+    if (errOrMsg instanceof VoiceLimitError) {
+      setVoiceLimitInfo({
+        minutesUsed: errOrMsg.minutesUsed,
+        limitMinutes: errOrMsg.limitMinutes,
+      });
+      setVoiceLimitOpen(true);
+      return;
+    }
+    setVoiceError(typeof errOrMsg === "string" ? errOrMsg : errOrMsg.message);
+  }, []);
 
   // ── Side-effects ────────────────────────────────────────────────────────────
 
@@ -244,9 +279,12 @@ export default function HomePage() {
           });
           setToolLabel("");
 
-          // Notify every dashboard panel that its data may have changed so
-          // any tab the user happens to have open refetches itself —
-          // no "close and reopen to see the update" step.
+          // Voice overlay: read the response aloud when enabled (Pro/Premium only)
+          if (event.voice_overlay && final) {
+            try { await textToSpeech(final); } catch { /* non-fatal */ }
+          }
+
+          // Notify every dashboard panel that its data may have changed.
           const tabs = Array.isArray(event.tabs) ? (event.tabs as string[]) : [];
           if (tabs.length > 0) dispatchDataChanged(tabs);
         } else if (event.type === "error") {
@@ -261,8 +299,20 @@ export default function HomePage() {
           });
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") return;
+      // Detect chat quota error (429 with code=chat_limit_reached)
+      const anyErr = err as { status?: number; detail?: { code?: string; messages_used?: number; limit?: number; plan?: string } };
+      if (anyErr?.status === 429 && anyErr?.detail?.code === "chat_limit_reached") {
+        setChatLimitInfo({
+          messagesUsed: anyErr.detail.messages_used ?? 0,
+          limit: anyErr.detail.limit ?? 0,
+          plan: anyErr.detail.plan ?? "starter",
+        });
+        setChatLimitOpen(true);
+        setMessages((prev) => prev.slice(0, -1)); // remove empty assistant bubble
+        return;
+      }
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
@@ -306,6 +356,33 @@ export default function HomePage() {
 
   return (
     <>
+      {/* ── Voice limit modal ─────────────────────────────────────────────── */}
+      <VoiceLimitModal
+        open={voiceLimitOpen}
+        onClose={() => setVoiceLimitOpen(false)}
+        onContinueText={() => setVoiceLimitOpen(false)}
+        onUpgrade={() => {
+          const panels = document.querySelector("[data-panel-open-settings]");
+          if (panels) (panels as HTMLButtonElement).click();
+        }}
+        minutesUsed={voiceLimitInfo?.minutesUsed}
+        limitMinutes={voiceLimitInfo?.limitMinutes}
+      />
+
+      {/* ── Chat limit modal ──────────────────────────────────────────────── */}
+      <ChatLimitModal
+        open={chatLimitOpen}
+        onClose={() => setChatLimitOpen(false)}
+        onUpgrade={() => {
+          setChatLimitOpen(false);
+          const panels = document.querySelector("[data-panel-open-settings]");
+          if (panels) (panels as HTMLButtonElement).click();
+        }}
+        messagesUsed={chatLimitInfo?.messagesUsed ?? 0}
+        limit={chatLimitInfo?.limit ?? 0}
+        plan={chatLimitInfo?.plan ?? "starter"}
+      />
+
       {/* ── History sidebar ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {historyOpen && (
@@ -419,6 +496,18 @@ export default function HomePage() {
         <div className="flex min-h-full flex-col">
           {/* Top action bar — aligned with chat container */}
           <div className={`${CONTAINER} flex shrink-0 items-center justify-end py-3`}>
+            {/* Voice overlay toggle in empty state too */}
+            {sub?.is_active_pro && sub?.plan !== "starter" && (
+              <button
+                onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
+                title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
+              >
+                {voiceOverlayOn
+                  ? <Volume2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  : <VolumeX className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+              </button>
+            )}
             <button
               onClick={handleOpenHistory}
               className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
@@ -434,6 +523,13 @@ export default function HomePage() {
               <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
             </button>
           </div>
+
+          {/* Daily briefing card */}
+          {sub?.is_active_pro && (
+            <div className={`${CONTAINER} mb-2`}>
+              <DailyBriefingCard />
+            </div>
+          )}
 
           {/* Upgrade success banner */}
           {upgradeBanner && (
@@ -513,7 +609,7 @@ export default function HomePage() {
                   disabled={streaming}
                   externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
-                  onVoiceError={setVoiceError}
+                  onVoiceError={handleVoiceError}
                 />
               </div>
             </div>
@@ -535,6 +631,18 @@ export default function HomePage() {
           {/* Chat header bar — border spans full width, buttons align to container */}
           <div className="shrink-0 border-b border-white/[0.06]">
             <div className={`${CONTAINER} flex items-center justify-end gap-1 py-2`}>
+              {/* Voice overlay toggle — Pro/Premium only */}
+              {sub?.is_active_pro && sub?.plan !== "starter" && (
+                <button
+                  onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
+                  title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
+                >
+                  {voiceOverlayOn
+                    ? <Volume2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    : <VolumeX className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+                </button>
+              )}
               <button
                 onClick={handleOpenHistory}
                 disabled={streaming}
@@ -586,7 +694,7 @@ export default function HomePage() {
                 disabled={streaming}
                 externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
-                onVoiceError={setVoiceError}
+                onVoiceError={handleVoiceError}
               />
             </div>
           </div>

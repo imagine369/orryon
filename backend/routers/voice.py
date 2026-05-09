@@ -8,15 +8,25 @@ how we handle Grok chat completions and receipt vision.
 Endpoints:
     POST /api/voice/stt   (multipart "file")  → {"text": "..."}
     POST /api/voice/tts   (json {text, voice}) → audio/mpeg (MP3 bytes)
+    GET  /api/voice/usage                      → voice usage summary for the month
 
 Rate-limited per user (in-memory + Redis-backed bucket) and billed against the
 same monthly spend cap as chat so voice can't be used to sidestep quota.
+
+Voice minute caps (v2):
+    Starter  : 30 min / month
+    Pro/Trial: 150 min / month
+    Premium  : 350 min / month
+    Free     : 0 min   (voice gated by plan anyway)
+
+Users can purchase 60-minute top-ups ($6) via /api/voice/topup.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -25,10 +35,20 @@ from pydantic import BaseModel, Field
 
 from backend.auth import get_current_user
 from backend.cache import check_rate_limit_async
-from backend.deps import MONTHLY_SPEND_CAP_USD, require_active_plan
+from backend.deps import (
+    MONTHLY_SPEND_CAP_USD,
+    get_voice_limit_minutes,
+    require_active_plan,
+    resolve_plan_for_user,
+)
 from backend.signing import require_signed_request
 from config import XAI_API_KEY, ELEVENLABS_API_KEY
-from db import get_monthly_spend
+from db import (
+    get_monthly_spend,
+    get_voice_seconds_used,
+    get_voice_topup_minutes,
+    record_voice_seconds,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,32 +61,21 @@ _XAI_BASE = "https://api.x.ai/v1"
 _STT_URL = f"{_XAI_BASE}/stt"
 _TTS_URL = f"{_XAI_BASE}/tts"
 
-# ElevenLabs — used for orb/breathing voice only.
-# "Erin - Meditation Guide": soft, peaceful, purpose-built for guided meditation.
 _EL_BASE = "https://api.elevenlabs.io/v1"
 _EL_ORB_VOICE_ID = os.getenv("ELEVENLABS_ORB_VOICE_ID", "DKfKzHbGIi7qsCsZWN8G")
 _EL_MODEL = "eleven_multilingual_v2"
 
-# xAI STT has a single global model — it does NOT accept a `model` request
-# field (unlike OpenAI's Whisper API). Sending one returns 400.
-# Reference: https://docs.x.ai/developers/model-capabilities/audio/speech-to-text
-
-# Default voice for Orryon — `sal` ("smooth, balanced, versatile") of the five
-# xAI voices is the closest match to the voice direction brief in
-# docs/voice-direction.md: warm enough for breathing guidance, grounded enough
-# for finance. Overridable via env without a redeploy.
 _DEFAULT_VOICE = os.getenv("XAI_TTS_VOICE", "sal")
-
-# Default language — BCP-47 code. xAI requires this field on every TTS call
-# and uses it on STT to enable text formatting (numbers / currencies / units).
 _DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
 
-# Hard caps: 25 MB audio upload (≈ 15 min at 256 kbps), 4000 characters for TTS.
 _STT_MAX_BYTES = 25 * 1024 * 1024
 _TTS_MAX_CHARS = 4000
 
-# Common browser-produced audio mimetypes. xAI accepts most; we pass through.
 _STT_ALLOWED_MIME_PREFIXES = ("audio/", "video/webm", "video/mp4")
+
+# MP3 at 128 kbps ≈ 16 000 bytes/second — used to estimate audio duration from
+# raw byte count for both TTS output and STT input.
+_BYTES_PER_SECOND_ESTIMATE = 16_000
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -89,22 +98,35 @@ def _require_key() -> None:
 
 import re as _re
 
-# STT phonetic variants of "Orryon" that the model produces instead of the
-# correct spelling. Applied case-insensitively; preserves surrounding context.
 _ORRYON_VARIANTS = _re.compile(
     r"\b(orr?i[ao]n|or[iy][ao]n|ori[ao]n|oryon|ory[ao]n|orrian|orrion|or\s*yon)\b",
     _re.IGNORECASE,
 )
 
 def _fix_brand_names(text: str) -> str:
-    """Correct STT mis-transcriptions of the Orryon brand name."""
     return _ORRYON_VARIANTS.sub("Orryon", text)
 
 
+def _estimate_audio_seconds(byte_count: int) -> float:
+    """Rough duration estimate from raw byte count (MP3/WebM ≈ 128 kbps)."""
+    if byte_count <= 0:
+        return 0.0
+    return max(0.0, byte_count / _BYTES_PER_SECOND_ESTIMATE)
+
+
+def _get_voice_budget(uid: str) -> tuple[int, float, int]:
+    """Return (limit_minutes, seconds_used, topup_minutes) for uid this month."""
+    plan_info = resolve_plan_for_user(uid)
+    plan = plan_info["plan"]
+    limit_min = get_voice_limit_minutes(plan)
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    secs_used = get_voice_seconds_used(uid, month)
+    topup_min = get_voice_topup_minutes(uid, month)
+    return limit_min, secs_used, topup_min
+
+
 async def _enforce_voice_quota(uid: str, kind: str) -> None:
-    """Per-user + global rate limits; monthly spend cap shared with chat."""
-    # 20 voice calls/min per user, 600/hour globally. Tuned to prevent runaway costs
-    # if a client-side loop gets stuck holding the mic open.
+    """Per-user rate limits, monthly spend cap, and voice-minute cap."""
     if not await check_rate_limit_async(f"voice:{kind}:user:{uid}", limit=20, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many voice requests — please wait a moment.")
     if not await check_rate_limit_async(f"voice:{kind}:global", limit=600, window_seconds=3600):
@@ -113,6 +135,24 @@ async def _enforce_voice_quota(uid: str, kind: str) -> None:
 
     if get_monthly_spend(uid) >= MONTHLY_SPEND_CAP_USD:
         raise HTTPException(status_code=402, detail="You have reached your monthly usage limit. It resets on the 1st of next month.")
+
+    # Voice-minute cap check
+    limit_min, secs_used, topup_min = _get_voice_budget(uid)
+    total_limit_secs = (limit_min + topup_min) * 60
+    if limit_min > 0 and secs_used >= total_limit_secs:
+        mins_used = round(secs_used / 60, 1)
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "voice_limit_reached",
+                "message": (
+                    "You've used all your included voice minutes this month. "
+                    "Orryon has been talking with you a lot!"
+                ),
+                "minutes_used": mins_used,
+                "limit_minutes": limit_min + topup_min,
+            },
+        )
 
 
 # ── STT ───────────────────────────────────────────────────────────────────────
@@ -126,7 +166,7 @@ async def speech_to_text(
     """
     Transcribe an audio clip using xAI STT.
 
-    Body: multipart/form-data with field `file` (e.g. audio/webm, audio/mp4, audio/wav).
+    Body: multipart/form-data with field `file`.
     Returns: {"text": "transcribed words"}
     """
     _require_key()
@@ -143,12 +183,8 @@ async def speech_to_text(
     if not contents:
         raise HTTPException(status_code=400, detail="Empty audio upload.")
 
-    # xAI STT multipart shape: `language` + `format` first, then `file` last.
-    # The docs explicitly require `file` to be the final multipart field, and
-    # there is NO `model` parameter — the service has one global model.
-    # `format=true` + `language` turns on Inverse Text Normalization so numbers,
-    # currencies, and units come back as "$167" / "42 dollars" rather than
-    # spelled-out words, which materially improves the Orryon expense flow.
+    audio_seconds = _estimate_audio_seconds(len(contents))
+
     data = {"language": _DEFAULT_LANGUAGE, "format": "true"}
     files = {"file": (file.filename or "audio.webm", contents, mime)}
     headers = {"Authorization": f"Bearer {XAI_API_KEY}"}
@@ -164,9 +200,6 @@ async def speech_to_text(
         raise HTTPException(status_code=502, detail="Could not reach the voice service.")
 
     if resp.status_code >= 400:
-        # Log full upstream body so we can debug future API shape drift, but
-        # surface a terse, user-facing message that still distinguishes the
-        # main failure modes (auth vs. quota vs. unsupported audio).
         logger.error("xAI STT error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
         if resp.status_code == 401:
             raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
@@ -175,7 +208,6 @@ async def speech_to_text(
         if resp.status_code == 429:
             raise HTTPException(status_code=429, detail="Voice service is busy — please try again in a moment.")
         if resp.status_code == 400:
-            # Most commonly: unsupported audio format for whatever the browser recorded.
             raise HTTPException(status_code=400, detail="Couldn't process that recording — try again.")
         raise HTTPException(status_code=502, detail="Transcription failed. Please try again.")
 
@@ -184,6 +216,9 @@ async def speech_to_text(
     except Exception:
         logger.error("xAI STT returned non-JSON for user=%s: %s", uid, resp.text[:500])
         raise HTTPException(status_code=502, detail="Voice service returned an unexpected response.")
+
+    # Record usage only on success
+    record_voice_seconds(uid, audio_seconds)
 
     text = _fix_brand_names((body.get("text") or body.get("transcript") or "").strip())
     return {"text": text}
@@ -213,8 +248,6 @@ async def text_to_speech(
 
     voice = (body.voice or _DEFAULT_VOICE).strip() or _DEFAULT_VOICE
 
-    # xAI TTS payload shape per docs.x.ai/developers/model-capabilities/audio/text-to-speech
-    # (`text` / `voice_id` / `language`, not the OpenAI-compatible `input` / `voice` / `format`).
     payload = {
         "text": text,
         "voice_id": voice,
@@ -239,9 +272,63 @@ async def text_to_speech(
         logger.error("xAI TTS error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
         raise HTTPException(status_code=502, detail="Voice synthesis failed. Please try again.")
 
-    # Stream audio bytes straight back to the client.
+    # Record usage from actual audio byte size
+    audio_seconds = _estimate_audio_seconds(len(resp.content))
+    record_voice_seconds(uid, audio_seconds)
+
     audio_type = resp.headers.get("content-type", "audio/mpeg")
     return Response(content=resp.content, media_type=audio_type)
+
+
+# ── Voice Usage ───────────────────────────────────────────────────────────────
+
+@router.get("/api/voice/usage")
+async def get_voice_usage(user: dict = Depends(get_current_user)) -> dict:
+    """
+    Return the current user's voice minute usage for this month.
+
+    Response:
+        {
+            "seconds_used": 4920.5,
+            "minutes_used": 82.0,
+            "limit_minutes": 150,
+            "topup_minutes": 0,
+            "total_available_minutes": 150,
+            "remaining_minutes": 68.0,
+            "plan": "pro",
+            "reset_date": "2026-06-01"
+        }
+    """
+    uid = user["user_id"]
+    plan_info = resolve_plan_for_user(uid)
+    plan = plan_info["plan"]
+    limit_min = get_voice_limit_minutes(plan)
+
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    secs_used = get_voice_seconds_used(uid, month)
+    topup_min = get_voice_topup_minutes(uid, month)
+
+    total_available = limit_min + topup_min
+    mins_used = round(secs_used / 60, 1)
+    remaining = max(0.0, round(total_available - mins_used, 1))
+
+    # First day of next month as reset date
+    y, m = int(month[:4]), int(month[5:7])
+    if m == 12:
+        reset_date = f"{y + 1}-01-01"
+    else:
+        reset_date = f"{y}-{m + 1:02d}-01"
+
+    return {
+        "seconds_used": round(secs_used, 1),
+        "minutes_used": mins_used,
+        "limit_minutes": limit_min,
+        "topup_minutes": topup_min,
+        "total_available_minutes": total_available,
+        "remaining_minutes": remaining,
+        "plan": plan,
+        "reset_date": reset_date,
+    }
 
 
 # ── Orb TTS (ElevenLabs — Erin, Meditation Guide) ────────────────────────────
@@ -255,8 +342,9 @@ async def orb_text_to_speech(
     """
     Synthesize orb / breathing cues using ElevenLabs Erin (Meditation Guide).
 
-    Falls back to xAI TTS (eve voice) if ELEVENLABS_API_KEY is not configured,
-    so the orb still works during local dev without an ElevenLabs key.
+    Falls back to xAI TTS (eve voice) if ELEVENLABS_API_KEY is not configured.
+    Orb TTS is NOT counted against voice-minute caps — it's part of the
+    wellness experience, not the chat assistant.
 
     Body: {"text": "Breathe in."}
     Returns: audio/mpeg (MP3 bytes)
@@ -275,9 +363,6 @@ async def orb_text_to_speech(
             "text": text,
             "model_id": _EL_MODEL,
             "voice_settings": {
-                # High stability = consistent, calm tone across every cue.
-                # Low style exaggeration = no dramatic flourishes.
-                # Speed slightly below 1.0 = unhurried, meditative pace.
                 "stability": 0.82,
                 "similarity_boost": 0.75,
                 "style": 0.0,

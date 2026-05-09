@@ -22,12 +22,27 @@ import {
   ExternalLink,
   FileText,
   Heart,
+  Mic,
+  Brain,
+  Activity,
+  MapPin,
+  Sunrise,
+  CheckCircle2,
+  Accessibility,
+  Trash2,
+  Plus,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
+import { useVoiceUsage, startVoiceTopup } from "@/lib/use-voice-usage";
+import { VoiceUsageMeter } from "@/components/voice-usage-meter";
 import { InstallButton } from "@/components/install-prompt";
+import { usePreferences } from "@/lib/use-preferences";
+import { useChatUsage } from "@/lib/use-chat-usage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +82,13 @@ type View =
   | "notifications"
   | "financial"
   | "subscription"
-  | "app";
+  | "app"
+  | "memory"
+  | "health"
+  | "location"
+  | "briefing"
+  | "approvals"
+  | "accessibility";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -149,6 +170,12 @@ const VIEW_TITLES: Record<string, string> = {
   financial: "Financial Preferences",
   subscription: "Subscription",
   app: "App",
+  memory: "Memory",
+  health: "Health",
+  location: "My Places",
+  briefing: "Daily Briefing",
+  approvals: "Approvals",
+  accessibility: "Accessibility",
 };
 
 function parentOf(view: View): View {
@@ -260,6 +287,9 @@ export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
   const { sub } = useSubscription();
+  const { usage: voiceUsage, isAtLimit: voiceAtLimit } = useVoiceUsage();
+  const { prefs, update: updatePrefs } = usePreferences();
+  const { usage: chatUsage } = useChatUsage();
   const isOpen = openPanel === "settings";
 
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -461,12 +491,75 @@ export function SettingsPanel() {
             onClick={() => setView("subscription")}
           />
         )}
+        {voiceUsage && sub?.is_active_pro && (
+          <NavItem
+            icon={<Mic className="h-5 w-5" strokeWidth={1.5} />}
+            title="Voice minutes"
+            description={
+              voiceAtLimit
+                ? "All included minutes used · Add more"
+                : `${Math.round(voiceUsage.minutes_used)} / ${voiceUsage.total_available_minutes} min used`
+            }
+            onClick={() => setView("subscription")}
+          />
+        )}
         <NavItem
           icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
           title="App"
           description="Install Orryon on your device"
           onClick={() => setView("app")}
         />
+
+        {/* ── Separator ── */}
+        {sub?.is_active_pro && (
+          <div className="my-3 border-t border-white/[0.04]" />
+        )}
+
+        {/* ── AI & intelligence ── */}
+        {sub?.is_active_pro && (
+          <>
+            <NavItem
+              icon={<Brain className="h-5 w-5" strokeWidth={1.5} />}
+              title="Memory"
+              description="What Orryon knows about you"
+              onClick={() => setView("memory")}
+            />
+            <NavItem
+              icon={<Activity className="h-5 w-5" strokeWidth={1.5} />}
+              title="Health"
+              description="Vitals, medications, and appointments"
+              onClick={() => setView("health")}
+            />
+            <NavItem
+              icon={<MapPin className="h-5 w-5" strokeWidth={1.5} />}
+              title="My Places"
+              description="Home, work, and commute"
+              onClick={() => setView("location")}
+            />
+            <NavItem
+              icon={<Sunrise className="h-5 w-5" strokeWidth={1.5} />}
+              title="Daily Briefing"
+              description="Morning summary preferences"
+              onClick={() => setView("briefing")}
+            />
+            <NavItem
+              icon={<CheckCircle2 className="h-5 w-5" strokeWidth={1.5} />}
+              title="Approvals"
+              description="Pending AI actions awaiting your approval"
+              onClick={() => setView("approvals")}
+            />
+          </>
+        )}
+
+        {/* ── Accessibility ── */}
+        {sub?.is_active_pro && (
+          <NavItem
+            icon={<Accessibility className="h-5 w-5" strokeWidth={1.5} />}
+            title="Accessibility"
+            description="Golden Mode, font size, animations"
+            onClick={() => setView("accessibility")}
+          />
+        )}
       </div>
 
       {/* Help Center link */}
@@ -994,6 +1087,25 @@ export function SettingsPanel() {
             </span>
           }
         />
+        {/* Voice minute usage meter */}
+        {voiceUsage && sub.is_active_pro && (
+          <div className="px-3 py-3 border-b border-white/5">
+            <VoiceUsageMeter usage={voiceUsage} variant="full" />
+            {voiceAtLimit && (
+              <button
+                onClick={async () => {
+                  try { await startVoiceTopup(); } catch { /* handled inside */ }
+                }}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white/80
+                  border border-white/10 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] transition"
+              >
+                <Mic className="h-4 w-4" strokeWidth={1.5} />
+                Add 60 minutes · $6.00
+              </button>
+            )}
+          </div>
+        )}
+
         {sub.plan === "pro" && (
           <div className="px-3 py-3">
             <button
@@ -1060,6 +1172,28 @@ export function SettingsPanel() {
     </div>
   );
 
+  // ── Memory view ─────────────────────────────────────────────────────────────
+  const renderMemory = () => <MemoryView />;
+
+  // ── Health view ─────────────────────────────────────────────────────────────
+  const renderHealth = () => <HealthView />;
+
+  // ── Location view ───────────────────────────────────────────────────────────
+  const renderLocation = () => <LocationView />;
+
+  // ── Briefing view ───────────────────────────────────────────────────────────
+  const renderBriefing = () => (
+    <BriefingView prefs={prefs} onUpdate={updatePrefs} />
+  );
+
+  // ── Approvals view ──────────────────────────────────────────────────────────
+  const renderApprovals = () => <ApprovalsView />;
+
+  // ── Accessibility view ──────────────────────────────────────────────────────
+  const renderAccessibility = () => (
+    <AccessibilityView prefs={prefs} onUpdate={updatePrefs} sub={sub} />
+  );
+
   const renderView = () => {
     switch (view) {
       case "security-access": return renderSecurityAccess();
@@ -1072,6 +1206,12 @@ export function SettingsPanel() {
       case "financial": return renderFinancial();
       case "subscription": return renderSubscription();
       case "app": return renderApp();
+      case "memory": return renderMemory();
+      case "health": return renderHealth();
+      case "location": return renderLocation();
+      case "briefing": return renderBriefing();
+      case "approvals": return renderApprovals();
+      case "accessibility": return renderAccessibility();
       default: return renderMainMenu();
     }
   };
@@ -1155,5 +1295,363 @@ export function SettingsPanel() {
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+// ── Memory View ──────────────────────────────────────────────────────────────
+
+interface MemoryFact { id: string; fact: string; category: string; created_at: string; }
+
+function MemoryView() {
+  const [facts, setFacts] = useState<MemoryFact[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get<{ facts: MemoryFact[]; count: number; cap: number }>("/api/memory")
+      .then((d) => { setFacts(d.facts); setCount(d.count); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const forget = async (id: string) => {
+    setFacts((p) => p.filter((f) => f.id !== id));
+    setCount((c) => c - 1);
+    try { await api.delete(`/api/memory/${id}`); } catch { /* non-fatal */ }
+  };
+
+  if (loading) return <div className="py-8 flex justify-center"><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/50" /></div>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-white/35 leading-relaxed">
+        Orryon remembers facts about you across conversations to give personalised advice.
+        You can remove any fact at any time.
+      </p>
+      <div className="flex items-center justify-between text-xs text-white/30">
+        <span>{count} facts stored</span>
+        {count >= 50 && <span className="text-amber-400/70">Starter cap: 50 facts</span>}
+      </div>
+      {facts.length === 0 && (
+        <p className="py-6 text-center text-sm text-white/20">No memories stored yet.</p>
+      )}
+      {facts.map((f) => (
+        <div key={f.id} className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-white/70 leading-relaxed">{f.fact}</p>
+            <p className="text-[0.65rem] text-white/25 mt-1 uppercase tracking-wide">{f.category}</p>
+          </div>
+          <button
+            onClick={() => forget(f.id)}
+            className="shrink-0 text-white/20 hover:text-red-400/70 transition p-1"
+            title="Forget this"
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Health View ───────────────────────────────────────────────────────────────
+
+interface Medication { id: string; name: string; dose: string; frequency: string; next_dose_at: string; }
+interface Appointment { id: string; type: string; provider: string; date: string; location: string; }
+
+function HealthView() {
+  const [meds, setMeds] = useState<Medication[]>([]);
+  const [appts, setAppts] = useState<Appointment[]>([]);
+  const [addingMed, setAddingMed] = useState(false);
+  const [medName, setMedName] = useState("");
+  const [medDose, setMedDose] = useState("");
+
+  useEffect(() => {
+    api.get<{ medications: Medication[] }>("/api/health/medications").then((d) => setMeds(d.medications)).catch(() => {});
+    api.get<{ appointments: Appointment[] }>("/api/health/appointments?upcoming=true").then((d) => setAppts(d.appointments)).catch(() => {});
+  }, []);
+
+  const addMed = async () => {
+    if (!medName.trim()) return;
+    try {
+      const row = await api.post<Medication>("/api/health/medications", { name: medName.trim(), dose: medDose.trim() });
+      setMeds((p) => [...p, row]);
+      setMedName(""); setMedDose(""); setAddingMed(false);
+    } catch { /* non-fatal */ }
+  };
+
+  const removeMed = async (id: string) => {
+    setMeds((p) => p.filter((m) => m.id !== id));
+    try { await api.delete(`/api/health/medications/${id}`); } catch { /* non-fatal */ }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Medications */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Medications</p>
+          <button onClick={() => setAddingMed((v) => !v)} className="text-white/30 hover:text-white/60 transition">
+            <Plus className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+        </div>
+        {addingMed && (
+          <div className="mb-3 space-y-2 rounded-xl border border-white/[0.07] p-3">
+            <input autoFocus value={medName} onChange={(e) => setMedName(e.target.value)}
+              placeholder="Medication name" className="w-full bg-transparent text-sm text-white/80 placeholder:text-white/25 outline-none border-b border-white/10 pb-1" />
+            <input value={medDose} onChange={(e) => setMedDose(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addMed()}
+              placeholder="Dose (e.g. 10mg daily)" className="w-full bg-transparent text-sm text-white/80 placeholder:text-white/25 outline-none border-b border-white/10 pb-1" />
+            <div className="flex gap-2 pt-1">
+              <button onClick={addMed} className="px-3 py-1.5 bg-white text-black text-xs font-semibold rounded-lg">Save</button>
+              <button onClick={() => setAddingMed(false)} className="px-3 py-1.5 text-xs text-white/30 hover:text-white/60 transition">Cancel</button>
+            </div>
+          </div>
+        )}
+        {meds.length === 0 && !addingMed && <p className="text-sm text-white/20 py-3">No medications added.</p>}
+        {meds.map((m) => (
+          <div key={m.id} className="flex items-center gap-3 py-2.5 border-b border-white/[0.04]">
+            <div className="flex-1">
+              <p className="text-sm text-white/75">{m.name}</p>
+              {m.dose && <p className="text-xs text-white/30 mt-0.5">{m.dose}</p>}
+            </div>
+            <button onClick={() => removeMed(m.id)} className="text-white/15 hover:text-red-400/70 transition p-1">
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Upcoming appointments */}
+      <div>
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-2">Upcoming Appointments</p>
+        {appts.length === 0 && <p className="text-sm text-white/20">No upcoming appointments.</p>}
+        {appts.map((a) => (
+          <div key={a.id} className="py-2.5 border-b border-white/[0.04]">
+            <p className="text-sm text-white/75">{a.provider || a.type || "Appointment"}</p>
+            <p className="text-xs text-white/30 mt-0.5">{a.date}{a.location ? ` · ${a.location}` : ""}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Location View ─────────────────────────────────────────────────────────────
+
+interface Place { id: string; label: string; address: string; }
+
+function LocationView() {
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState("");
+  const [address, setAddress] = useState("");
+
+  useEffect(() => {
+    api.get<{ places: Place[] }>("/api/location/places").then((d) => setPlaces(d.places)).catch(() => {});
+  }, []);
+
+  const addPlace = async () => {
+    if (!label.trim()) return;
+    try {
+      const row = await api.post<Place>("/api/location/places", { label: label.trim(), address: address.trim() });
+      setPlaces((p) => [...p, row]);
+      setLabel(""); setAddress(""); setAdding(false);
+    } catch { /* non-fatal */ }
+  };
+
+  const removePlace = async (id: string) => {
+    setPlaces((p) => p.filter((pl) => pl.id !== id));
+    try { await api.delete(`/api/location/places/${id}`); } catch { /* non-fatal */ }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-white/35 leading-relaxed">
+        Save places Orryon should know about — home, work, gym. No live GPS tracking.
+      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Places</p>
+        <button onClick={() => setAdding((v) => !v)} className="text-white/30 hover:text-white/60 transition">
+          <Plus className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      </div>
+      {adding && (
+        <div className="space-y-2 rounded-xl border border-white/[0.07] p-3">
+          <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label (e.g. Home, Work)" className="w-full bg-transparent text-sm text-white/80 placeholder:text-white/25 outline-none border-b border-white/10 pb-1" />
+          <input value={address} onChange={(e) => setAddress(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPlace()}
+            placeholder="Address (optional)" className="w-full bg-transparent text-sm text-white/80 placeholder:text-white/25 outline-none border-b border-white/10 pb-1" />
+          <div className="flex gap-2 pt-1">
+            <button onClick={addPlace} className="px-3 py-1.5 bg-white text-black text-xs font-semibold rounded-lg">Save</button>
+            <button onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs text-white/30 hover:text-white/60 transition">Cancel</button>
+          </div>
+        </div>
+      )}
+      {places.length === 0 && !adding && <p className="text-sm text-white/20">No places saved yet.</p>}
+      {places.map((pl) => (
+        <div key={pl.id} className="flex items-center gap-3 py-2.5 border-b border-white/[0.04]">
+          <MapPin className="h-4 w-4 text-white/25 shrink-0" strokeWidth={1.5} />
+          <div className="flex-1">
+            <p className="text-sm text-white/75">{pl.label}</p>
+            {pl.address && <p className="text-xs text-white/30 mt-0.5">{pl.address}</p>}
+          </div>
+          <button onClick={() => removePlace(pl.id)} className="text-white/15 hover:text-red-400/70 transition p-1">
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Briefing View ─────────────────────────────────────────────────────────────
+
+const BRIEFING_SECTIONS = [
+  { key: "finance",  label: "Finances" },
+  { key: "health",   label: "Health & medications" },
+  { key: "calendar", label: "Calendar & events" },
+  { key: "goals",    label: "Goals progress" },
+];
+
+const BRIEFING_TIMES = ["06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00"];
+
+function BriefingView({ prefs, onUpdate }: { prefs: ReturnType<typeof usePreferences>["prefs"]; onUpdate: ReturnType<typeof usePreferences>["update"]; }) {
+  const includes = (prefs.briefing_includes || "finance,health,calendar,goals").split(",");
+
+  const toggleSection = (key: string) => {
+    const next = includes.includes(key) ? includes.filter((k) => k !== key) : [...includes, key];
+    onUpdate({ briefing_includes: next.join(",") });
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Briefing time</p>
+        <div className="grid grid-cols-3 gap-2">
+          {BRIEFING_TIMES.map((t) => (
+            <button
+              key={t}
+              onClick={() => onUpdate({ briefing_time: t })}
+              className={`py-2 rounded-xl text-xs font-medium transition border ${prefs.briefing_time === t ? "border-white/20 bg-white/10 text-white/90" : "border-white/[0.06] bg-white/[0.03] text-white/35 hover:bg-white/[0.06]"}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Include in briefing</p>
+        {BRIEFING_SECTIONS.map(({ key, label }) => (
+          <div key={key} className="flex items-center justify-between py-3 border-b border-white/[0.04]">
+            <p className="text-sm text-white/70">{label}</p>
+            <button
+              onClick={() => toggleSection(key)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includes.includes(key) ? "bg-white/80" : "bg-white/10"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${includes.includes(key) ? "translate-x-4" : "translate-x-0"}`} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Approvals View ────────────────────────────────────────────────────────────
+
+interface Approval { id: string; action_type: string; description: string; created_at: string; status: string; }
+
+function ApprovalsView() {
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    api.get<{ approvals: Approval[] }>("/api/approvals").then((d) => setApprovals(d.approvals)).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const resolve = async (id: string, action: "approve" | "reject") => {
+    setApprovals((p) => p.filter((a) => a.id !== id));
+    try { await api.post(`/api/approvals/${id}/${action}`, {}); } catch { /* non-fatal */ }
+  };
+
+  if (loading) return <div className="py-8 flex justify-center"><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/50" /></div>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-white/35 leading-relaxed">
+        Sensitive actions Orryon wants to take on your behalf require your explicit approval.
+      </p>
+      {approvals.length === 0 && <p className="py-6 text-center text-sm text-white/20">No pending approvals.</p>}
+      {approvals.map((a) => (
+        <div key={a.id} className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 space-y-3">
+          <div>
+            <p className="text-xs text-white/30 uppercase tracking-wider mb-1">{a.action_type.replace(/_/g, " ")}</p>
+            <p className="text-sm text-white/75 leading-relaxed">{a.description}</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => resolve(a.id, "approve")} className="flex-1 py-2 rounded-xl bg-white/10 text-sm text-white/80 hover:bg-white/[0.15] transition font-medium">Approve</button>
+            <button onClick={() => resolve(a.id, "reject")} className="flex-1 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/35 hover:text-white/55 transition">Reject</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Accessibility View ────────────────────────────────────────────────────────
+
+function AccessibilityView({ prefs, onUpdate, sub }: {
+  prefs: ReturnType<typeof usePreferences>["prefs"];
+  onUpdate: ReturnType<typeof usePreferences>["update"];
+  sub: ReturnType<typeof useSubscription>["sub"];
+}) {
+  const isPro = sub?.is_active_pro && sub?.plan !== "starter";
+
+  return (
+    <div className="space-y-4">
+      {/* Golden Mode */}
+      <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
+        <div>
+          <p className="text-sm text-white/80 font-medium">Golden Mode</p>
+          <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
+            Larger text, higher contrast, bigger tap targets, slower animations.
+            Designed for comfort.
+          </p>
+        </div>
+        <button
+          onClick={() => onUpdate({ golden_mode_enabled: !prefs.golden_mode_enabled })}
+          className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 mt-0.5 ${prefs.golden_mode_enabled ? "bg-white/80" : "bg-white/10"}`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.golden_mode_enabled ? "translate-x-4" : "translate-x-0"}`} />
+        </button>
+      </div>
+
+      {/* Voice overlay */}
+      {isPro && (
+        <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
+          <div>
+            <p className="text-sm text-white/80 font-medium">Speak responses aloud</p>
+            <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
+              Orryon reads every response out loud. Text is always shown too.
+              Uses voice minutes.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdate({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
+            className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 mt-0.5 ${prefs.voice_overlay_enabled ? "bg-white/80" : "bg-white/10"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.voice_overlay_enabled ? "translate-x-4" : "translate-x-0"}`} />
+          </button>
+        </div>
+      )}
+
+      {!isPro && (
+        <p className="text-xs text-white/25 leading-relaxed">
+          Voice responses (TTS) are available on Pro and Premium plans.
+        </p>
+      )}
+    </div>
   );
 }

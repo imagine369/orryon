@@ -285,6 +285,8 @@ async def run_orryon_stream(
     chat_history: list[dict] | None = None,
     user_name: str = "there",
     session_id: str = "",
+    tier: str = "pro",
+    mode: str = "adult",
 ) -> AsyncGenerator[dict, None]:
     """
     Async streaming generator that yields events as orryon processes a message.
@@ -302,7 +304,7 @@ async def run_orryon_stream(
         yield {"type": "error", "message": "Grok API key not set."}
         return
 
-    system_prompt = get_system_prompt(user_name=user_name)
+    system_prompt = get_system_prompt(user_name=user_name, tier=tier, mode=mode)
     memories = _get_user_memories(user_id)
     messages = _build_messages(system_prompt, chat_history or [], user_message, user_id, memories)
 

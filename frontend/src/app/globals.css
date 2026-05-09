@@ -195,3 +195,37 @@
     transform: scaleY(1);
   }
 }
+/* ── Golden Mode — larger, higher-contrast, calmer ── */
+html.golden-mode {
+  font-size: 18px;
+}
+
+html.golden-mode body {
+  letter-spacing: 0.01em;
+}
+
+/* Larger tap targets */
+html.golden-mode button,
+html.golden-mode a,
+html.golden-mode [role="button"] {
+  min-height: 52px;
+  min-width: 52px;
+}
+
+/* Higher contrast text */
+html.golden-mode .text-white\/40,
+html.golden-mode .text-white\/35,
+html.golden-mode .text-white\/30 {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+html.golden-mode .text-white\/50,
+html.golden-mode .text-white\/45 {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Slower, gentler animations */
+html.golden-mode * {
+  transition-duration: 300ms !important;
+  animation-duration: 600ms !important;
+}

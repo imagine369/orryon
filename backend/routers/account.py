@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import check_rate_limit_async
@@ -33,6 +34,9 @@ from db import (
     create_verification_code,
     get_connection,
     get_monthly_spend,
+    get_user_preferences,
+    upsert_user_preferences,
+    get_chat_message_count,
     insert_row,
     record_token_spend,
     update_row,
@@ -531,6 +535,92 @@ async def billing_portal(user: dict = Depends(require_active_plan)):
     return {"portal_url": portal.url}
 
 
+# ── Voice Top-up ──────────────────────────────────────────────────────────────
+
+@router.post("/api/voice/topup")
+async def create_voice_topup_checkout(
+    request: Request,
+    user: dict = Depends(require_active_plan),
+) -> dict:
+    """
+    Create a Stripe Checkout session for a one-time voice-minute top-up.
+
+    Purchases 60 minutes for $6.00. On success Stripe sends a
+    `checkout.session.completed` webhook which credits the minutes.
+
+    Returns: {"checkout_url": "https://checkout.stripe.com/..."}
+    """
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+    from backend.deps import VOICE_TOPUP_MINUTES, VOICE_TOPUP_PRICE_CENTS
+
+    if not STRIPE_ENABLED:
+        raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed. Run: pip install stripe")
+
+    uid = user["user_id"]
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not row:
+        raise HTTPException(404, "User not found")
+    row = dict(row)
+
+    frontend_url = os.getenv("FRONTEND_URL", os.getenv("APP_URL", "http://localhost:3000"))
+    success_url = _validate_stripe_return_url(
+        f"{frontend_url}/home?voice_topup=success", "success_url"
+    )
+    cancel_url = _validate_stripe_return_url(f"{frontend_url}/home", "cancel_url")
+
+    try:
+        customer_id = row.get("stripe_customer_id") or ""
+        if not customer_id:
+            customer = stripe_lib.Customer.create(
+                email=row["email"],
+                metadata={"user_id": uid},
+            )
+            customer_id = customer.id
+            with get_connection() as conn:
+                conn.execute(
+                    "UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, uid)
+                )
+                conn.commit()
+
+        session = stripe_lib.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": VOICE_TOPUP_PRICE_CENTS,
+                    "product_data": {
+                        "name": f"{VOICE_TOPUP_MINUTES} Voice Minutes",
+                        "description": (
+                            f"Add {VOICE_TOPUP_MINUTES} voice minutes to your Orryon account. "
+                            "Minutes are added instantly after payment."
+                        ),
+                    },
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": uid,
+                "topup_type": "voice_topup",
+                "minutes": str(VOICE_TOPUP_MINUTES),
+            },
+        )
+    except Exception as exc:
+        logger.exception("Voice topup checkout failed for user=%s: %s", uid, exc)
+        raise HTTPException(502, "Could not create checkout session. Please try again.")
+
+    return {"checkout_url": session.url}
+
+
 @router.post("/api/stripe/webhook")
 async def stripe_webhook(request: Request):
     """Stripe webhook handler — no auth required (validated via Stripe signature)."""
@@ -560,15 +650,29 @@ async def stripe_webhook(request: Request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        user_id = session.get("metadata", {}).get("user_id")
-        sub_id = session.get("subscription")
-        if user_id and sub_id:
-            with get_connection() as conn:
-                conn.execute(
-                    "UPDATE users SET plan='pro', stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
-                    (sub_id, user_id),
-                )
-                conn.commit()
+        meta = session.get("metadata", {})
+        user_id = meta.get("user_id")
+        topup_type = meta.get("topup_type")
+
+        if topup_type == "voice_topup" and user_id:
+            # One-time voice minute top-up
+            from db import add_voice_topup
+            from backend.deps import VOICE_TOPUP_PRICE_USD
+            minutes = int(meta.get("minutes", 60))
+            pi_id = session.get("payment_intent", "")
+            add_voice_topup(user_id, minutes, VOICE_TOPUP_PRICE_USD, pi_id or "")
+            logger.info("Voice topup: +%d min for user=%s (pi=%s)", minutes, user_id, pi_id)
+
+        else:
+            # Regular subscription checkout
+            sub_id = session.get("subscription")
+            if user_id and sub_id:
+                with get_connection() as conn:
+                    conn.execute(
+                        "UPDATE users SET plan='pro', stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
+                        (sub_id, user_id),
+                    )
+                    conn.commit()
 
     elif event["type"] in ("customer.subscription.deleted", "customer.subscription.paused"):
         sub = event["data"]["object"]
@@ -601,3 +705,52 @@ async def stripe_webhook(request: Request):
         logger.warning("Payment failed for customer %s (attempt %d)", customer_id, attempt)
 
     return {"received": True}
+
+
+# ── User preferences (voice overlay, golden mode, onboarding) ─────────────────
+
+class PrefsReq(BaseModel):
+    voice_overlay_enabled: int | None = None
+    golden_mode_enabled: int | None = None
+    briefing_time: str | None = None
+    briefing_includes: str | None = None
+    onboarding_complete: int | None = None
+
+
+@router.get("/api/preferences")
+async def get_prefs(user: dict = Depends(get_current_user)):
+    prefs = get_user_preferences(user["user_id"])
+    return {
+        "voice_overlay_enabled": bool(prefs.get("voice_overlay_enabled", 0)),
+        "golden_mode_enabled": bool(prefs.get("golden_mode_enabled", 0)),
+        "briefing_time": prefs.get("briefing_time", "07:00"),
+        "briefing_includes": prefs.get("briefing_includes", "finance,health,calendar,goals"),
+        "onboarding_complete": bool(prefs.get("onboarding_complete", 0)),
+    }
+
+
+@router.patch("/api/preferences")
+async def update_prefs(body: PrefsReq, user: dict = Depends(get_current_user)):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if updates:
+        upsert_user_preferences(user["user_id"], updates)
+    return {"updated": True}
+
+
+# ── Chat usage summary ────────────────────────────────────────────────────────
+
+@router.get("/api/chat/usage")
+async def chat_usage(user: dict = Depends(get_current_user)):
+    from backend.deps import get_chat_limit
+    conn = get_connection()
+    user_row = conn.execute("SELECT plan FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    conn.close()
+    plan = (user_row["plan"] if user_row else None) or "free"
+    count = get_chat_message_count(user["user_id"])
+    limit = get_chat_limit(plan)
+    return {
+        "messages_used": count,
+        "limit": limit,
+        "unlimited": limit == -1,
+        "plan": plan,
+    }

@@ -23,15 +23,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from backend.deps import MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT, check_rate_limit, require_active_plan, resolve_plan_for_user
+from backend.deps import (
+    MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT,
+    check_rate_limit, check_chat_quota,
+    require_active_plan, resolve_plan_for_user,
+)
 from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_current_user
 from backend.signing import require_signed_request
 from backend.schemas import ChatReq
 from db import (
     create_chat_session,
     delete_chat_session,
+    get_chat_message_count,
     get_connection,
     get_monthly_spend,
+    get_user_preferences,
+    increment_chat_message_count,
     list_chat_sessions,
     load_chat_history,
     record_token_spend,
@@ -60,6 +67,24 @@ def _get_display_name(uid: str) -> str:
     return row["display_name"] if row else "there"
 
 
+def _get_user_context(uid: str) -> dict:
+    """Return user plan, segment, display_name, and preferences in one pass."""
+    conn = get_connection()
+    user_row = conn.execute("SELECT plan, segment, display_name FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
+    prefs = get_user_preferences(uid)
+    if not user_row:
+        return {"plan": "free", "segment": "", "display_name": "there",
+                "voice_overlay": False, "golden_mode": False}
+    return {
+        "plan": user_row["plan"] or "free",
+        "segment": user_row["segment"] or "",
+        "display_name": user_row["display_name"] or "there",
+        "voice_overlay": bool(prefs.get("voice_overlay_enabled", 0)),
+        "golden_mode": bool(prefs.get("golden_mode_enabled", 0)),
+    }
+
+
 # ── SSE transport ─────────────────────────────────────────────────────────────
 
 @router.post("/api/chat")
@@ -81,12 +106,16 @@ async def chat_stream(
     if not message:
         raise HTTPException(400, "Empty message")
 
+    ctx = _get_user_context(uid)
+    # Enforce monthly chat message quota before processing
+    check_chat_quota(uid, ctx["plan"])
+
     session_id, auto_created = _resolve_session(uid, body.session_id or "")
-    display_name = _get_display_name(uid)
 
     history = load_chat_history(uid, session_id=session_id)
     user_msg = {"role": "user", "content": message, "created_at": datetime.now(timezone.utc).isoformat()}
     save_chat_message(uid, user_msg, session_id=session_id)
+    increment_chat_message_count(uid)
 
     async def event_generator():
         if auto_created:
@@ -106,8 +135,10 @@ async def chat_stream(
                 user_message=message,
                 user_id=uid,
                 chat_history=history,
-                user_name=display_name or "there",
+                user_name=ctx["display_name"],
                 session_id=session_id,
+                tier=ctx["plan"],
+                mode="golden" if ctx["golden_mode"] else "adult",
             ):
                 if event["type"] == "token":
                     full_text += event["content"]
@@ -129,6 +160,8 @@ async def chat_stream(
                             usage.get("prompt_tokens", 0),
                             usage.get("completion_tokens", 0),
                         )
+                    # Attach voice_overlay flag so the frontend knows to trigger TTS
+                    event["voice_overlay"] = ctx["voice_overlay"]
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "error":
                     yield f"data: {json.dumps(event)}\n\n"
@@ -208,9 +241,15 @@ async def chat_ws(ws: WebSocket):
                 await ws.send_json({"type": "error", "message": exc.detail})
                 continue
 
+            ctx = _get_user_context(uid)
+            try:
+                check_chat_quota(uid, ctx["plan"])
+            except HTTPException as exc:
+                await ws.send_json({"type": "error", "message": exc.detail if isinstance(exc.detail, str) else exc.detail.get("message", "Chat limit reached.")})
+                continue
+
             req_session_id = data.get("session_id") or ""
             session_id, auto_created = _resolve_session(uid, req_session_id)
-            display_name = _get_display_name(uid)
 
             if auto_created:
                 await ws.send_json({"type": "session", "session_id": session_id})
@@ -223,6 +262,7 @@ async def chat_ws(ws: WebSocket):
             history = load_chat_history(uid, session_id=session_id)
             user_msg = {"role": "user", "content": message, "created_at": datetime.now(timezone.utc).isoformat()}
             save_chat_message(uid, user_msg, session_id=session_id)
+            increment_chat_message_count(uid)
 
             from core.grok_agent import run_orryon_stream
 
@@ -232,8 +272,10 @@ async def chat_ws(ws: WebSocket):
                     user_message=message,
                     user_id=uid,
                     chat_history=history,
-                    user_name=display_name or "there",
+                    user_name=ctx["display_name"],
                     session_id=session_id,
+                    tier=ctx["plan"],
+                    mode="golden" if ctx["golden_mode"] else "adult",
                 ):
                     if event["type"] == "token":
                         full_text += event["content"]
@@ -248,6 +290,7 @@ async def chat_ws(ws: WebSocket):
                         usage = event.get("usage") or {}
                         if usage.get("prompt_tokens") or usage.get("completion_tokens"):
                             record_token_spend(uid, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+                        event["voice_overlay"] = ctx["voice_overlay"]
                     await ws.send_json(event)
             except Exception as exc:
                 logger.error("WS chat error: %s", exc, exc_info=True)
