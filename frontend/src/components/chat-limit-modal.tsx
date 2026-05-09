@@ -62,7 +62,12 @@ export function ChatLimitModal({
 
             <p className="text-sm text-white/50 leading-relaxed mb-5">
               You&apos;ve reached your {plan.charAt(0).toUpperCase() + plan.slice(1)} plan limit
-              for this month. Upgrade to Pro for 500 messages, or Premium for unlimited.
+              for this month.{" "}
+              {plan === "starter"
+                ? "Upgrade to Pro ($22/mo) for 500 messages, or Premium ($33/mo) for unlimited."
+                : plan === "pro"
+                  ? "Upgrade to Premium ($33/mo) for unlimited messages."
+                  : "Your messages reset at the start of next month."}
             </p>
 
             <div className="space-y-2">

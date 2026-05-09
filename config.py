@@ -139,18 +139,61 @@ ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
-# Price IDs from your Stripe dashboard (set via env vars — no defaults)
+# ── Stripe price IDs (set in Railway / .env.local — no hardcoded defaults) ───
+# Starter  $11/mo  |  $8.25/mo billed annually ($99/yr)
+STRIPE_PRICE_STARTER_MONTHLY: str = os.getenv("STRIPE_PRICE_STARTER_MONTHLY", "")
+STRIPE_PRICE_STARTER_ANNUAL: str  = os.getenv("STRIPE_PRICE_STARTER_ANNUAL",  "")
+# Pro     $22/mo  |  $16.50/mo billed annually ($198/yr)
+STRIPE_PRICE_PRO_MONTHLY: str     = os.getenv("STRIPE_PRICE_PRO_MONTHLY",     "")
+STRIPE_PRICE_PRO_ANNUAL: str      = os.getenv("STRIPE_PRICE_PRO_ANNUAL",       "")
+# Premium $33/mo  |  $24.75/mo billed annually ($297/yr)
+STRIPE_PRICE_PREMIUM_MONTHLY: str = os.getenv("STRIPE_PRICE_PREMIUM_MONTHLY", "")
+STRIPE_PRICE_PREMIUM_ANNUAL: str  = os.getenv("STRIPE_PRICE_PREMIUM_ANNUAL",  "")
+
+# Legacy single-plan IDs (kept so existing Stripe subscriptions still work)
 STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")
-STRIPE_PRICE_ANNUAL: str = os.getenv("STRIPE_PRICE_ANNUAL", "")
-ALLOWED_STRIPE_PRICES: set[str] = {p for p in (STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL) if p}
+STRIPE_PRICE_ANNUAL: str  = os.getenv("STRIPE_PRICE_ANNUAL",  "")
+
+ALLOWED_STRIPE_PRICES: set[str] = {
+    p for p in (
+        STRIPE_PRICE_STARTER_MONTHLY, STRIPE_PRICE_STARTER_ANNUAL,
+        STRIPE_PRICE_PRO_MONTHLY,     STRIPE_PRICE_PRO_ANNUAL,
+        STRIPE_PRICE_PREMIUM_MONTHLY, STRIPE_PRICE_PREMIUM_ANNUAL,
+        # legacy
+        STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL,
+    ) if p
+}
+
+# price_id → plan name  (used by webhook to set users.plan after checkout)
+PRICE_ID_TO_PLAN: dict[str, str] = {
+    pid: plan
+    for pid, plan in [
+        (STRIPE_PRICE_STARTER_MONTHLY, "starter"),
+        (STRIPE_PRICE_STARTER_ANNUAL,  "starter"),
+        (STRIPE_PRICE_PRO_MONTHLY,     "pro"),
+        (STRIPE_PRICE_PRO_ANNUAL,      "pro"),
+        (STRIPE_PRICE_PREMIUM_MONTHLY, "premium"),
+        (STRIPE_PRICE_PREMIUM_ANNUAL,  "premium"),
+        # legacy — treat old single plan as Pro
+        (STRIPE_PRICE_MONTHLY, "pro"),
+        (STRIPE_PRICE_ANNUAL,  "pro"),
+    ]
+    if pid
+}
+
+# Annual price IDs (used to decide trial eligibility — annual = no trial)
+ANNUAL_PRICE_IDS: set[str] = {
+    p for p in (
+        STRIPE_PRICE_STARTER_ANNUAL, STRIPE_PRICE_PRO_ANNUAL,
+        STRIPE_PRICE_PREMIUM_ANNUAL, STRIPE_PRICE_ANNUAL,
+    ) if p
+}
 
 TRIAL_DAYS: int = 14
 
 def get_trial_days(price_id: str) -> int:
-    """Monthly gets 14-day trial. Annual gets no trial (immediate billing)."""
-    if price_id == STRIPE_PRICE_ANNUAL:
-        return 0
-    return TRIAL_DAYS
+    """Annual billing has no trial (immediate charge). Monthly gets 14 days."""
+    return 0 if price_id in ANNUAL_PRICE_IDS else TRIAL_DAYS
 
 STRIPE_ENABLED: bool = bool(STRIPE_SECRET_KEY)
 

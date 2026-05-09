@@ -14,36 +14,95 @@ import { PillButton } from "@/components/pill-cta";
 const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "";
 const ANNUAL_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "";
 
-// Beta flag: when enabled, signup bypasses Stripe Checkout and drops the new
-// user straight into /home. Their 14-day trial is already provisioned on the
-// backend (users.plan='trial', trial_ends_at set at account creation — see
-// db.py:819). When the trial expires, backend `resolve_plan` auto-downgrades
-// them to 'free' and the in-app TrialBanner surfaces the upgrade CTA, which
-// *does* route through Stripe Checkout — so revenue path is unaffected, only
-// the signup-time friction is removed. Default off to preserve prior
-// behaviour; flip on for beta by setting NEXT_PUBLIC_NO_CARD_TRIAL=true.
-const NO_CARD_TRIAL: boolean =
-  (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
+// Per-tier price IDs (Starter / Pro / Premium)
+const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
+  starter: {
+    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_MONTHLY || "",
+    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_ANNUAL  || "",
+  },
+  pro: {
+    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || MONTHLY_PRICE_ID,
+    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  || ANNUAL_PRICE_ID,
+  },
+  premium: {
+    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY || "",
+    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_ANNUAL  || "",
+  },
+};
 
-const PRO_FEATURES = [
-  "Full access to your personal concierge",
-  "Easy voice input",
-  "Search across transactions, notes & tasks",
-  "Budget tracking with custom categories",
-  "Spending summaries, recaps & patterns",
-  "Savings & financial goals",
-  "Recurring bills & income tracking",
-  "Cash flow forecast",
-  "Calendar events, reminders & errands",
-  "Today — tasks & events at a glance",
-  "Lists — groceries, errands & more",
-  "Journal — private daily entries",
-  "Guided breathing & mindfulness",
-  "Full data export",
-  "Bill due & event reminder alerts",
+type Tier = "starter" | "pro" | "premium";
+
+const TIER_CONFIG: {
+  id: Tier;
+  name: string;
+  monthlyPrice: number;
+  annualMonthlyPrice: number;
+  annualTotal: number;
+  voiceMinutes: number;
+  chatMessages: string;
+  features: string[];
+}[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    monthlyPrice: 11,
+    annualMonthlyPrice: 8.25,
+    annualTotal: 99,
+    voiceMinutes: 30,
+    chatMessages: "150 messages/mo",
+    features: [
+      "Personal AI concierge (text)",
+      "Health vitals, medications & appointments",
+      "Location intelligence & commute awareness",
+      "Daily briefing — morning summary",
+      "Email bill detection",
+      "Budget tracking & spending insights",
+      "Calendar, tasks & reminders",
+      "30 voice-input minutes included",
+      "Full data export",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    monthlyPrice: 22,
+    annualMonthlyPrice: 16.50,
+    annualTotal: 198,
+    voiceMinutes: 150,
+    chatMessages: "500 messages/mo",
+    features: [
+      "Everything in Starter",
+      "Voice responses (TTS) — speak aloud toggle",
+      "Long-term memory (persistent context)",
+      "Proactive suggestions & smart briefings",
+      "Approval gate for sensitive actions",
+      "150 voice minutes included",
+      "On-demand voice top-ups ($6 / 60 min)",
+    ],
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    monthlyPrice: 33,
+    annualMonthlyPrice: 24.75,
+    annualTotal: 297,
+    voiceMinutes: 350,
+    chatMessages: "Unlimited messages",
+    features: [
+      "Everything in Pro",
+      "Unlimited chat messages",
+      "350 voice minutes included",
+      "Golden Mode (senior-friendly UI)",
+      "Priority AI processing",
+    ],
+  },
 ];
 
 type Step = "breathe" | "tiers" | "email" | "code" | "name";
+
+// Beta flag — set NEXT_PUBLIC_NO_CARD_TRIAL=true to skip Stripe at signup
+const NO_CARD_TRIAL: boolean =
+  (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -55,8 +114,6 @@ function LoginPageInner() {
   const planParam  = searchParams.get("plan");
   const nextParam  = searchParams.get("next") || "/home";
 
-  // Store breatheFlow in state so it survives re-renders and is reliably
-  // available inside async callbacks like sendCode().
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
     if (flow === "breathe") return "breathe";
@@ -64,7 +121,6 @@ function LoginPageInner() {
     return "email";
   });
 
-  // Sync breatheFlow if searchParams resolve after hydration
   useEffect(() => {
     if (flow === "breathe") {
       setBreatheFlow(true);
@@ -72,6 +128,7 @@ function LoginPageInner() {
     }
   }, [flow]);
 
+  const [selectedTier, setSelectedTier] = useState<Tier>("pro");
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -228,7 +285,7 @@ function LoginPageInner() {
     setLoading(true);
     setError("");
     try {
-      const priceId = selectedPlan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
+      const priceId = PRICE_IDS[selectedTier][selectedPlan];
 
       // Cookie was set by /api/auth/login during handleVerify; subsequent API
       // calls authenticate via that cookie automatically. A user who abandons
@@ -351,73 +408,105 @@ function LoginPageInner() {
       {/* ── Step 1: Plan selection ── */}
       {step === "tiers" && (
         <div className="flex-1 flex flex-col items-center px-5 pt-4 pb-10">
-          <p className="text-[0.6rem] uppercase tracking-[4px] text-white/40 mb-2">Pricing</p>
+          <p className="text-[0.6rem] uppercase tracking-[4px] text-white/40 mb-2">Choose your plan</p>
           <h1 className="text-2xl font-bold text-white mb-1 font-[family-name:var(--font-playfair)] text-center">
-            Your full financial + personal life.<br />$8 a month.
+            Your personal AI operator.
           </h1>
-          <p className="text-sm text-white/40 mb-8 text-center">
-            14-day free trial. Cancel anytime before it ends — you won&apos;t be charged.
+          <p className="text-sm text-white/40 mb-6 text-center">
+            14-day free trial on monthly plans. Cancel anytime.
           </p>
 
+          {/* Billing cycle toggle */}
+          <div className="flex rounded-full border border-white/8 bg-[#111] p-0.5 mb-5 w-full max-w-xs">
+            {(["monthly", "annual"] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setSelectedPlan(opt)}
+                className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 min-h-[44px]"
+                style={{
+                  background: selectedPlan === opt ? "rgba(255,255,255,0.1)" : "transparent",
+                  color: selectedPlan === opt ? "white" : "rgba(255,255,255,0.35)",
+                }}
+              >
+                {opt === "monthly" ? "Monthly" : (
+                  <><span>Annual</span>
+                    <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Save 25%</span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* 3-tier cards */}
           <div className="w-full max-w-md space-y-3 mb-6">
-            {/* Plan toggle */}
-            <div className="flex rounded-full border border-white/8 bg-[#111] p-0.5">
-              {(["monthly", "annual"] as const).map((opt) => (
+            {TIER_CONFIG.map((tier) => {
+              const isSelected = selectedTier === tier.id;
+              const price = selectedPlan === "annual" ? tier.annualMonthlyPrice : tier.monthlyPrice;
+              const priceLabel = selectedPlan === "annual"
+                ? `$${tier.annualMonthlyPrice.toFixed(2)}/mo`
+                : `$${tier.monthlyPrice}/mo`;
+              return (
                 <button
-                  key={opt}
-                  onClick={() => setSelectedPlan(opt)}
-                  className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 flex-wrap min-h-[44px]"
+                  key={tier.id}
+                  onClick={() => setSelectedTier(tier.id)}
+                  className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
                   style={{
-                    background: selectedPlan === opt ? "rgba(255,255,255,0.1)" : "transparent",
-                    color: selectedPlan === opt ? "white" : "rgba(255,255,255,0.35)",
+                    borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
+                    background: isSelected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
                   }}
                 >
-                  {opt === "monthly" ? (
-                    <><span>Monthly</span> <span className="text-white/40">$8/mo</span></>
-                  ) : (
-                    <><span>Annual</span> <span className="text-white/40">$6/mo</span>
-                      <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">Save 25%</span>
-                    </>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-white/90">{tier.name}</p>
+                        {tier.id === "pro" && (
+                          <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">Most popular</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/35">{tier.chatMessages} · {tier.voiceMinutes} voice min</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-base font-bold text-white">{priceLabel}</p>
+                      {selectedPlan === "annual" && (
+                        <p className="text-[0.6rem] text-white/30">${tier.annualTotal}/yr</p>
+                      )}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
+                      {tier.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2 text-xs text-white/55">
+                          <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </button>
-              ))}
-            </div>
-
-            {/* Trial callout */}
-            <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-5 py-4 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 text-black text-xs font-bold">14</div>
-              <div>
-                <p className="text-sm font-semibold text-white">14-day free trial</p>
-                <p className="text-xs text-white/40">
-                  {selectedPlan === "monthly"
-                    ? "Then $8/month. Cancel anytime."
-                    : "Then $72/year (save 25%). Billed annually. Cancel to stop renewal."}
-                </p>
-              </div>
-            </div>
-
-            {/* Feature list */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-              <p className="text-[0.6rem] uppercase tracking-[3px] text-white/30 mb-3">Everything included</p>
-              <ul className="space-y-2">
-                {PRO_FEATURES.map((f) => (
-                  <li key={f} className="flex items-center gap-2.5 text-sm text-white/70">
-                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" strokeWidth={2} />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              );
+            })}
           </div>
+
+          {/* Trial note */}
+          {selectedPlan === "monthly" && (
+            <div className="w-full max-w-md rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3 flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 text-black text-xs font-bold">14</div>
+              <p className="text-xs text-white/45">
+                14-day free trial — you won&apos;t be charged until day 15.
+              </p>
+            </div>
+          )}
 
           <div className="w-full max-w-sm space-y-3">
             <PillButton onClick={() => setStep("email")} className="w-full">
-              Start 14-day free trial
+              {selectedPlan === "monthly" ? `Start 14-day free trial` : `Get ${TIER_CONFIG.find(t=>t.id===selectedTier)?.name}`}
             </PillButton>
             <p className="text-center text-xs text-white/25">
-              {MONTHLY_PRICE_ID && !NO_CARD_TRIAL
+              {selectedPlan === "monthly" && !NO_CARD_TRIAL
                 ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
-                : "No credit card required. Cancel anytime during your trial."}
+                : selectedPlan === "annual"
+                  ? `Billed as $${TIER_CONFIG.find(t=>t.id===selectedTier)?.annualTotal}/yr. Cancel anytime.`
+                  : "No credit card required during trial."}
             </p>
             <div className="text-center mt-2">
               <button

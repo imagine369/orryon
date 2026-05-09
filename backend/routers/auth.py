@@ -255,7 +255,7 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
         "mode": "subscription",
         "success_url": success_url,
         "cancel_url": cancel_url,
-        "metadata": {"user_id": row["id"]},
+        "metadata": {"user_id": row["id"], "price_id": body.price_id},
     }
     if trial_days:
         checkout_params["subscription_data"] = {"trial_period_days": trial_days}

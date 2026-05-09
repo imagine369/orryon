@@ -482,7 +482,7 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
             "mode": "subscription",
             "success_url": success_url,
             "cancel_url": cancel_url,
-            "metadata": {"user_id": row["id"]},
+            "metadata": {"user_id": row["id"], "price_id": body.price_id},
         }
         is_free_breathe = row.get("segment") == "free_breathe"
         if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe:
@@ -664,15 +664,21 @@ async def stripe_webhook(request: Request):
             logger.info("Voice topup: +%d min for user=%s (pi=%s)", minutes, user_id, pi_id)
 
         else:
-            # Regular subscription checkout
+            # Regular subscription checkout — look up which tier was purchased
             sub_id = session.get("subscription")
             if user_id and sub_id:
+                from config import PRICE_ID_TO_PLAN
+                # Resolve tier from the line item price ID stored in metadata,
+                # or fall back to reading it from the subscription object.
+                price_id = meta.get("price_id", "")
+                new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")  # default pro for legacy
                 with get_connection() as conn:
                     conn.execute(
-                        "UPDATE users SET plan='pro', stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
-                        (sub_id, user_id),
+                        "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
+                        (new_plan, sub_id, user_id),
                     )
                     conn.commit()
+                logger.info("Subscription checkout: user=%s plan=%s sub=%s", user_id, new_plan, sub_id)
 
     elif event["type"] in ("customer.subscription.deleted", "customer.subscription.paused"):
         sub = event["data"]["object"]
@@ -690,7 +696,17 @@ async def stripe_webhook(request: Request):
         sub_id = sub.get("id")
         status = sub.get("status")
         if sub_id and status:
-            new_plan = "pro" if status in ("active", "trialing", "past_due") else "free"
+            if status in ("active", "trialing", "past_due"):
+                # Resolve tier from the subscription's current price ID
+                from config import PRICE_ID_TO_PLAN
+                try:
+                    items = sub.get("items", {}).get("data", [])
+                    price_id = items[0]["price"]["id"] if items else ""
+                except Exception:
+                    price_id = ""
+                new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
+            else:
+                new_plan = "free"
             with get_connection() as conn:
                 conn.execute(
                     "UPDATE users SET plan=? WHERE stripe_subscription_id=?",
