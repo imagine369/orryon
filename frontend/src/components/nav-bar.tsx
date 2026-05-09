@@ -260,7 +260,7 @@ export function NavBar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5" style={{ paddingTop: "max(0.75rem, calc(0.75rem + env(safe-area-inset-top)))", paddingLeft: "max(1rem, calc(1rem + env(safe-area-inset-left)))", paddingRight: "max(1rem, calc(1rem + env(safe-area-inset-right)))" }}>
         <Link href="/home" className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
           ORRYON
         </Link>
@@ -409,9 +409,9 @@ export function NavBar() {
               <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl flex flex-col">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0" style={{ paddingTop: "max(1rem, calc(1rem + env(safe-area-inset-top)))" }}>
                   <h1 className="text-2xl font-extrabold">Quick Access</h1>
-                  <button onClick={() => setNotifOpen(false)} className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                  <button onClick={() => setNotifOpen(false)} className="flex items-center justify-center w-11 h-11 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                     <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />
                   </button>
                 </div>
@@ -423,7 +423,7 @@ export function NavBar() {
                       <button
                         key={key}
                         onClick={() => setActiveTab(key)}
-                        className="flex-1 rounded-full py-1.5 text-xs font-medium transition-all duration-200"
+                        className="flex-1 rounded-full py-2.5 text-xs font-medium transition-all duration-200 min-h-[44px] flex items-center justify-center"
                         style={{
                           background: activeTab === key ? "rgba(255,255,255,0.1)" : "transparent",
                           color: activeTab === key ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
@@ -436,7 +436,7 @@ export function NavBar() {
                 </div>
 
                 {/* Tab content */}
-                <div className="flex-1 overflow-y-auto px-5 pb-4" data-scroll-container>
+                <div className="flex-1 overflow-y-auto px-5 pb-4" data-scroll-container style={{ paddingBottom: "max(1rem, calc(1rem + env(safe-area-inset-bottom)))" }}>
                  <ErrorBoundary fallback={
                    <div className="flex flex-col items-center justify-center py-12 text-center">
                      <p className="text-white/40 text-sm mb-3">Something went wrong loading this tab.</p>
@@ -471,11 +471,11 @@ export function NavBar() {
                           </button>
                           <button
                             onClick={() => { setAddingTask((v) => !v); setTimeout(() => taskInputRef.current?.focus(), 50); }}
-                            className="flex items-center justify-center w-6 h-6 rounded-full bg-white hover:bg-gray-200 transition"
+                            className="flex items-center justify-center w-11 h-11 rounded-full bg-white hover:bg-gray-200 transition"
                           >
                             {addingTask
-                              ? <X className="h-3 w-3 text-black" strokeWidth={1.5} />
-                              : <Plus className="h-3 w-3 text-black" strokeWidth={1.5} />
+                              ? <X className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
+                              : <Plus className="h-3.5 w-3.5 text-black" strokeWidth={1.5} />
                             }
                           </button>
                         </div>
@@ -525,10 +525,11 @@ export function NavBar() {
                         <div className="flex gap-2 mb-4 items-center">
                           <button
                             onClick={cyclePriority}
-                            style={{ borderColor: priorityBorderColor(newTaskPriority) }}
-                            className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
+                            className="shrink-0 w-11 h-11 flex items-center justify-center hover:opacity-70 active:scale-95 transition"
                             title="Cycle priority"
-                          />
+                          >
+                            <span style={{ borderColor: priorityBorderColor(newTaskPriority) }} className="w-5 h-5 rounded-full border-2 block" />
+                          </button>
                           <input
                             ref={taskInputRef}
                             autoFocus
@@ -594,15 +595,20 @@ export function NavBar() {
                                 <button
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={() => completeTask(t)}
-                                  style={{ borderColor: priorityBorderColor(t.priority) }}
-                                  className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
-                                />
+                                  className="shrink-0 w-11 h-11 flex items-center justify-center hover:opacity-70 active:scale-95 transition"
+                                  title="Complete task"
+                                >
+                                  <span
+                                    style={{ borderColor: priorityBorderColor(t.priority) }}
+                                    className="w-5 h-5 rounded-full border-2 block"
+                                  />
+                                </button>
                                 <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
                                 <button
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={() => changeTaskPriority(t)}
                                   style={{ color: priorityBorderColor(t.priority) }}
-                                  className="shrink-0 text-[0.55rem] font-bold opacity-50 hover:opacity-90 transition w-5 text-center"
+                                  className="shrink-0 text-[0.55rem] font-bold opacity-50 hover:opacity-90 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
                                   title="Change priority"
                                 >
                                   {PRIORITY_CONFIG[t.priority as PriorityKey]?.label ?? "P4"}
@@ -610,9 +616,9 @@ export function NavBar() {
                                 <button
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={() => deleteTask(t.id)}
-                                  className="shrink-0 w-4 h-4 flex items-center justify-center text-white/15 hover:text-white/50 transition"
+                                  className="shrink-0 w-11 h-11 flex items-center justify-center text-white/15 hover:text-white/50 transition"
                                 >
-                                  <X className="h-3 w-3" strokeWidth={1.5} />
+                                  <X className="h-3.5 w-3.5" strokeWidth={1.5} />
                                 </button>
                               </div>
                             </Reorder.Item>
@@ -624,14 +630,19 @@ export function NavBar() {
                             <div className="flex items-center gap-3 py-3 border-b border-white/5">
                               <button
                                 onClick={() => completeTask(t)}
-                                style={{ borderColor: priorityBorderColor(t.priority) }}
-                                className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center hover:opacity-70 active:scale-90 transition"
-                              />
+                                className="shrink-0 w-11 h-11 flex items-center justify-center hover:opacity-70 active:scale-95 transition"
+                                title="Complete task"
+                              >
+                                <span
+                                  style={{ borderColor: priorityBorderColor(t.priority) }}
+                                  className="w-5 h-5 rounded-full border-2 block"
+                                />
+                              </button>
                               <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
                               <button
                                 onClick={() => changeTaskPriority(t)}
                                 style={{ color: priorityBorderColor(t.priority) }}
-                                className="shrink-0 text-[0.55rem] font-bold opacity-40 hover:opacity-80 transition"
+                                className="shrink-0 text-[0.55rem] font-bold opacity-40 hover:opacity-80 transition min-w-[44px] min-h-[44px] flex items-center justify-center"
                                 title="Change priority"
                               >
                                 {PRIORITY_CONFIG[t.priority as PriorityKey]?.label ?? "P4"}

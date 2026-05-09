@@ -410,7 +410,7 @@ export default function HomePage() {
                 <p className="text-sm font-semibold text-white/70">Chat History</p>
                 <button
                   onClick={() => setHistoryOpen(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
+                  className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
                 >
                   <X className="h-4 w-4 text-white/45" strokeWidth={1.5} />
                 </button>
@@ -476,7 +476,8 @@ export default function HomePage() {
                         e.stopPropagation();
                         handleDeleteSession(s.id);
                       }}
-                      className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition hover:bg-white/[0.08] group-hover:opacity-100"
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition hover:bg-white/[0.08] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100"
+                      style={{ WebkitTapHighlightColor: "transparent" }}
                     >
                       <Trash2
                         className="h-3 w-3 text-white/28 hover:text-red-400/80"
@@ -500,8 +501,8 @@ export default function HomePage() {
             {sub?.is_active_pro && sub?.plan !== "starter" && (
               <button
                 onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
-                className={`flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
-                title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
+              className={`flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
+                  title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
               >
                 {voiceOverlayOn
                   ? <Volume2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -510,14 +511,14 @@ export default function HomePage() {
             )}
             <button
               onClick={handleOpenHistory}
-              className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
+              className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
               title="Chat history"
             >
               <Clock className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
             </button>
             <button
               onClick={handleNewChat}
-              className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
+              className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08]"
               title="New chat"
             >
               <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
@@ -635,7 +636,7 @@ export default function HomePage() {
               {sub?.is_active_pro && sub?.plan !== "starter" && (
                 <button
                   onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
-                  className={`flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
                   title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
                 >
                   {voiceOverlayOn
@@ -646,7 +647,7 @@ export default function HomePage() {
               <button
                 onClick={handleOpenHistory}
                 disabled={streaming}
-                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
+                className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
                 title="Chat history"
               >
                 <Clock className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
@@ -654,7 +655,7 @@ export default function HomePage() {
               <button
                 onClick={handleNewChat}
                 disabled={streaming}
-                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
+                className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] disabled:opacity-25"
                 title="New chat"
               >
                 <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />

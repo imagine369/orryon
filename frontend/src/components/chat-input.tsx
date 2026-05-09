@@ -479,7 +479,7 @@ export function ChatInput({
         aria-label={micTooltip}
         title={micTooltip}
         className={cn(
-          "relative shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-200",
+          "relative shrink-0 flex items-center justify-center rounded-full w-11 h-11 transition-all duration-200",
           isRecording
             ? "bg-white text-black scale-110"
             : effectiveStatus === "transcribing" || effectiveStatus === "thinking"
@@ -527,7 +527,7 @@ export function ChatInput({
         disabled={disabled || !value.trim()}
         aria-label="Send message"
         className={cn(
-          "shrink-0 flex items-center justify-center rounded-full w-10 h-10 transition-all duration-150",
+          "shrink-0 flex items-center justify-center rounded-full w-11 h-11 transition-all duration-150",
           value.trim()
             ? "bg-white text-black hover:bg-white/90 active:scale-95"
             : "bg-white/[0.08] text-white/25 cursor-not-allowed"

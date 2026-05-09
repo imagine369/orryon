@@ -427,10 +427,10 @@ export function SettingsPanel() {
                 className="flex-1 bg-white/5 border border-white/20 rounded-lg px-2.5 py-1.5 text-sm text-white outline-none"
                 placeholder="Display name"
               />
-              <button onClick={saveName} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
+              <button onClick={saveName} className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition">
                 <Check className="h-3.5 w-3.5 text-green-400" strokeWidth={2} />
               </button>
-              <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
+              <button onClick={() => setEditingName(false)} className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition">
                 <X className="h-3.5 w-3.5 text-white/40" strokeWidth={2} />
               </button>
             </div>
@@ -853,7 +853,7 @@ export function SettingsPanel() {
                   finally { setCalLoading(false); }
                 }}
                 disabled={calLoading}
-                className="p-1.5 text-white/30 hover:text-white/70 transition disabled:opacity-40"
+                className="w-11 h-11 flex items-center justify-center text-white/30 hover:text-white/70 transition disabled:opacity-40"
                 title="Sync now"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${calLoading ? "animate-spin" : ""}`} strokeWidth={1.5} />
@@ -868,7 +868,7 @@ export function SettingsPanel() {
                   finally { setCalLoading(false); }
                 }}
                 disabled={calLoading}
-                className="p-1.5 text-white/20 hover:text-red-400 transition disabled:opacity-40"
+                className="w-11 h-11 flex items-center justify-center text-white/20 hover:text-red-400 transition disabled:opacity-40"
                 title="Disconnect"
               >
                 <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -880,7 +880,7 @@ export function SettingsPanel() {
                 const token = localStorage.getItem("orryon_token") ?? "";
                 window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
               }}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
+              className="text-xs px-3 py-2.5 min-h-[44px] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
             >
               <ChevronRight className="w-3 h-3" strokeWidth={2} />
               Connect
@@ -1343,7 +1343,7 @@ function MemoryView() {
           </div>
           <button
             onClick={() => forget(f.id)}
-            className="shrink-0 text-white/20 hover:text-red-400/70 transition p-1"
+            className="shrink-0 w-11 h-11 flex items-center justify-center text-white/20 hover:text-red-400/70 transition"
             title="Forget this"
           >
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1414,7 +1414,7 @@ function HealthView() {
               <p className="text-sm text-white/75">{m.name}</p>
               {m.dose && <p className="text-xs text-white/30 mt-0.5">{m.dose}</p>}
             </div>
-            <button onClick={() => removeMed(m.id)} className="text-white/15 hover:text-red-400/70 transition p-1">
+            <button onClick={() => removeMed(m.id)} className="w-11 h-11 flex items-center justify-center text-white/15 hover:text-red-400/70 transition">
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
             </button>
           </div>
@@ -1495,7 +1495,7 @@ function LocationView() {
             <p className="text-sm text-white/75">{pl.label}</p>
             {pl.address && <p className="text-xs text-white/30 mt-0.5">{pl.address}</p>}
           </div>
-          <button onClick={() => removePlace(pl.id)} className="text-white/15 hover:text-red-400/70 transition p-1">
+          <button onClick={() => removePlace(pl.id)} className="w-11 h-11 flex items-center justify-center text-white/15 hover:text-red-400/70 transition">
             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </div>
@@ -1532,7 +1532,7 @@ function BriefingView({ prefs, onUpdate }: { prefs: ReturnType<typeof usePrefere
             <button
               key={t}
               onClick={() => onUpdate({ briefing_time: t })}
-              className={`py-2 rounded-xl text-xs font-medium transition border ${prefs.briefing_time === t ? "border-white/20 bg-white/10 text-white/90" : "border-white/[0.06] bg-white/[0.03] text-white/35 hover:bg-white/[0.06]"}`}
+              className={`min-h-[44px] rounded-xl text-xs font-medium transition border ${prefs.briefing_time === t ? "border-white/20 bg-white/10 text-white/90" : "border-white/[0.06] bg-white/[0.03] text-white/35 hover:bg-white/[0.06]"}`}
             >
               {t}
             </button>
@@ -1542,13 +1542,17 @@ function BriefingView({ prefs, onUpdate }: { prefs: ReturnType<typeof usePrefere
       <div>
         <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Include in briefing</p>
         {BRIEFING_SECTIONS.map(({ key, label }) => (
-          <div key={key} className="flex items-center justify-between py-3 border-b border-white/[0.04]">
+          <div key={key} className="flex items-center justify-between py-2 border-b border-white/[0.04] min-h-[52px]">
             <p className="text-sm text-white/70">{label}</p>
             <button
               onClick={() => toggleSection(key)}
-              className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includes.includes(key) ? "bg-white/80" : "bg-white/10"}`}
+              className={`relative flex items-center justify-center w-11 h-11 rounded-full transition-colors duration-200`}
+              aria-checked={includes.includes(key)}
+              role="switch"
             >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${includes.includes(key) ? "translate-x-4" : "translate-x-0"}`} />
+              <span className={`relative w-9 h-5 rounded-full transition-colors duration-200 block ${includes.includes(key) ? "bg-white/80" : "bg-white/10"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${includes.includes(key) ? "translate-x-4" : "translate-x-0"}`} />
+              </span>
             </button>
           </div>
         ))}
@@ -1591,8 +1595,8 @@ function ApprovalsView() {
             <p className="text-sm text-white/75 leading-relaxed">{a.description}</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => resolve(a.id, "approve")} className="flex-1 py-2 rounded-xl bg-white/10 text-sm text-white/80 hover:bg-white/[0.15] transition font-medium">Approve</button>
-            <button onClick={() => resolve(a.id, "reject")} className="flex-1 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/35 hover:text-white/55 transition">Reject</button>
+            <button onClick={() => resolve(a.id, "approve")} className="flex-1 min-h-[44px] rounded-xl bg-white/10 text-sm text-white/80 hover:bg-white/[0.15] transition font-medium">Approve</button>
+            <button onClick={() => resolve(a.id, "reject")} className="flex-1 min-h-[44px] rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/35 hover:text-white/55 transition">Reject</button>
           </div>
         </div>
       ))}
@@ -1622,9 +1626,13 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
         </div>
         <button
           onClick={() => onUpdate({ golden_mode_enabled: !prefs.golden_mode_enabled })}
-          className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 mt-0.5 ${prefs.golden_mode_enabled ? "bg-white/80" : "bg-white/10"}`}
+          className="relative shrink-0 flex items-center justify-center w-11 h-11 mt-0.5"
+          role="switch"
+          aria-checked={prefs.golden_mode_enabled}
         >
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.golden_mode_enabled ? "translate-x-4" : "translate-x-0"}`} />
+          <span className={`relative w-9 h-5 rounded-full transition-colors duration-200 block ${prefs.golden_mode_enabled ? "bg-white/80" : "bg-white/10"}`}>
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.golden_mode_enabled ? "translate-x-4" : "translate-x-0"}`} />
+          </span>
         </button>
       </div>
 
@@ -1640,9 +1648,13 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
           </div>
           <button
             onClick={() => onUpdate({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
-            className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 mt-0.5 ${prefs.voice_overlay_enabled ? "bg-white/80" : "bg-white/10"}`}
+            className="relative shrink-0 flex items-center justify-center w-11 h-11 mt-0.5"
+            role="switch"
+            aria-checked={prefs.voice_overlay_enabled}
           >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.voice_overlay_enabled ? "translate-x-4" : "translate-x-0"}`} />
+            <span className={`relative w-9 h-5 rounded-full transition-colors duration-200 block ${prefs.voice_overlay_enabled ? "bg-white/80" : "bg-white/10"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.voice_overlay_enabled ? "translate-x-4" : "translate-x-0"}`} />
+            </span>
           </button>
         </div>
       )}

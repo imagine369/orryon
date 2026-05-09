@@ -195,6 +195,12 @@
     transform: scaleY(1);
   }
 }
+/* ── Safe area utility ── */
+.safe-top    { padding-top:    env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-left   { padding-left:   env(safe-area-inset-left); }
+.safe-right  { padding-right:  env(safe-area-inset-right); }
+
 /* ── Golden Mode — larger, higher-contrast, calmer ── */
 html.golden-mode {
   font-size: 18px;

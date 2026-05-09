@@ -39,6 +39,9 @@ function FreeTierNav({ onUpgrade, onSettings, checkoutPending }: {
       alignItems: "center",
       justifyContent: "space-between",
       padding: "14px 20px",
+      paddingTop: "max(14px, calc(14px + env(safe-area-inset-top)))",
+      paddingLeft: "max(20px, calc(20px + env(safe-area-inset-left)))",
+      paddingRight: "max(20px, calc(20px + env(safe-area-inset-right)))",
       background: "rgba(0,0,0,0.85)",
       backdropFilter: "blur(16px)",
       WebkitBackdropFilter: "blur(16px)",
@@ -75,7 +78,7 @@ function FreeTierNav({ onUpgrade, onSettings, checkoutPending }: {
         <button
           onClick={onSettings}
           style={{
-            width: 32, height: 32, borderRadius: "50%",
+            width: 44, height: 44, borderRadius: "50%",
             background: "rgba(255,255,255,0.1)",
             border: "1px solid rgba(255,255,255,0.12)",
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -241,7 +244,7 @@ function AnchorRow({ anchor, isRecommended, onStart }: { anchor: ResetAnchor; is
             onClick={(e) => { e.stopPropagation(); onStart(anchor); }}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
-              width: 30, height: 30, borderRadius: "50%",
+              width: 44, height: 44, borderRadius: "50%",
               border: "1px solid rgba(255,255,255,0.12)",
               background: "rgba(255,255,255,0.04)",
               color: "rgba(255,255,255,0.55)", cursor: "pointer",
@@ -309,18 +312,16 @@ function UpgradeCard({
           <button
             key={opt}
             onClick={() => setSelected(opt)}
-            className="flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap"
+            className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 flex-wrap min-h-[44px]"
             style={{
               background: selected === opt ? "rgba(255,255,255,0.1)" : "transparent",
               color: selected === opt ? "white" : "rgba(255,255,255,0.35)",
             }}
           >
             {opt === "monthly" ? (
-              <>Monthly <span className="text-white/40">$8/mo</span></>
+              <><span>Monthly</span> <span className="text-white/40">$8/mo</span></>
             ) : (
-              <>Annual <span className="text-white/40">$6/mo</span>
-                <span className="text-white/25 mx-1">·</span>
-                <span className="text-white/40">$72/yr</span>
+              <><span>Annual</span> <span className="text-white/40">$6/mo</span>
                 <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">Save 25%</span>
               </>
             )}

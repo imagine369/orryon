@@ -112,7 +112,7 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
               </h2>
               <button
                 onClick={onClose}
-                className="text-white/30 hover:text-white/60 transition-colors p-1"
+                className="flex items-center justify-center w-11 h-11 text-white/30 hover:text-white/60 transition-colors"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -145,7 +145,7 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
                         <button
                           onClick={saveName}
                           disabled={nameSaving}
-                          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition"
+                          className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/15 transition"
                         >
                           {nameSaving
                             ? <Loader2 className="w-3.5 h-3.5 text-white/50 animate-spin" />
@@ -153,7 +153,7 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
                         </button>
                         <button
                           onClick={() => setEditingName(false)}
-                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition"
+                          className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 transition"
                         >
                           <X className="w-3.5 h-3.5 text-white/30" strokeWidth={2} />
                         </button>

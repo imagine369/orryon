@@ -160,7 +160,13 @@ function LoginPageInner() {
           // eslint-disable-next-line no-console
           console.warn("[login] verify failed", resp.status, payload);
         }
-        setError(payload.detail || `Sign in failed (${resp.status}).`);
+        // 429 = OTP lockout; surface a friendlier message
+        const detail = payload.detail || `Sign in failed (${resp.status}).`;
+        setError(
+          resp.status === 429
+            ? "Too many attempts — please wait 15 minutes, then request a fresh code."
+            : detail
+        );
         setLoading(false);
         return;
       }
@@ -266,7 +272,7 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-black">
+    <div className="flex flex-col min-h-[100dvh] bg-black" style={{ paddingTop: "env(safe-area-inset-top)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="px-4 pt-4 flex items-center justify-between shrink-0">
         <Link
           href="/"
@@ -360,16 +366,16 @@ function LoginPageInner() {
                 <button
                   key={opt}
                   onClick={() => setSelectedPlan(opt)}
-                  className="flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap"
+                  className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 flex-wrap min-h-[44px]"
                   style={{
                     background: selectedPlan === opt ? "rgba(255,255,255,0.1)" : "transparent",
                     color: selectedPlan === opt ? "white" : "rgba(255,255,255,0.35)",
                   }}
                 >
                   {opt === "monthly" ? (
-                    <>Monthly <span className="text-white/40">$8/mo</span></>
+                    <><span>Monthly</span> <span className="text-white/40">$8/mo</span></>
                   ) : (
-                    <>Annual <span className="text-white/40">$6/mo</span><span className="text-white/25 mx-1">·</span><span className="text-white/40">$72/yr</span>
+                    <><span>Annual</span> <span className="text-white/40">$6/mo</span>
                       <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">Save 25%</span>
                     </>
                   )}

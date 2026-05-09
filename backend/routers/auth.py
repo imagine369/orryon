@@ -170,7 +170,10 @@ async def auth_send_code(body: SendCodeReq, request: Request):
 @router.post("/api/auth/verify", response_model=AuthRes)
 async def auth_verify(body: VerifyReq, request: Request):
     """Verify OTP code, create/fetch user, issue JWT."""
+    from db import _check_otp_lockout
     email = body.email.strip().lower()
+    if _check_otp_lockout(email):
+        raise HTTPException(429, "Too many attempts. Please wait 15 minutes then request a new code.")
     if not verify_code(email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
     display_name = (body.display_name or "").strip()
