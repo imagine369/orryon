@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWA from "@ducanh2912/next-pwa";
+import path from "path";
 
 // Content-Security-Policy is set per-request in `src/middleware.ts` (nonce +
 // strict-dynamic) so Next.js can auto-attach the nonce to its inline script
@@ -29,6 +30,9 @@ const BUILD_SHA = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_S
 const CANARY = `orr-${BUILD_SHA}`;
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   compiler: {
