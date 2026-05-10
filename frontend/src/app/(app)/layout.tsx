@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { PanelProvider, usePanels } from "@/lib/panel-context";
@@ -20,11 +20,22 @@ import { usePreferences } from "@/lib/use-preferences";
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { openPanel } = usePanels();
   const isPanelOpen = openPanel !== null;
   const { sub } = useSubscription();
 
-  const isFreeBreathe = !loading && !!user && (user.segment === "free_breathe" || user.plan === "free");
+  // Don't redirect on the Stripe success landing — the webhook may not have
+  // fired yet, so plan/segment can still reflect the old free state for a
+  // few seconds. The live subscription hook will correct itself shortly.
+  const justUpgraded = searchParams.get("upgraded") === "1";
+
+  const isFreeBreathe =
+    !loading &&
+    !!user &&
+    !justUpgraded &&
+    !sub?.is_active_pro &&
+    (user.segment === "free_breathe" || user.plan === "free");
   const { prefs } = usePreferences();
 
   useEffect(() => {

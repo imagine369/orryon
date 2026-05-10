@@ -7,9 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "cap:init": "npx cap sync",
-    "cap:ios": "npx cap open ios",
-    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap sync && npx cap open ios",
+    "cap:android": "npx cap sync && npx cap open android",
     "cap:sync": "npx cap sync"
   },
   "dependencies": {

@@ -674,7 +674,7 @@ async def stripe_webhook(request: Request):
                 new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")  # default pro for legacy
                 with get_connection() as conn:
                     conn.execute(
-                        "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='' WHERE id=?",
+                        "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='' WHERE id=?",
                         (new_plan, sub_id, user_id),
                     )
                     conn.commit()
