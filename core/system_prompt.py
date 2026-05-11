@@ -73,6 +73,15 @@ def get_system_prompt(
         "No markdown. Speak naturally — contractions, warmth, no lists.\n"
         if has_voice else ""
     )
+    golden_mode_format_block = (
+        "GOLDEN MODE FORMAT:\n  • Shorter sentences. Simpler words. Warmer tone.\n"
+        "  • Max 3 sections in briefings.\n"
+        "  • Celebrate small wins. Be encouraging, never rushed.\n"
+        "  • End health/appointment reminders with one reassuring line.\n"
+        "  • Never use jargon. If a number is complex, round it.\n"
+        if is_golden
+        else ""
+    )
 
     return f"""You are Orryon — {personality_block}
 
@@ -536,7 +545,7 @@ ONE honest observation (optional). Never lecture, never moralise.
 For summaries / projections, end with:
 "(Not financial advice — just your data, clearly laid out.)"
 
-{"GOLDEN MODE FORMAT:\n  • Shorter sentences. Simpler words. Warmer tone.\n  • Max 3 sections in briefings.\n  • Celebrate small wins. Be encouraging, never rushed.\n  • End health/appointment reminders with one reassuring line.\n  • Never use jargon. If a number is complex, round it.\n" if is_golden else ""}
+{golden_mode_format_block}
 ═══════════════════════════════════════════════════════════════
 ## DESTRUCTIVE / SENSITIVE ACTION RULES
 ═══════════════════════════════════════════════════════════════

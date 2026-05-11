@@ -107,10 +107,9 @@ def resolve_plan(user_row: dict) -> dict:
             delta = trial_ends - datetime.now(timezone.utc)
             if delta.total_seconds() <= 0:
                 plan = "free"
-                conn = get_connection()
-                conn.execute("UPDATE users SET plan='free' WHERE id=?", (user_row["id"],))
-                conn.commit()
-                conn.close()
+                with get_connection() as conn:
+                    conn.execute("UPDATE users SET plan='free' WHERE id=?", (user_row["id"],))
+                    conn.commit()
             else:
                 trial_days_remaining = max(0, delta.days)
         except Exception:
@@ -121,15 +120,14 @@ def resolve_plan(user_row: dict) -> dict:
         "trial_ends_at": trial_ends_at_str or None,
         "trial_days_remaining": trial_days_remaining,
         "is_active_pro": plan in ("trial", "pro", "starter", "premium"),
-        "is_free_tier": plan == "free",
+        "is_free_tier": plan in ("free", "past_due"),
     }
 
 
 def resolve_plan_for_user(user_id: str) -> dict:
     """Look up a user by ID and return their effective plan."""
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-    conn.close()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
     return resolve_plan(dict(row))

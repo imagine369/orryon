@@ -130,6 +130,7 @@ function LoginPageInner() {
 
   const [selectedTier, setSelectedTier] = useState<Tier>("pro");
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
+  const [freeSelected, setFreeSelected] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState("");
@@ -440,15 +441,14 @@ function LoginPageInner() {
           {/* 3-tier cards */}
           <div className="w-full max-w-md space-y-3 mb-6">
             {TIER_CONFIG.map((tier) => {
-              const isSelected = selectedTier === tier.id;
-              const price = selectedPlan === "annual" ? tier.annualMonthlyPrice : tier.monthlyPrice;
+              const isSelected = !freeSelected && selectedTier === tier.id;
               const priceLabel = selectedPlan === "annual"
                 ? `$${tier.annualMonthlyPrice.toFixed(2)}/mo`
                 : `$${tier.monthlyPrice}/mo`;
               return (
                 <button
                   key={tier.id}
-                  onClick={() => setSelectedTier(tier.id)}
+                  onClick={() => { setSelectedTier(tier.id); setFreeSelected(false); }}
                   className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
                   style={{
                     borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
@@ -485,10 +485,50 @@ function LoginPageInner() {
                 </button>
               );
             })}
+
+            {/* Free breathing tier — always free, no card required */}
+            <div className="flex items-center gap-3 my-1">
+              <div className="flex-1 h-px bg-white/[0.06]" />
+              <span className="text-[0.6rem] uppercase tracking-[3px] text-white/25">or</span>
+              <div className="flex-1 h-px bg-white/[0.06]" />
+            </div>
+            <button
+              onClick={() => setFreeSelected(true)}
+              className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
+              style={{
+                borderColor: freeSelected ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.07)",
+                background: freeSelected ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.01)",
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-white/90">Starter</p>
+                    <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/8 text-white/40 border border-white/10">Free forever</span>
+                  </div>
+                  <p className="text-xs text-white/35">Breathing exercises &amp; guided calm</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-base font-bold text-white/70">Free</p>
+                </div>
+              </div>
+              {freeSelected && (
+                <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
+                  {[
+                    "Access to all of Orryon's breathe exercises. Free forever.",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-xs text-white/55">
+                      <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </button>
           </div>
 
-          {/* Trial note */}
-          {selectedPlan === "monthly" && (
+          {/* Trial note — only shown for paid monthly plans */}
+          {!freeSelected && selectedPlan === "monthly" && (
             <div className="w-full max-w-md rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3 flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 text-black text-xs font-bold">14</div>
               <p className="text-xs text-white/45">
@@ -498,14 +538,30 @@ function LoginPageInner() {
           )}
 
           <div className="w-full max-w-sm space-y-3">
-            <PillButton onClick={() => setStep("email")} className="w-full">
-              {selectedPlan === "monthly" ? `Start 14-day free trial` : `Get ${TIER_CONFIG.find(t=>t.id===selectedTier)?.name}`}
+            <PillButton
+              onClick={() => {
+                if (freeSelected) {
+                  setBreatheFlow(true);
+                  setStep("breathe");
+                } else {
+                  setStep("email");
+                }
+              }}
+              className="w-full"
+            >
+              {freeSelected
+                ? "Start for free — no card needed"
+                : selectedPlan === "monthly"
+                ? `Start 14-day free trial`
+                : `Get ${TIER_CONFIG.find(t => t.id === selectedTier)?.name}`}
             </PillButton>
             <p className="text-center text-xs text-white/25">
-              {selectedPlan === "monthly" && !NO_CARD_TRIAL
+              {freeSelected
+                ? "Breathing & meditation · always free · upgrade anytime."
+                : selectedPlan === "monthly" && !NO_CARD_TRIAL
                 ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
                 : selectedPlan === "annual"
-                  ? `Billed as $${TIER_CONFIG.find(t=>t.id===selectedTier)?.annualTotal}/yr. Cancel anytime.`
+                  ? `Billed as $${TIER_CONFIG.find(t => t.id === selectedTier)?.annualTotal}/yr. Cancel anytime.`
                   : "No credit card required during trial."}
             </p>
             <div className="text-center mt-2">

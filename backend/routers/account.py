@@ -719,6 +719,42 @@ async def stripe_webhook(request: Request):
         customer_id = invoice.get("customer", "")
         attempt = invoice.get("attempt_count", 0)
         logger.warning("Payment failed for customer %s (attempt %d)", customer_id, attempt)
+        # After the first retry grace period, mark the account as past_due so
+        # require_active_plan blocks access. Stripe will fire
+        # customer.subscription.deleted once it exhausts all retries — that
+        # sets plan='free' as the final state.
+        if attempt >= 2 and customer_id:
+            with get_connection() as conn:
+                conn.execute(
+                    "UPDATE users SET plan='past_due' WHERE stripe_customer_id=? AND plan NOT IN ('free', 'past_due')",
+                    (customer_id,),
+                )
+                conn.commit()
+            logger.info("Marked user past_due for customer=%s after %d failed attempt(s)", customer_id, attempt)
+
+    elif event["type"] == "invoice.payment_succeeded":
+        # Renewal confirmed — restore access if the user was past_due.
+        invoice = event["data"]["object"]
+        customer_id = invoice.get("customer", "")
+        sub_id = invoice.get("subscription", "")
+        billing_reason = invoice.get("billing_reason", "")
+        # Only act on renewals, not the initial checkout invoice (already
+        # handled by checkout.session.completed).
+        if customer_id and sub_id and billing_reason == "subscription_cycle":
+            from config import PRICE_ID_TO_PLAN
+            try:
+                lines = invoice.get("lines", {}).get("data", [])
+                price_id = lines[0]["price"]["id"] if lines else ""
+            except Exception:
+                price_id = ""
+            new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
+            with get_connection() as conn:
+                conn.execute(
+                    "UPDATE users SET plan=? WHERE stripe_customer_id=? AND stripe_subscription_id=?",
+                    (new_plan, customer_id, sub_id),
+                )
+                conn.commit()
+            logger.info("Renewal confirmed: customer=%s sub=%s plan=%s", customer_id, sub_id, new_plan)
 
     return {"received": True}
 

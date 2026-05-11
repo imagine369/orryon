@@ -23,19 +23,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const { openPanel } = usePanels();
   const isPanelOpen = openPanel !== null;
-  const { sub } = useSubscription();
+  const { sub, fetchError: subFetchError } = useSubscription();
 
   // Don't redirect on the Stripe success landing — the webhook may not have
   // fired yet, so plan/segment can still reflect the old free state for a
   // few seconds. The live subscription hook will correct itself shortly.
   const justUpgraded = searchParams.get("upgraded") === "1";
 
+  // Only redirect to /breathe when:
+  //  1. Auth is resolved and user is present
+  //  2. Not mid-checkout landing (?upgraded=1)
+  //  3. The subscription fetch succeeded (fetchError = false) — a transient
+  //     backend hiccup must never bounce a legitimate Pro user to /breathe
+  //  4. The user is genuinely on the free/breathe-only tier
   const isFreeBreathe =
     !loading &&
     !!user &&
     !justUpgraded &&
-    !sub?.is_active_pro &&
-    (user.segment === "free_breathe" || user.plan === "free");
+    !subFetchError &&
+    sub !== null &&
+    !sub.is_active_pro &&
+    user.segment === "free_breathe";
   const { prefs } = usePreferences();
 
   useEffect(() => {

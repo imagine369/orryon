@@ -51,23 +51,37 @@ export interface SubscriptionServiceValue {
   startCheckout: (plan: CheckoutPlan) => Promise<void>;
   /** True while a checkout call is in-flight. */
   checkoutPending: boolean;
+  /** Non-null when the last checkout attempt failed. Cleared on next attempt. */
+  checkoutError: string | null;
 }
 
 const SubscriptionContext = createContext<SubscriptionServiceValue | null>(null);
 
-const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
-const ANNUAL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ?? "";
+// Accept both the generic name (NEXT_PUBLIC_STRIPE_PRICE_MONTHLY) and the
+// tier-qualified name (NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY) so that either
+// Vercel env-var convention works without a code change.
+const MONTHLY_PRICE_ID =
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ??
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ??
+  "";
+const ANNUAL_PRICE_ID =
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ??
+  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL ??
+  "";
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PaywallState>({ open: false });
   const [checkoutPending, setCheckoutPending] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const showPaywall = useCallback((reason?: string) => {
     setState({ open: true, reason });
+    setCheckoutError(null);
   }, []);
 
   const hidePaywall = useCallback(() => {
     setState((s) => ({ ...s, open: false }));
+    setCheckoutError(null);
   }, []);
 
   const startCheckout = useCallback(async (plan: CheckoutPlan) => {
@@ -81,6 +95,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     setCheckoutPending(true);
+    setCheckoutError(null);
+    const timeoutId = setTimeout(() => {
+      setCheckoutError("Request timed out. Please try again.");
+      setCheckoutPending(false);
+    }, 15_000);
     try {
       const origin = window.location.origin;
       const res = await api.post<{ checkout_url: string }>(
@@ -91,8 +110,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           cancel_url: `${origin}/home`,
         },
       );
+      clearTimeout(timeoutId);
       window.location.href = res.checkout_url;
-    } catch {
+    } catch (e) {
+      clearTimeout(timeoutId);
+      const msg =
+        e instanceof Error ? e.message : "Something went wrong. Please try again.";
+      setCheckoutError(msg);
       setCheckoutPending(false);
     }
   }, []);
@@ -105,8 +129,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       paywallReason: state.reason,
       startCheckout,
       checkoutPending,
+      checkoutError,
     }),
-    [showPaywall, hidePaywall, state.open, state.reason, startCheckout, checkoutPending],
+    [showPaywall, hidePaywall, state.open, state.reason, startCheckout, checkoutPending, checkoutError],
   );
 
   return (
@@ -118,6 +143,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         onClose={hidePaywall}
         onCheckout={startCheckout}
         checkoutPending={checkoutPending}
+        checkoutError={checkoutError}
       />
     </SubscriptionContext.Provider>
   );

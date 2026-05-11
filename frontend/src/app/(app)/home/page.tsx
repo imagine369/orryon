@@ -76,7 +76,7 @@ const CONTAINER = "mx-auto w-full max-w-3xl px-4";
 
 export default function HomePage() {
   const { user } = useAuth();
-  const { sub, loading: subLoading } = useSubscription();
+  const { sub, loading: subLoading, refresh: refreshSub } = useSubscription();
   const searchParams = useSearchParams();
 
   // Home empty-state "Take a breath" is a free-user entry + upgrade nudge.
@@ -148,11 +148,29 @@ export default function HomePage() {
   useEffect(() => {
     if (searchParams.get("upgraded") === "1") {
       setUpgradeBanner(true);
-      const t = setTimeout(() => setUpgradeBanner(false), 5000);
       window.history.replaceState({}, "", "/home");
-      return () => clearTimeout(t);
+
+      // Poll /api/subscription until the webhook updates the plan (up to 30s).
+      // Stripe webhooks fire within seconds of payment; polling catches the
+      // update and refreshes the UI without requiring a manual page reload.
+      let attempts = 0;
+      const poll = setInterval(() => {
+        refreshSub();
+        attempts++;
+        if (attempts >= 10) clearInterval(poll);
+      }, 3000);
+
+      const bannerTimer = setTimeout(() => {
+        setUpgradeBanner(false);
+        clearInterval(poll);
+      }, 30000);
+
+      return () => {
+        clearTimeout(bannerTimer);
+        clearInterval(poll);
+      };
     }
-  }, [searchParams]);
+  }, [searchParams, refreshSub]);
 
   useEffect(() => {
     warmConnection();
@@ -536,7 +554,9 @@ export default function HomePage() {
           {upgradeBanner && (
             <div className={`${CONTAINER} mb-2`}>
               <div className="rounded-full border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-center text-sm text-green-400 animate-in fade-in">
-                Welcome to Pro! Your upgrade is active.
+                {sub?.plan
+                  ? `Welcome to ${sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1)}! Your upgrade is active.`
+                  : "Your upgrade is active. Welcome!"}
               </div>
             </div>
           )}
@@ -624,7 +644,9 @@ export default function HomePage() {
           {upgradeBanner && (
             <div className={`${CONTAINER} mt-2`}>
               <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-center text-sm text-green-400 animate-in fade-in">
-                Welcome to Pro! Your upgrade is active.
+                {sub?.plan
+                  ? `Welcome to ${sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1)}! Your upgrade is active.`
+                  : "Your upgrade is active. Welcome!"}
               </div>
             </div>
           )}

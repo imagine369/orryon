@@ -46,9 +46,10 @@ interface PaywallProps {
   onClose: () => void;
   onCheckout: (plan: CheckoutPlan) => Promise<void> | void;
   checkoutPending: boolean;
+  checkoutError?: string | null;
 }
 
-export function Paywall({ open, onClose, onCheckout, checkoutPending }: PaywallProps) {
+export function Paywall({ open, onClose, onCheckout, checkoutPending, checkoutError }: PaywallProps) {
   const [plan, setPlan] = useState<CheckoutPlan>("monthly");
 
   // Lock body scroll while open.
@@ -288,6 +289,15 @@ export function Paywall({ open, onClose, onCheckout, checkoutPending }: PaywallP
                   ? "Continue · $72 / year"
                   : "Continue · $8 / month"}
               </PillButton>
+
+              {checkoutError && (
+                <p
+                  className="mt-3 text-center text-[0.75rem] leading-snug"
+                  style={{ color: "rgba(255, 120, 100, 0.90)", maxWidth: 380 }}
+                >
+                  {checkoutError}
+                </p>
+              )}
 
               <button
                 onClick={onClose}
