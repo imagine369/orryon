@@ -246,7 +246,8 @@ async def text_to_speech(
     if not text:
         raise HTTPException(status_code=400, detail="Empty text.")
 
-    voice = (body.voice or _DEFAULT_VOICE).strip() or _DEFAULT_VOICE
+    plan = resolve_plan_for_user(uid).get("plan", "free")
+    voice = "eve" if plan in ("premium", "premium_plus") else "sal"
 
     payload = {
         "text": text,

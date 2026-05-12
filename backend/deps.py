@@ -46,13 +46,14 @@ RATE_LIMIT_OTP = 5
 RATE_LIMIT_OTP_IP = 10
 
 # ── Voice minute caps by plan ─────────────────────────────────────────────────
-# Starter: 30 min | Pro / Trial: 150 min | Premium: 350 min | Free: 0
+# Free/Starter: 0 min | Pro / Trial: 150 min | Premium: 350 min | Premium Plus: 500 min
 VOICE_LIMITS_MINUTES: dict[str, int] = {
-    "free":     0,
-    "starter":  30,
-    "trial":    150,
-    "pro":      150,
-    "premium":  350,
+    "free":          0,
+    "starter":       0,
+    "trial":         150,
+    "pro":           150,
+    "premium":       350,
+    "premium_plus":  500,
 }
 
 # On-demand top-up pricing
@@ -119,8 +120,8 @@ def resolve_plan(user_row: dict) -> dict:
         "plan": plan,
         "trial_ends_at": trial_ends_at_str or None,
         "trial_days_remaining": trial_days_remaining,
-        "is_active_pro": plan in ("trial", "pro", "starter", "premium"),
-        "is_free_tier": plan in ("free", "past_due"),
+        "is_active_pro": plan in ("trial", "pro", "premium", "premium_plus"),
+        "is_free_tier": plan in ("free", "starter", "past_due"),
     }
 
 
@@ -139,7 +140,7 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
     if not info["is_active_pro"]:
         raise HTTPException(
             403,
-            "Your Pro trial has ended. Upgrade to continue using this feature.",
+            "Upgrade to Pro, Premium, or Premium Plus to access this feature.",
         )
     return user
 
@@ -147,19 +148,21 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
 # ── Chat message quota ────────────────────────────────────────────────────────
 
 CHAT_LIMITS: dict[str, int] = {
-    "free":    0,
-    "starter": 150,
-    "trial":   500,
-    "pro":     500,
-    "premium": -1,   # -1 = unlimited
+    "free":          0,
+    "starter":       0,
+    "trial":         500,
+    "pro":           500,
+    "premium":       -1,   # -1 = unlimited
+    "premium_plus":  -1,
 }
 
 TIER_RANK: dict[str, int] = {
-    "free": 0,
-    "starter": 1,
-    "trial": 2,
-    "pro": 2,
-    "premium": 3,
+    "free":          0,
+    "starter":       0,
+    "trial":         1,
+    "pro":           2,
+    "premium":       3,
+    "premium_plus":  4,
 }
 
 

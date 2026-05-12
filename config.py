@@ -139,16 +139,17 @@ ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
-# ── Stripe price IDs (set in Railway / .env.local — no hardcoded defaults) ───
-# Starter  $11/mo  |  $8.25/mo billed annually ($99/yr)
-STRIPE_PRICE_STARTER_MONTHLY: str = os.getenv("STRIPE_PRICE_STARTER_MONTHLY", "")
-STRIPE_PRICE_STARTER_ANNUAL: str  = os.getenv("STRIPE_PRICE_STARTER_ANNUAL",  "")
-# Pro     $22/mo  |  $16.50/mo billed annually ($198/yr)
-STRIPE_PRICE_PRO_MONTHLY: str     = os.getenv("STRIPE_PRICE_PRO_MONTHLY",     "")
-STRIPE_PRICE_PRO_ANNUAL: str      = os.getenv("STRIPE_PRICE_PRO_ANNUAL",       "")
-# Premium $33/mo  |  $24.75/mo billed annually ($297/yr)
-STRIPE_PRICE_PREMIUM_MONTHLY: str = os.getenv("STRIPE_PRICE_PREMIUM_MONTHLY", "")
-STRIPE_PRICE_PREMIUM_ANNUAL: str  = os.getenv("STRIPE_PRICE_PREMIUM_ANNUAL",  "")
+# ── Stripe price IDs (set in Railway / .env — no hardcoded defaults) ─────────
+# Starter is the free plan — no Stripe price IDs needed.
+# Pro          paid tier 1
+STRIPE_PRICE_PRO_MONTHLY: str          = os.getenv("STRIPE_PRICE_PRO_MONTHLY",          "")
+STRIPE_PRICE_PRO_ANNUAL: str           = os.getenv("STRIPE_PRICE_PRO_ANNUAL",            "")
+# Premium      paid tier 2
+STRIPE_PRICE_PREMIUM_MONTHLY: str      = os.getenv("STRIPE_PRICE_PREMIUM_MONTHLY",      "")
+STRIPE_PRICE_PREMIUM_ANNUAL: str       = os.getenv("STRIPE_PRICE_PREMIUM_ANNUAL",        "")
+# Premium Plus paid tier 3
+STRIPE_PRICE_PREMIUM_PLUS_MONTHLY: str = os.getenv("STRIPE_PRICE_PREMIUM_PLUS_MONTHLY", "")
+STRIPE_PRICE_PREMIUM_PLUS_ANNUAL: str  = os.getenv("STRIPE_PRICE_PREMIUM_PLUS_ANNUAL",  "")
 
 # Legacy single-plan IDs (kept so existing Stripe subscriptions still work)
 STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")
@@ -156,9 +157,9 @@ STRIPE_PRICE_ANNUAL: str  = os.getenv("STRIPE_PRICE_ANNUAL",  "")
 
 ALLOWED_STRIPE_PRICES: set[str] = {
     p for p in (
-        STRIPE_PRICE_STARTER_MONTHLY, STRIPE_PRICE_STARTER_ANNUAL,
-        STRIPE_PRICE_PRO_MONTHLY,     STRIPE_PRICE_PRO_ANNUAL,
-        STRIPE_PRICE_PREMIUM_MONTHLY, STRIPE_PRICE_PREMIUM_ANNUAL,
+        STRIPE_PRICE_PRO_MONTHLY,          STRIPE_PRICE_PRO_ANNUAL,
+        STRIPE_PRICE_PREMIUM_MONTHLY,      STRIPE_PRICE_PREMIUM_ANNUAL,
+        STRIPE_PRICE_PREMIUM_PLUS_MONTHLY, STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
         # legacy
         STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL,
     ) if p
@@ -168,12 +169,12 @@ ALLOWED_STRIPE_PRICES: set[str] = {
 PRICE_ID_TO_PLAN: dict[str, str] = {
     pid: plan
     for pid, plan in [
-        (STRIPE_PRICE_STARTER_MONTHLY, "starter"),
-        (STRIPE_PRICE_STARTER_ANNUAL,  "starter"),
-        (STRIPE_PRICE_PRO_MONTHLY,     "pro"),
-        (STRIPE_PRICE_PRO_ANNUAL,      "pro"),
-        (STRIPE_PRICE_PREMIUM_MONTHLY, "premium"),
-        (STRIPE_PRICE_PREMIUM_ANNUAL,  "premium"),
+        (STRIPE_PRICE_PRO_MONTHLY,          "pro"),
+        (STRIPE_PRICE_PRO_ANNUAL,           "pro"),
+        (STRIPE_PRICE_PREMIUM_MONTHLY,      "premium"),
+        (STRIPE_PRICE_PREMIUM_ANNUAL,       "premium"),
+        (STRIPE_PRICE_PREMIUM_PLUS_MONTHLY, "premium_plus"),
+        (STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,  "premium_plus"),
         # legacy — treat old single plan as Pro
         (STRIPE_PRICE_MONTHLY, "pro"),
         (STRIPE_PRICE_ANNUAL,  "pro"),
@@ -184,8 +185,8 @@ PRICE_ID_TO_PLAN: dict[str, str] = {
 # Annual price IDs (used to decide trial eligibility — annual = no trial)
 ANNUAL_PRICE_IDS: set[str] = {
     p for p in (
-        STRIPE_PRICE_STARTER_ANNUAL, STRIPE_PRICE_PRO_ANNUAL,
-        STRIPE_PRICE_PREMIUM_ANNUAL, STRIPE_PRICE_ANNUAL,
+        STRIPE_PRICE_PRO_ANNUAL, STRIPE_PRICE_PREMIUM_ANNUAL,
+        STRIPE_PRICE_PREMIUM_PLUS_ANNUAL, STRIPE_PRICE_ANNUAL,
     ) if p
 }
 

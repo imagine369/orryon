@@ -1618,10 +1618,10 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
       {/* Golden Mode */}
       <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
         <div>
-          <p className="text-sm text-white/80 font-medium">Golden Mode</p>
+          <p className="text-sm text-white/80 font-medium">Gentle Mode</p>
           <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-            Larger text, higher contrast, bigger tap targets, slower animations.
-            Designed for comfort.
+            A warmer, unhurried Orryon. Speaks more carefully, checks in often,
+            and keeps everything simple.
           </p>
         </div>
         <button
