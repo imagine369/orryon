@@ -13,7 +13,7 @@ import {
   getHapticPatternForStep,
 } from "@/lib/breathing-sounds";
 
-// ── Design tokens (consistent with breathing-widget.tsx) ─────────────────────
+// ── Design tokens ────────────────────────────────────────────────────────────
 
 // Navy-to-purple background
 const SESSION_BG  = "linear-gradient(180deg, #1e3a48 0%, #2d3a62 35%, #5a4872 68%, #7e6082 100%)";

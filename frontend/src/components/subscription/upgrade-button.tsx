@@ -19,7 +19,6 @@
 
 import { ReactNode } from "react";
 import { Sparkles, Wind } from "lucide-react";
-import { useSubscriptionService } from "@/lib/subscription-service";
 import { useSubscription } from "@/lib/use-subscription";
 
 type UpgradeButtonVariant = "pill" | "subtle" | "icon";
@@ -48,13 +47,12 @@ export function UpgradeButton({
   alwaysRender = false,
   ariaLabel,
 }: UpgradeButtonProps) {
-  const { showPaywall } = useSubscriptionService();
   const { sub } = useSubscription();
 
   const isPro = sub?.is_active_pro === true;
   if (!alwaysRender && isPro) return null;
 
-  const handle = () => showPaywall(reason);
+  const handle = () => { window.location.href = "/login?step=tiers"; };
   const label = children ?? "Upgrade";
 
   if (variant === "icon") {
@@ -138,7 +136,6 @@ export function UpgradeBanner({
   ctaLabel = "Unlock financial peace",
   className = "",
 }: UpgradeBannerProps) {
-  const { showPaywall } = useSubscriptionService();
   const { sub } = useSubscription();
   const isPro = sub?.is_active_pro === true;
   if (isPro) return null;
@@ -179,7 +176,7 @@ export function UpgradeBanner({
       </div>
 
       <button
-        onClick={() => showPaywall(reason)}
+        onClick={() => { window.location.href = "/login?step=tiers"; }}
         className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[0.65rem] font-semibold uppercase tracking-[2px] text-white bg-white/[0.10] hover:bg-white/[0.18] border border-white/15 hover:border-white/25 transition-all"
       >
         <Sparkles className="h-3 w-3" strokeWidth={1.8} />

@@ -14,12 +14,8 @@ import { PillButton } from "@/components/pill-cta";
 const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "";
 const ANNUAL_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "";
 
-// Per-tier price IDs (Starter / Pro / Premium)
+// Per-tier price IDs (Pro / Premium / Premium Plus)
 const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
-  starter: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_MONTHLY || "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_ANNUAL  || "",
-  },
   pro: {
     monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || MONTHLY_PRICE_ID,
     annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  || ANNUAL_PRICE_ID,
@@ -28,9 +24,13 @@ const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
     monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY || "",
     annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_ANNUAL  || "",
   },
+  premium_plus: {
+    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_PLUS_MONTHLY || "",
+    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_PLUS_ANNUAL  || "",
+  },
 };
 
-type Tier = "starter" | "pro" | "premium";
+type Tier = "pro" | "premium" | "premium_plus";
 
 const TIER_CONFIG: {
   id: Tier;
@@ -43,26 +43,6 @@ const TIER_CONFIG: {
   features: string[];
 }[] = [
   {
-    id: "starter",
-    name: "Starter",
-    monthlyPrice: 11,
-    annualMonthlyPrice: 8.25,
-    annualTotal: 99,
-    voiceMinutes: 30,
-    chatMessages: "150 messages/mo",
-    features: [
-      "Personal AI concierge (text)",
-      "Health vitals, medications & appointments",
-      "Location intelligence & commute awareness",
-      "Daily briefing — morning summary",
-      "Email bill detection",
-      "Budget tracking & spending insights",
-      "Calendar, tasks & reminders",
-      "30 voice-input minutes included",
-      "Full data export",
-    ],
-  },
-  {
     id: "pro",
     name: "Pro",
     monthlyPrice: 22,
@@ -71,13 +51,16 @@ const TIER_CONFIG: {
     voiceMinutes: 150,
     chatMessages: "500 messages/mo",
     features: [
-      "Everything in Starter",
-      "Voice responses (TTS) — speak aloud toggle",
-      "Long-term memory (persistent context)",
-      "Proactive suggestions & smart briefings",
-      "Approval gate for sensitive actions",
+      "Personal AI concierge (text & voice)",
+      "Health vitals, medications & appointments",
+      "Location intelligence & commute awareness",
+      "Daily briefing — morning summary",
+      "Email bill detection",
+      "Budget tracking & spending insights",
+      "Calendar, tasks & reminders",
       "150 voice minutes included",
       "On-demand voice top-ups ($6 / 60 min)",
+      "Full data export",
     ],
   },
   {
@@ -92,8 +75,26 @@ const TIER_CONFIG: {
       "Everything in Pro",
       "Unlimited chat messages",
       "350 voice minutes included",
+      "Long-term memory (persistent context)",
+      "Proactive suggestions & smart briefings",
       "Golden Mode (senior-friendly UI)",
       "Priority AI processing",
+    ],
+  },
+  {
+    id: "premium_plus",
+    name: "Premium Plus",
+    monthlyPrice: 44,
+    annualMonthlyPrice: 33,
+    annualTotal: 396,
+    voiceMinutes: 600,
+    chatMessages: "Unlimited messages",
+    features: [
+      "Everything in Premium",
+      "600 voice minutes included",
+      "Approval gate for sensitive actions",
+      "Dedicated priority support",
+      "Early access to new features",
     ],
   },
 ];
@@ -106,7 +107,7 @@ const NO_CARD_TRIAL: boolean =
 
 function LoginPageInner() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user: authedUser } = useAuth();
   const searchParams = useNextSearchParams();
 
   const flow       = searchParams.get("flow");
@@ -117,8 +118,8 @@ function LoginPageInner() {
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
     if (flow === "breathe") return "breathe";
-    if (stepParam === "tiers") return "tiers";
-    return "email";
+    if (stepParam === "email") return "email";
+    return "tiers";
   });
 
   useEffect(() => {
@@ -128,7 +129,7 @@ function LoginPageInner() {
     }
   }, [flow]);
 
-  const [selectedTier, setSelectedTier] = useState<Tier>("pro");
+  const [selectedTier, setSelectedTier] = useState<Tier>("premium");
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
   const [freeSelected, setFreeSelected] = useState(false);
   const [email, setEmail] = useState("");
@@ -273,6 +274,37 @@ function LoginPageInner() {
       }
       const msg = e instanceof Error ? e.message : "";
       setError(msg || "Couldn't reach the server. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  // Already signed-in users clicking "Upgrade" land here: skip email/code
+  // and go straight to Stripe with the selected tier.
+  const handleUpgradeCheckout = async () => {
+    if (freeSelected) {
+      router.push("/home");
+      return;
+    }
+    const priceId = PRICE_IDS[selectedTier][selectedPlan];
+    if (!priceId) {
+      setError("Stripe isn't configured for this tier yet.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const origin = window.location.origin;
+      const data = await api.post<{ checkout_url: string }>(
+        "/api/subscription/checkout",
+        {
+          price_id: priceId,
+          success_url: `${origin}/home?upgraded=1`,
+          cancel_url: `${origin}/login?step=tiers`,
+        },
+      );
+      window.location.href = data.checkout_url;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
     }
   };
@@ -438,60 +470,9 @@ function LoginPageInner() {
             ))}
           </div>
 
-          {/* 3-tier cards */}
+          {/* Plan cards: Starter (free) first, then paid tiers */}
           <div className="w-full max-w-md space-y-3 mb-6">
-            {TIER_CONFIG.map((tier) => {
-              const isSelected = !freeSelected && selectedTier === tier.id;
-              const priceLabel = selectedPlan === "annual"
-                ? `$${tier.annualMonthlyPrice.toFixed(2)}/mo`
-                : `$${tier.monthlyPrice}/mo`;
-              return (
-                <button
-                  key={tier.id}
-                  onClick={() => { setSelectedTier(tier.id); setFreeSelected(false); }}
-                  className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
-                  style={{
-                    borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
-                    background: isSelected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-semibold text-white/90">{tier.name}</p>
-                        {tier.id === "pro" && (
-                          <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">Most popular</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-white/35">{tier.chatMessages} · {tier.voiceMinutes} voice min</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-base font-bold text-white">{priceLabel}</p>
-                      {selectedPlan === "annual" && (
-                        <p className="text-[0.6rem] text-white/30">${tier.annualTotal}/yr</p>
-                      )}
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-                      {tier.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2 text-xs text-white/55">
-                          <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* Free breathing tier — always free, no card required */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-white/[0.06]" />
-              <span className="text-[0.6rem] uppercase tracking-[3px] text-white/25">or</span>
-              <div className="flex-1 h-px bg-white/[0.06]" />
-            </div>
+            {/* Starter — free forever, no Stripe */}
             <button
               onClick={() => setFreeSelected(true)}
               className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
@@ -512,19 +493,65 @@ function LoginPageInner() {
                   <p className="text-base font-bold text-white/70">Free</p>
                 </div>
               </div>
-              {freeSelected && (
-                <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-                  {[
-                    "Access to all of Orryon's breathe exercises. Free forever.",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-white/55">
-                      <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
+                {[
+                  "Guided breathing exercises",
+                  "Calm & meditation sessions",
+                  "Works offline",
+                  "Always free — no card needed",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-xs text-white/55">
+                    <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
+                    {f}
+                  </li>
+                ))}
+              </ul>
             </button>
+
+            {/* Pro, Premium, Premium Plus */}
+            {TIER_CONFIG.map((tier) => {
+              const isSelected = !freeSelected && selectedTier === tier.id;
+              const priceLabel = selectedPlan === "annual"
+                ? `$${tier.annualMonthlyPrice.toFixed(2)}/mo`
+                : `$${tier.monthlyPrice}/mo`;
+              return (
+                <button
+                  key={tier.id}
+                  onClick={() => { setSelectedTier(tier.id); setFreeSelected(false); }}
+                  className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
+                  style={{
+                    borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
+                    background: isSelected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-white/90">{tier.name}</p>
+                        {tier.id === "premium" && (
+                          <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">Most popular</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/35">{tier.chatMessages} · {tier.voiceMinutes} voice min</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-base font-bold text-white">{priceLabel}</p>
+                      {selectedPlan === "annual" && (
+                        <p className="text-[0.6rem] text-white/30">${tier.annualTotal}/yr</p>
+                      )}
+                    </div>
+                  </div>
+                  <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
+                    {tier.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-xs text-white/55">
+                        <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </button>
+              );
+            })}
           </div>
 
           {/* Trial note — only shown for paid monthly plans */}
@@ -541,16 +568,28 @@ function LoginPageInner() {
             <PillButton
               onClick={() => {
                 if (freeSelected) {
-                  setBreatheFlow(true);
-                  setStep("breathe");
+                  if (authedUser) {
+                    router.push("/home");
+                  } else {
+                    setBreatheFlow(true);
+                    setStep("breathe");
+                  }
+                } else if (authedUser) {
+                  // Already signed in (upgrade flow) — skip email/code
+                  void handleUpgradeCheckout();
                 } else {
                   setStep("email");
                 }
               }}
+              disabled={loading}
               className="w-full"
             >
-              {freeSelected
+              {loading
+                ? "Opening checkout…"
+                : freeSelected
                 ? "Start for free — no card needed"
+                : authedUser
+                ? `Upgrade to ${TIER_CONFIG.find(t => t.id === selectedTier)?.name}`
                 : selectedPlan === "monthly"
                 ? `Start 14-day free trial`
                 : `Get ${TIER_CONFIG.find(t => t.id === selectedTier)?.name}`}
@@ -564,17 +603,19 @@ function LoginPageInner() {
                   ? `Billed as $${TIER_CONFIG.find(t => t.id === selectedTier)?.annualTotal}/yr. Cancel anytime.`
                   : "No credit card required during trial."}
             </p>
-            <div className="text-center mt-2">
-              <button
-                onClick={() => setStep("email")}
-                className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/70 hover:text-white transition-colors"
-              >
-                Already have an account?{" "}
-                <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">
-                  Sign in
-                </span>
-              </button>
-            </div>
+            {!authedUser && (
+              <div className="text-center mt-2">
+                <button
+                  onClick={() => setStep("email")}
+                  className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/70 hover:text-white transition-colors"
+                >
+                  Already have an account?{" "}
+                  <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">
+                    Sign in
+                  </span>
+                </button>
+              </div>
+            )}
 
           </div>
         </div>

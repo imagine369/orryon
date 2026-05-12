@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import { api } from "@/lib/api";
 import { Subscription } from "@/lib/use-subscription";
 
 interface Props {
@@ -11,32 +10,9 @@ interface Props {
 
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
-  const handleUpgrade = async () => {
-    setUpgrading(true);
-    setUpgradeError(null);
-    try {
-      const priceId =
-        process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ??
-        process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ??
-        "";
-      if (!priceId) {
-        window.location.href = "/login?step=tiers";
-        return;
-      }
-      const origin = window.location.origin;
-      const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
-        price_id: priceId,
-        success_url: `${origin}/home?upgraded=1`,
-        cancel_url: `${origin}/home`,
-      });
-      window.location.href = res.checkout_url;
-    } catch (e) {
-      setUpgradeError(e instanceof Error ? e.message : "Couldn't open checkout. Please try again.");
-      setUpgrading(false);
-    }
+  const handleUpgrade = () => {
+    window.location.href = "/login?step=tiers";
   };
 
   if (sub.plan === "pro" || dismissed) return null;
@@ -67,10 +43,9 @@ export function TrialBanner({ sub }: Props) {
 
         <button
           onClick={handleUpgrade}
-          disabled={upgrading}
-          className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors disabled:opacity-50"
+          className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors"
         >
-          {upgrading ? "Opening…" : "Upgrade"}
+          Upgrade
         </button>
 
         {!isExpired && !urgency && (
@@ -83,12 +58,6 @@ export function TrialBanner({ sub }: Props) {
           </button>
         )}
       </div>
-
-      {upgradeError && (
-        <p className="mt-1 text-[0.7rem]" style={{ color: "rgba(255, 120, 100, 0.85)" }}>
-          {upgradeError}
-        </p>
-      )}
     </div>
   );
 }
