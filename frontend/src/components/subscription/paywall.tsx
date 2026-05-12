@@ -218,13 +218,13 @@ export function Paywall({ open, onClose, onCheckout, checkoutPending, checkoutEr
                 >
                   {opt === "monthly" ? (
                     <>
-                      Monthly <span className="text-white/40">$8/mo</span>
+                      Monthly <span className="text-white/40">$22/mo</span>
                     </>
                   ) : (
                     <>
-                      Annual <span className="text-white/40">$6/mo</span>
+                      Annual <span className="text-white/40">$16.50/mo</span>
                       <span className="text-white/25 mx-1">·</span>
-                      <span className="text-white/40">$72/yr</span>
+                      <span className="text-white/40">$198/yr</span>
                       <span
                         className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
                         style={{
@@ -286,8 +286,8 @@ export function Paywall({ open, onClose, onCheckout, checkoutPending, checkoutEr
                 {checkoutPending
                   ? "Opening checkout…"
                   : plan === "annual"
-                  ? "Continue · $72 / year"
-                  : "Continue · $8 / month"}
+                  ? "Continue · $198 / year"
+                  : "Continue · $22 / month"}
               </PillButton>
 
               {checkoutError && (
