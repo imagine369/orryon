@@ -30,7 +30,6 @@
 
 import { ReactNode } from "react";
 import { Lock, Sparkles, Wind } from "lucide-react";
-import { useSubscriptionService } from "@/lib/subscription-service";
 import { useSubscription } from "@/lib/use-subscription";
 
 interface PaywallGuardProps {
@@ -68,7 +67,6 @@ export function PaywallGuard({
   className = "",
 }: PaywallGuardProps) {
   const { sub, loading } = useSubscription();
-  const { showPaywall } = useSubscriptionService();
 
   if (loading) {
     return (
@@ -159,8 +157,8 @@ export function PaywallGuard({
             Breathing stays free. Forever.
           </div>
 
-          <button
-            onClick={() => showPaywall(`guard:${feature}`)}
+          <a
+            href="/login?step=tiers"
             className="group inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[2.5px] text-white bg-white/[0.10] hover:bg-white/[0.18] border border-white/15 hover:border-white/25 transition-all"
           >
             <Sparkles
@@ -168,7 +166,7 @@ export function PaywallGuard({
               strokeWidth={1.8}
             />
             {ctaLabel}
-          </button>
+          </a>
         </div>
       </div>
     </div>

@@ -595,6 +595,38 @@ export default function HomePage() {
                 </Link>
               )}
 
+              {/* Upgrade CTA — shown for free / trial-expired users */}
+              {!subLoading && !sub?.is_active_pro && (
+                <div className={`${CONTAINER} mt-6 w-full`}>
+                  <Link
+                    href="/login?step=tiers"
+                    className="group w-full flex flex-col rounded-2xl border border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.08] active:scale-[0.98] transition-all overflow-hidden"
+                  >
+                    <div className="px-5 pt-5 pb-4">
+                      <p className="text-[0.55rem] uppercase tracking-[3px] text-white/35 mb-2">
+                        {sub?.plan === "free" || !sub ? "Start your free trial" : "Trial ended"}
+                      </p>
+                      <p className="text-lg font-bold text-white/90 leading-snug mb-1">
+                        Unlock your personal AI operator.
+                      </p>
+                      <p className="text-[0.78rem] text-white/45 leading-snug mb-4">
+                        Chat, voice, memory, budgeting, health tracking and more.
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {["Pro · $22/mo", "Premium · $33/mo", "Premium Plus · $44/mo"].map((t) => (
+                          <span key={t} className="text-[0.65rem] px-2.5 py-1 rounded-full border border-white/[0.10] bg-white/[0.04] text-white/50">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="w-full rounded-xl bg-white py-3 text-center text-[0.82rem] font-bold text-black tracking-wide group-hover:bg-white/90 transition-colors">
+                        See plans →
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              )}
+
               <div className={`${CONTAINER} mt-4 w-full`}>
                 <Link
                   href="/breathe"

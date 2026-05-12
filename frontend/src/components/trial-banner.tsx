@@ -35,15 +35,23 @@ export function TrialBanner({ sub }: Props) {
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-white/50 flex-1">{message}</span>
+        {isExpired ? (
+          <a href="/login?step=tiers" className="text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors">
+            {message}
+          </a>
+        ) : (
+          <span className="text-white/50 flex-1">{message}</span>
+        )}
 
-        <button
-          onClick={() => setDismissed(true)}
-          className="ml-2 shrink-0 text-white/30 hover:text-white/60 transition-colors"
-          aria-label="Dismiss"
-        >
-          <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </button>
+        {!isExpired && (
+          <button
+            onClick={() => setDismissed(true)}
+            className="ml-2 shrink-0 text-white/30 hover:text-white/60 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </button>
+        )}
       </div>
     </div>
   );
