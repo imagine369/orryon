@@ -6,5 +6,4 @@
  */
 
 export { Paywall } from "./paywall";
-export { UpgradeButton, UpgradeBanner } from "./upgrade-button";
 export { PaywallGuard } from "./paywall-guard";
