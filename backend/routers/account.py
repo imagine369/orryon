@@ -475,26 +475,47 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
 
         current_plan = resolve_plan(row)
         trial_days = get_trial_days(body.price_id)
-        checkout_params: dict[str, Any] = {
-            "customer": customer_id,
-            "payment_method_types": ["card"],
-            "line_items": [{"price": body.price_id, "quantity": 1}],
-            "mode": "subscription",
-            "success_url": success_url,
-            "cancel_url": cancel_url,
-            "metadata": {"user_id": row["id"], "price_id": body.price_id},
-        }
-        is_free_breathe = row.get("segment") == "free_breathe"
-        if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe:
-            effective_trial = (
-                max(current_plan.get("trial_days_remaining", 0), 1)
-                if current_plan["plan"] == "trial"
-                else trial_days
-            )
-            checkout_params["subscription_data"] = {"trial_period_days": effective_trial}
-        session = stripe_lib.checkout.Session.create(**checkout_params)
+
+        def _build_checkout_params(cid: str) -> dict:
+            params: dict[str, Any] = {
+                "customer": cid,
+                "payment_method_types": ["card"],
+                "line_items": [{"price": body.price_id, "quantity": 1}],
+                "mode": "subscription",
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+                "metadata": {"user_id": row["id"], "price_id": body.price_id},
+            }
+            is_free_breathe = row.get("segment") == "free_breathe"
+            if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe:
+                effective_trial = (
+                    max(current_plan.get("trial_days_remaining", 0), 1)
+                    if current_plan["plan"] == "trial"
+                    else trial_days
+                )
+                params["subscription_data"] = {"trial_period_days": effective_trial}
+            return params
+
+        try:
+            session = stripe_lib.checkout.Session.create(**_build_checkout_params(customer_id))
+        except stripe_lib.error.InvalidRequestError as e:
+            err_msg = str(e)
+            # Stale customer from a previous test/live mode — create a fresh one and retry once.
+            if "no such customer" in err_msg.lower() or "similar object exists in test mode" in err_msg.lower():
+                logger.warning("Stale Stripe customer %s for user %s — creating fresh customer and retrying", customer_id, row["id"])
+                customer = stripe_lib.Customer.create(
+                    email=row["email"],
+                    metadata={"user_id": row["id"]},
+                )
+                customer_id = customer.id
+                with get_connection() as conn:
+                    conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
+                    conn.commit()
+                session = stripe_lib.checkout.Session.create(**_build_checkout_params(customer_id))
+            else:
+                raise
     except stripe_lib.error.InvalidRequestError as e:
-        # Bad price ID, test/live-mode mismatch, malformed params, etc.
+        # Bad price ID, malformed params, or other unrecoverable Stripe rejection.
         logger.warning("Stripe InvalidRequestError in checkout: %s", e.user_message or str(e))
         raise HTTPException(400, f"Stripe rejected the request: {e.user_message or str(e)}")
     except stripe_lib.error.AuthenticationError as e:
