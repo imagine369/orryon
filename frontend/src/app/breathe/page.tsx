@@ -2,97 +2,14 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
-import { Play, ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, Zap, Waves, Check, type LucideProps } from "lucide-react";
+import { ChevronRight, Square, Wind, Anchor, Crosshair, Sun, Moon, Pause, Zap, Waves, Play, type LucideProps } from "lucide-react";
 import { useResetAnchors } from "@/lib/use-reset-anchors";
 import { RESET_ANCHORS, getRecommendedAnchor, type ResetAnchor } from "@/lib/reset-scripts";
 import { ResetAnchorSession } from "@/components/reset-anchor-session";
 import { primeAudioContext } from "@/lib/breathing-sounds";
-import { FreeSettingsSheet } from "@/components/free-settings-sheet";
 import type { MoodState } from "@/lib/use-reset-anchors";
 
-// ── Free-tier nav ──────────────────────────────────────────────────────────────
-
-function FreeTierNav({ onUpgrade, onSettings, checkoutPending }: {
-  onUpgrade: () => void;
-  onSettings: () => void;
-  checkoutPending: boolean;
-}) {
-  const { user } = useAuth();
-
-  if (!user) return null;
-
-  const initials = (user.display_name || user.email || "?")
-    .split(" ")
-    .map((w: string) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <div style={{
-      position: "sticky",
-      top: 0,
-      zIndex: 30,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "14px 20px",
-      paddingTop: "max(14px, calc(14px + env(safe-area-inset-top)))",
-      paddingLeft: "max(20px, calc(20px + env(safe-area-inset-left)))",
-      paddingRight: "max(20px, calc(20px + env(safe-area-inset-right)))",
-      background: "rgba(0,0,0,0.85)",
-      backdropFilter: "blur(16px)",
-      WebkitBackdropFilter: "blur(16px)",
-      borderBottom: "1px solid rgba(255,255,255,0.05)",
-    }}>
-      {/* Wordmark */}
-      <span style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.02em" }}>
-        orryon
-      </span>
-
-      {/* Right side */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {/* Upgrade pill */}
-        <button
-          onClick={onUpgrade}
-          disabled={checkoutPending}
-          style={{
-            padding: "6px 14px",
-            borderRadius: 20,
-            background: "rgba(255,255,255,0.9)",
-            color: "#000",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.03em",
-            border: "none",
-            cursor: "pointer",
-            opacity: checkoutPending ? 0.6 : 1,
-          }}
-        >
-          {checkoutPending ? "Opening…" : "Upgrade"}
-        </button>
-
-        {/* Avatar → opens settings sheet */}
-        <button
-          onClick={onSettings}
-          style={{
-            width: 44, height: 44, borderRadius: "50%",
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)",
-            cursor: "pointer",
-          }}
-          aria-label="Account settings"
-        >
-          {initials}
-        </button>
-      </div>
-    </div>
-  );
-}
+// ── Per-anchor icon ────────────────────────────────────────────────────────────
 
 // ── Per-anchor icon ────────────────────────────────────────────────────────────
 
@@ -277,229 +194,17 @@ function AnchorRow({ anchor, isRecommended, onStart }: { anchor: ResetAnchor; is
   );
 }
 
-// ── Upgrade card ───────────────────────────────────────────────────────────────
-
-type UpgradeTier = "starter" | "pro" | "premium";
-
-const UPGRADE_TIERS: {
-  id: UpgradeTier;
-  name: string;
-  monthlyPrice: number;
-  annualMonthlyPrice: number;
-  annualTotal: number;
-  voiceMinutes: number;
-  badge?: string;
-  features: string[];
-}[] = [
-  {
-    id: "starter",
-    name: "Starter",
-    monthlyPrice: 11,
-    annualMonthlyPrice: 8.25,
-    annualTotal: 99,
-    voiceMinutes: 30,
-    features: [
-      "Personal AI concierge (text)",
-      "Health, location & daily briefing",
-      "Budget tracking & goals",
-      "30 voice-input minutes/mo",
-      "Full data export",
-    ],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    monthlyPrice: 22,
-    annualMonthlyPrice: 16.50,
-    annualTotal: 198,
-    voiceMinutes: 150,
-    badge: "Most popular",
-    features: [
-      "Everything in Starter",
-      "Voice responses (TTS)",
-      "Long-term memory & proactive AI",
-      "150 voice minutes/mo",
-      "On-demand top-ups ($6/60 min)",
-    ],
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    monthlyPrice: 33,
-    annualMonthlyPrice: 24.75,
-    annualTotal: 297,
-    voiceMinutes: 350,
-    features: [
-      "Everything in Pro",
-      "Unlimited messages",
-      "350 voice minutes/mo",
-      "Golden Mode & priority AI",
-    ],
-  },
-];
-
-const UPGRADE_PRICE_IDS: Record<UpgradeTier, Record<"monthly" | "annual", string>> = {
-  starter: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_MONTHLY ?? "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER_ANNUAL  ?? "",
-  },
-  pro: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ?? process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  ?? process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "",
-  },
-  premium: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY ?? "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_ANNUAL  ?? "",
-  },
-};
-
-function UpgradeCard({
-  startCheckout,
-  checkoutPending,
-}: {
-  startCheckout: (priceId: string, tier: UpgradeTier, billing: "monthly" | "annual") => void;
-  checkoutPending: string | null;
-}) {
-  const [billing, setBilling] = useState<"monthly" | "annual">("annual");
-  const [tier, setTier] = useState<UpgradeTier>("pro");
-
-  return (
-    <div id="upgrade" className="mt-12 space-y-3">
-      <p className="text-[0.6rem] uppercase tracking-[4px] text-white/40">Pricing</p>
-      <h2 className="text-2xl font-bold text-white font-[family-name:var(--font-playfair)]">
-        Unlock your personal operator.
-      </h2>
-
-      {/* Billing toggle */}
-      <div className="flex rounded-full border border-white/8 bg-[#111] p-0.5">
-        {(["monthly", "annual"] as const).map((opt) => (
-          <button
-            key={opt}
-            onClick={() => setBilling(opt)}
-            className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 min-h-[44px]"
-            style={{
-              background: billing === opt ? "rgba(255,255,255,0.1)" : "transparent",
-              color: billing === opt ? "white" : "rgba(255,255,255,0.35)",
-            }}
-          >
-            {opt === "monthly" ? "Monthly" : (
-              <><span>Annual</span>
-                <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Save 25%</span>
-              </>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tier cards */}
-      <div className="space-y-2">
-        {UPGRADE_TIERS.map((t) => {
-          const isSelected = tier === t.id;
-          const priceLabel = billing === "annual"
-            ? `$${t.annualMonthlyPrice.toFixed(2)}/mo`
-            : `$${t.monthlyPrice}/mo`;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTier(t.id)}
-              className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
-              style={{
-                borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
-                background: isSelected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
-              }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold text-white/90">{t.name}</p>
-                    {t.badge && (
-                      <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">{t.badge}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-white/35">{t.voiceMinutes} voice min/mo</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-base font-bold text-white">{priceLabel}</p>
-                  {billing === "annual" && (
-                    <p className="text-[0.6rem] text-white/30">${t.annualTotal}/yr</p>
-                  )}
-                </div>
-              </div>
-              {isSelected && (
-                <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-                  {t.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-white/55">
-                      <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* CTA */}
-      <button
-        onClick={() => {
-          const priceId = UPGRADE_PRICE_IDS[tier][billing];
-          startCheckout(priceId || `/login?step=tiers`, tier, billing);
-        }}
-        disabled={checkoutPending !== null}
-        className="flex items-center justify-center w-full rounded-full bg-white py-3.5 text-[0.85rem] font-semibold text-black hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-60"
-      >
-        {checkoutPending ? "Redirecting to payment…" : `UPGRADE TO ${UPGRADE_TIERS.find(t=>t.id===tier)?.name.toUpperCase()}`}
-      </button>
-      <p className="text-center text-xs text-white/25">
-        Breathing stays free forever — even if you never upgrade.
-      </p>
-    </div>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
-
-const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? "";
-const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL  ?? "";
 
 export default function BreathePage() {
   const { lastUsedId, markedToday, streakCount, addCompletion, updateCompletion, markStreakForCompletion } = useResetAnchors();
 
-  const [activeAnchor,    setActiveAnchor]    = useState<ResetAnchor | null>(null);
+  const [activeAnchor, setActiveAnchor] = useState<ResetAnchor | null>(null);
 
   const handleStartAnchor = useCallback((anchor: ResetAnchor) => {
     primeAudioContext();
     setActiveAnchor(anchor);
   }, []);
-  const [checkoutPending, setCheckoutPending] = useState<string | null>(null);
-
-  const startCheckout = useCallback(async (priceId: string, tier: UpgradeTier, billing: "monthly" | "annual") => {
-    if (!priceId || priceId.startsWith("/")) {
-      window.location.href = `/login?step=tiers`;
-      return;
-    }
-    setCheckoutPending(priceId);
-    try {
-      const origin = window.location.origin;
-      const res = await api.post<{ checkout_url: string }>("/api/subscription/checkout", {
-        price_id: priceId,
-        success_url: `${origin}/home?upgraded=1`,
-        cancel_url:  `${origin}/breathe`,
-      });
-      window.location.href = res.checkout_url;
-    } catch {
-      setCheckoutPending(null);
-    }
-  }, []);
-
-  const handleNavUpgrade = useCallback(() => {
-    const priceId = MONTHLY_PRICE_ID || "";
-    startCheckout(priceId || `/login?step=tiers`, "pro", "monthly");
-  }, [startCheckout]);
-
-  // Settings sheet
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const recommended = getRecommendedAnchor(lastUsedId);
 
@@ -511,21 +216,6 @@ export default function BreathePage() {
 
   return (
     <div className="min-h-full bg-black text-white">
-
-      {/* Nav — only visible to signed-in free users */}
-      <FreeTierNav
-        onUpgrade={handleNavUpgrade}
-        onSettings={() => setSettingsOpen(true)}
-        checkoutPending={checkoutPending !== null}
-      />
-
-      {/* Account settings sheet for free-tier users */}
-      <FreeSettingsSheet
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onUpgrade={handleNavUpgrade}
-      />
-
       <div className="max-w-2xl mx-auto px-5 pt-8 pb-16">
 
         {/* Header */}
@@ -582,9 +272,6 @@ export default function BreathePage() {
             Today&apos;s anchor is done.
           </p>
         )}
-
-        {/* Upgrade card */}
-        <UpgradeCard startCheckout={startCheckout} checkoutPending={checkoutPending} />
 
       </div>
 

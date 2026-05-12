@@ -11,10 +11,6 @@ interface Props {
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
 
-  const handleUpgrade = () => {
-    window.location.href = "/login?step=tiers";
-  };
-
   if (sub.plan === "pro" || dismissed) return null;
 
   const isExpired = sub.plan === "free" || sub.plan === "past_due";
@@ -23,7 +19,7 @@ export function TrialBanner({ sub }: Props) {
   const message = sub.plan === "past_due"
     ? "Your payment failed. Please update your billing details."
     : isExpired
-    ? "Your Pro trial has ended. Subscribe to continue."
+    ? "Your trial has ended. Subscribe to continue."
     : daysLeft <= 1
     ? "Last day of your free trial."
     : `${daysLeft} days left in your free trial.`;
@@ -42,21 +38,12 @@ export function TrialBanner({ sub }: Props) {
         <span className="text-white/50 flex-1">{message}</span>
 
         <button
-          onClick={handleUpgrade}
-          className="ml-3 shrink-0 text-white font-semibold underline underline-offset-2 hover:text-white/80 transition-colors"
+          onClick={() => setDismissed(true)}
+          className="ml-2 shrink-0 text-white/30 hover:text-white/60 transition-colors"
+          aria-label="Dismiss"
         >
-          Upgrade
+          <X className="h-3.5 w-3.5" strokeWidth={1.5} />
         </button>
-
-        {!isExpired && !urgency && (
-          <button
-            onClick={() => setDismissed(true)}
-            className="ml-2 shrink-0 text-white/30 hover:text-white/60 transition-colors"
-            aria-label="Dismiss"
-          >
-            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
-        )}
       </div>
     </div>
   );
