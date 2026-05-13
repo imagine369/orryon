@@ -33,7 +33,7 @@ const TIERS = [
   {
     id: "pro",
     name: "Pro",
-    tagline: "Full money management + AI concierge.",
+    tagline: "All-in-One Life Concierge",
     monthlyPrice: 22,
     annualTotal: 198,
     annualMonthly: 16.50,
