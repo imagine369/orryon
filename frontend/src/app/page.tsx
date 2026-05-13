@@ -1491,7 +1491,7 @@ export default function LandingPage() {
     // was only ~14px tall on iPhone, well under Apple's 44px min target.
     // Padded pill so it registers reliably on touch and matches Apple HIG.
     <Link
-      href="/login"
+      href="/login?step=email"
       className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
     >
       Sign in
@@ -1503,7 +1503,7 @@ export default function LandingPage() {
   ) : (
     <div className="flex flex-col items-center gap-3">
       <div className="flex flex-col xs:flex-row items-center gap-3">
-        <PillLink href="/login" size="sm">
+        <PillLink href="/login?step=email" size="sm">
           Sign in
         </PillLink>
         <Link
@@ -1631,7 +1631,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex flex-col xs:flex-row items-center gap-3">
-              <PillLink href="/login" size="sm">Sign in</PillLink>
+              <PillLink href="/login?step=email" size="sm">Sign in</PillLink>
               <Link
                 href="/pricing"
                 className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
