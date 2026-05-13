@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <BackButton />
       <h1 className="text-3xl font-bold mt-4 mb-6">Privacy Policy</h1>
       <div className="prose prose-invert prose-sm max-w-none">
-        <p className="text-white/40 text-xs mb-6">Last updated: April 12, 2026</p>
+        <p className="text-white/40 text-xs mb-6">Last updated: May 12, 2026</p>
         
         <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 mb-8">
           <p className="text-sm text-white/80">
@@ -49,7 +49,8 @@ export default function PrivacyPage() {
         <h2 className="text-xl font-semibold mt-8 mb-3">Your Rights</h2>
         <ul>
           <li>Export all your data anytime (ZIP with SQLite database + JSON)</li>
-          <li>Permanently delete your account and all data (this is also how you cancel your subscription)</li>
+          <li>Cancel your subscription anytime via Settings → Manage Billing (Stripe billing portal)</li>
+          <li>Permanently delete your account and all your data</li>
         </ul>
 
         <div className="mt-12 p-6 bg-zinc-900 border border-white/10 rounded-2xl">
