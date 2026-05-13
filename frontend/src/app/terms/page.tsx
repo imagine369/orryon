@@ -66,7 +66,7 @@ export default function TermsPage() {
         <p>PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS.</p>
         <p>Any dispute, claim, or controversy arising out of or relating to these Terms or the Service shall be resolved exclusively through binding individual arbitration administered by the American Arbitration Association ("AAA") under its Commercial Arbitration Rules, in the State of Wyoming, United States. The arbitration shall be conducted by a single arbitrator. Judgment on the award may be entered in any court having jurisdiction.</p>
         <p>YOU AGREE THAT ANY ARBITRATION OR PROCEEDING WILL BE LIMITED TO THE DISPUTE BETWEEN YOU AND ORRYON, AND YOU WAIVE ANY RIGHT TO PARTICIPATE IN A CLASS ACTION, CLASS ARBITRATION, OR OTHER REPRESENTATIVE PROCEEDING. THE ARBITRATOR MAY NOT CONSOLIDATE CLAIMS OR PRESIDE OVER ANY FORM OF REPRESENTATIVE PROCEEDING.</p>
-        <p>You may opt out of this arbitration agreement by emailing support@orryon.com within thirty (30) days of first using the Service, stating your intent to opt out. If you do not opt out, this arbitration agreement shall be binding.</p>
+        <p>You may opt out of this arbitration agreement by emailing contact@orryon.com within thirty (30) days of first using the Service, stating your intent to opt out. If you do not opt out, this arbitration agreement shall be binding.</p>
         <p>Nothing in this section prevents either party from seeking injunctive or other equitable relief in a court of competent jurisdiction for intellectual property or breach of confidentiality claims. This arbitration agreement shall survive termination of these Terms.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">16. Governing Law</h2>
@@ -79,14 +79,14 @@ export default function TermsPage() {
         <p>These Terms, together with the Privacy Policy, constitute the entire agreement between you and Orryon concerning the Service and supersede all prior agreements. If any provision is held invalid or unenforceable, the remaining provisions shall continue in full force. Our failure to enforce any right shall not constitute a waiver. You may not assign these Terms without our prior written consent; we may assign freely. These Terms do not create any agency, partnership, or joint venture. Sections 4–18 shall survive termination.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">19. Contact</h2>
-        <p>Questions? Contact us at <a href="mailto:support@orryon.com" className="underline">support@orryon.com</a>. For legal notices, send to the address provided upon request.</p>
+        <p>Questions? Contact us at <a href="mailto:contact@orryon.com" className="underline">contact@orryon.com</a>. For legal notices, send to the address provided upon request.</p>
 
         <div className="mt-12 p-6 bg-zinc-900 border border-white/10 rounded-2xl">
           <p className="text-sm text-white/70">
             BY USING ORRYON, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO THESE TERMS OF SERVICE, INCLUDING THE DISCLAIMERS THAT THIS IS NOT PROFESSIONAL ADVICE, THE LIMITATION OF LIABILITY, THE INDEMNIFICATION OBLIGATION, AND THE BINDING ARBITRATION AND CLASS ACTION WAIVER.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            This document is not legal advice. Questions or concerns? Contact us at <a href="mailto:support@orryon.com" className="underline hover:text-white">support@orryon.com</a>.
+            This document is not legal advice. Questions or concerns? Contact us at <a href="mailto:contact@orryon.com" className="underline hover:text-white">contact@orryon.com</a>.
           </p>
         </div>
       </div>

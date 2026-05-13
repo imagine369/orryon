@@ -45,7 +45,7 @@ Data is kept as long as needed to provide the Service, meet legal obligations, r
 
 ## 8. Your Rights and Choices
 
-You may have rights to access, correct, delete, port, restrict, or object to processing. Use in-app Export/Delete tools or contact support@orryon.com. We respond within legal timeframes (typically 30 days). Deletion is permanent.
+You may have rights to access, correct, delete, port, restrict, or object to processing. Use in-app Export/Delete tools or contact contact@orryon.com. We respond within legal timeframes (typically 30 days). Deletion is permanent.
 
 ## 9. Data Security
 
@@ -65,13 +65,13 @@ Material changes will be announced via Effective Date update, in-app notice, or 
 
 ## 13. Contact
 
-Questions? Email support@orryon.com (include "Privacy Request" for formal notices).
+Questions? Email contact@orryon.com (include "Privacy Request" for formal notices).
 
 ---
 
 **By using Orryon, you acknowledge that you have read and agree to this Privacy Policy and our Terms of Service.**
 
-This is not legal advice. Contact support@orryon.com with questions.
+This is not legal advice. Contact contact@orryon.com with questions.
 """)
 
 st.caption("© 2026 Orryon. All rights reserved.")

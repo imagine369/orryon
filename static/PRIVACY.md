@@ -41,7 +41,7 @@ We retain your information for as long as necessary to provide the Service, comp
 
 ## 8. Your Rights and Choices
 
-Depending on your location, you may have rights including: access, correction, deletion, portability, restriction of processing, objection, and withdrawal of consent. To exercise these rights, use the in-app tools (Export, Delete Account) or contact support@orryon.com. We will respond within the timeframes required by law (typically 30 days). California residents may make CCPA requests; EEA/UK users may contact our designated representative if required. Note that deletion will permanently remove your account and data; you cannot later recover it.
+Depending on your location, you may have rights including: access, correction, deletion, portability, restriction of processing, objection, and withdrawal of consent. To exercise these rights, use the in-app tools (Export, Delete Account) or contact contact@orryon.com. We will respond within the timeframes required by law (typically 30 days). California residents may make CCPA requests; EEA/UK users may contact our designated representative if required. Note that deletion will permanently remove your account and data; you cannot later recover it.
 
 ## 9. Data Security
 
@@ -49,7 +49,7 @@ We implement reasonable administrative, technical, and physical safeguards, incl
 
 ## 10. Children's Privacy
 
-The Service is not directed to individuals under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under 13. If we become aware that we have collected such information, we will delete it promptly. If you believe a child has provided us information, contact support@orryon.com.
+The Service is not directed to individuals under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under 13. If we become aware that we have collected such information, we will delete it promptly. If you believe a child has provided us information, contact contact@orryon.com.
 
 ## 11. Cookies and Tracking
 
@@ -61,10 +61,10 @@ We may update this Privacy Policy from time to time. Material changes will be an
 
 ## 13. Contact Us
 
-If you have questions, concerns, or requests regarding this Privacy Policy or your data, contact us at support@orryon.com. For formal legal notices, include "Privacy Request" in the subject line.
+If you have questions, concerns, or requests regarding this Privacy Policy or your data, contact us at contact@orryon.com. For formal legal notices, include "Privacy Request" in the subject line.
 
 ---
 
-**Questions?** Contact us at [support@orryon.com](mailto:support@orryon.com)
+**Questions?** Contact us at [contact@orryon.com](mailto:contact@orryon.com)
 
 © 2026 Orryon. All rights reserved.

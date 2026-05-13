@@ -64,7 +64,7 @@ You agree to indemnify and hold Orryon harmless from claims arising from your us
 
 ## 14. Dispute Resolution; Arbitration; Class Action Waiver
 
-**PLEASE READ CAREFULLY.** All disputes shall be resolved by binding individual arbitration in Wyoming under AAA rules. You waive class actions, class arbitrations, and representative proceedings. The arbitrator cannot consolidate claims. You may opt out of arbitration within 30 days of first use by emailing support@orryon.com. This survives termination.
+**PLEASE READ CAREFULLY.** All disputes shall be resolved by binding individual arbitration in Wyoming under AAA rules. You waive class actions, class arbitrations, and representative proceedings. The arbitrator cannot consolidate claims. You may opt out of arbitration within 30 days of first use by emailing contact@orryon.com. This survives termination.
 
 ## 15. Governing Law & Miscellaneous
 
@@ -72,13 +72,13 @@ Governed by Wyoming law. These Terms + Privacy Policy are the entire agreement. 
 
 ## 16. Contact
 
-Questions? support@orryon.com
+Questions? contact@orryon.com
 
 ---
 
 **BY USING ORRYON, YOU ACKNOWLEDGE YOU HAVE READ, UNDERSTOOD, AND AGREE TO THESE TERMS, INCLUDING THE DISCLAIMERS, LIABILITY LIMITS, INDEMNIFICATION, AND BINDING ARBITRATION + CLASS WAIVER.**
 
-This is not legal advice. Contact support@orryon.com with questions.
+This is not legal advice. Contact contact@orryon.com with questions.
 """)
 
 st.caption("© 2026 Orryon. All rights reserved.")

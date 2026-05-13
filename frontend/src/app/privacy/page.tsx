@@ -46,13 +46,13 @@ export default function PrivacyPage() {
         <p>We retain your information for as long as necessary to provide the Service, comply with legal obligations, resolve disputes, and enforce agreements. Upon account deletion, we permanently delete your personal data from active systems within thirty (30) days, subject to legal holds, fraud investigations, or backup retention (typically no longer than 90 days). Anonymized or aggregated data may be retained indefinitely for analytics. You control retention of your local/self-hosted data.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">8. Your Rights and Choices</h2>
-        <p>Depending on your location, you may have rights including: access, correction, deletion, portability, restriction of processing, objection, and withdrawal of consent. To exercise these rights, use the in-app tools (Export, Delete Account) or contact support@orryon.com. We will respond within the timeframes required by law (typically 30 days). California residents may make CCPA requests; EEA/UK users may contact our designated representative if required. Note that deletion will permanently remove your account and data; you cannot later recover it.</p>
+        <p>Depending on your location, you may have rights including: access, correction, deletion, portability, restriction of processing, objection, and withdrawal of consent. To exercise these rights, use the in-app tools (Export, Delete Account) or contact contact@orryon.com. We will respond within the timeframes required by law (typically 30 days). California residents may make CCPA requests; EEA/UK users may contact our designated representative if required. Note that deletion will permanently remove your account and data; you cannot later recover it.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">9. Data Security</h2>
         <p>We implement reasonable administrative, technical, and physical safeguards, including: passwordless OTP + JWT authentication, optional at-rest encryption via ENCRYPTION_KEY (Fernet), HTTPS/TLS for all production traffic, and restricted database access. No security measure is perfect; you are responsible for maintaining the confidentiality of your account credentials. We will notify affected users of material security breaches as required by applicable law.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">10. Children's Privacy</h2>
-        <p>The Service is not directed to individuals under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under 13. If we become aware that we have collected such information, we will delete it promptly. If you believe a child has provided us information, contact support@orryon.com.</p>
+        <p>The Service is not directed to individuals under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under 13. If we become aware that we have collected such information, we will delete it promptly. If you believe a child has provided us information, contact contact@orryon.com.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">11. Cookies and Tracking</h2>
         <p>We use essential cookies and similar technologies for authentication, security, and basic functionality. We do not use cookies for targeted advertising or cross-site tracking. You may control cookies through your browser settings, but disabling them may affect Service functionality.</p>
@@ -61,14 +61,14 @@ export default function PrivacyPage() {
         <p>We may update this Privacy Policy from time to time. Material changes will be announced by updating the Effective Date, posting a notice in the Service, or emailing you. Your continued use of the Service after the Effective Date constitutes acceptance of the updated Policy. We encourage you to review this page periodically.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">13. Contact Us</h2>
-        <p>If you have questions, concerns, or requests regarding this Privacy Policy or your data, contact us at <a href="mailto:support@orryon.com" className="underline">support@orryon.com</a>. For formal legal notices, include "Privacy Request" in the subject line.</p>
+        <p>If you have questions, concerns, or requests regarding this Privacy Policy or your data, contact us at <a href="mailto:contact@orryon.com" className="underline">contact@orryon.com</a>. For formal legal notices, include "Privacy Request" in the subject line.</p>
 
         <div className="mt-12 p-6 bg-zinc-900 border border-white/10 rounded-2xl">
           <p className="text-sm text-white/70">
             We are committed to protecting your privacy and giving you control over your data. Your trust matters to us.
           </p>
           <p className="text-xs text-white/40 mt-4">
-            Questions or concerns? Contact us at <a href="mailto:support@orryon.com" className="underline hover:text-white">support@orryon.com</a>.
+            Questions or concerns? Contact us at <a href="mailto:contact@orryon.com" className="underline hover:text-white">contact@orryon.com</a>.
           </p>
         </div>
       </div>

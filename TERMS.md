@@ -76,7 +76,7 @@ Any dispute, claim, or controversy arising out of or relating to these Terms or 
 
 YOU AGREE THAT ANY ARBITRATION OR PROCEEDING WILL BE LIMITED TO THE DISPUTE BETWEEN YOU AND ORRYON, AND YOU WAIVE ANY RIGHT TO PARTICIPATE IN A CLASS ACTION, CLASS ARBITRATION, OR OTHER REPRESENTATIVE PROCEEDING. THE ARBITRATOR MAY NOT CONSOLIDATE CLAIMS OR PRESIDE OVER ANY FORM OF REPRESENTATIVE PROCEEDING.
 
-You may opt out of this arbitration agreement by emailing support@orryon.com within thirty (30) days of first using the Service, stating your intent to opt out. If you do not opt out, this arbitration agreement shall be binding.
+You may opt out of this arbitration agreement by emailing contact@orryon.com within thirty (30) days of first using the Service, stating your intent to opt out. If you do not opt out, this arbitration agreement shall be binding.
 
 Nothing in this section prevents either party from seeking injunctive or other equitable relief in a court of competent jurisdiction for intellectual property or breach of confidentiality claims. This arbitration agreement shall survive termination of these Terms.
 
@@ -94,12 +94,12 @@ These Terms, together with the Privacy Policy, constitute the entire agreement b
 
 ## 19. Contact
 
-Questions? Contact us at support@orryon.com. For legal notices, send to the address provided upon request.
+Questions? Contact us at contact@orryon.com. For legal notices, send to the address provided upon request.
 
 ---
 
 **BY USING ORRYON, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO THESE TERMS OF SERVICE, INCLUDING THE DISCLAIMERS THAT THIS IS NOT PROFESSIONAL ADVICE, THE LIMITATION OF LIABILITY, THE INDEMNIFICATION OBLIGATION, AND THE BINDING ARBITRATION AND CLASS ACTION WAIVER.**
 
-This document is not legal advice. Questions or concerns? Contact us at support@orryon.com.
+This document is not legal advice. Questions or concerns? Contact us at contact@orryon.com.
 
 © 2026 Orryon. All rights reserved.
