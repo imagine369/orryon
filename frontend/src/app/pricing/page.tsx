@@ -79,7 +79,7 @@ const TIERS = [
       "350 voice minutes / month",
       "Long-term memory (persistent context)",
       "Proactive suggestions & smart briefings",
-      "Golden Mode (senior-friendly UI)",
+      "Golden Mode (easy-read UI)",
       "Priority AI processing",
     ],
   },
