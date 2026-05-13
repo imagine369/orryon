@@ -255,7 +255,7 @@ export default function PricingPage() {
 
                 {/* CTA */}
                 <Link
-                  href={tier.ctaHref}
+                  href={tier.monthlyPrice === 0 ? tier.ctaHref : `/login?tier=${tier.id}&plan=${billing}`}
                   className="block text-center rounded-xl py-3 text-base font-semibold transition-all duration-200 mb-7"
                   style={
                     tier.popular

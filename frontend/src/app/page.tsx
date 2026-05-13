@@ -1475,7 +1475,7 @@ export default function LandingPage() {
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/login" size="sm">Sign up</PillLink>
+    <PillLink href="/pricing" size="sm">Sign up</PillLink>
   );
 
   return (
@@ -1592,7 +1592,7 @@ export default function LandingPage() {
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <PillLink href="/login" size="sm">Sign up</PillLink>
+            <PillLink href="/pricing" size="sm">Sign up</PillLink>
 
             <GetAppButton className="mt-8" />
           </>

@@ -110,12 +110,16 @@ function LoginPageInner() {
   const flow       = searchParams.get("flow");
   const stepParam  = searchParams.get("step");
   const planParam  = searchParams.get("plan");
+  const tierParam  = searchParams.get("tier") as Tier | null;
   const nextParam  = searchParams.get("next") || "/home";
+
+  // If a tier was passed from the pricing page, skip straight to email
+  const hasTierParam = !!(tierParam && TIER_CONFIG.find(t => t.id === tierParam));
 
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
     if (flow === "breathe") return "breathe";
-    if (stepParam === "email") return "email";
+    if (stepParam === "email" || hasTierParam) return "email";
     return "tiers";
   });
 
@@ -126,7 +130,9 @@ function LoginPageInner() {
     }
   }, [flow]);
 
-  const [selectedTier, setSelectedTier] = useState<Tier>("premium");
+  const [selectedTier, setSelectedTier] = useState<Tier>(
+    hasTierParam ? tierParam! : "premium"
+  );
   const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
   const [freeSelected, setFreeSelected] = useState(false);
   const [email, setEmail] = useState("");
@@ -260,6 +266,29 @@ function LoginPageInner() {
       setAuthUser(payload.user);
       setDisplayName(payload.user.display_name || "");
       login(payload.user);
+
+      // If a paid tier was passed from /pricing, auto-open Stripe checkout
+      if (hasTierParam && selectedTier && !freeSelected) {
+        const priceId = PRICE_IDS[selectedTier]?.[selectedPlan];
+        if (priceId) {
+          try {
+            const origin = window.location.origin;
+            const data = await api.post<{ checkout_url: string }>(
+              "/api/subscription/checkout",
+              {
+                price_id: priceId,
+                success_url: `${origin}/home?upgraded=1`,
+                cancel_url: `${origin}/pricing`,
+              },
+            );
+            window.location.href = data.checkout_url;
+            return;
+          } catch {
+            // Fall through to /home if checkout fails
+          }
+        }
+      }
+
       // Hard navigation so the freshly-set HttpOnly session cookie is in
       // place for the very first request /home makes — a soft router.push
       // has, in practice, raced ahead of the cookie write.
@@ -296,7 +325,7 @@ function LoginPageInner() {
         {
           price_id: priceId,
           success_url: `${origin}/home?upgraded=1`,
-          cancel_url: `${origin}/login?step=tiers`,
+          cancel_url: `${origin}/pricing`,
         },
       );
       window.location.href = data.checkout_url;
