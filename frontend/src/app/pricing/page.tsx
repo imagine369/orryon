@@ -149,7 +149,7 @@ export default function PricingPage() {
           >
             Simple, honest pricing
           </h1>
-          <p className="text-white/50 text-base max-w-md mx-auto leading-relaxed">
+          <p className="text-white/50 text-lg max-w-md mx-auto leading-relaxed">
             Breathing and meditation are free for everyone, always.
             Unlock the full AI experience with a paid plan.
           </p>
@@ -165,7 +165,7 @@ export default function PricingPage() {
               <button
                 key={opt}
                 onClick={() => setBilling(opt)}
-                className="rounded-full px-5 py-2 text-sm font-medium transition-all duration-200 flex items-center gap-2"
+                className="rounded-full px-6 py-2.5 text-base font-medium transition-all duration-200 flex items-center gap-2"
                 style={{
                   background: billing === opt ? "rgba(255,255,255,0.10)" : "transparent",
                   color: billing === opt ? "white" : "rgba(255,255,255,0.42)",
@@ -179,8 +179,8 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Cards grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Cards grid — 2 columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
           {TIERS.map((tier) => {
             const Icon = tier.icon;
             const isFree = tier.monthlyPrice === 0;
@@ -189,14 +189,11 @@ export default function PricingPage() {
               : billing === "monthly"
               ? `$${tier.monthlyPrice}`
               : `$${tier.annualMonthly.toFixed(2).replace(/\.00$/, "")}`;
-            const subPrice = !isFree && billing === "annual"
-              ? `$${tier.annualTotal}/yr`
-              : null;
 
             return (
               <div
                 key={tier.id}
-                className="relative flex flex-col rounded-2xl p-6"
+                className="relative flex flex-col rounded-2xl p-7"
                 style={{
                   background: tier.popular
                     ? "linear-gradient(160deg, rgba(168,85,247,0.12) 0%, rgba(255,255,255,0.03) 100%)"
@@ -205,9 +202,9 @@ export default function PricingPage() {
                 }}
               >
                 {tier.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                     <span
-                      className="text-[0.6rem] uppercase tracking-widest font-semibold px-3 py-1 rounded-full"
+                      className="text-xs uppercase tracking-widest font-semibold px-4 py-1 rounded-full"
                       style={{ background: "rgba(168,85,247,0.25)", color: "rgba(192,132,252,0.95)", border: "1px solid rgba(168,85,247,0.30)" }}
                     >
                       Most Popular
@@ -215,45 +212,51 @@ export default function PricingPage() {
                   </div>
                 )}
 
-                {/* Icon */}
-                <div
-                  className="flex items-center justify-center w-9 h-9 rounded-xl mb-4"
-                  style={{ background: tier.accentBg, border: `1px solid ${tier.accentBorder}` }}
-                >
-                  <Icon className={`w-4 h-4 ${tier.iconColor}`} strokeWidth={1.5} />
+                {/* Icon + name row */}
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
+                    style={{ background: tier.accentBg, border: `1px solid ${tier.accentBorder}` }}
+                  >
+                    <Icon className={`w-5 h-5 ${tier.iconColor}`} strokeWidth={1.5} />
+                  </div>
+                  <p className="text-white font-bold text-xl">{tier.name}</p>
                 </div>
 
-                {/* Name + tagline */}
-                <p className="text-white font-semibold text-base mb-1">{tier.name}</p>
-                <p className="text-white/40 text-xs leading-snug mb-5">{tier.tagline}</p>
+                {/* Tagline */}
+                <p className="text-white/50 text-sm leading-relaxed mb-6">{tier.tagline}</p>
 
-                {/* Price */}
-                <div className="mb-5">
-                  <div className="flex items-end gap-1">
-                    <span className="text-white font-bold" style={{ fontSize: "2rem", lineHeight: 1 }}>
+                {/* Price block */}
+                <div className="mb-6">
+                  <div className="flex items-end gap-1.5">
+                    <span className="text-white font-bold" style={{ fontSize: "2.75rem", lineHeight: 1 }}>
                       {displayPrice}
                     </span>
                     {!isFree && (
-                      <span className="text-white/35 text-sm mb-1">/mo</span>
+                      <span className="text-white/45 text-lg mb-1.5">/mo</span>
                     )}
                   </div>
-                  {subPrice && (
-                    <p className="text-white/30 text-xs mt-1">{subPrice} billed annually</p>
-                  )}
-                  {isFree && (
-                    <p className="text-white/30 text-xs mt-1">No credit card required</p>
+
+                  {/* Annual billing line — prominent */}
+                  {!isFree && billing === "annual" && (
+                    <p className="text-white/60 text-sm mt-2 font-medium">
+                      ${tier.annualTotal} billed annually · save 25%
+                    </p>
                   )}
                   {!isFree && billing === "monthly" && (
-                    <p className="text-white/25 text-xs mt-1">
-                      or ${tier.annualMonthly.toFixed(2).replace(/\.00$/, "")}/mo billed annually
+                    <p className="text-white/45 text-sm mt-2">
+                      or ${tier.annualMonthly.toFixed(2).replace(/\.00$/, "")}/mo · billed ${tier.annualTotal}/yr
                     </p>
+                  )}
+                  {isFree && (
+                    <p className="text-white/40 text-sm mt-2">No credit card required</p>
                   )}
                 </div>
 
                 {/* CTA */}
                 <Link
                   href={tier.ctaHref}
-                  className="block text-center rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 mb-6"
+                  className="block text-center rounded-xl py-3 text-base font-semibold transition-all duration-200 mb-7"
                   style={
                     tier.popular
                       ? { background: "rgba(168,85,247,0.25)", color: "rgba(216,180,254,0.95)", border: "1px solid rgba(168,85,247,0.35)" }
@@ -264,13 +267,13 @@ export default function PricingPage() {
                 </Link>
 
                 {/* Divider */}
-                <div className="border-t mb-5" style={{ borderColor: "rgba(255,255,255,0.06)" }} />
+                <div className="border-t mb-6" style={{ borderColor: "rgba(255,255,255,0.06)" }} />
 
                 {/* Features */}
-                <ul className="space-y-2.5 flex-1">
+                <ul className="space-y-3 flex-1">
                   {tier.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-xs text-white/60 leading-snug">
-                      <Check className="w-3 h-3 text-white/30 shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <li key={f} className="flex items-start gap-3 text-sm text-white/65 leading-snug">
+                      <Check className="w-4 h-4 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
                       {f}
                     </li>
                   ))}
@@ -287,8 +290,8 @@ export default function PricingPage() {
         >
           <Wind className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" strokeWidth={1.5} />
           <div>
-            <p className="text-sm font-semibold text-white/80 mb-1">Breathing stays free. Forever.</p>
-            <p className="text-xs text-white/45 leading-relaxed">
+            <p className="text-base font-semibold text-white/80 mb-1">Breathing stays free. Forever.</p>
+            <p className="text-sm text-white/45 leading-relaxed">
               We believe tools that support breathing, meditation, and human wellbeing should be
               available to everyone — no account tier, no credit card, no strings attached.
             </p>
@@ -297,7 +300,7 @@ export default function PricingPage() {
 
         {/* FAQ / bottom nudge */}
         <div className="mt-14 text-center">
-          <p className="text-white/35 text-sm">
+          <p className="text-white/40 text-base">
             Questions?{" "}
             <Link href="/contact" className="underline underline-offset-2 hover:text-white/60 transition-colors">
               Contact us
