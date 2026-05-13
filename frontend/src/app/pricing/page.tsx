@@ -137,10 +137,7 @@ export default function PricingPage() {
 
         {/* Hero */}
         <div className="text-center pt-16 pb-12">
-          <h1
-            className="font-[family-name:var(--font-playfair)] text-white mb-4"
-            style={{ fontSize: "clamp(3rem, 8vw, 5.5rem)", fontWeight: 700, lineHeight: 1.1 }}
-          >
+          <h1 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)] leading-[1.25]">
             Pricing
           </h1>
         </div>
