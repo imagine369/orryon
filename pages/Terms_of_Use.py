@@ -3,47 +3,82 @@ import streamlit as st
 st.set_page_config(page_title="Terms of Service - orryon", page_icon="📜", layout="centered")
 
 st.title("📜 Terms of Service")
-st.markdown("**Last updated: April 12, 2026**")
+st.markdown("**Effective Date: May 12, 2026 | Version 2.0**")
 
-st.info("Thank you for using Orryon. We built this tool to genuinely help you with your finances, schedule, goals, and wellbeing.")
+st.error("IMPORTANT: BY USING ORRYON YOU AGREE TO THESE TERMS, INCLUDING DISCLAIMERS, LIABILITY LIMITS, ARBITRATION, AND CLASS ACTION WAIVER. READ CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE THE SERVICE.")
 
 st.markdown("""
-### Important Disclaimers
+## 1. Definitions & Acceptance
 
-**Orryon is not a financial advisor, lawyer, accountant, doctor, or therapist.**
+"Orryon," "we," "us," or "our" means Orryon and its affiliates. "You" means the user. By using the Service you represent you are 18+, not embargoed, and will comply with all laws. You bind any organization you represent.
 
-This includes all AI features and the Breathe/Meditation exercises. Everything in the app is provided for informational, organizational, and general wellness purposes only.
+## 2. Service Description
 
-- Do not make important financial, legal, medical, or mental health decisions based solely on Orryon.
-- The Breathe and Meditation features are **not** medical treatment or therapy.
-- If you have any medical condition, please consult a qualified healthcare professional before using these features.
-- You use Orryon at your own risk.
+Orryon is a personal finance, productivity, AI, and wellness platform. Features include tracking, budgeting, AI chat (xAI Grok), breathing/meditation, scheduling, etc. We may modify or discontinue features at any time without liability.
 
-### AI and Wellness Features
-The AI assistant (powered by xAI Grok) may sometimes be inaccurate. The wellness features are meant to support relaxation and mindfulness but are not a substitute for professional care.
+## 3. Not Professional Advice; Assumption of Risk
 
-### Subscription & Billing (Hosted Version)
-New users get a 14-day Pro trial. Continued Pro access requires a paid subscription. Self-hosted users do not need to subscribe. Payments are processed by Stripe.
+**ORRYON IS NOT A FINANCIAL ADVISOR, LAWYER, ACCOUNTANT, DOCTOR, THERAPIST, OR ANY LICENSED PROFESSIONAL.** All outputs (AI, forecasts, budgets, wellness exercises) are for informational and general wellness purposes only.
 
-### Your Data & Privacy
-You own your data. We provide easy export and account deletion tools. Self-hosted users keep everything locally in `finance.db`. See the full [Privacy Policy](/privacy) for details.
+**YOU USE THE SERVICE ENTIRELY AT YOUR OWN RISK.** Do not make financial, legal, medical, or other important decisions based solely on Orryon. Breathe/Meditation features are not medical treatment. Consult qualified professionals. Orryon has no liability for decisions you make.
 
-### Service "As Is"
-Orryon is provided "AS IS" without warranties. We cannot guarantee perfect accuracy.
+## 4. AI Limitations; No Reliance
 
-### Limitation of Liability
-To the fullest extent permitted by law, Orryon and its owners are not liable for indirect or consequential damages. Our total liability is limited to the amount you paid in the past 12 months (or $0 for free/self-hosted use).
+AI uses third-party models (xAI Grok) and may produce inaccurate, biased, or unreliable outputs. **DO NOT RELY ON AI OUTPUTS FOR ANY MATERIAL DECISION.** We may modify or remove AI features at any time.
 
-### Dispute Resolution
-Any disputes arising from these Terms will be resolved through binding individual arbitration in the State of Wyoming.
+## 5. Subscription, Billing & Cancellation
+
+14-day free trial for monthly plans (annual charged immediately). Subscriptions auto-renew. Cancel via Stripe billing portal (Settings → Manage Billing). No refunds or credits for partial periods or annual plans. Data remains accessible after cancellation until you delete your account.
+
+## 6. Intellectual Property
+
+Orryon owns all rights in the Service and Content (except your User Content). You receive a limited, revocable, non-transferable license for personal non-commercial use. No copying, reverse engineering, reselling, or creating derivatives without written consent.
+
+## 7. Acceptable Use Policy
+
+You may not: use for illegal/harmful purposes; scrape or harvest data; reverse engineer; upload malware; disrupt the Service; abuse the AI; resell access; train other AI models on our outputs; or violate laws/third-party rights. Violations may result in immediate termination without refund.
+
+## 8. User Content License
+
+You own your User Content but grant Orryon a perpetual, royalty-free, worldwide license to use it as needed to provide and improve the Service.
+
+## 9. Privacy
+
+Your use is subject to our [Privacy Policy](PRIVACY.md) (incorporated by reference).
+
+## 10. Third-Party Services
+
+We are not responsible for xAI, Stripe, SMTP providers, or any linked third-party services. Your use of them is at your own risk.
+
+## 11. Disclaimers; No Warranties
+
+THE SERVICE AND CONTENT ARE PROVIDED "AS IS" AND "AS AVAILABLE" WITH NO WARRANTIES OF ANY KIND (EXPRESS OR IMPLIED), INCLUDING MERCHANTABILITY, FITNESS FOR A PURPOSE, ACCURACY, OR NON-INFRINGEMENT. YOU ASSUME ALL RISK.
+
+## 12. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, ORRYON SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, PUNITIVE, OR EXEMPLARY DAMAGES (INCLUDING LOSS OF PROFITS, DATA, OR GOODWILL), REGARDLESS OF CAUSE. OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID IN THE PRIOR 12 MONTHS. SOME JURISDICTIONS MAY NOT ALLOW CERTAIN LIMITATIONS.
+
+## 13. Indemnification
+
+You agree to indemnify and hold Orryon harmless from claims arising from your use, your content, your violations, or disputes with third parties.
+
+## 14. Dispute Resolution; Arbitration; Class Action Waiver
+
+**PLEASE READ CAREFULLY.** All disputes shall be resolved by binding individual arbitration in Wyoming under AAA rules. You waive class actions, class arbitrations, and representative proceedings. The arbitrator cannot consolidate claims. You may opt out of arbitration within 30 days of first use by emailing support@orryon.com. This survives termination.
+
+## 15. Governing Law & Miscellaneous
+
+Governed by Wyoming law. These Terms + Privacy Policy are the entire agreement. Severability, no waiver, assignment rights (we may assign freely), survival of key sections.
+
+## 16. Contact
+
+Questions? support@orryon.com
 
 ---
 
-**By using Orryon, you acknowledge that you have read and agree to these Terms.**
+**BY USING ORRYON, YOU ACKNOWLEDGE YOU HAVE READ, UNDERSTOOD, AND AGREE TO THESE TERMS, INCLUDING THE DISCLAIMERS, LIABILITY LIMITS, INDEMNIFICATION, AND BINDING ARBITRATION + CLASS WAIVER.**
 
-We genuinely want Orryon to be a helpful tool for you. These terms exist to protect both users and the project while we focus on building something useful and privacy-first.
-
-See `TERMS.md` for the full authoritative version.
+This is not legal advice. Contact support@orryon.com with questions.
 """)
 
-st.caption("This is not legal advice. Consider consulting with a qualified attorney if you have questions.")
+st.caption("© 2026 Orryon. All rights reserved.")

@@ -277,7 +277,7 @@ orryon/
 
 ## Data & Privacy
 
-See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies.
+See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies (Effective Date: May 12, 2026 | Version 2.0). These are the authoritative versions and are harmonized with the live frontend legal pages.
 
 - **Local-first** — all data stays in a single SQLite file on your device.
 - **AI chat** sends your messages + a context summary to xAI Grok. No full database is shared.
@@ -286,4 +286,4 @@ See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies.
 
 ---
 
-> **Disclaimer:** Orryon is provided "AS IS". Never make important financial, legal, or medical decisions based solely on the app or AI. Always consult qualified professionals. See [TERMS.md](TERMS.md).
+> **Disclaimer:** Orryon is provided "AS IS" and "AS AVAILABLE" without warranties of any kind. Never make important financial, legal, medical, or mental health decisions based solely on the app or AI outputs. Always consult qualified professionals. See [TERMS.md](TERMS.md) for the full binding terms, including limitation of liability, indemnification, arbitration, and class action waiver.
