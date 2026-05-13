@@ -286,9 +286,26 @@ export function Paywall({ open, onClose, onCheckout, checkoutPending, checkoutEr
                 {checkoutPending
                   ? "Opening checkout…"
                   : plan === "annual"
-                  ? "Continue · $198 / year"
-                  : "Continue · $22 / month"}
+                  ? "Start now · $198 / year"
+                  : "Start 14-day free trial · $22 / month"}
               </PillButton>
+
+              {plan === "monthly" && !checkoutPending && (
+                <p
+                  className="mt-2.5 text-center text-[0.72rem]"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Free for 14 days, then $22/mo. Cancel anytime.
+                </p>
+              )}
+              {plan === "annual" && !checkoutPending && (
+                <p
+                  className="mt-2.5 text-center text-[0.72rem]"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Billed once at $198. Cancel anytime.
+                </p>
+              )}
 
               {checkoutError && (
                 <p
