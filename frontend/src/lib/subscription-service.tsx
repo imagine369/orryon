@@ -57,17 +57,8 @@ export interface SubscriptionServiceValue {
 
 const SubscriptionContext = createContext<SubscriptionServiceValue | null>(null);
 
-// Accept both the generic name (NEXT_PUBLIC_STRIPE_PRICE_MONTHLY) and the
-// tier-qualified name (NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY) so that either
-// Vercel env-var convention works without a code change.
-const MONTHLY_PRICE_ID =
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ??
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ??
-  "";
-const ANNUAL_PRICE_ID =
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ??
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL ??
-  "";
+const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ?? "";
+const ANNUAL_PRICE_ID  = process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  ?? "";
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PaywallState>({ open: false });

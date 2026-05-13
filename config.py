@@ -151,17 +151,11 @@ STRIPE_PRICE_PREMIUM_ANNUAL: str       = os.getenv("STRIPE_PRICE_PREMIUM_ANNUAL"
 STRIPE_PRICE_PREMIUM_PLUS_MONTHLY: str = os.getenv("STRIPE_PRICE_PREMIUM_PLUS_MONTHLY", "")
 STRIPE_PRICE_PREMIUM_PLUS_ANNUAL: str  = os.getenv("STRIPE_PRICE_PREMIUM_PLUS_ANNUAL",  "")
 
-# Legacy single-plan IDs (kept so existing Stripe subscriptions still work)
-STRIPE_PRICE_MONTHLY: str = os.getenv("STRIPE_PRICE_MONTHLY", "")
-STRIPE_PRICE_ANNUAL: str  = os.getenv("STRIPE_PRICE_ANNUAL",  "")
-
 ALLOWED_STRIPE_PRICES: set[str] = {
     p for p in (
         STRIPE_PRICE_PRO_MONTHLY,          STRIPE_PRICE_PRO_ANNUAL,
         STRIPE_PRICE_PREMIUM_MONTHLY,      STRIPE_PRICE_PREMIUM_ANNUAL,
         STRIPE_PRICE_PREMIUM_PLUS_MONTHLY, STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
-        # legacy
-        STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL,
     ) if p
 }
 
@@ -175,9 +169,6 @@ PRICE_ID_TO_PLAN: dict[str, str] = {
         (STRIPE_PRICE_PREMIUM_ANNUAL,       "premium"),
         (STRIPE_PRICE_PREMIUM_PLUS_MONTHLY, "premium_plus"),
         (STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,  "premium_plus"),
-        # legacy — treat old single plan as Pro
-        (STRIPE_PRICE_MONTHLY, "pro"),
-        (STRIPE_PRICE_ANNUAL,  "pro"),
     ]
     if pid
 }
@@ -186,7 +177,7 @@ PRICE_ID_TO_PLAN: dict[str, str] = {
 ANNUAL_PRICE_IDS: set[str] = {
     p for p in (
         STRIPE_PRICE_PRO_ANNUAL, STRIPE_PRICE_PREMIUM_ANNUAL,
-        STRIPE_PRICE_PREMIUM_PLUS_ANNUAL, STRIPE_PRICE_ANNUAL,
+        STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
     ) if p
 }
 

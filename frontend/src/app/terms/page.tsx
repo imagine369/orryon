@@ -8,7 +8,7 @@ export default function TermsPage() {
       <BackButton />
       <h1 className="text-3xl font-bold mt-4 mb-6">Terms of Service</h1>
       <div className="prose prose-invert prose-sm max-w-none">
-        <p className="text-white/40 text-xs mb-6">Last updated: April 12, 2026</p>
+        <p className="text-white/40 text-xs mb-6">Last updated: May 12, 2026</p>
         
         <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 mb-8">
           <p className="text-sm text-white/80">
@@ -26,7 +26,15 @@ export default function TermsPage() {
         <p>The AI assistant uses xAI&apos;s Grok and may occasionally be inaccurate. Always verify important information independently. You use all features of Orryon at your own risk.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">3. Subscription &amp; Billing</h2>
-        <p>New users receive a 14-day Pro trial. After the trial, continued access requires a paid subscription ($8/month or $72/year) processed by Stripe. Subscriptions automatically renew unless cancelled. To cancel, you must sign in and delete your account. Refund requests are considered on a case-by-case basis.</p>
+        <p>New users on monthly plans receive a 14-day free trial (annual plans are charged immediately). After the trial, continued access requires a paid subscription processed by Stripe. Subscriptions renew automatically unless cancelled.</p>
+        <p className="mt-3">Current plan pricing:</p>
+        <ul className="mt-2 space-y-1">
+          <li><strong>Starter</strong> — Free forever (breathing &amp; meditation features)</li>
+          <li><strong>Pro</strong> — $22/month or $198/year ($16.50/mo)</li>
+          <li><strong>Premium</strong> — $33/month or $297/year ($24.75/mo)</li>
+          <li><strong>Premium Plus</strong> — $44/month or $396/year ($33/mo)</li>
+        </ul>
+        <p className="mt-3">To cancel your subscription, sign in to Orryon and use the billing portal under Settings → Manage Billing. You may also cancel directly via your Stripe billing portal. Refund requests are considered on a case-by-case basis — contact us at <a href="mailto:support@orryon.com" className="underline">support@orryon.com</a>.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">4. Your Data &amp; Privacy</h2>
         <p>You own your data. We provide full export and account deletion tools. See our <a href="/privacy" className="underline">Privacy Policy</a> for details.</p>

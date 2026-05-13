@@ -197,13 +197,13 @@ export default function DownloadPage() {
                   <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
                     <p className="text-xs text-white/50 font-medium uppercase tracking-wider mb-3">Native App (Coming Soon)</p>
                     <p className="text-[13px] text-white/30 leading-relaxed">
-                      A native iOS build via TestFlight is in development. Join the waitlist to be notified.
+                      A native iOS build via TestFlight is in development. Contact us to be notified when it&rsquo;s ready.
                     </p>
                     <Link
                       href="/contact"
                       className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition"
                     >
-                      Join waitlist →
+                      Get notified →
                     </Link>
                   </div>
                 </PlatformCard>
@@ -244,13 +244,13 @@ export default function DownloadPage() {
                   <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
                     <p className="text-xs text-white/50 font-medium uppercase tracking-wider mb-3">Native APK (Coming Soon)</p>
                     <p className="text-[13px] text-white/30 leading-relaxed">
-                      A native Android build is in development. Join the waitlist to get early access.
+                      A native Android build is in development. Contact us to be notified when it&rsquo;s ready.
                     </p>
                     <Link
                       href="/contact"
                       className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60 transition"
                     >
-                      Join waitlist →
+                      Get notified →
                     </Link>
                   </div>
                 </PlatformCard>

@@ -11,14 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 
-const MONTHLY_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || "";
-const ANNUAL_PRICE_ID: string = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || "";
-
 // Per-tier price IDs (Pro / Premium / Premium Plus)
 const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
   pro: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || MONTHLY_PRICE_ID,
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  || ANNUAL_PRICE_ID,
+    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || "",
+    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  || "",
   },
   premium: {
     monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY || "",
@@ -397,7 +394,7 @@ function LoginPageInner() {
             Free breathing &amp; calm
           </h1>
           <p className="text-sm text-white/50 mb-6 text-center max-w-xs">
-            Create a free account. We&rsquo;ll email a 6-digit code to sign you in — no waitlist.
+            Create a free account. We&rsquo;ll email a 6-digit code to sign you in.
           </p>
           <Input
             type="text"

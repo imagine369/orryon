@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 
-const ADMIN_EMAIL = "sato@orryon.com";
-
 type UserRow = {
   id: string;
   email: string;
@@ -93,22 +91,25 @@ export default function AdminPage() {
   const [data, setData] = useState<AdminData | null>(null);
   const [fetchError, setFetchError] = useState("");
   const [activeTab, setActiveTab] = useState("free_breathe");
-
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
-    if (!loading && user && !isAdmin) router.replace("/home");
-  }, [loading, user, isAdmin, router]);
+  }, [loading, user, router]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (loading || !user) return;
     api.get<AdminData>("/api/admin/users")
-      .then(setData)
-      .catch((e) => setFetchError(e?.message || "Failed to load users"));
-  }, [isAdmin]);
+      .then((d) => { setAuthorized(true); setData(d); })
+      .catch((e) => {
+        const status = (e as { status?: number })?.status;
+        if (status === 403) { router.replace("/home"); return; }
+        setAuthorized(true);
+        setFetchError(e?.message || "Failed to load users");
+      });
+  }, [loading, user, router]);
 
-  if (loading || !user || !isAdmin) {
+  if (loading || !user || authorized === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />

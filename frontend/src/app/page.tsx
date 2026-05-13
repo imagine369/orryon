@@ -7,7 +7,7 @@ const StarEight = ({ className }: { className?: string }) => (
     <polygon points="12,2 13.5,8.3 19.1,4.9 15.7,10.5 22,12 15.7,13.5 19.1,19.1 13.5,15.7 12,22 10.5,15.7 4.9,19.1 8.3,13.5 2,12 8.3,10.5 4.9,4.9 10.5,8.3" />
   </svg>
 );
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowUp, Plus, Search, Bell, LayoutGrid, Settings, X, Mic, ChevronLeft, ChevronRight, TrendingDown, Calendar, SlidersHorizontal, BookOpen, Target, Receipt, BarChart2, Wind, Sparkles, List, Check, TrendingUp, Activity, MessageCircle, FileText, Moon, Flame, Dumbbell, Droplets } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
@@ -1479,31 +1479,10 @@ function StoreBadges({ className = "" }: { className?: string }) {
 
 export default function LandingPage() {
   const [loggedIn, setLoggedIn] = useState(false);
-  const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [waitlistStatus, setWaitlistStatus] = useState<"idle" | "loading" | "success" | "duplicate" | "error">("idle");
 
   useEffect(() => {
     setLoggedIn(hasToken());
   }, []);
-
-  const handleWaitlist = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = waitlistEmail.trim();
-    if (!email) return;
-    setWaitlistStatus("loading");
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) throw new Error("request_failed");
-      const data = await res.json();
-      setWaitlistStatus(data.status === "already_on_waitlist" ? "duplicate" : "success");
-    } catch {
-      setWaitlistStatus("error");
-    }
-  }, [waitlistEmail]);
 
   const navActions = loggedIn ? (
     <PillLink href="/home" variant="primary" size="sm">Go to app</PillLink>
@@ -1521,58 +1500,20 @@ export default function LandingPage() {
 
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
-  ) : waitlistStatus === "success" || waitlistStatus === "duplicate" ? (
-    <>
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/[0.04]">
-          <StarEight className="w-4 h-4 text-white/60" />
-        </div>
-        <p className="text-sm font-semibold text-white/85">
-          {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
-        </p>
-        <p className="text-xs text-white/60">
-          {waitlistStatus === "duplicate" ? "We\u2019ll be in touch." : "We\u2019ll reach out when it\u2019s your turn."}
-        </p>
-      </div>
-      <Link
-        href="/login"
-        className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
-      >
-        Already have an account? <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
-      </Link>
-    </>
   ) : (
-    <>
-      <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
-        <div className="w-full flex flex-col xs:flex-row items-stretch xs:items-center gap-2 rounded-2xl xs:rounded-full border border-white/12 bg-white/[0.04] p-2 xs:pl-5 xs:pr-1.5 xs:py-1.5 focus-within:border-white/25 transition-colors duration-200">
-          <input
-            type="email"
-            required
-            placeholder="Enter your email"
-            value={waitlistEmail}
-            onChange={(e) => setWaitlistEmail(e.target.value)}
-            className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
-          />
-          <PillButton
-            type="submit"
-            disabled={waitlistStatus === "loading"}
-            size="sm"
-            className="shrink-0 whitespace-nowrap"
-          >
-            {waitlistStatus === "loading" ? "Joining…" : "Get Early Access"}
-          </PillButton>
-        </div>
-        {waitlistStatus === "error" && (
-          <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
-        )}
-      </form>
-      <Link
-        href="/login"
-        className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
-      >
-        Already have an account? <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
-      </Link>
-    </>
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col xs:flex-row items-center gap-3">
+        <PillLink href="/login" size="sm">
+          Sign in
+        </PillLink>
+        <Link
+          href="/pricing"
+          className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
+        >
+          View pricing
+        </Link>
+      </div>
+    </div>
   );
 
   return (
@@ -1661,12 +1602,12 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* Early Access / Waitlist */}
-      <section id="early-access" className="border-t border-white/5">
+      {/* Bottom CTA */}
+      <section className="border-t border-white/5">
       <div className="max-w-lg lg:max-w-2xl mx-auto px-4 sm:px-6 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
         {!loggedIn && (
           <>
-            {/* Breathing orb + belief statement */}
+            {/* Breathing orb */}
             <motion.div
               animate={{ scale: [1, 1.1, 1], opacity: [0.75, 0.92, 0.75] }}
               transition={{ duration: 5.5, ease: "easeInOut", repeat: Infinity }}
@@ -1684,80 +1625,22 @@ export default function LandingPage() {
               Wellbeing should be free.<br />For everyone.
             </h2>
             <div className="space-y-4 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] text-[0.82rem] sm:text-sm lg:text-base text-white/50 leading-relaxed">
-              <p>That’s why our wellness tools are free for everyone.</p>
+              <p>That&rsquo;s why our wellness tools are free for everyone.</p>
               <p className="font-semibold text-white/70">Use them as much as you like.</p>
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <PillLink href="/login?next=/breathe&flow=breathe" size="sm">Sign up — it&rsquo;s free</PillLink>
-            <Link
-              href="/login"
-              className="mt-4 mb-8 sm:mb-10 lg:mb-12 inline-flex items-center justify-center px-4 py-3 text-sm text-white/75 hover:text-white transition-colors"
-            >
-              Already have an account?{" "}
-              <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">Sign in</span>
-            </Link>
+            <div className="flex flex-col xs:flex-row items-center gap-3">
+              <PillLink href="/login" size="sm">Sign in</PillLink>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
+              >
+                View pricing
+              </Link>
+            </div>
 
-            {/* Divider */}
-            <div className="w-px h-12 bg-white/10 mb-8 sm:mb-10 lg:mb-12" />
-
-            {/* Orryon avatar + Early Access */}
-            <motion.div
-              className="mb-8"
-              animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-              transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-            >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
-            </motion.div>
-            <p className="text-[0.6rem] sm:text-[0.65rem] uppercase tracking-[3px] text-white/30 mb-5">Early Access</p>
-            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">
-              Less noise. More you.
-            </h2>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">
-              Be first. No spam. Ever.
-            </p>
-
-            {waitlistStatus === "success" || waitlistStatus === "duplicate" ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/15 bg-white/[0.04] mb-1">
-                  <StarEight className="w-4 h-4 text-white/60" />
-                </div>
-                <p className="text-base font-semibold text-white/85">
-                  {waitlistStatus === "duplicate" ? "You\u2019re already on the list." : "You\u2019re on the list."}
-                </p>
-                <p className="text-sm text-white/60">
-                  {waitlistStatus === "duplicate"
-                    ? "We already have your email \u2014 we\u2019ll be in touch."
-                    : "We\u2019ll reach out when it\u2019s your turn."}
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleWaitlist} className="w-full max-w-md flex flex-col items-center gap-3">
-                <div className="w-full flex flex-col xs:flex-row items-stretch xs:items-center gap-2 rounded-2xl xs:rounded-full border border-white/12 bg-white/[0.04] p-2 xs:pl-5 xs:pr-1.5 xs:py-1.5 focus-within:border-white/25 transition-colors duration-200">
-                  <input
-                    type="email"
-                    required
-                    placeholder="Enter your email"
-                    value={waitlistEmail}
-                    onChange={(e) => setWaitlistEmail(e.target.value)}
-                    className="flex-1 bg-transparent text-[14px] sm:text-[15px] text-white/85 placeholder:text-white/30 outline-none px-3 xs:px-0 py-2 xs:py-1.5 min-w-0"
-                  />
-                  <PillButton
-                    type="submit"
-                    disabled={waitlistStatus === "loading"}
-                    size="sm"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    {waitlistStatus === "loading" ? "Joining…" : "Access All Features"}
-                  </PillButton>
-                </div>
-                {waitlistStatus === "error" && (
-                  <p className="text-xs text-red-400/70">Something went wrong. Please try again.</p>
-                )}
-              </form>
-            )}
-
-            <StoreBadges className="mt-8" />
+            <StoreBadges className="mt-10" />
           </>
         )}
 
