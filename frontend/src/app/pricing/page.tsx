@@ -270,21 +270,6 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* Free breathe reassurance */}
-        <div
-          className="mt-10 flex items-start gap-4 rounded-2xl px-6 py-5 max-w-xl mx-auto"
-          style={{ background: "rgba(20,184,166,0.06)", border: "1px solid rgba(20,184,166,0.14)" }}
-        >
-          <Wind className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" strokeWidth={1.5} />
-          <div>
-            <p className="text-base font-semibold text-white/80 mb-1">Breathing stays free. Forever.</p>
-            <p className="text-sm text-white/45 leading-relaxed">
-              We believe tools that support breathing, meditation, and human wellbeing should be
-              available to everyone — no account tier, no credit card, no strings attached.
-            </p>
-          </div>
-        </div>
-
         {/* FAQ / bottom nudge */}
         <div className="mt-14 text-center">
           <p className="text-white/40 text-base">
