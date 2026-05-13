@@ -34,18 +34,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div className="p-8 text-center">
-          <h2 className="text-2xl font-semibold text-red-600 mb-4">
-            Something went wrong
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+          <p className="text-white/30 text-xs uppercase tracking-widest mb-4">Something went wrong</p>
+          <h2 className="text-xl font-semibold text-white mb-3">
+            We hit an unexpected error.
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-white/40 text-sm mb-8 max-w-xs">
             We&apos;ve been notified and are looking into it.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-2.5 rounded-full border border-white/15 text-sm text-white/70 hover:text-white hover:border-white/30 transition-colors"
           >
-            Reload Page
+            Reload
           </button>
         </div>
       );

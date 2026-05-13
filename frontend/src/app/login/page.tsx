@@ -370,58 +370,6 @@ function LoginPageInner() {
     }
   };
 
-  const handleStartTrial = async () => {
-    const name = displayName.trim();
-    if (!name) {
-      setError("Please enter your name.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const priceId = PRICE_IDS[selectedTier][selectedPlan];
-
-      // Cookie was set by /api/auth/login during handleVerify; subsequent API
-      // calls authenticate via that cookie automatically. A user who abandons
-      // Stripe checkout will stay signed in as a free-tier user and hit the
-      // server-enforced paywall on protected endpoints — the real gate.
-      //
-      // Beta bypass: when NO_CARD_TRIAL is set, skip the Stripe redirect
-      // entirely. The user lands in /home with their 14-day trial active.
-      // The paywall still fires on day 15 via the in-app TrialBanner's
-      // upgrade button, which *does* hit Stripe Checkout — so this only
-      // removes friction at the very front door, not the monetisation path.
-      if (priceId && !NO_CARD_TRIAL) {
-        const origin = window.location.origin;
-        const data = await api.post<{ checkout_url: string }>(
-          "/api/subscription/checkout",
-          {
-            price_id: priceId,
-            success_url: `${origin}/home?upgraded=1`,
-            cancel_url: `${origin}/login?step=tiers`,
-          },
-        );
-
-        login({ ...authUser!, display_name: name });
-        if (name !== authUser?.display_name) {
-          api.patch("/api/settings", { display_name: name }).catch(() => {});
-        }
-        window.location.href = data.checkout_url;
-        return;
-      }
-
-      // No Stripe configured → no paywall; just finish sign-in.
-      login({ ...authUser!, display_name: name });
-      if (name !== authUser?.display_name) {
-        api.patch("/api/settings", { display_name: name }).catch(() => {});
-      }
-      router.push("/home");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-[100dvh] bg-black" style={{ paddingTop: "env(safe-area-inset-top)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="px-4 pt-4 flex items-center justify-between shrink-0">

@@ -271,13 +271,13 @@ function HowItWorksDemo() {
                 <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-sm">Savings Goal</span>
-                    <span className="text-sm font-bold text-green-400">—%</span>
+                    <span className="text-sm font-bold text-green-400">37%</span>
                   </div>
                   <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
-                    <div className="absolute inset-y-0 left-0 rounded-full bg-green-600/50" style={{ width: "0%" }} />
+                    <div className="absolute inset-y-0 left-0 rounded-full bg-green-600/50" style={{ width: "37%" }} />
                   </div>
                   <div className="flex justify-between text-[0.7rem] text-white/30">
-                    <span>$X,XXX saved of $X,XXX</span>
+                    <span>$1,840 saved of $5,000</span>
                     <span>In progress · by Dec</span>
                   </div>
                 </div>
@@ -285,14 +285,14 @@ function HowItWorksDemo() {
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-sm">Long-term Fund</span>
-                  <span className="text-sm font-bold text-green-400">—%</span>
+                  <span className="text-sm font-bold text-green-400">32%</span>
                 </div>
                 <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                   <div className="absolute inset-y-0 left-0 rounded-full bg-green-600/50" style={{ width: "32%" }} />
                 </div>
                 <div className="flex justify-between text-[0.7rem] text-white/30">
-                  <span>$X,XXX saved of $X,XXX</span>
-                  <span>$X,XXX to go</span>
+                  <span>$1,280 saved of $4,000</span>
+                  <span>$2,720 to go</span>
                 </div>
               </div>
             </div>
