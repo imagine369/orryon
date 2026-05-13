@@ -137,22 +137,12 @@ export default function PricingPage() {
 
         {/* Hero */}
         <div className="text-center pt-16 pb-12">
-          <p
-            className="mb-4"
-            style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "4px", color: "rgba(255,255,255,.35)" }}
-          >
-            Pricing
-          </p>
           <h1
             className="font-[family-name:var(--font-playfair)] text-white mb-4"
-            style={{ fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 700, lineHeight: 1.1 }}
+            style={{ fontSize: "clamp(3rem, 8vw, 5.5rem)", fontWeight: 700, lineHeight: 1.1 }}
           >
-            Simple, honest pricing
+            Pricing
           </h1>
-          <p className="text-white/50 text-lg max-w-md mx-auto leading-relaxed">
-            Breathing and meditation are free for everyone, always.
-            Unlock the full AI experience with a paid plan.
-          </p>
         </div>
 
         {/* Billing toggle */}
