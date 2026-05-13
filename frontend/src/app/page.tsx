@@ -1434,20 +1434,6 @@ function OrbitSection() {
 
 // ─── Get the app button ───────────────────────────────────────────────────────
 
-function GetAppButton({ className = "" }: { className?: string }) {
-  return (
-    <a
-      href="/download"
-      className={`group inline-flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 transition-all hover:border-white/20 hover:bg-white/[0.07] ${className}`}
-    >
-      <svg viewBox="0 0 24 24" className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 16l-4-4 1.4-1.4 1.6 1.6V4h2v8.2l1.6-1.6L16 12l-4 4z" fill="currentColor" stroke="none" />
-        <rect x="4" y="18" width="16" height="2" rx="1" fill="currentColor" stroke="none" />
-      </svg>
-      <span className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors">Get the App</span>
-    </a>
-  );
-}
 
 // ─── Landing page ─────────────────────────────────────────────────────────────
 
@@ -1594,7 +1580,7 @@ export default function LandingPage() {
 
             <PillLink href="/pricing" size="sm">Sign up</PillLink>
 
-            <GetAppButton className="mt-8" />
+            
           </>
         )}
 
@@ -1636,7 +1622,7 @@ export default function LandingPage() {
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Nothing to configure. Just talk to me.</p>
             <PillLink href="/home" size="sm">Access All Features</PillLink>
-            <GetAppButton className="mt-8" />
+            
           </>
         )}
       </div>
