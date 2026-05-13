@@ -119,6 +119,7 @@ function LoginPageInner() {
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
     if (flow === "breathe") return "breathe";
+    if (stepParam === "name") return "name";
     if (stepParam === "email" || hasTierParam) return "email";
     return "tiers";
   });
@@ -277,16 +278,24 @@ function LoginPageInner() {
               "/api/subscription/checkout",
               {
                 price_id: priceId,
-                success_url: `${origin}/home?upgraded=1`,
+                success_url: `${origin}/login?step=name`,
                 cancel_url: `${origin}/pricing`,
               },
             );
             window.location.href = data.checkout_url;
             return;
           } catch {
-            // Fall through to /home if checkout fails
+            // Fall through to name step if checkout fails
           }
         }
+      }
+
+      // New users (no display_name yet) who didn't arrive from a specific tier
+      // or breathe flow should see the plan picker before entering the app.
+      if (!hasTierParam && !breatheFlow && !payload.user.display_name) {
+        setStep("tiers");
+        setLoading(false);
+        return;
       }
 
       // Hard navigation so the freshly-set HttpOnly session cookie is in
@@ -324,11 +333,37 @@ function LoginPageInner() {
         "/api/subscription/checkout",
         {
           price_id: priceId,
-          success_url: `${origin}/home?upgraded=1`,
+          success_url: `${origin}/login?step=name`,
           cancel_url: `${origin}/pricing`,
         },
       );
       window.location.href = data.checkout_url;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      setLoading(false);
+    }
+  };
+
+  // Called from the name step after Stripe checkout (or free signup).
+  // At this point the user is already authenticated and subscribed — we just
+  // save the display name and send them into the app.
+  const handleSaveName = async () => {
+    const name = displayName.trim();
+    if (!name) {
+      setError("Please enter your name.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const currentUser = authedUser || authUser;
+      if (currentUser && name !== currentUser.display_name) {
+        await api.patch("/api/settings", { display_name: name }).catch(() => {});
+      }
+      if (currentUser) {
+        login({ ...currentUser, display_name: name });
+      }
+      window.location.assign("/home");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
@@ -595,7 +630,7 @@ function LoginPageInner() {
               onClick={() => {
                 if (freeSelected) {
                   if (authedUser) {
-                    router.push("/home");
+                    setStep("name");
                   } else {
                     setBreatheFlow(true);
                     setStep("breathe");
@@ -743,25 +778,28 @@ function LoginPageInner() {
         </div>
       )}
 
-      {/* ── Step 4: Name ── */}
+      {/* ── Step 4: Name (post-payment account setup) ── */}
       {step === "name" && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
-          <h1 className="text-2xl font-bold text-white mb-1">What should we call you?</h1>
-          <p className="text-sm text-white/50 mb-6">
-            This is how orryon will greet you.
+          <h1 className="text-2xl font-bold text-white mb-1 font-[family-name:var(--font-playfair)]">
+            One last thing.
+          </h1>
+          <p className="text-sm text-white/50 mb-6 text-center">
+            What should Orryon call you?
           </p>
           <Input
             type="text"
             placeholder="Your name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleStartTrial()}
+            onKeyDown={(e) => e.key === "Enter" && void handleSaveName()}
             className="mb-4 bg-[#111] border-white/10 text-white"
             autoFocus
+            autoComplete="given-name"
           />
           {error && <p className="text-red-400 text-sm mb-3 w-full">{error}</p>}
-          <PillButton onClick={handleStartTrial} disabled={loading} className="w-full">
-            {loading ? "Setting up…" : "Get started"}
+          <PillButton onClick={() => void handleSaveName()} disabled={loading} className="w-full">
+            {loading ? "Setting up…" : "Enter Orryon →"}
           </PillButton>
         </div>
       )}
