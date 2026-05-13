@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import html as _html
 import logging
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import partial
@@ -22,7 +21,7 @@ from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import cache_set
 from backend.deps import ENABLE_DEMO, IS_LOCAL_DEV, IS_PRODUCTION, check_otp_rate_limit
 from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
-from config import CONTACT_EMAIL, SMTP_ENABLED, SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER
+from config import CONTACT_EMAIL, SMTP_FROM, SMTP_USER
 from db import (
     create_verification_code,
     fetch_rows,
@@ -38,47 +37,78 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
 
 
-def _notify_admin_breathe_signup(email: str, display_name: str) -> None:
-    """Send admin notification when a new free breathe user signs up."""
+def _notify_admin_new_signup(email: str, display_name: str, segment: str) -> None:
+    """Send admin notification whenever a brand-new user account is created."""
+    from email_sender import _send_email, orryon_email_header_html
     admin = (CONTACT_EMAIL or "").strip()
-    if not SMTP_ENABLED or not admin:
-        logger.info("Free breathe signup for %s — admin notification skipped (SMTP not configured).", email)
+    if not admin:
+        logger.info("New signup for %s — admin notification skipped (CONTACT_EMAIL not set).", email)
         return
-    try:
-        safe_email = _html.escape(email, quote=True)
-        safe_name = _html.escape(display_name or "—", quote=True)
 
-        html_body = f"""
-<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
-  <h2 style="margin-bottom:4px">🌬️ New Free Breathe Signup</h2>
-  <p style="color:#555;margin-top:0">Someone just signed up for the free breathing feature.</p>
-  <table style="border-collapse:collapse;width:100%;margin:16px 0">
-    <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:120px">Name</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee">{safe_name}</td></tr>
-    <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600">Email</td>
-        <td style="padding:8px 12px">{safe_email}</td></tr>
+    is_breathe = segment == "free_breathe"
+    label     = "🌬️ Free Breathe Signup" if is_breathe else "✨ New User Signup"
+    plan_note = "Free · Breathe only" if is_breathe else "Free trial — will choose plan at checkout"
+    accent    = "#3ecfbe" if is_breathe else "#a78bfa"
+
+    safe_email = _html.escape(email, quote=True)
+    safe_name  = _html.escape(display_name or "—", quote=True)
+
+    plain = (
+        f"{label}\n\n"
+        f"Name:  {display_name or '—'}\n"
+        f"Email: {email}\n"
+        f"Plan:  {plan_note}\n\n"
+        "— orryon"
+    )
+    html = f"""<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+             background:#000;color:#fff;margin:0;padding:0;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="420" cellpadding="0" cellspacing="0"
+               style="background:#111;border-radius:16px;padding:40px;">
+          {orryon_email_header_html()}
+          <tr>
+            <td align="center" style="padding-bottom:8px;">
+              <p style="margin:0;font-size:14px;font-weight:600;letter-spacing:1px;
+                        text-transform:uppercase;color:{accent};">{label}</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:14px 0 20px;">
+              <span style="font-size:20px;font-weight:700;color:#fff;">{safe_email}</span>
+              <span style="display:block;font-size:13px;color:#94a3b8;margin-top:4px;">{safe_name}</span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.1);
+                          border-radius:12px;padding:12px 20px;display:inline-block;">
+                <span style="font-size:13px;color:#94a3b8;">{plan_note}</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
-  <p style="color:#888;font-size:12px">Plan: free · Segment: free_breathe · No trial, no waitlist.</p>
-</div>"""
+</body>
+</html>"""
 
-        plain_body = f"New Free Breathe Signup\n\nName: {display_name or '—'}\nEmail: {email}\nPlan: free · Segment: free_breathe"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{label} — {email}"
+    msg["From"]    = SMTP_FROM or SMTP_USER or admin
+    msg["To"]      = admin
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html, "html"))
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🌬️ New free breathe user — {email}"
-        msg["From"] = SMTP_FROM or SMTP_USER or admin
-        msg["To"] = admin
-        msg["Reply-To"] = admin
-        msg.attach(MIMEText(plain_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
-            s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(msg["From"], [admin], msg.as_string())
-
-        logger.info("Admin notified of free breathe signup: %s", email)
-    except Exception as exc:
-        logger.warning("Failed to notify admin of free breathe signup (%s): %s", email, exc)
+    ok = _send_email(admin, msg)
+    if ok:
+        logger.info("Admin notified of new signup: %s (segment=%s)", email, segment or "standard")
+    else:
+        logger.warning("Failed to notify admin of new signup: %s", email)
 
 _PUBLIC_USER_FIELDS = {
     "id", "email", "display_name", "created_at", "plan", "trial_ends_at",
@@ -163,10 +193,10 @@ async def auth_verify(body: VerifyReq, request: Request):
     if display_name and user.get("display_name") != display_name:
         update_row("users", {"display_name": display_name}, {"id": user["id"]})
         user["display_name"] = display_name
-    # Notify admin of new free breathe signups (fire-and-forget, never blocks response)
-    if is_new_user and segment == "free_breathe":
+    # Notify admin of every new account (fire-and-forget, never blocks response)
+    if is_new_user:
         asyncio.create_task(
-            asyncio.to_thread(_notify_admin_breathe_signup, email, user.get("display_name", ""))
+            asyncio.to_thread(_notify_admin_new_signup, email, user.get("display_name", ""), segment)
         )
     ua = request.headers.get("user-agent", "")
     ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")

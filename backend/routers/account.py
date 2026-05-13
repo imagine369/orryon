@@ -42,7 +42,7 @@ from db import (
     update_row,
     verify_code,
 )
-from email_sender import send_verification_code
+from email_sender import send_verification_code, _send_email, orryon_email_header_html
 
 logger = logging.getLogger(__name__)
 
@@ -642,6 +642,90 @@ async def create_voice_topup_checkout(
     return {"checkout_url": session.url}
 
 
+def _notify_admin_new_subscriber(email: str, plan: str, billing_interval: str) -> None:
+    """Fire-and-forget email to admin when a paid subscription checkout completes."""
+    import html as _html
+    from config import CONTACT_EMAIL, SMTP_FROM, SMTP_USER
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    admin = (CONTACT_EMAIL or "").strip()
+    if not admin:
+        return
+
+    plan_labels = {
+        "pro":          ("Pro",          "$22/mo or $198/yr"),
+        "premium":      ("Premium",      "$33/mo or $297/yr"),
+        "premium_plus": ("Premium Plus", "$44/mo or $396/yr"),
+    }
+    plan_name, plan_price = plan_labels.get(plan, (plan.title(), ""))
+    interval_label = billing_interval.capitalize() if billing_interval else "Subscription"
+
+    safe_email = _html.escape(email, quote=True)
+
+    plain = (
+        f"💳 New Paying Customer\n\n"
+        f"Email:    {email}\n"
+        f"Plan:     {plan_name} ({interval_label})\n"
+        f"Price:    {plan_price}\n\n"
+        "— orryon"
+    )
+    html = f"""<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+             background:#000;color:#fff;margin:0;padding:0;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="420" cellpadding="0" cellspacing="0"
+               style="background:#111;border-radius:16px;padding:40px;">
+          {orryon_email_header_html()}
+          <tr>
+            <td align="center" style="padding-bottom:8px;">
+              <p style="margin:0;font-size:14px;font-weight:600;letter-spacing:1px;
+                        text-transform:uppercase;color:#92fe9d;">💳 New Paying Customer</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:14px 0 8px;">
+              <span style="font-size:20px;font-weight:700;color:#fff;">{safe_email}</span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <div style="background:#0f2027;border:1px solid rgba(146,254,157,0.25);
+                          border-radius:12px;padding:16px 24px;display:inline-block;margin-top:8px;">
+                <span style="font-size:22px;font-weight:800;color:#92fe9d;">{plan_name}</span>
+                <span style="display:block;font-size:13px;color:#64748b;margin-top:4px;">
+                  {interval_label} · {plan_price}
+                </span>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"💳 New subscriber — {email} ({plan_name})"
+    msg["From"]    = SMTP_FROM or SMTP_USER or admin
+    msg["To"]      = admin
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        ok = _send_email(admin, msg)
+        if ok:
+            logger.info("Admin notified of new subscriber: %s plan=%s", email, plan)
+        else:
+            logger.warning("Failed to notify admin of new subscriber: %s", email)
+    except Exception as exc:
+        logger.warning("Admin subscriber notification error for %s: %s", email, exc)
+
+
 @router.post("/api/stripe/webhook")
 async def stripe_webhook(request: Request):
     """Stripe webhook handler — no auth required (validated via Stripe signature)."""
@@ -693,13 +777,26 @@ async def stripe_webhook(request: Request):
                 # or fall back to reading it from the subscription object.
                 price_id = meta.get("price_id", "")
                 new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")  # default pro for legacy
+                billing_interval = "annual" if price_id in (
+                    __import__("config").STRIPE_PRICE_PRO_ANNUAL,
+                    __import__("config").STRIPE_PRICE_PREMIUM_ANNUAL,
+                    __import__("config").STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
+                ) else "monthly"
+                user_email = ""
                 with get_connection() as conn:
                     conn.execute(
                         "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='' WHERE id=?",
                         (new_plan, sub_id, user_id),
                     )
                     conn.commit()
+                    row = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()
+                    user_email = row["email"] if row else ""
                 logger.info("Subscription checkout: user=%s plan=%s sub=%s", user_id, new_plan, sub_id)
+                if user_email:
+                    import asyncio as _asyncio
+                    _asyncio.create_task(
+                        _asyncio.to_thread(_notify_admin_new_subscriber, user_email, new_plan, billing_interval)
+                    )
 
     elif event["type"] in ("customer.subscription.deleted", "customer.subscription.paused"):
         sub = event["data"]["object"]
