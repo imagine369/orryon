@@ -20,6 +20,7 @@ const TIERS = [
     iconColor: "text-teal-400",
     accentBg: "rgba(20,184,166,0.08)",
     accentBorder: "rgba(20,184,166,0.18)",
+    popular: false,
     cta: "Start for free",
     ctaHref: "/login",
     features: [
@@ -69,6 +70,7 @@ const TIERS = [
     iconColor: "text-amber-400",
     accentBg: "rgba(251,191,36,0.06)",
     accentBorder: "rgba(251,191,36,0.18)",
+    popular: false,
     cta: "Get Premium",
     ctaHref: "/login?step=tiers",
     features: [
@@ -92,6 +94,7 @@ const TIERS = [
     iconColor: "text-sky-400",
     accentBg: "rgba(56,189,248,0.06)",
     accentBorder: "rgba(56,189,248,0.18)",
+    popular: false,
     cta: "Get Premium Plus",
     ctaHref: "/login?step=tiers",
     features: [
