@@ -86,7 +86,7 @@ const TIERS = [
   {
     id: "premium_plus",
     name: "Premium Plus",
-    tagline: "Maximum voice, approval gate & priority support.",
+    tagline: "Your all-in-one personal concierge — maximum voice, full power.",
     monthlyPrice: 44,
     annualTotal: 396,
     annualMonthly: 33,
