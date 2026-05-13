@@ -1501,19 +1501,7 @@ export default function LandingPage() {
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex flex-col xs:flex-row items-center gap-3">
-        <PillLink href="/login?step=email" size="sm">
-          Sign in
-        </PillLink>
-        <Link
-          href="/pricing"
-          className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
-        >
-          View pricing
-        </Link>
-      </div>
-    </div>
+    <PillLink href="/login" size="sm">Sign up</PillLink>
   );
 
   return (
@@ -1630,15 +1618,7 @@ export default function LandingPage() {
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <div className="flex flex-col xs:flex-row items-center gap-3">
-              <PillLink href="/login?step=email" size="sm">Sign in</PillLink>
-              <Link
-                href="/pricing"
-                className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
-              >
-                View pricing
-              </Link>
-            </div>
+            <PillLink href="/login" size="sm">Sign up</PillLink>
 
             <StoreBadges className="mt-10" />
           </>
