@@ -34,7 +34,7 @@ export default function TermsPage() {
           <li><strong>Premium</strong> — $33/month or $297/year ($24.75/mo)</li>
           <li><strong>Premium Plus</strong> — $44/month or $396/year ($33/mo)</li>
         </ul>
-        <p className="mt-3">To cancel your subscription, sign in to Orryon and use the billing portal under Settings → Manage Billing. You may also cancel directly via your Stripe billing portal. Refund requests are considered on a case-by-case basis — contact us at <a href="mailto:support@orryon.com" className="underline">support@orryon.com</a>.</p>
+        <p className="mt-3">To cancel your subscription, sign in to Orryon and use the billing portal under Settings → Manage Billing. When you cancel, your access continues until the end of the current billing period — no partial-period refunds are issued. Annual subscriptions are non-refundable. We do not offer refunds for unused time remaining in any billing period. For questions, contact us at <a href="mailto:support@orryon.com" className="underline">support@orryon.com</a>.</p>
 
         <h2 className="text-xl font-semibold mt-8 mb-3">4. Your Data &amp; Privacy</h2>
         <p>You own your data. We provide full export and account deletion tools. See our <a href="/privacy" className="underline">Privacy Policy</a> for details.</p>
