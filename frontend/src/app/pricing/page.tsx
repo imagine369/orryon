@@ -27,7 +27,6 @@ const TIERS = [
       "Guided breathing sessions",
       "Meditation exercises",
       "Breathe orb (always free)",
-      "Basic AI chat",
     ],
   },
   {
