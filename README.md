@@ -277,7 +277,7 @@ orryon/
 
 ## Data & Privacy
 
-See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies (Effective Date: May 12, 2026 | Version 2.0). These are the authoritative versions and are harmonized with the live frontend legal pages.
+See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies (Effective Date: May 12, 2026 | Version 3.0). These are the authoritative versions and are harmonized with the live frontend legal pages.
 
 - **Local-first** — all data stays in a single SQLite file on your device.
 - **AI chat** sends your messages + a context summary to xAI Grok. No full database is shared.

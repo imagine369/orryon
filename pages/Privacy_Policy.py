@@ -3,69 +3,73 @@ import streamlit as st
 st.set_page_config(page_title="Privacy Policy - orryon", page_icon="🔒", layout="centered")
 
 st.title("🔒 Privacy Policy")
-st.markdown("**Effective Date: May 12, 2026 | Version 2.0**")
+st.markdown("**Effective Date: May 12, 2026 | Version 3.0**")
 
-st.info("Orryon respects your privacy. This policy explains how we collect, use, disclose, and protect your information. By using the Service, you consent to these practices.")
+st.info("Orryon respects your privacy. This policy explains how we collect, use, disclose, and protect your information. By using the Service, you consent to these practices. If you do not agree, do not use the Service.")
 
 st.markdown("""
 ## 1. Information We Collect
 
-We collect information necessary to provide and improve the Service:
+We collect information necessary to provide, maintain, improve, and secure the Service. Categories include:
 
-- **Account Information**: Email address for authentication (passwordless OTP), notifications, and recovery.
-- **User Data**: Transactions, budgets, goals, accounts, notes, events, schedules, and other records you create.
-- **AI Interaction Data**: Chat messages, history, and limited context summaries sent to third-party AI providers.
-- **Billing Information**: Stripe customer and subscription IDs (we never store card details).
-- **Technical & Usage Data**: Device info, IP, browser, access times, and error logs for security and improvement.
-- **Optional Information**: Data you voluntarily provide (support requests, feedback).
+- **Account Information**: Email address (for authentication via passwordless OTP, notifications, and account recovery).
+- **User Data**: Financial records (transactions, budgets, accounts, goals, subscriptions), notes, events, schedules, productivity data, and other content you create or import.
+- **AI Interaction Data**: Chat messages, conversation history, prompts, and limited context summaries sent to third-party AI providers.
+- **Billing Information**: Stripe customer and subscription identifiers (we never store full payment card details or other sensitive payment information).
+- **Technical & Usage Data**: Device information, IP address, browser type, operating system, access times, pages viewed, error logs, and performance data.
+- **Optional Information**: Any additional data you voluntarily provide (e.g., via support requests, feedback, or surveys).
 
 ## 2. How We Use Your Information
 
-We use your information to provide and improve the Service, authenticate users, process payments, deliver AI features, send transactional emails, analyze usage, comply with law, and enforce our Terms.
+We use the information we collect to: (a) provide, maintain, and improve the Service; (b) authenticate users and prevent fraud or abuse; (c) process payments and manage subscriptions; (d) deliver AI-powered and other features; (e) send transactional emails (OTP codes, billing receipts, optional reminders); (f) analyze usage to enhance features, performance, and user experience; (g) comply with legal obligations; (h) enforce our Terms of Service; and (i) protect the rights, property, and safety of Orryon, our users, and the public.
 
-## 3. Legal Bases for Processing
+## 3. Legal Bases for Processing (GDPR, UK GDPR, and Similar Laws)
 
-Where applicable (EEA, UK, California), legal bases include contract performance, consent, legitimate interests (security, improvement), and legal compliance. You may withdraw consent where applicable.
+Where applicable (including for users in the EEA, UK, Switzerland, or California), our legal bases for processing personal information include: (i) performance of a contract with you (providing the Service pursuant to the Terms of Service); (ii) your consent (for optional features, marketing communications, or specific processing activities); (iii) our legitimate interests (including improving the Service, security, fraud prevention, and analytics), provided such interests are not overridden by your data protection rights; and (iv) compliance with legal obligations. You may withdraw consent at any time where processing is based on consent.
 
-## 4. AI and Third-Party Processing
+## 4. AI and Third-Party Processing; Subprocessors
 
-AI messages and limited context may be sent to xAI (Grok API). We do not send full databases. See xAI's policy: https://x.ai/legal/privacy-policy. Stripe handles billing (https://stripe.com/privacy). Optional SMTP providers handle emails you configure.
+When you use the AI assistant, your messages and a limited, relevant summary of your data (e.g., recent transactions, current budgets, or active goals) may be transmitted to third-party AI providers such as xAI (Grok API). We do not transmit your full database or raw financial history. Current subprocessors include xAI (for AI processing), Stripe (for billing), and optional SMTP providers (for transactional emails you configure). Review xAI's privacy policy at https://x.ai/legal/privacy-policy and Stripe's privacy policy at https://stripe.com/privacy. We require all subprocessors to maintain appropriate confidentiality and security measures.
 
-## 5. Sharing and Disclosure
+## 5. Sharing and Disclosure of Personal Information
 
-We do not sell personal information. We may share with subprocessors under confidentiality, for legal compliance, to protect rights, or with your consent. Aggregated/de-identified data may be used for analytics.
+We do not sell your personal information. We may share personal information: (a) with service providers and subprocessors who perform services on our behalf under appropriate confidentiality and data protection obligations; (b) to comply with law, legal process, or valid government requests; (c) to protect our rights, property, or safety or that of our users or the public; (d) in connection with a merger, acquisition, corporate reorganization, or sale of all or substantially all of our assets (with notice where required); or (e) with your consent. Aggregated or de-identified data that does not identify you may be used or shared for analytics, product improvement, research, or other lawful purposes.
 
 ## 6. International Data Transfers
 
-Data may be processed in the US or other countries. We use Standard Contractual Clauses or other lawful mechanisms where required.
+Your information may be transferred to and processed in the United States or other countries where our service providers and subprocessors are located. Where required by applicable law (including GDPR and UK GDPR), we use appropriate safeguards such as Standard Contractual Clauses approved by the European Commission, the UK Information Commissioner's Office, or other lawful transfer mechanisms. By using the Service, you consent to such transfers to the extent permitted by law.
 
 ## 7. Data Retention
 
-Data is kept as long as needed to provide the Service, meet legal obligations, resolve disputes, and enforce agreements. Upon deletion, personal data is removed from active systems within 30 days (subject to legal holds/backups up to ~90 days). Anonymized data may be retained indefinitely.
+We retain personal information for as long as necessary to provide the Service, comply with legal obligations, resolve disputes, enforce agreements, and protect our rights. Upon account deletion, we permanently delete your personal data from active production systems within thirty (30) days, subject to legal holds, fraud investigations, backup retention (typically no longer than ninety (90) days), or requirements under applicable law. Anonymized or aggregated data may be retained indefinitely for analytics and product improvement. You control retention of your local or self-hosted data.
 
 ## 8. Your Rights and Choices
 
-You may have rights to access, correct, delete, port, restrict, or object to processing. Use in-app Export/Delete tools or contact contact@orryon.com. We respond within legal timeframes (typically 30 days). Deletion is permanent.
+Depending on your location, you may have rights under applicable data protection laws, including the right to access, correct, delete, port, restrict processing of, object to processing of, and (where processing is based on consent) withdraw consent to your personal information. To exercise these rights, use the in-app tools (Export, Delete Account) or contact contact@orryon.com. We will respond to verified requests within the timeframes required by applicable law (typically thirty (30) days). California residents may make CCPA/CPRA requests. EEA/UK users may contact our designated representative if required. Note that deletion will permanently remove your account and data; you cannot later recover it. Some rights may be subject to exceptions or limitations under applicable law.
 
 ## 9. Data Security
 
-We use reasonable safeguards: OTP + JWT auth, optional ENCRYPTION_KEY (Fernet), HTTPS/TLS, and restricted access. No system is perfect; you are responsible for your credentials. We notify users of material breaches as required by law.
+We implement reasonable administrative, technical, and physical safeguards designed to protect your personal information, including passwordless OTP + JWT authentication, optional at-rest encryption via ENCRYPTION_KEY (Fernet), HTTPS/TLS for all production traffic, and restricted database access. No security measure is perfect, and we cannot guarantee absolute security. You are responsible for maintaining the confidentiality of your account credentials. We will notify affected users of material security breaches as required by applicable law, without admission of liability.
 
 ## 10. Children's Privacy
 
-The Service is not directed to children under 13 (or applicable digital consent age). We do not knowingly collect personal information from children under 13. Contact us if you believe this has occurred.
+The Service is not directed to individuals under the age of thirteen (13) (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children under thirteen (13). If we become aware that we have collected such information, we will delete it promptly. If you believe a child has provided us information, contact contact@orryon.com.
 
-## 11. Cookies and Tracking
+## 11. Cookies and Tracking Technologies
 
-We use essential cookies for authentication and functionality. No targeted advertising or cross-site tracking cookies. Browser settings control cookies (may affect functionality if disabled).
+We use essential cookies and similar technologies for authentication, security, and basic functionality. We do not use cookies for targeted advertising, cross-site tracking, or marketing purposes. You may control cookies through your browser settings, but disabling essential cookies may affect Service functionality.
 
-## 12. Changes to This Policy
+## 12. Data Processing Addendum (DPA)
 
-Material changes will be announced via Effective Date update, in-app notice, or email. Continued use after the Effective Date constitutes acceptance.
+For enterprise or business customers subject to GDPR, UK GDPR, CCPA, or similar data protection laws, Orryon offers a separate Data Processing Addendum (DPA) that sets forth additional contractual terms regarding the processing of personal data. The DPA is available upon request by emailing contact@orryon.com. The DPA supplements this Privacy Policy and the Terms of Service and forms part of the agreement between Orryon and the enterprise customer when executed.
 
-## 13. Contact
+## 13. Changes to This Policy
 
-Questions? Email contact@orryon.com (include "Privacy Request" for formal notices).
+We may update this Privacy Policy from time to time. Material changes will be announced by updating the Effective Date, posting a notice in the Service, or emailing you. Your continued use of the Service after the Effective Date constitutes acceptance of the updated Policy. We encourage you to review this page periodically.
+
+## 14. Contact Us
+
+If you have questions, concerns, or requests regarding this Privacy Policy or your personal information, contact us at contact@orryon.com. For formal legal notices, include "Privacy Request" in the subject line.
 
 ---
 
