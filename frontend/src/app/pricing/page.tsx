@@ -22,7 +22,7 @@ const TIERS = [
     accentBorder: "rgba(20,184,166,0.18)",
     popular: false,
     cta: "Start for free",
-    ctaHref: "/login",
+    ctaHref: "/login?step=email",
     features: [
       "Guided breathing sessions",
       "Meditation exercises",
