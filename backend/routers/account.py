@@ -487,7 +487,19 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
                 "metadata": {"user_id": row["id"], "price_id": body.price_id},
             }
             is_free_breathe = row.get("segment") == "free_breathe"
-            if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe:
+            had_previous = False
+            try:
+                subs = stripe_lib.Subscription.list(customer=cid, status="all", limit=10)
+                for s in subs.get("data", []):
+                    for item in s.get("items", {}).get("data", []):
+                        if item.get("price", {}).get("id") == body.price_id:
+                            had_previous = True
+                            break
+                    if had_previous:
+                        break
+            except Exception:
+                pass
+            if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe and not had_previous:
                 effective_trial = (
                     max(current_plan.get("trial_days_remaining", 0), 1)
                     if current_plan["plan"] == "trial"
