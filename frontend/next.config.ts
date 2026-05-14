@@ -41,11 +41,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
-  async redirects() {
-    return [
-      { source: "/download", destination: "/pricing", permanent: true },
-    ];
-  },
+  // No redirects needed — /download is now a real page (web download like Cursor)
   // API proxy: `app/api/[[...path]]/route.ts` (runtime BACKEND_URL), not rewrites (build-time).
 };
 

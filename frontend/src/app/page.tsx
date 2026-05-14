@@ -1461,7 +1461,7 @@ export default function LandingPage() {
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/pricing" size="sm">Sign up</PillLink>
+    <PillLink href="/download" size="sm">Get the app</PillLink>
   );
 
   return (
@@ -1578,7 +1578,7 @@ export default function LandingPage() {
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <PillLink href="/pricing" size="sm">Sign up</PillLink>
+            <PillLink href="/download" size="sm">Get the app</PillLink>
 
             {/* Divider */}
             <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
@@ -1593,7 +1593,7 @@ export default function LandingPage() {
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
-            <PillLink href="/pricing" size="sm">Get started</PillLink>
+            <PillLink href="/download" size="sm">Get the app</PillLink>
           </>
         )}
 
