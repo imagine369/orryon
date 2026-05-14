@@ -38,7 +38,7 @@ from backend.cache import check_rate_limit_async
 from backend.deps import (
     MONTHLY_SPEND_CAP_USD,
     get_voice_limit_minutes,
-    require_active_plan,
+    require_voice_plan,
     resolve_plan_for_user,
 )
 from backend.signing import require_signed_request
@@ -52,7 +52,7 @@ from db import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["voice"], dependencies=[Depends(require_active_plan)])
+router = APIRouter(tags=["voice"], dependencies=[Depends(require_voice_plan)])
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -65,7 +65,6 @@ _EL_BASE = "https://api.elevenlabs.io/v1"
 _EL_ORB_VOICE_ID = os.getenv("ELEVENLABS_ORB_VOICE_ID", "DKfKzHbGIi7qsCsZWN8G")
 _EL_MODEL = "eleven_multilingual_v2"
 
-_DEFAULT_VOICE = os.getenv("XAI_TTS_VOICE", "sal")
 _DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
 
 _STT_MAX_BYTES = 25 * 1024 * 1024
@@ -82,7 +81,6 @@ _BYTES_PER_SECOND_ESTIMATE = 16_000
 
 class TTSReq(BaseModel):
     text: str = Field(min_length=1, max_length=_TTS_MAX_CHARS)
-    voice: str | None = None
 
 
 class OrbTTSReq(BaseModel):
@@ -233,9 +231,12 @@ async def text_to_speech(
     _signed: dict = Depends(require_signed_request),
 ) -> Response:
     """
-    Synthesize speech from text using xAI TTS.
+    Synthesize speech from text using xAI TTS using Orryon's voice (eve).
 
-    Body: {"text": "hello", "voice": "eve"}
+    Only Premium and Premium Plus users can reach this endpoint — all others
+    are blocked at the router level (403). Eve is Orryon's only voice.
+
+    Body: {"text": "hello"}
     Returns: audio/mpeg (MP3 bytes)
     """
     _require_key()
@@ -246,12 +247,9 @@ async def text_to_speech(
     if not text:
         raise HTTPException(status_code=400, detail="Empty text.")
 
-    plan = resolve_plan_for_user(uid).get("plan", "free")
-    voice = "eve" if plan in ("premium", "premium_plus") else "sal"
-
     payload = {
         "text": text,
-        "voice_id": voice,
+        "voice_id": "eve",
         "language": _DEFAULT_LANGUAGE,
     }
     headers = {

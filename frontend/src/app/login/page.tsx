@@ -12,6 +12,8 @@ import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 
 // Per-tier price IDs (Pro / Premium / Premium Plus)
+type Tier = "pro" | "premium" | "premium_plus";
+
 const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
   pro: {
     monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || "",
@@ -26,8 +28,6 @@ const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
     annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_PLUS_ANNUAL  || "",
   },
 };
-
-type Tier = "pro" | "premium" | "premium_plus";
 
 const TIER_CONFIG: {
   id: Tier;
@@ -56,7 +56,6 @@ const TIER_CONFIG: {
       "Budget tracking & spending insights",
       "Calendar, tasks & reminders",
       "150 voice minutes included",
-      "On-demand voice top-ups ($6 / 60 min)",
       "Full data export",
     ],
   },

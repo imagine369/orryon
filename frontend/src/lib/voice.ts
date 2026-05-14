@@ -1,8 +1,8 @@
 /**
  * Voice helpers for orryon — xAI Speech-to-Text and Text-to-Speech.
  *
- * Used only for the chat assistant (sal voice). Breathing / Reset Anchor
- * sessions use synthesized soundscapes (Web Audio API) with no TTS.
+ * Orryon speaks exclusively with the eve voice (Premium / Premium Plus only).
+ * Breathing / Reset Anchor sessions use synthesized soundscapes (Web Audio API) with no TTS.
  *
  * Keys are never exposed to the browser — injected server-side.
  * See `backend/routers/voice.py`.
@@ -90,7 +90,7 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
  */
 export async function textToSpeech(text: string): Promise<void> {
   try {
-    const bodyStr = JSON.stringify({ text, voice: "shimmer" });
+    const bodyStr = JSON.stringify({ text });
     const sigHeaders = await signRequest("POST", "/api/voice/tts", bodyStr);
     const res = await fetch(`${getApiBase()}/api/voice/tts`, {
       method: "POST",

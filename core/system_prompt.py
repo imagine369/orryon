@@ -56,7 +56,7 @@ def get_system_prompt(
     user_name: str = "there",
     mode: str = "adult",          # "adult" | "golden"
     tier: str = "pro",            # "starter" | "pro" | "premium"
-    voice_enabled: bool = False,  # True = Orryon speaks (Pro/Premium only)
+    voice_enabled: bool = False,  # True = Orryon speaks (Premium / Premium Plus only)
 ) -> str:
     now = datetime.now()
     today_str = now.strftime("%A, %B %d, %Y")
@@ -65,7 +65,7 @@ def get_system_prompt(
     current_month = now.strftime("%Y-%m")
     prior_year = year - 1
     is_golden = mode == "golden"
-    has_voice = voice_enabled and tier in ("pro", "premium")
+    has_voice = voice_enabled and tier in ("premium", "premium_plus")
 
     personality_block = _golden_personality(user_name) if is_golden else _adult_personality(user_name)
     voice_note = (

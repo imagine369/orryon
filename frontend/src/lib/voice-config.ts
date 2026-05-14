@@ -1,12 +1,12 @@
 /**
  * Orryon voice configuration.
  *
- * Used only for the chat assistant (xAI `sal`).
+ * Orryon speaks exclusively with xAI `eve` — available on Premium and Premium Plus only.
  * Breathing / Reset Anchor sessions use Web Audio API soundscapes — no TTS.
  */
 
 /** xAI TTS voice ID — used for chat assistant replies only. */
-export const ORRYON_VOICE_ID = "sal" as const;
+export const ORRYON_VOICE_ID = "eve" as const;
 
 /** BCP-47 language code. */
 export const ORRYON_VOICE_LANGUAGE = "en" as const;

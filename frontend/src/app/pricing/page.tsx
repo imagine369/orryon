@@ -56,7 +56,6 @@ const TIERS = [
       "Calendar, tasks & reminders",
       "Cash flow forecast",
       "300 voice minutes / month",
-      "On-demand voice top-ups ($6 / 60 min)",
       "3,000 chat messages / month",
       "Full data export",
       "Heavy usage handling: Hard limits + upgrade prompts",

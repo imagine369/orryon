@@ -46,12 +46,12 @@ RATE_LIMIT_OTP = 5
 RATE_LIMIT_OTP_IP = 10
 
 # ── Voice minute caps by plan ─────────────────────────────────────────────────
-# Free/Starter: 0 min | Pro / Trial: 150 min | Premium: 350 min | Premium Plus: 500 min
+# Voice (eve) is Premium and Premium Plus only. All other plans get 0.
 VOICE_LIMITS_MINUTES: dict[str, int] = {
     "free":          0,
     "starter":       0,
-    "trial":         150,
-    "pro":           150,
+    "trial":         0,
+    "pro":           0,
     "premium":       350,
     "premium_plus":  500,
 }
@@ -141,6 +141,17 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
         raise HTTPException(
             403,
             "Upgrade to Pro, Premium, or Premium Plus to access this feature.",
+        )
+    return user
+
+
+async def require_voice_plan(user: dict = Depends(get_current_user)) -> dict:
+    """FastAPI dependency — restricts voice (eve) to Premium and Premium Plus only."""
+    info = resolve_plan_for_user(user["user_id"])
+    if info["plan"] not in ("premium", "premium_plus"):
+        raise HTTPException(
+            403,
+            "Upgrade to Premium or Premium Plus to use Orryon's voice.",
         )
     return user
 
