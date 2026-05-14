@@ -1,123 +1,57 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-
-type Platform = "mac" | "windows" | "linux";
-
-interface PlatformInfo {
-  label: string;
-  filename: string;
-  icon: string;
-}
-
-const platforms: Record<Platform, PlatformInfo> = {
-  mac: {
-    label: "macOS",
-    filename: "Orryon-mac.dmg",
-    icon: "",
-  },
-  windows: {
-    label: "Windows",
-    filename: "Orryon-win.exe",
-    icon: "🪟",
-  },
-  linux: {
-    label: "Linux",
-    filename: "Orryon-linux.AppImage",
-    icon: "🐧",
-  },
-};
+import Image from "next/image";
+import { Footer } from "@/components/footer";
 
 export default function DownloadPage() {
-  const [detectedPlatform] = useState<Platform>(() => {
-    if (typeof window === "undefined") return "mac";
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes("win")) return "windows";
-    if (ua.includes("linux")) return "linux";
-    return "mac";
-  });
-  const [downloaded, setDownloaded] = useState(false);
-
-  const handleDownload = (platform: Platform) => {
-    // In production this would point to real hosted binaries
-    // For now we just trigger a fake download + show success state
-    const link = document.createElement("a");
-    link.href = `/downloads/${platforms[platform].filename}`;
-    link.download = platforms[platform].filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 2500);
-  };
-
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-6">
-      <div className="max-w-[520px] text-center">
-        {/* Logo / brand */}
-        <div className="mb-8">
-          <span className="font-[family-name:var(--font-playfair)] text-4xl tracking-[6px] font-bold">
-            ORRYON
-          </span>
-        </div>
+    <div className="min-h-screen flex flex-col bg-black text-white">
+      <header className="flex items-center justify-between px-6 py-5 max-w-4xl mx-auto w-full">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="rounded-full object-cover ring-1 ring-white/10" priority />
+          <span className="text-white font-extrabold tracking-widest uppercase text-sm font-[family-name:var(--font-playfair)]">ORRYON</span>
+        </Link>
+        <Link href="/login" className="text-white/50 text-sm hover:text-white/80 transition-colors">Sign in</Link>
+      </header>
 
-        <h1 className="text-[2.25rem] sm:text-5xl font-bold tracking-tight mb-4 font-[family-name:var(--font-playfair)]">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <Image
+          src="/avatar.png"
+          alt="Orryon"
+          width={88}
+          height={88}
+          className="rounded-full object-cover ring-1 ring-white/10 mb-8"
+        />
+
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 font-[family-name:var(--font-playfair)]">
           Get Orryon
         </h1>
-        <p className="text-white/60 text-lg mb-12">
-          Download the app. Sign in. Your wellbeing, private by design.
+        <p className="text-white/55 text-lg mb-10 max-w-sm leading-relaxed">
+          Orryon runs in your browser — no download needed. Sign in on any device and you&apos;re ready to go.
         </p>
 
-        {/* Primary detected platform */}
-        <div className="mb-8">
-          <button
-            onClick={() => handleDownload(detectedPlatform)}
-            className="group relative inline-flex items-center justify-center rounded-full border border-white bg-white px-12 py-4 text-lg font-medium text-black transition active:scale-[0.985]"
-          >
-            Download for {platforms[detectedPlatform].label}
-          </button>
-          <p className="mt-3 text-xs text-white/40 tracking-[2px]">
-            DETECTED • {platforms[detectedPlatform].label.toUpperCase()}
-          </p>
-        </div>
-
-        {/* Other platforms */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          {(["mac", "windows", "linux"] as Platform[])
-            .filter((p) => p !== detectedPlatform)
-            .map((p) => (
-              <button
-                key={p}
-                onClick={() => handleDownload(p)}
-                className="rounded-full border border-white/20 px-6 py-2.5 text-sm text-white/80 hover:bg-white/5 hover:text-white transition"
-              >
-                {platforms[p].icon} {platforms[p].label}
-              </button>
-            ))}
-        </div>
-
-        {downloaded && (
-          <p className="mt-8 text-emerald-400 text-sm tracking-widest">
-            DOWNLOAD STARTED — CHECK YOUR DOWNLOADS FOLDER
-          </p>
-        )}
-
-        {/* Subtle footer */}
-        <div className="mt-16 text-[10px] text-white/30 tracking-[3px]">
-          FREE FOREVER ON STARTER • UPGRADE ANYTIME INSIDE THE APP
-        </div>
-
-        <div className="mt-4">
+          <Link
+            href="/login?step=email"
+            className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors"
+          >
+            Open Orryon →
+          </Link>
           <Link
             href="/pricing"
-            className="text-xs text-white/40 hover:text-white/70 underline-offset-4 hover:underline transition"
+            className="inline-flex items-center justify-center rounded-full border border-white/20 px-8 py-3.5 text-base text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
           >
             View pricing
           </Link>
         </div>
-      </div>
+
+        <p className="mt-8 text-xs text-white/25 tracking-[2px] uppercase">
+          Works on Mac · Windows · iPhone · Android · any browser
+        </p>
+      </main>
+
+      <Footer />
     </div>
   );
 }
