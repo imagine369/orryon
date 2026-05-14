@@ -17,7 +17,7 @@ We collect information necessary to provide, maintain, improve, and secure the S
 
 ## 2. How We Use Your Information
 
-We use the information we collect to: (a) provide, maintain, and improve the Service; (b) authenticate users and prevent fraud or abuse; (c) process payments and manage subscriptions; (d) deliver AI-powered and other features; (e) send transactional emails (OTP codes, billing receipts, optional reminders); (f) analyze usage to enhance features, performance, and user experience; (g) comply with legal obligations; (h) enforce our Terms of Service; and (i) protect the rights, property, and safety of Orryon, our users, and the public.
+**Orryon uses your data solely to make your experience better.** We use the information we collect to: (a) provide, maintain, and improve the Service for you; (b) authenticate users and prevent fraud or abuse; (c) process payments and manage subscriptions; (d) deliver personalized AI-powered and other features; (e) send transactional emails (OTP codes, billing receipts, optional reminders); (f) analyze usage to enhance features, performance, and user experience; (g) comply with legal obligations; (h) enforce our Terms of Service; and (i) protect the rights, property, and safety of Orryon, our users, and the public. We do not use your data for any other purpose.
 
 ## 3. Legal Bases for Processing (GDPR, UK GDPR, and Similar Laws)
 
@@ -27,9 +27,13 @@ Where applicable (including for users in the European Economic Area, United King
 
 When you use the AI assistant, your messages and a limited, relevant summary of your data (e.g., recent transactions, current budgets, or active goals) may be transmitted to third-party AI providers such as xAI (Grok API). We do not transmit your full database or raw financial history. We maintain a list of subprocessors and service providers, which we update from time to time. Current subprocessors include xAI (for AI processing), Stripe (for billing), and optional SMTP providers (for transactional emails you configure). Review xAI's privacy policy at https://x.ai/legal/privacy-policy and Stripe's privacy policy at https://stripe.com/privacy. We require all subprocessors to maintain appropriate confidentiality and security measures.
 
-## 5. Sharing and Disclosure of Personal Information
+## 5. Sharing and Disclosure of Personal Information; No Sale of Data
 
-We do not sell your personal information. We may share personal information: (a) with service providers and subprocessors who perform services on our behalf under appropriate confidentiality and data protection obligations; (b) to comply with law, legal process, or valid government requests; (c) to protect our rights, property, or safety or that of our users or the public; (d) in connection with a merger, acquisition, corporate reorganization, or sale of all or substantially all of our assets (with notice where required); or (e) with your consent. Aggregated or de-identified data that does not identify you may be used or shared for analytics, product improvement, research, or other lawful purposes.
+**ORRYON DOES NOT SELL, RENT, LEASE, OR TRADE YOUR PERSONAL INFORMATION OR USER CONTENT TO ANY THIRD PARTY FOR ANY PURPOSE WHATSOEVER.** We keep your data private and use it solely to provide, operate, secure, and improve the Service for your benefit—including delivering personalized AI assistance, financial insights, wellness guidance, and other features you choose to use. We do not use your data for targeted advertising, cross-site tracking, profiling for third parties, or any unrelated commercial purpose.
+
+We may share personal information only in the following limited circumstances: (a) with service providers and subprocessors (such as xAI for AI processing or Stripe for billing) who perform services on our behalf under strict confidentiality and data protection obligations; (b) to comply with law, valid legal process, or government requests; (c) to protect the rights, property, or safety of Orryon, our users, or the public; (d) in connection with a merger, acquisition, or sale of all or substantially all of our assets (with notice where required by law); or (e) with your explicit consent. Aggregated or de-identified data that cannot identify you may be used for analytics and product improvement.
+
+**NOTWITHSTANDING ANY OTHER PROVISION, ORRYON SHALL HAVE NO LIABILITY FOR ANY THIRD PARTY (INCLUDING SUBPROCESSORS OR OTHER USERS) THAT OBTAINS, MISUSES, OR DISCLOSES YOUR DATA THROUGH MEANS OUTSIDE OUR REASONABLE CONTROL, SUCH AS YOUR OWN SHARING OF DATA, A SECURITY BREACH AT A THIRD-PARTY PROVIDER DESPITE OUR CONTRACTUAL REQUIREMENTS, OR ANY OTHER ACTION BY A PARTY WE DO NOT CONTROL.**
 
 ## 6. International Data Transfers
 

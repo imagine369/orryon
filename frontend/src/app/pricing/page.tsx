@@ -78,7 +78,7 @@ const TIERS = [
     ctaHref: "/login?step=tiers",
     features: [
       "Everything in Pro",
-      "Unlimited chat messages (Fair Use)",
+      "Unlimited chat messages (subject to Fair Usage Policy)",
       "650 voice minutes / month",
       "Long-term memory (persistent context)",
       "Proactive suggestions & smart briefings",
