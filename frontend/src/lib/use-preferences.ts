@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 export interface UserPreferences {
   voice_overlay_enabled: boolean;
   golden_mode_enabled: boolean;
+  live_orryon_enabled: boolean;
   briefing_time: string;
   briefing_includes: string;
   onboarding_complete: boolean;
@@ -14,6 +15,7 @@ export interface UserPreferences {
 const DEFAULT_PREFS: UserPreferences = {
   voice_overlay_enabled: false,
   golden_mode_enabled: false,
+  live_orryon_enabled: true,
   briefing_time: "07:00",
   briefing_includes: "finance,health,calendar,goals",
   onboarding_complete: false,

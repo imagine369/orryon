@@ -82,6 +82,7 @@ def _get_user_context(uid: str) -> dict:
         "display_name": user_row["display_name"] or "there",
         "voice_overlay": bool(prefs.get("voice_overlay_enabled", 0)),
         "golden_mode": bool(prefs.get("golden_mode_enabled", 0)),
+        "live_orryon": bool(prefs.get("live_orryon_enabled", 1)),
     }
 
 

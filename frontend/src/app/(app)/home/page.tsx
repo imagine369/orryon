@@ -368,9 +368,15 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ── Orryon floating buddy (Premium / Premium Plus only) ──────────── */}
-      {sub?.is_active_pro && sub?.plan !== "starter" && (
-        <OrroyonBuddy onActivate={() => document.querySelector<HTMLElement>("[data-chat-input]")?.focus()} />
+      {/* ── Live Orryon floating companion — Premium / Premium Plus only, user-controllable */}
+      {(sub?.plan === "premium" || sub?.plan === "premium_plus") && prefs.live_orryon_enabled && (
+        <OrroyonBuddy
+          onActivate={() => {
+            setVoiceStatus("listening");
+            document.querySelector<HTMLElement>("[data-chat-input]")?.focus();
+          }}
+          onStopListening={() => setVoiceStatus("idle")}
+        />
       )}
 
       {/* ── Voice limit modal ─────────────────────────────────────────────── */}

@@ -1664,6 +1664,29 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
           Voice responses (TTS) are available on Pro and Premium plans.
         </p>
       )}
+
+      {/* Live Orryon floating companion */}
+      {(sub?.plan === "premium" || sub?.plan === "premium_plus") && (
+        <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
+          <div>
+            <p className="text-sm text-white/80 font-medium">Live Orryon</p>
+            <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
+              Show the floating Orryon companion that follows your cursor.
+              Click her to speak with voice. Turn off to use only the chat box.
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdate({ live_orryon_enabled: !prefs.live_orryon_enabled })}
+            className="relative shrink-0 flex items-center justify-center w-11 h-11 mt-0.5"
+            role="switch"
+            aria-checked={prefs.live_orryon_enabled}
+          >
+            <span className={`relative w-9 h-5 rounded-full transition-colors duration-200 block ${prefs.live_orryon_enabled ? "bg-white/80" : "bg-white/10"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform duration-200 ${prefs.live_orryon_enabled ? "translate-x-4" : "translate-x-0"}`} />
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

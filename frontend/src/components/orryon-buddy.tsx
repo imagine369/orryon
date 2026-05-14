@@ -1,18 +1,21 @@
 "use client";
 
 /**
- * OrroyonBuddy — Clicky-style floating companion overlay.
+ * OrroyonBuddy — Live Orryon floating companion (Clicky-style).
+ *
+ * This is the Live Orryon avatar: a cursor-following, always-on-screen
+ * visual buddy. Clicking or pressing ` activates voice listening mode.
  *
  * Mechanics:
  *  - Fixed always-on-top portal, transparent background
  *  - Smooth cursor-following with natural spring damping (RAF lerp)
  *  - Idle animations: breathing, slow drift, blink, gentle head-tilt
- *  - Click avatar or press hotkey (backtick `) to activate talk mode
+ *  - Click avatar or press hotkey (backtick `) to activate Live Orryon voice
  *  - Glide/point: call buddyGlideTo(x, y) to fly Orryon to a screen position
  *  - Click passthrough: wrapper is pointer-events:none; only avatar is interactive
  *
  * Tier gate: caller is responsible — render this component only for
- * Premium / Premium Plus subscribers (plan !== "starter" && is_active_pro).
+ * Premium and Premium Plus subscribers.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -162,7 +165,13 @@ function Tooltip({ text }: { text: string }) {
 
 type BuddyMode = "idle" | "talking" | "listening" | "gliding";
 
-export function OrroyonBuddy({ onActivate }: { onActivate?: () => void }) {
+export function OrroyonBuddy({
+  onActivate,
+  onStopListening,
+}: {
+  onActivate?: () => void;
+  onStopListening?: () => void;
+}) {
   const [mounted, setMounted] = useState(false);
 
   // Position state — actual rendered position, smoothly interpolated
@@ -178,6 +187,9 @@ export function OrroyonBuddy({ onActivate }: { onActivate?: () => void }) {
   const [showBeam, setShowBeam] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [following, setFollowing] = useState(true);
+
+  // Live Orryon voice state — persistent while listening
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   const modeRef = useRef<BuddyMode>("idle");
   modeRef.current = mode;
@@ -302,28 +314,40 @@ export function OrroyonBuddy({ onActivate }: { onActivate?: () => void }) {
     return () => void glideListeners.delete(listener);
   }, []);
 
-  // ── Activate (click or hotkey) ────────────────────────────────────────────
+  // ── Live Orryon activate / cancel (toggle) ────────────────────────────────
 
   const handleActivate = useCallback(() => {
-    setMode("listening");
-    setTooltip("Listening…");
-    onActivate?.();
-    setTimeout(() => {
+    if (isVoiceActive) {
+      // Cancel / stop listening
+      setIsVoiceActive(false);
       setMode("idle");
       setTooltip(null);
-    }, 3000);
-  }, [onActivate]);
+      setShowBeam(false);
+      onStopListening?.();
+    } else {
+      // Start Live Orryon voice listening
+      setIsVoiceActive(true);
+      setMode("listening");
+      setTooltip("Listening… click again to stop");
+      setShowBeam(true);
+      onActivate?.();
+    }
+  }, [isVoiceActive, onActivate, onStopListening]);
 
-  // ── Hover tooltip ─────────────────────────────────────────────────────────
+  // ── Hover tooltip — reflects Live Orryon state ────────────────────────────
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    setTooltip(`Click or press \`${HOTKEY}\` to talk`);
+    if (isVoiceActive) {
+      setTooltip("Click to stop listening");
+    } else {
+      setTooltip(`Click or press \`${HOTKEY}\` to talk with Live Orryon`);
+    }
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    if (mode === "idle") setTooltip(null);
+    if (!isVoiceActive && mode === "idle") setTooltip(null);
   };
 
   // ── Don't render on server ────────────────────────────────────────────────
@@ -388,8 +412,8 @@ export function OrroyonBuddy({ onActivate }: { onActivate?: () => void }) {
             {/* Blink overlay */}
             <Blink />
 
-            {/* Glow ring */}
-            <GlowRing active={mode === "talking" || mode === "listening"} />
+            {/* Glow ring — stronger pulse when Live Orryon voice is actively listening */}
+            <GlowRing active={mode === "talking" || mode === "listening" || isVoiceActive} />
           </motion.div>
 
           {/* Tooltip */}

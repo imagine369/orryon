@@ -882,6 +882,7 @@ async def stripe_webhook(request: Request):
 class PrefsReq(BaseModel):
     voice_overlay_enabled: int | None = None
     golden_mode_enabled: int | None = None
+    live_orryon_enabled: int | None = None
     briefing_time: str | None = None
     briefing_includes: str | None = None
     onboarding_complete: int | None = None
@@ -893,6 +894,7 @@ async def get_prefs(user: dict = Depends(get_current_user)):
     return {
         "voice_overlay_enabled": bool(prefs.get("voice_overlay_enabled", 0)),
         "golden_mode_enabled": bool(prefs.get("golden_mode_enabled", 0)),
+        "live_orryon_enabled": bool(prefs.get("live_orryon_enabled", 1)),  # default ON
         "briefing_time": prefs.get("briefing_time", "07:00"),
         "briefing_includes": prefs.get("briefing_includes", "finance,health,calendar,goals"),
         "onboarding_complete": bool(prefs.get("onboarding_complete", 0)),

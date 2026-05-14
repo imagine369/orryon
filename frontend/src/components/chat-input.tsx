@@ -144,6 +144,18 @@ export function ChatInput({
     };
   }, []);
 
+  // Live Orryon / external voice trigger bridge
+  // When the parent (e.g. floating Live Orryon buddy) sets externalStatus="listening",
+  // automatically start the microphone. When it goes back to "idle", stop recording.
+  useEffect(() => {
+    if (externalStatus === "listening" && voiceStatus !== "listening" && !disabled) {
+      void startRecording();
+    }
+    if (externalStatus === "idle" && voiceStatus === "listening") {
+      stopRecording();
+    }
+  }, [externalStatus, disabled]);
+
   const handleSend = () => {
     const msg = value.trim();
     if (!msg || disabled) return;
