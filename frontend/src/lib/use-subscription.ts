@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 
 export interface Subscription {
-  plan: "trial" | "free" | "starter" | "pro" | "premium" | "past_due";
+  plan: "trial" | "free" | "starter" | "pro" | "premium" | "premium_plus" | "past_due";
   trial_ends_at: string | null;
   trial_days_remaining: number;
   is_active_pro: boolean;

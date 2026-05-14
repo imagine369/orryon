@@ -369,13 +369,12 @@ export default function HomePage() {
   return (
     <>
       {/* ── Live Orryon floating companion — Premium / Premium Plus only, user-controllable */}
-      {(sub?.plan === "premium" || sub?.plan === "premium_plus") && prefs.live_orryon_enabled && (
+      {sub?.is_active_pro && sub?.plan !== "starter" && prefs.live_orryon_enabled && (
         <OrroyonBuddy
           onActivate={() => {
             setVoiceStatus("listening");
             document.querySelector<HTMLElement>("[data-chat-input]")?.focus();
           }}
-          onStopListening={() => setVoiceStatus("idle")}
         />
       )}
 
