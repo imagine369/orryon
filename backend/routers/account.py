@@ -84,15 +84,18 @@ def _get_or_create_stripe_customer(
     return customer.id, True
 
 
-def _customer_has_any_prior_subscription(
+def _customer_has_prior_subscription_for_price(
     stripe_lib: Any,
     customer_id: str,
+    price_id: str,
 ) -> bool:
     """
-    Returns True if this customer has EVER had ANY subscription (active, canceled,
-    past_due, incomplete, unpaid, etc.), regardless of price.
+    Checks whether this customer has ever had a subscription for our specific PRICE_ID before.
 
-    This implements a strict "one lifetime trial per customer" policy.
+    Returns True if the customer has ANY subscription (active, canceled, past_due,
+    incomplete, unpaid, etc.) that contains the given price_id.
+
+    This implements the "one lifetime trial per price_id" policy.
     Uses Stripe's recommended auto_paging_iter() for reliable, automatic pagination.
     """
     try:
@@ -101,13 +104,14 @@ def _customer_has_any_prior_subscription(
         for sub in stripe_lib.Subscription.auto_paging_iter(
             customer=customer_id,
             status="all",
-            limit=1,  # we only need to know if at least one exists
         ):
-            logger.info(
-                "Lifetime trial guard: customer %s has prior subscription %s (status=%s)",
-                customer_id, sub.id, sub.status
-            )
-            return True
+            for item in getattr(sub.items, "data", []):
+                if getattr(item.price, "id", None) == price_id:
+                    logger.info(
+                        "Lifetime trial guard: customer %s already used price %s (sub %s, status=%s)",
+                        customer_id, price_id, sub.id, sub.status
+                    )
+                    return True
     except Exception as e:
         logger.warning("Failed to check prior subscriptions for customer %s: %s", customer_id, e)
         # Fail open (allow trial) only on transient errors; you may choose to fail closed instead.
@@ -129,9 +133,9 @@ def _build_checkout_session_params(
 ) -> dict:
     """
     Assemble the params for stripe.checkout.Session.create.
-    Applies the strict lifetime-trial rule:
+    Applies the lifetime-trial rule:
       - Grant trial only if (a) user is free/trial, (b) no active sub in our DB,
-        (c) customer has NEVER had any subscription in Stripe history (any price).
+        (c) customer has never had a subscription for this specific price_id before.
     """
     params: dict[str, Any] = {
         "customer": customer_id,
@@ -153,7 +157,7 @@ def _build_checkout_session_params(
     )
 
     if eligible_for_trial:
-        had_previous = _customer_has_any_prior_subscription(stripe_lib, customer_id)
+        had_previous = _customer_has_prior_subscription_for_price(stripe_lib, customer_id, price_id)
         if not had_previous:
             effective_trial = (
                 max(current_plan.get("trial_days_remaining", 0), 1)
@@ -161,9 +165,9 @@ def _build_checkout_session_params(
                 else trial_days
             )
             params["subscription_data"] = {"trial_period_days": effective_trial}
-            logger.info("Granting %s-day trial to user %s", effective_trial, user_id)
+            logger.info("Granting %s-day trial to user %s for price %s", effective_trial, user_id, price_id)
         else:
-            logger.info("Blocking trial for user %s — customer has prior subscription history", user_id)
+            logger.info("Blocking trial for user %s — customer already used price %s", user_id, price_id)
 
     return params
 
