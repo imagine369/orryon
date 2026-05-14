@@ -49,6 +49,125 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["account"])
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stripe helpers — production-ready, lifetime-trial guard
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_or_create_stripe_customer(
+    stripe_lib: Any,
+    email: str,
+    user_id: str,
+    existing_customer_id: str | None = None,
+) -> tuple[str, bool]:
+    """
+    Return (customer_id, is_new_customer).
+    Reuses existing customer by email if one exists (prevents duplicate customers).
+    Creates a new one otherwise and stores the id in our DB caller.
+    """
+    if existing_customer_id:
+        try:
+            cust = stripe_lib.Customer.retrieve(existing_customer_id)
+            if cust and not getattr(cust, "deleted", False):
+                return existing_customer_id, False
+        except Exception:
+            pass  # fall through to search/create
+
+    # Search by email (most reliable way to dedupe)
+    existing = stripe_lib.Customer.list(email=email, limit=1)
+    if existing.data:
+        return existing.data[0].id, False
+
+    customer = stripe_lib.Customer.create(
+        email=email,
+        metadata={"user_id": user_id},
+    )
+    return customer.id, True
+
+
+def _customer_has_any_prior_subscription(
+    stripe_lib: Any,
+    customer_id: str,
+) -> bool:
+    """
+    Returns True if this customer has EVER had ANY subscription (active, canceled,
+    past_due, incomplete, unpaid, etc.), regardless of price.
+
+    This implements a strict "one lifetime trial per customer" policy.
+    Uses Stripe's recommended auto_paging_iter() for reliable, automatic pagination.
+    """
+    try:
+        # auto_paging_iter is Stripe's recommended way — handles pagination,
+        # retries, and rate limits more robustly than manual loops.
+        for sub in stripe_lib.Subscription.auto_paging_iter(
+            customer=customer_id,
+            status="all",
+            limit=1,  # we only need to know if at least one exists
+        ):
+            logger.info(
+                "Lifetime trial guard: customer %s has prior subscription %s (status=%s)",
+                customer_id, sub.id, sub.status
+            )
+            return True
+    except Exception as e:
+        logger.warning("Failed to check prior subscriptions for customer %s: %s", customer_id, e)
+        # Fail open (allow trial) only on transient errors; you may choose to fail closed instead.
+        return False
+    return False
+
+
+def _build_checkout_session_params(
+    *,
+    customer_id: str,
+    price_id: str,
+    success_url: str,
+    cancel_url: str,
+    user_id: str,
+    trial_days: int | None,
+    current_plan: dict,
+    db_row: dict,
+    stripe_lib: Any,
+) -> dict:
+    """
+    Assemble the params for stripe.checkout.Session.create.
+    Applies the strict lifetime-trial rule:
+      - Grant trial only if (a) user is free/trial, (b) no active sub in our DB,
+        (c) customer has NEVER had any subscription in Stripe history (any price).
+    """
+    params: dict[str, Any] = {
+        "customer": customer_id,
+        "payment_method_types": ["card"],
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "mode": "subscription",
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+        "metadata": {"user_id": user_id, "price_id": price_id},
+    }
+
+    is_free_breathe = db_row.get("segment") == "free_breathe"
+    has_db_sub = bool(db_row.get("stripe_subscription_id"))
+    eligible_for_trial = (
+        trial_days
+        and current_plan.get("plan") in ("trial", "free")
+        and not has_db_sub
+        and not is_free_breathe
+    )
+
+    if eligible_for_trial:
+        had_previous = _customer_has_any_prior_subscription(stripe_lib, customer_id)
+        if not had_previous:
+            effective_trial = (
+                max(current_plan.get("trial_days_remaining", 0), 1)
+                if current_plan.get("plan") == "trial"
+                else trial_days
+            )
+            params["subscription_data"] = {"trial_period_days": effective_trial}
+            logger.info("Granting %s-day trial to user %s", effective_trial, user_id)
+        else:
+            logger.info("Blocking trial for user %s — customer has prior subscription history", user_id)
+
+    return params
+
+
 # ── Settings ──────────────────────────────────────────────────────────────────
 
 _SETTINGS_READ_FIELDS = {
@@ -462,13 +581,11 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
     row = dict(row)
 
     try:
-        customer_id = row.get("stripe_customer_id") or ""
-        if not customer_id:
-            customer = stripe_lib.Customer.create(
-                email=row["email"],
-                metadata={"user_id": row["id"]},
-            )
-            customer_id = customer.id
+        # 1. Customer creation / retrieval (with reuse by email)
+        customer_id, is_new = _get_or_create_stripe_customer(
+            stripe_lib, row["email"], row["id"], row.get("stripe_customer_id")
+        )
+        if is_new:
             with get_connection() as conn:
                 conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
                 conn.commit()
@@ -476,44 +593,25 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
         current_plan = resolve_plan(row)
         trial_days = get_trial_days(body.price_id)
 
-        def _build_checkout_params(cid: str) -> dict:
-            params: dict[str, Any] = {
-                "customer": cid,
-                "payment_method_types": ["card"],
-                "line_items": [{"price": body.price_id, "quantity": 1}],
-                "mode": "subscription",
-                "success_url": success_url,
-                "cancel_url": cancel_url,
-                "metadata": {"user_id": row["id"], "price_id": body.price_id},
-            }
-            is_free_breathe = row.get("segment") == "free_breathe"
-            had_previous = False
-            try:
-                subs = stripe_lib.Subscription.list(customer=cid, status="all", limit=10)
-                for s in subs.get("data", []):
-                    for item in s.get("items", {}).get("data", []):
-                        if item.get("price", {}).get("id") == body.price_id:
-                            had_previous = True
-                            break
-                    if had_previous:
-                        break
-            except Exception:
-                pass
-            if trial_days and current_plan["plan"] in ("trial", "free") and not row.get("stripe_subscription_id") and not is_free_breathe and not had_previous:
-                effective_trial = (
-                    max(current_plan.get("trial_days_remaining", 0), 1)
-                    if current_plan["plan"] == "trial"
-                    else trial_days
-                )
-                params["subscription_data"] = {"trial_period_days": effective_trial}
-            return params
+        # 2. Build Checkout Session params (applies lifetime trial guard)
+        params = _build_checkout_session_params(
+            customer_id=customer_id,
+            price_id=body.price_id,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            user_id=row["id"],
+            trial_days=trial_days,
+            current_plan=current_plan,
+            db_row=row,
+            stripe_lib=stripe_lib,
+        )
 
         try:
-            session = stripe_lib.checkout.Session.create(**_build_checkout_params(customer_id))
+            session = stripe_lib.checkout.Session.create(**params)
         except stripe_lib.error.InvalidRequestError as e:
-            err_msg = str(e)
-            # Stale customer from a previous test/live mode — create a fresh one and retry once.
-            if "no such customer" in err_msg.lower() or "similar object exists in test mode" in err_msg.lower():
+            err_msg = str(e).lower()
+            # Stale customer (test/live mode mismatch) — recreate once
+            if "no such customer" in err_msg or "similar object exists in test mode" in err_msg:
                 logger.warning("Stale Stripe customer %s for user %s — creating fresh customer and retrying", customer_id, row["id"])
                 customer = stripe_lib.Customer.create(
                     email=row["email"],
@@ -523,11 +621,21 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
                 with get_connection() as conn:
                     conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, row["id"]))
                     conn.commit()
-                session = stripe_lib.checkout.Session.create(**_build_checkout_params(customer_id))
+                params = _build_checkout_session_params(
+                    customer_id=customer_id,
+                    price_id=body.price_id,
+                    success_url=success_url,
+                    cancel_url=cancel_url,
+                    user_id=row["id"],
+                    trial_days=trial_days,
+                    current_plan=current_plan,
+                    db_row=row,
+                    stripe_lib=stripe_lib,
+                )
+                session = stripe_lib.checkout.Session.create(**params)
             else:
                 raise
     except stripe_lib.error.InvalidRequestError as e:
-        # Bad price ID, malformed params, or other unrecoverable Stripe rejection.
         logger.warning("Stripe InvalidRequestError in checkout: %s", e.user_message or str(e))
         raise HTTPException(400, f"Stripe rejected the request: {e.user_message or str(e)}")
     except stripe_lib.error.AuthenticationError as e:
