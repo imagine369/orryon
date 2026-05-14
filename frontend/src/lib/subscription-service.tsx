@@ -81,7 +81,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     // No Stripe configured (dev / self-hosted) → fall through to the legacy
     // login route which can also drive provisioning. Mirrors trial-banner.tsx.
     if (!priceId) {
-      window.location.href = "/login?step=tiers";
+      window.location.href = "/pricing";
       return;
     }
 

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 
-// Per-tier price IDs (Pro / Premium / Premium Plus)
+// Per-tier price IDs — used only for the upgrade checkout flow (already signed-in users)
 type Tier = "pro" | "premium" | "premium_plus";
 
 const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
@@ -29,73 +29,7 @@ const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
   },
 };
 
-const TIER_CONFIG: {
-  id: Tier;
-  name: string;
-  monthlyPrice: number;
-  annualMonthlyPrice: number;
-  annualTotal: number;
-  voiceMinutes: number;
-  chatMessages: string;
-  features: string[];
-}[] = [
-  {
-    id: "pro",
-    name: "Pro",
-    monthlyPrice: 22,
-    annualMonthlyPrice: 16.50,
-    annualTotal: 198,
-    voiceMinutes: 150,
-    chatMessages: "500 messages/mo",
-    features: [
-      "Personal AI concierge (text & voice)",
-      "Health vitals, medications & appointments",
-      "Location intelligence & commute awareness",
-      "Daily briefing — morning summary",
-      "Email bill detection",
-      "Budget tracking & spending insights",
-      "Calendar, tasks & reminders",
-      "150 voice minutes included",
-      "Full data export",
-    ],
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    monthlyPrice: 33,
-    annualMonthlyPrice: 24.75,
-    annualTotal: 297,
-    voiceMinutes: 350,
-    chatMessages: "Unlimited messages",
-    features: [
-      "Everything in Pro",
-      "Unlimited chat messages",
-      "350 voice minutes included",
-      "Long-term memory (persistent context)",
-      "Proactive suggestions & smart briefings",
-      "Golden Mode (senior-friendly UI)",
-      "Priority AI processing",
-    ],
-  },
-  {
-    id: "premium_plus",
-    name: "Premium Plus",
-    monthlyPrice: 44,
-    annualMonthlyPrice: 33,
-    annualTotal: 396,
-    voiceMinutes: 600,
-    chatMessages: "Unlimited messages",
-    features: [
-      "Everything in Premium",
-      "600 voice minutes included",
-      "Approval gate for sensitive actions",
-      "Dedicated priority support",
-      "Early access to new features",
-    ],
-  },
-];
-
-type Step = "breathe" | "tiers" | "email" | "code" | "name";
+type Step = "breathe" | "email" | "code" | "name";
 
 // Beta flag — set NEXT_PUBLIC_NO_CARD_TRIAL=true to skip Stripe at signup
 const NO_CARD_TRIAL: boolean =
@@ -112,15 +46,13 @@ function LoginPageInner() {
   const tierParam  = searchParams.get("tier") as Tier | null;
   const nextParam  = searchParams.get("next") || "/home";
 
-  // If a tier was passed from the pricing page, skip straight to email
-  const hasTierParam = !!(tierParam && TIER_CONFIG.find(t => t.id === tierParam));
+  const hasTierParam = !!(tierParam && PRICE_IDS[tierParam]);
 
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
     if (flow === "breathe") return "breathe";
     if (stepParam === "name") return "name";
-    if (stepParam === "email" || hasTierParam) return "email";
-    return "tiers";
+    return "email";
   });
 
   useEffect(() => {
@@ -130,11 +62,8 @@ function LoginPageInner() {
     }
   }, [flow]);
 
-  const [selectedTier, setSelectedTier] = useState<Tier>(
-    hasTierParam ? tierParam! : "premium"
-  );
-  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
-  const [freeSelected, setFreeSelected] = useState(false);
+  const [selectedTier] = useState<Tier>(hasTierParam ? tierParam! : "premium");
+  const [selectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState("");
@@ -268,7 +197,7 @@ function LoginPageInner() {
       login(payload.user);
 
       // If a paid tier was passed from /pricing, auto-open Stripe checkout
-      if (hasTierParam && selectedTier && !freeSelected) {
+      if (hasTierParam && selectedTier) {
         const priceId = PRICE_IDS[selectedTier]?.[selectedPlan];
         if (priceId) {
           try {
@@ -289,14 +218,6 @@ function LoginPageInner() {
         }
       }
 
-      // New users (no display_name yet) who didn't arrive from a specific tier
-      // or breathe flow should see the plan picker before entering the app.
-      if (!hasTierParam && !breatheFlow && !payload.user.display_name) {
-        setStep("tiers");
-        setLoading(false);
-        return;
-      }
-
       // Hard navigation so the freshly-set HttpOnly session cookie is in
       // place for the very first request /home makes — a soft router.push
       // has, in practice, raced ahead of the cookie write.
@@ -315,10 +236,6 @@ function LoginPageInner() {
   // Already signed-in users clicking "Upgrade" land here: skip email/code
   // and go straight to Stripe with the selected tier.
   const handleUpgradeCheckout = async () => {
-    if (freeSelected) {
-      router.push("/home");
-      return;
-    }
     const priceId = PRICE_IDS[selectedTier][selectedPlan];
     if (!priceId) {
       setError("Stripe isn't configured for this tier yet.");
@@ -446,190 +363,7 @@ function LoginPageInner() {
         </div>
       )}
 
-      {/* ── Step 1: Plan selection ── */}
-      {step === "tiers" && (
-        <div className="flex-1 flex flex-col items-center px-5 pt-4 pb-10">
-          <p className="text-[0.6rem] uppercase tracking-[4px] text-white/40 mb-2">Choose your plan</p>
-          <h1 className="text-2xl font-bold text-white mb-1 font-[family-name:var(--font-playfair)] text-center">
-            Your personal AI operator.
-          </h1>
-          <p className="text-sm text-white/40 mb-6 text-center">
-            14-day free trial on monthly plans. Cancel anytime.
-          </p>
-
-          {/* Billing cycle toggle */}
-          <div className="flex rounded-full border border-white/8 bg-[#111] p-0.5 mb-5 w-full max-w-xs">
-            {(["monthly", "annual"] as const).map((opt) => (
-              <button
-                key={opt}
-                onClick={() => setSelectedPlan(opt)}
-                className="flex-1 rounded-full px-3 py-2.5 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 min-h-[44px]"
-                style={{
-                  background: selectedPlan === opt ? "rgba(255,255,255,0.1)" : "transparent",
-                  color: selectedPlan === opt ? "white" : "rgba(255,255,255,0.35)",
-                }}
-              >
-                {opt === "monthly" ? "Monthly" : (
-                  <><span>Annual</span>
-                    <span className="text-[0.55rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Save 25%</span>
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Plan cards: Starter (free) first, then paid tiers */}
-          <div className="w-full max-w-md space-y-3 mb-6">
-            {/* Starter — free forever, no Stripe */}
-            <button
-              onClick={() => setFreeSelected(true)}
-              className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
-              style={{
-                borderColor: freeSelected ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.07)",
-                background: freeSelected ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.01)",
-              }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold text-white/90">Starter</p>
-                    <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/8 text-white/40 border border-white/10">Free forever</span>
-                  </div>
-                  <p className="text-xs text-white/35">Breathing exercises &amp; guided calm</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-base font-bold text-white/70">Free</p>
-                </div>
-              </div>
-              <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-                {[
-                  "Guided breathing exercises",
-                  "Calm & meditation sessions",
-                  "Works offline",
-                  "Always free — no card needed",
-                ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-xs text-white/55">
-                    <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </button>
-
-            {/* Pro, Premium, Premium Plus */}
-            {TIER_CONFIG.map((tier) => {
-              const isSelected = !freeSelected && selectedTier === tier.id;
-              const priceLabel = selectedPlan === "annual"
-                ? `$${tier.annualMonthlyPrice.toFixed(2)}/mo`
-                : `$${tier.monthlyPrice}/mo`;
-              return (
-                <button
-                  key={tier.id}
-                  onClick={() => { setSelectedTier(tier.id); setFreeSelected(false); }}
-                  className="w-full text-left rounded-2xl border transition-all duration-200 p-4"
-                  style={{
-                    borderColor: isSelected ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.07)",
-                    background: isSelected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-semibold text-white/90">{tier.name}</p>
-                        {tier.id === "premium" && (
-                          <span className="text-[0.5rem] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">Most popular</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-white/35">{tier.chatMessages} · {tier.voiceMinutes} voice min</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-base font-bold text-white">{priceLabel}</p>
-                      {selectedPlan === "annual" && (
-                        <p className="text-[0.6rem] text-white/30">${tier.annualTotal}/yr</p>
-                      )}
-                    </div>
-                  </div>
-                  <ul className="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
-                    {tier.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-xs text-white/55">
-                        <Check className="h-3 w-3 text-white/35 shrink-0 mt-0.5" strokeWidth={2.5} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Trial note — only shown for paid monthly plans */}
-          {!freeSelected && selectedPlan === "monthly" && (
-            <div className="w-full max-w-md rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3 flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 text-black text-xs font-bold">14</div>
-              <p className="text-xs text-white/45">
-                14-day free trial — you won&apos;t be charged until day 15.
-              </p>
-            </div>
-          )}
-
-          <div className="w-full max-w-sm space-y-3">
-            <PillButton
-              onClick={() => {
-                if (freeSelected) {
-                  if (authedUser) {
-                    setStep("name");
-                  } else {
-                    setBreatheFlow(true);
-                    setStep("breathe");
-                  }
-                } else if (authedUser) {
-                  // Already signed in (upgrade flow) — skip email/code
-                  void handleUpgradeCheckout();
-                } else {
-                  setStep("email");
-                }
-              }}
-              disabled={loading}
-              className="w-full"
-            >
-              {loading
-                ? "Opening checkout…"
-                : freeSelected
-                ? "Start for free — no card needed"
-                : authedUser
-                ? `Upgrade to ${TIER_CONFIG.find(t => t.id === selectedTier)?.name}`
-                : selectedPlan === "monthly"
-                ? `Start 14-day free trial`
-                : `Get ${TIER_CONFIG.find(t => t.id === selectedTier)?.name}`}
-            </PillButton>
-            <p className="text-center text-xs text-white/25">
-              {freeSelected
-                ? "Breathing & meditation · always free · upgrade anytime."
-                : selectedPlan === "monthly" && !NO_CARD_TRIAL
-                ? "You\u2019ll enter your card at the end. You won\u2019t be charged for 14\u00a0days."
-                : selectedPlan === "annual"
-                  ? `Billed as $${TIER_CONFIG.find(t => t.id === selectedTier)?.annualTotal}/yr. Cancel anytime.`
-                  : "No credit card required during trial."}
-            </p>
-            {!authedUser && (
-              <div className="text-center mt-2">
-                <button
-                  onClick={() => setStep("email")}
-                  className="inline-flex items-center justify-center px-4 py-3 text-sm text-white/70 hover:text-white transition-colors"
-                >
-                  Already have an account?{" "}
-                  <span className="ml-1.5 font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white">
-                    Sign in
-                  </span>
-                </button>
-              </div>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 2: Email ── */}
+      {/* ── Step 1: Email ── */}
       {step === "email" && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
           <h1 className="text-2xl font-bold text-white mb-1">Enter your email</h1>

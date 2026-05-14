@@ -1134,7 +1134,7 @@ export function SettingsPanel() {
                 try {
                   const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY ?? "";
                   if (!priceId) {
-                    window.location.href = "/login?step=tiers";
+                    window.location.href = "/pricing";
                     return;
                   }
                   const origin = window.location.origin;

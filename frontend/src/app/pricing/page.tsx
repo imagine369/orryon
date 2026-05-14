@@ -45,7 +45,7 @@ const TIERS = [
     accentBorder: "rgba(168,85,247,0.20)",
     popular: true,
     cta: "Start 14-day trial",
-    ctaHref: "/login?step=tiers",
+    ctaHref: "/login?step=email",
     features: [
       "Personal AI concierge (text & voice)",
       "Budget tracking & spending insights",
@@ -74,7 +74,7 @@ const TIERS = [
     accentBorder: "rgba(251,191,36,0.18)",
     popular: false,
     cta: "Get Premium",
-    ctaHref: "/login?step=tiers",
+    ctaHref: "/login?step=email",
     features: [
       "Everything in Pro",
       "Unlimited chat messages (subject to Fair Usage Policy)",
@@ -101,7 +101,7 @@ const TIERS = [
     accentBorder: "rgba(56,189,248,0.18)",
     popular: false,
     cta: "Get Premium Plus",
-    ctaHref: "/login?step=tiers",
+    ctaHref: "/login?step=email",
     features: [
       "Everything in Premium",
       "1,200 voice minutes / month",

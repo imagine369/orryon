@@ -158,7 +158,7 @@ export function PaywallGuard({
           </div>
 
           <a
-            href="/login?step=tiers"
+            href="/pricing"
             className="group inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[2.5px] text-white bg-white/[0.10] hover:bg-white/[0.18] border border-white/15 hover:border-white/25 transition-all"
           >
             <Sparkles
