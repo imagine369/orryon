@@ -5,14 +5,21 @@ import Link from "next/link";
 import { Check, Wind, Sparkles, Zap } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
+import { RESET_ANCHORS } from "@/lib/reset-scripts";
 
 type Billing = "monthly" | "annual";
+
+const STARTER_FEATURES = [
+  "Guided breathing sessions",
+  ...RESET_ANCHORS.map((a) => a.title),
+  "Breathe orb (always free)",
+] as const;
 
 const TIERS = [
   {
     id: "starter",
     name: "Starter",
-    tagline: "Breathing & meditation. Forever free.",
+    tagline: "Guided breathing. Forever free.",
     monthlyPrice: 0,
     annualTotal: 0,
     annualMonthly: 0,
@@ -23,11 +30,7 @@ const TIERS = [
     popular: false,
     cta: "Start for free",
     ctaHref: "/login?step=email",
-    features: [
-      "Guided breathing sessions",
-      "Meditation exercises",
-      "Breathe orb (always free)",
-    ],
+    features: [...STARTER_FEATURES],
   },
   {
     id: "pro",
@@ -52,10 +55,11 @@ const TIERS = [
       "Email bill detection",
       "Calendar, tasks & reminders",
       "Cash flow forecast",
-      "150 voice minutes / month",
+      "300 voice minutes / month",
       "On-demand voice top-ups ($6 / 60 min)",
-      "500 chat messages / month",
+      "3,000 chat messages / month",
       "Full data export",
+      "Heavy usage handling: Hard limits + upgrade prompts",
     ],
   },
   {
@@ -74,21 +78,24 @@ const TIERS = [
     ctaHref: "/login?step=tiers",
     features: [
       "Everything in Pro",
-      "Unlimited chat messages",
-      "350 voice minutes / month",
+      "Unlimited chat messages (Fair Use)",
+      "650 voice minutes / month",
       "Long-term memory (persistent context)",
       "Proactive suggestions & smart briefings",
       "Golden Mode (easy-read UI)",
       "Priority AI processing",
+      "Live Orryon: Full access",
+      "Live Orryon Calls: Full",
+      "Heavy usage handling: Upgrade prompts near limits",
     ],
   },
   {
     id: "premium_plus",
     name: "Premium Plus",
     tagline: "Your all-in-one personal concierge — maximum voice, full power.",
-    monthlyPrice: 44,
-    annualTotal: 396,
-    annualMonthly: 33,
+    monthlyPrice: 49,
+    annualTotal: 441,
+    annualMonthly: 36.75,
     icon: Zap,
     iconColor: "text-sky-400",
     accentBg: "rgba(56,189,248,0.06)",
@@ -98,10 +105,13 @@ const TIERS = [
     ctaHref: "/login?step=tiers",
     features: [
       "Everything in Premium",
-      "600 voice minutes / month",
+      "1,200 voice minutes / month",
       "Approval gate for sensitive actions",
       "Dedicated priority support",
       "Early access to new features",
+      "Live Orryon: Full + Priority + Faster",
+      "Live Orryon Calls: Full + Priority",
+      "Heavy usage handling: Progressive slowdown + notice",
     ],
   },
 ] as const;
