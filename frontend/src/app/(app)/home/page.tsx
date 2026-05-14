@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
 import { DailyBriefingCard } from "@/components/daily-briefing-card";
+import { OrroyonBuddy } from "@/components/orryon-buddy";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -367,6 +368,11 @@ export default function HomePage() {
 
   return (
     <>
+      {/* ── Orryon floating buddy (Premium / Premium Plus only) ──────────── */}
+      {sub?.is_active_pro && sub?.plan !== "starter" && (
+        <OrroyonBuddy onActivate={() => document.querySelector<HTMLElement>("[data-chat-input]")?.focus()} />
+      )}
+
       {/* ── Voice limit modal ─────────────────────────────────────────────── */}
       <VoiceLimitModal
         open={voiceLimitOpen}
@@ -599,7 +605,7 @@ export default function HomePage() {
               {!subLoading && !sub?.is_active_pro && (
                 <div className={`${CONTAINER} mt-6 w-full`}>
                   <Link
-                    href="/login?step=tiers"
+                    href="/pricing"
                     className="group w-full flex flex-col rounded-2xl border border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.08] active:scale-[0.98] transition-all overflow-hidden"
                   >
                     <div className="px-5 pt-5 pb-4">
