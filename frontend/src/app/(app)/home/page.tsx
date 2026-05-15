@@ -87,6 +87,8 @@ export default function HomePage() {
   const [tasksDueToday, setTasksDueToday] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [upgradeBanner, setUpgradeBanner] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [activationPlan, setActivationPlan] = useState<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [sessionId, setSessionId] = useState<string>("");
@@ -139,32 +141,38 @@ export default function HomePage() {
 
   // ── Side-effects ────────────────────────────────────────────────────────────
 
+  // ── Robust activation after Stripe success (works for Pro, Premium, Premium+ trial or paid) ──
   useEffect(() => {
     if (searchParams.get("upgraded") === "1") {
-      setUpgradeBanner(true);
+      setActivating(true);
+      setActivationPlan(sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : "Pro");
       window.history.replaceState({}, "", "/home");
 
-      // Poll /api/subscription until the webhook updates the plan (up to 30s).
-      // Stripe webhooks fire within seconds of payment; polling catches the
-      // update and refreshes the UI without requiring a manual page reload.
+      // Aggressive poll until webhook lands the new plan (up to ~45s).
+      // Prevents showing the stale paywall/upgrade card during the webhook delay.
       let attempts = 0;
       const poll = setInterval(() => {
         refreshSub();
         attempts++;
-        if (attempts >= 10) clearInterval(poll);
-      }, 3000);
+        if (attempts >= 30) {
+          setActivating(false);
+          clearInterval(poll);
+        }
+      }, 1500);
 
-      const bannerTimer = setTimeout(() => {
-        setUpgradeBanner(false);
-        clearInterval(poll);
-      }, 30000);
-
-      return () => {
-        clearTimeout(bannerTimer);
-        clearInterval(poll);
-      };
+      return () => clearInterval(poll);
     }
   }, [searchParams, refreshSub]);
+
+  // When subscription becomes active during activation, show welcome banner
+  useEffect(() => {
+    if (activating && sub?.is_active_pro) {
+      setActivating(false);
+      setUpgradeBanner(true);
+      const t = setTimeout(() => setUpgradeBanner(false), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [activating, sub]);
 
   useEffect(() => {
     warmConnection();
@@ -365,6 +373,23 @@ export default function HomePage() {
   const hasMessages = messages.length > 0;
 
   // ── Render ──────────────────────────────────────────────────────────────────
+
+  // Show clean activation screen during the post-payment webhook window.
+  // This guarantees every paid tier (Pro/Premium/Premium+ , trial or direct) lands
+  // on the real chat interface instead of the paywall creature.
+  if (activating) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="text-center px-6">
+          <div className="mx-auto mb-6 h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          <p className="text-[17px] font-medium text-white/90">Activating your {activationPlan}…</p>
+          <p className="mt-2 text-[13px] text-white/55 max-w-[260px] mx-auto">
+            You’ll be chatting with Orryon in just a moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -638,37 +663,39 @@ export default function HomePage() {
                 </div>
               )}
 
-              <div className={`${CONTAINER} mt-4 w-full`}>
-                <Link
-                  href="/breathe"
-                  className="w-full flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-4 mb-2 text-left hover:bg-white/[0.06] active:scale-[0.98] transition-all"
-                >
-                  <motion.div
-                    className="shrink-0 rounded-full"
-                    style={{
-                      width: 35, height: 35,
-                      background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
-                    }}
-                    animate={{
-                      scale: [1, 1.13, 1],
-                      boxShadow: [
-                        "0 0 10px rgba(90,163,216,.40), 0 0 4px rgba(90,163,216,.20)",
-                        "0 0 26px rgba(90,163,216,.72), 0 0 12px rgba(90,163,216,.36)",
-                        "0 0 10px rgba(90,163,216,.40), 0 0 4px rgba(90,163,216,.20)",
-                      ],
-                    }}
-                    transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white/70 mb-0.5">Take a breath</p>
-                    <p className="text-[0.72rem] text-white/38 leading-snug">Breathe, reset, or just be still</p>
-                  </div>
-                  <svg className="w-4 h-4 text-white/25 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-                </Link>
-                <p className="text-center text-[0.62rem] uppercase tracking-[2.5px] text-white/25">
-                  Always free · works offline
-                </p>
-              </div>
+              {sub?.plan === "starter" && (
+                <div className={`${CONTAINER} mt-4 w-full`}>
+                  <Link
+                    href="/breathe"
+                    className="w-full flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-4 mb-2 text-left hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+                  >
+                    <motion.div
+                      className="shrink-0 rounded-full"
+                      style={{
+                        width: 35, height: 35,
+                        background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
+                      }}
+                      animate={{
+                        scale: [1, 1.13, 1],
+                        boxShadow: [
+                          "0 0 10px rgba(90,163,216,.40), 0 0 4px rgba(90,163,216,.20)",
+                          "0 0 26px rgba(90,163,216,.72), 0 0 12px rgba(90,163,216,.36)",
+                          "0 0 10px rgba(90,163,216,.40), 0 0 4px rgba(90,163,216,.20)",
+                        ],
+                      }}
+                      transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white/70 mb-0.5">Take a breath</p>
+                      <p className="text-[0.72rem] text-white/38 leading-snug">Breathe, reset, or just be still</p>
+                    </div>
+                    <svg className="w-4 h-4 text-white/25 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                  </Link>
+                  <p className="text-center text-[0.62rem] uppercase tracking-[2.5px] text-white/25">
+                    Always free · works offline
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Input — pinned to bottom, identical structure to chat view footer */}
@@ -710,7 +737,29 @@ export default function HomePage() {
 
           {/* Chat header bar — border spans full width, buttons align to container */}
           <div className="shrink-0 border-b border-white/[0.06]">
-            <div className={`${CONTAINER} flex items-center justify-end gap-1 py-2`}>
+            <div className={`${CONTAINER} flex items-center justify-between gap-2 py-2`}>
+              {/* Take a breath — starter tier only */}
+              {sub?.plan === "starter" && (
+                <Link
+                  href="/breathe"
+                  className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-left hover:bg-white/[0.06] active:scale-[0.985] transition-all"
+                >
+                  <div
+                    className="shrink-0 rounded-full"
+                    style={{
+                      width: 28,
+                      height: 28,
+                      background: "radial-gradient(circle at 50% 28%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)",
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white/70 leading-none mb-0.5">Take a breath</p>
+                    <p className="text-[0.7rem] text-white/40 leading-none">Breathe, reset, or just be still</p>
+                  </div>
+                </Link>
+              )}
+
+              <div className="flex items-center gap-1">
               {/* Voice overlay toggle — Pro/Premium only */}
               {sub?.is_active_pro && sub?.plan !== "starter" && (
                 <button
@@ -739,6 +788,7 @@ export default function HomePage() {
               >
                 <SquarePen className="h-[18px] w-[18px] text-white/40" strokeWidth={1.5} />
               </button>
+              </div>
             </div>
           </div>
 
