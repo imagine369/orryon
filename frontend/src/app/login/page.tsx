@@ -279,7 +279,9 @@ function LoginPageInner() {
       if (currentUser) {
         login({ ...currentUser, display_name: name });
       }
-      window.location.assign("/home");
+      // After checkout, the Stripe webhook may still be in flight — the same
+      // ?upgraded=1 handshake as /paywall + settings billing triggers polling on /home.
+      window.location.assign("/home?upgraded=1");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
