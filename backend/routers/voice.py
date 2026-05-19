@@ -13,11 +13,11 @@ Endpoints:
 Rate-limited per user (in-memory + Redis-backed bucket) and billed against the
 same monthly spend cap as chat so voice can't be used to sidestep quota.
 
-Voice minute caps (v2):
-    Starter  : 30 min / month
-    Pro/Trial: 150 min / month
-    Premium  : 350 min / month
-    Free     : 0 min   (voice gated by plan anyway)
+Voice minute caps (see backend/deps.VOICE_LIMITS_MINUTES):
+    Free/Starter/pre-pay trial : 0 min  (no /api/voice/* access)
+    Pro                         : 300 min / month
+    Premium                     : 650 min / month
+    Premium Plus                : 1,200 min / month
 
 Users can purchase 60-minute top-ups ($6) via /api/voice/topup.
 """

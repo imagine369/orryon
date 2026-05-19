@@ -3,13 +3,13 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
+import { GetAppNavLink, SiteNav } from "@/components/site-nav";
 
 // Per-tier price IDs — used only for the upgrade checkout flow (already signed-in users)
 type Tier = "pro" | "premium" | "premium_plus";
@@ -289,33 +289,17 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-black" style={{ paddingTop: "env(safe-area-inset-top)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="px-4 pt-4 flex items-center justify-between shrink-0">
+    <div className="flex flex-col min-h-[100dvh] bg-black" style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <SiteNav logoHref="/" safeArea>
+        <GetAppNavLink />
         <Link
           href="/"
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          aria-label="Orryon home"
-        >
-          <Image
-            src="/avatar.png"
-            alt="Orryon"
-            width={28}
-            height={28}
-            className="rounded-full object-cover ring-1 ring-white/10"
-            priority
-          />
-          <span className="text-white font-extrabold tracking-widest uppercase text-sm font-[family-name:var(--font-playfair)]">
-            ORRYON
-          </span>
-        </Link>
-        <Link
-          href="/"
-          className="text-white/50 hover:text-white p-1"
+          className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] p-2 text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
           aria-label="Close"
         >
           <X className="h-5 w-5" strokeWidth={1.5} />
         </Link>
-      </div>
+      </SiteNav>
 
       {/* ── Free breathing signup: name + email (skips waitlist on backend) ── */}
       {step === "breathe" && (

@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { SiteNav, NavBackLink } from "@/components/site-nav";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-screen bg-black flex flex-col">
+      <SiteNav>
+        <NavBackLink />
+      </SiteNav>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <p className="text-[0.65rem] uppercase tracking-widest text-white/20 font-semibold mb-4">
         404
       </p>
@@ -18,6 +23,7 @@ export default function NotFound() {
       >
         Go home
       </Link>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IntegrityGate } from "@/components/integrity-gate";
+import { ScrollToTopOnNavigate } from "@/components/scroll-to-top-on-navigate";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -66,7 +67,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <IntegrityGate>
           <AuthProvider>
             <ErrorBoundary>
-              <TooltipProvider>{children}</TooltipProvider>
+              <TooltipProvider>
+                <ScrollToTopOnNavigate />
+                {children}
+              </TooltipProvider>
             </ErrorBoundary>
           </AuthProvider>
         </IntegrityGate>

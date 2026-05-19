@@ -133,7 +133,8 @@
   }
   html {
     @apply font-sans;
-    scroll-behavior: smooth;
+    /* Instant scroll on route changes (footer links, etc.). Use behavior:"smooth" in JS where needed. */
+    scroll-behavior: auto;
   }
   /* Make every interactive element feel native on iOS:
        - `touch-action: manipulation` drops the 300ms wait WebKit holds for

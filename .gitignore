@@ -30,3 +30,10 @@ token.json
 .DS_Store
 .vercel
 .env*.local
+
+# Desktop app build artifacts & local installers
+desktop/node_modules/
+desktop/dist/
+frontend/public/downloads/*.dmg
+frontend/public/downloads/*.exe
+frontend/public/downloads/*.AppImage

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
+import { SiteNav } from "@/components/site-nav";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -426,30 +427,33 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black">
+      <SiteNav logoHref="/">
+        {activeCategory || isSearching ? (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveCategory(null);
+              setQuery("");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Help Center
+          </button>
+        ) : (
+          <Link
+            href="/home"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+            Home
+          </Link>
+        )}
+      </SiteNav>
+
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <div className="border-b border-white/[0.06]">
         <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 w-full">
-          {activeCategory || isSearching ? (
-            <button
-              onClick={() => {
-                setActiveCategory(null);
-                setQuery("");
-              }}
-              className="inline-flex items-center gap-1.5 text-white/25 hover:text-white/50 text-sm transition mb-8"
-            >
-              <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Back to Help Center
-            </button>
-          ) : (
-            <Link
-              href="/home"
-              className="inline-flex items-center gap-1.5 text-white/25 hover:text-white/50 text-sm transition mb-8"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Home
-            </Link>
-          )}
-
           <h1 className="text-[28px] font-bold text-white/90 tracking-tight mb-2">
             What can we help you find?
           </h1>

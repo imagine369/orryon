@@ -1,48 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  detectPlatform,
+  isStandalonePwa,
+  platformLabel,
+  type Platform,
+} from "@/lib/platform";
+
+export type { Platform };
+export { platformLabel };
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-type Platform = "ios" | "android" | "mac" | "windows" | "linux" | "desktop" | "unknown";
-
 const DISMISS_KEY = "orryon_install_dismissed";
-const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-function detectPlatform(): Platform {
-  if (typeof navigator === "undefined") return "unknown";
-  const ua = navigator.userAgent;
-  if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
-    return "ios";
-  }
-  if (/Android/i.test(ua)) return "android";
-  if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) return "mac";
-  if (/Win32|Win64|Windows|WinCE/.test(ua)) return "windows";
-  if (/Linux/.test(ua)) return "linux";
-  return "desktop";
-}
-
-export function platformLabel(platform: Platform): string {
-  switch (platform) {
-    case "ios":     return "iPhone";
-    case "android": return "Android";
-    case "mac":     return "Mac";
-    case "windows": return "Windows";
-    case "linux":   return "Linux";
-    default:        return "your device";
-  }
-}
-
-function isStandalone(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  if ((navigator as unknown as { standalone?: boolean }).standalone) return true;
-  if (document.referrer.includes("android-app://")) return true;
-  return false;
-}
+const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isDismissed(): boolean {
   if (typeof window === "undefined") return false;
@@ -66,7 +41,7 @@ export function usePwaInstall() {
   const [platform] = useState<Platform>(() => detectPlatform());
 
   useEffect(() => {
-    setIsInstalled(isStandalone());
+    setIsInstalled(isStandalonePwa());
     setDismissed(isDismissed());
 
     const onBeforeInstall = (e: Event) => {

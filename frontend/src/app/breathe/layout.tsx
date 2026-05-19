@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { SiteNav } from "@/components/site-nav";
 
 export default function BreatheLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -23,12 +24,7 @@ export default function BreatheLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white">
-      {/* Minimal nav — logo + upgrade link only */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-black/80 backdrop-blur-xl border-b border-white/5">
-        <span className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
-          ORRYON
-        </span>
-      </nav>
+      <SiteNav logoHref="/" />
 
       <main className="flex-1 min-h-0 overflow-y-auto">
         {children}

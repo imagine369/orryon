@@ -80,7 +80,7 @@ export const config = {
     // Exclude API routes and static assets. Also skip prefetches so we don't
     // bust the Next router's prefetch cache with a per-request CSP header.
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icon-.*\\.png|apple-touch-icon\\.png|avatar\\.png|og-image\\.png|sw\\.js|workbox-.*\\.js).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icon-.*\\.png|apple-touch-icon\\.png|avatar\\.png|og-image\\.png|downloads/.*|sw\\.js|workbox-.*\\.js).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

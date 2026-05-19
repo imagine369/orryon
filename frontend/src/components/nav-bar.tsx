@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import Link from "next/link";
 import {
   Settings, LayoutGrid, Bell, X, Search, Plus, Calendar, GripVertical, SlidersHorizontal, Flame, Feather,
 } from "lucide-react";
@@ -14,6 +13,7 @@ import { api } from "@/lib/api";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { SearchPanel } from "@/components/search-panel";
+import { SiteNav } from "@/components/site-nav";
 import { usePanels } from "@/lib/panel-context";
 
 // ── Priority system (Todoist-style) ─────────────────────────────────────────
@@ -259,10 +259,7 @@ export function NavBar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/5" style={{ paddingTop: "max(0.75rem, calc(0.75rem + env(safe-area-inset-top)))", paddingLeft: "max(1rem, calc(1rem + env(safe-area-inset-left)))", paddingRight: "max(1rem, calc(1rem + env(safe-area-inset-right)))" }}>
-        <Link href="/home" className="text-white font-extrabold tracking-widest uppercase text-[1.03rem] font-[family-name:var(--font-playfair)]">
-          ORRYON
-        </Link>
+      <SiteNav logoHref="/home" safeArea>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setSearchOpen(true)}
@@ -357,7 +354,7 @@ export function NavBar() {
             <Settings className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
-      </nav>
+      </SiteNav>
 
       <AnimatePresence>
         {searchOpen && <SearchPanel onClose={() => setSearchOpen(false)} />}

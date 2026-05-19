@@ -7,6 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:platform": "node --test src/lib/platform.test.mjs",
+    "test:download": "node --test scripts/test-download-flow.mjs",
+    "test:download:local": "TEST_BASE_URL=http://127.0.0.1:3456 node --test scripts/test-download-flow.mjs",
+    "test:mobile": "node scripts/test-mobile-pwa.mjs",
+    "test:mobile:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-mobile-pwa.mjs",
     "cap:ios": "npx cap sync && npx cap open ios",
     "cap:android": "npx cap sync && npx cap open android",
     "cap:sync": "npx cap sync"
@@ -42,6 +47,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "playwright": "^1.60.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

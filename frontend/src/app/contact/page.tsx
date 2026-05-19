@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Footer } from "@/components/footer";
-import { BackButton } from "@/components/back-button";
+import { SiteNav } from "@/components/site-nav";
+import { NavBackButton } from "@/components/nav-back-button";
 import { Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -53,10 +54,11 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
+      <SiteNav>
+        <NavBackButton />
+      </SiteNav>
       <div className="flex-1 max-w-xl mx-auto px-5 py-12 w-full">
-        <BackButton />
-
-        <div className="mt-8 mb-10">
+        <div className="mb-10">
           <h1 className="text-3xl font-bold tracking-tight">Get in touch</h1>
           <p className="mt-2 text-sm text-white/40">
             We read every message. Expect a reply within 24 hours.

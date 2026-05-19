@@ -895,16 +895,46 @@ async def stripe_webhook(request: Request):
         else:
             # Regular subscription checkout — look up which tier was purchased
             sub_id = session.get("subscription")
+            if isinstance(sub_id, dict):
+                sub_id = sub_id.get("id")
             if user_id and sub_id:
                 from config import PRICE_ID_TO_PLAN
-                # Resolve tier from the line item price ID stored in metadata,
-                # or fall back to reading it from the subscription object.
-                price_id = meta.get("price_id", "")
-                new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")  # default pro for legacy
+                price_id = (meta.get("price_id") or "").strip()
+                new_plan = PRICE_ID_TO_PLAN.get(price_id)
+
+                # If metadata price_id isn't in our map (stale .env, wrong deploy),
+                # read the live subscription from Stripe so Premium isn't stored as pro.
+                if new_plan is None:
+                    try:
+                        sub_obj = stripe_lib.Subscription.retrieve(str(sub_id))
+                        items = sub_obj.get("items", {}).get("data", [])
+                        if items:
+                            p = items[0].get("price") or {}
+                            resolved = (p.get("id") or "").strip()
+                            if resolved:
+                                price_id = resolved
+                                new_plan = PRICE_ID_TO_PLAN.get(price_id)
+                    except Exception as e:
+                        logger.warning(
+                            "checkout.session.completed: could not retrieve subscription %s: %s",
+                            sub_id,
+                            e,
+                        )
+
+                if new_plan is None:
+                    new_plan = "pro"
+                    logger.warning(
+                        "checkout.session.completed: unknown price_id=%r user=%s sub=%s — defaulting to pro",
+                        price_id,
+                        user_id,
+                        sub_id,
+                    )
+
+                _cfg = __import__("config")
                 billing_interval = "annual" if price_id in (
-                    __import__("config").STRIPE_PRICE_PRO_ANNUAL,
-                    __import__("config").STRIPE_PRICE_PREMIUM_ANNUAL,
-                    __import__("config").STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
+                    _cfg.STRIPE_PRICE_PRO_ANNUAL,
+                    _cfg.STRIPE_PRICE_PREMIUM_ANNUAL,
+                    _cfg.STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
                 ) else "monthly"
                 user_email = ""
                 with get_connection() as conn:
@@ -915,7 +945,7 @@ async def stripe_webhook(request: Request):
                     conn.commit()
                     row = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()
                     user_email = row["email"] if row else ""
-                logger.info("Subscription checkout: user=%s plan=%s sub=%s", user_id, new_plan, sub_id)
+                logger.info("Subscription checkout: user=%s plan=%s sub=%s price_id=%s", user_id, new_plan, sub_id, price_id)
                 if user_email:
                     import asyncio as _asyncio
                     _asyncio.create_task(

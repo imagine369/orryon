@@ -15,6 +15,7 @@ import { FadeIn } from "@/components/motion";
 import { motion } from "framer-motion";
 import { Footer } from "@/components/footer";
 import { PillLink, PillButton } from "@/components/pill-cta";
+import { SiteNav } from "@/components/site-nav";
 import {
   CHAT_ASSISTANT_BUBBLE_CLASS,
   CHAT_USER_BUBBLE_CLASS,
@@ -1467,15 +1468,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-black text-white">
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-16 py-3.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/5">
-        <span className="text-white font-extrabold tracking-widest uppercase text-[0.95rem] sm:text-[1.03rem] font-[family-name:var(--font-playfair)]">
-          ORRYON
-        </span>
-        <div className="flex items-center gap-3">
-          {navActions}
-        </div>
-      </nav>
+      <SiteNav logoHref={false}>{navActions}</SiteNav>
 
       {/* Hero */}
       <FadeIn>
