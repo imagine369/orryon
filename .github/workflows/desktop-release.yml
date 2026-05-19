@@ -5,19 +5,14 @@ on:
   push:
     tags:
       - "desktop-v*"
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            script: dist:mac
-          - os: windows-latest
-            script: dist:win
-          - os: ubuntu-latest
-            script: dist:linux
-    runs-on: ${{ matrix.os }}
+  release-mac:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -29,18 +24,16 @@ jobs:
         working-directory: desktop
         run: npm install
 
-      - name: Build installer
+      - name: Build Mac DMG
         working-directory: desktop
         env:
           ORRYON_APP_URL: https://orryon.vercel.app
-        run: npm run ${{ matrix.script }}
+        run: npm run dist:mac
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: orryon-desktop-${{ matrix.os }}
-          path: |
-            desktop/dist/*.dmg
-            desktop/dist/*.exe
-            desktop/dist/*.AppImage
-          if-no-files-found: error
+          files: desktop/dist/Orryon-mac.dmg
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
