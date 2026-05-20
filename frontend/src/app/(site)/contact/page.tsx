@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Footer } from "@/components/footer";
 import { SiteNav } from "@/components/site-nav";
 import { NavBackButton } from "@/components/nav-back-button";
 import { Send, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
@@ -53,7 +52,7 @@ export default function ContactPage() {
     "transition resize-none";
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white">
+    <div className="flex flex-col flex-1 bg-black text-white">
       <SiteNav>
         <NavBackButton />
       </SiteNav>
@@ -177,7 +176,6 @@ export default function ContactPage() {
         )}
       </div>
 
-      <Footer />
     </div>
   );
 }

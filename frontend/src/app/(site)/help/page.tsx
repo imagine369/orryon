@@ -22,7 +22,6 @@ import {
   Feather,
   ListChecks,
 } from "lucide-react";
-import { Footer } from "@/components/footer";
 import { PillLink } from "@/components/pill-cta";
 import { SiteNav } from "@/components/site-nav";
 
@@ -426,7 +425,7 @@ export default function HelpPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-black">
+    <div className="flex flex-col flex-1 bg-black">
       <SiteNav logoHref="/">
         {activeCategory || isSearching ? (
           <button
@@ -637,7 +636,6 @@ export default function HelpPage() {
         )}
       </div>
 
-      <Footer />
     </div>
   );
 }

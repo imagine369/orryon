@@ -13,7 +13,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
 import { motion } from "framer-motion";
-import { Footer } from "@/components/footer";
 import { PillLink, PillButton } from "@/components/pill-cta";
 import { SiteNav } from "@/components/site-nav";
 import {
@@ -1466,7 +1465,7 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="flex flex-col flex-1 bg-black text-white">
 
       <SiteNav logoHref={false}>{navActions}</SiteNav>
 
@@ -1634,7 +1633,6 @@ export default function LandingPage() {
       </div>
       </section>
 
-      <Footer />
     </div>
   );
 }

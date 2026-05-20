@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/footer";
 import { SiteNav, NavBackLink } from "@/components/site-nav";
 
 export default function NotFound() {
@@ -24,6 +25,7 @@ export default function NotFound() {
         Go home
       </Link>
       </div>
+      <Footer />
     </div>
   );
 }

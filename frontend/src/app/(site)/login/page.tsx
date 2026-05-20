@@ -7,7 +7,6 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
-import { Footer } from "@/components/footer";
 import { PillButton } from "@/components/pill-cta";
 import { GetAppNavLink, SiteNav } from "@/components/site-nav";
 
@@ -289,7 +288,7 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-black" style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div className="flex flex-col flex-1 min-h-[100dvh] bg-black" style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <SiteNav logoHref="/" safeArea>
         <GetAppNavLink />
         <Link
@@ -471,7 +470,6 @@ function LoginPageInner() {
         </div>
       )}
 
-      <Footer />
     </div>
   );
 }

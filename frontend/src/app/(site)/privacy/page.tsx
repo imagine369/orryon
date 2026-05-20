@@ -1,9 +1,8 @@
-import { Footer } from "@/components/footer";
 import { SiteNav, NavBackLink } from "@/components/site-nav";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white">
+    <div className="flex flex-col flex-1 bg-black text-white">
     <SiteNav>
       <NavBackLink />
     </SiteNav>
@@ -80,7 +79,6 @@ export default function PrivacyPage() {
         </div>
       </div>
     </div>
-    <Footer />
     </div>
   );
 }

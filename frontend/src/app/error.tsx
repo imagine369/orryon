@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Footer } from "@/components/footer";
 
 export default function Error({
   error,
@@ -38,6 +39,7 @@ export default function Error({
           Go home
         </a>
       </div>
+      <Footer />
     </div>
   );
 }

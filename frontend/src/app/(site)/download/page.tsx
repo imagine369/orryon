@@ -3,7 +3,7 @@ import { SiteNav, SignInNavLink } from "@/components/site-nav";
 
 export default function DownloadPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white">
+    <div className="flex flex-col flex-1 bg-black text-white">
       <SiteNav>
         <SignInNavLink />
       </SiteNav>

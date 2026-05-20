@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Wind, Sparkles, Zap } from "lucide-react";
-import { Footer } from "@/components/footer";
 import { SiteNav, SignInNavLink } from "@/components/site-nav";
 import { RESET_ANCHORS } from "@/lib/reset-scripts";
 
@@ -262,7 +261,7 @@ function PricingTierCard({ tier }: { tier: Tier }) {
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#080c10" }}>
+    <div className="flex flex-col flex-1" style={{ background: "#080c10" }}>
       <SiteNav>
         <SignInNavLink />
       </SiteNav>
@@ -299,7 +298,6 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }
