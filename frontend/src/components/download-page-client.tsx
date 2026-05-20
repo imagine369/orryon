@@ -121,8 +121,7 @@ export function DownloadPageClient() {
   if (installed) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
-        <div>
-          <motion.div className="mx-auto mb-8" {...AVATAR_FLOAT}>
+        <motion.div className="mb-8" {...AVATAR_FLOAT}>
             <Image
               src="/avatar.png"
               alt="Orryon"
@@ -135,7 +134,7 @@ export function DownloadPageClient() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
             Open Orryon
           </h1>
-          <p className="text-white/50 text-lg mb-10 max-w-sm mx-auto">
+          <p className="text-white/50 text-lg mb-10 max-w-sm">
             You&apos;re all set. Sign in to continue.
           </p>
           <Link
@@ -144,7 +143,6 @@ export function DownloadPageClient() {
           >
             Sign in
           </Link>
-        </div>
       </main>
     );
   }
@@ -153,8 +151,7 @@ export function DownloadPageClient() {
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
-      <div>
-        <motion.div className="mx-auto mb-8" {...AVATAR_FLOAT}>
+      <motion.div className="mb-8" {...AVATAR_FLOAT}>
           <Image
             src="/avatar.png"
             alt="Orryon"
@@ -165,53 +162,52 @@ export function DownloadPageClient() {
           />
         </motion.div>
 
-        <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md mx-auto leading-relaxed">
+      <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
           {isMobile
             ? "Add Orryon to your home screen, then open the app to sign up."
             : "Install the app, then open Orryon from your dock to sign up."}
         </p>
 
-        {iosNeedsSafari && (
-          <p className="text-sm text-white/40 mb-6 max-w-sm mx-auto">
-            Open this page in <span className="text-white/70">Safari</span> to install.
-          </p>
-        )}
+      {iosNeedsSafari && (
+        <p className="text-sm text-white/40 mb-6 max-w-sm">
+          Open this page in <span className="text-white/70">Safari</span> to install.
+        </p>
+      )}
 
-        <button
-          type="button"
-          onClick={handlePrimary}
-          disabled={primaryDisabled}
-          className="inline-flex min-w-[240px] items-center justify-center rounded-full bg-white px-10 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {ctaFor(selected, isInstallable)}
-        </button>
+      <button
+        type="button"
+        onClick={handlePrimary}
+        disabled={primaryDisabled}
+        className="inline-flex min-w-[240px] items-center justify-center rounded-full bg-white px-10 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {ctaFor(selected, isInstallable)}
+      </button>
 
-        {footnoteFor(selected) && (
-          <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
-        )}
+      {footnoteFor(selected) && (
+        <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
+      )}
 
-        <nav
-          className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
-          aria-label="Other platforms"
-        >
-          {PLATFORM_LINKS.map((p, i) => (
-            <span key={p.id} className="inline-flex items-center gap-1">
-              {i > 0 && <span className="text-white/15 px-1">·</span>}
-              <button
-                type="button"
-                onClick={() => setSelected(p.id)}
-                className={
-                  selected === p.id
-                    ? "text-white/80 font-medium"
-                    : "hover:text-white/60 transition-colors"
-                }
-              >
-                {p.label}
-              </button>
-            </span>
-          ))}
-        </nav>
-      </div>
+      <nav
+        className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
+        aria-label="Other platforms"
+      >
+        {PLATFORM_LINKS.map((p, i) => (
+          <span key={p.id} className="inline-flex items-center gap-1">
+            {i > 0 && <span className="text-white/15 px-1">·</span>}
+            <button
+              type="button"
+              onClick={() => setSelected(p.id)}
+              className={
+                selected === p.id
+                  ? "text-white/80 font-medium"
+                  : "hover:text-white/60 transition-colors"
+              }
+            >
+              {p.label}
+            </button>
+          </span>
+        ))}
+      </nav>
 
       {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
     </main>
