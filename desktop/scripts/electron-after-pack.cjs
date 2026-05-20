@@ -1,11 +1,11 @@
 /**
- * Ad-hoc sign the .app bundle so macOS Gatekeeper is less aggressive.
- * Users still need Right-click → Open or `xattr -cr` after browser download.
+ * Ad-hoc sign only for unsigned local builds. Skip when Apple CSC_* env is set.
  */
 const { execSync } = require("node:child_process");
 
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== "darwin") return;
+  if (process.env.CSC_LINK || process.env.CSC_LINK_LOCAL_FILE) return;
 
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${context.appOutDir}/${appName}.app`;

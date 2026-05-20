@@ -1,0 +1,7 @@
+{
+  "mac": {
+    "hardenedRuntime": true,
+    "gatekeeperAssess": true,
+    "notarize": true
+  }
+}
