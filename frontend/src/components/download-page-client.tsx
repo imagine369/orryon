@@ -43,6 +43,21 @@ function isDesktopTab(tab: DownloadTab): tab is DesktopOs {
   return tab === "mac" || tab === "windows" || tab === "linux";
 }
 
+function ctaFor(tab: DownloadTab, installable: boolean): string {
+  switch (tab) {
+    case "mac":
+      return "Download for Mac";
+    case "windows":
+      return "Download for Windows";
+    case "linux":
+      return "Download for Linux";
+    case "ios":
+      return "Download for iPhone & iPad";
+    case "android":
+      return installable ? "Install Orryon" : "Install for Android";
+  }
+}
+
 function footnoteFor(tab: DownloadTab): string | null {
   switch (tab) {
     case "mac":
@@ -156,15 +171,17 @@ export function DownloadPageClient() {
         </p>
       )}
 
-      <PillButton
-        type="button"
-        onClick={handlePrimary}
-        disabled={primaryDisabled}
-        size="sm"
-        variant="primary"
-      >
-        Download
-      </PillButton>
+      <div className="w-full max-w-sm">
+        <PillButton
+          type="button"
+          onClick={handlePrimary}
+          disabled={primaryDisabled}
+          variant="primary"
+          className="w-full"
+        >
+          {ctaFor(selected, isInstallable)}
+        </PillButton>
+      </div>
 
       {footnoteFor(selected) && (
         <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
