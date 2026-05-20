@@ -11,7 +11,7 @@ export function Footer() {
           Terms of Use
         </Link>
       </div>
-      <p className="text-[0.65rem] text-white/15">© 2026 Orryon</p>
+      <p className="text-[0.65rem] text-white/25">© 2026 Orryon</p>
     </footer>
   );
 }
