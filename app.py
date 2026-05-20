@@ -579,19 +579,6 @@ if not st.session_state.data_loaded:
     border:none;border-top:1px solid rgba(255,255,255,0.07);
     margin:3.5rem 0 3rem;
   }}
-  /* How It Works steps */
-  .hiw-step{{
-    display:flex;align-items:flex-start;gap:1rem;
-    padding:1.1rem 0;border-bottom:1px solid rgba(255,255,255,0.07);
-  }}
-  .hiw-num{{
-    min-width:34px;height:34px;border-radius:50%;
-    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);
-    display:flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:0.9rem;color:#fff;flex-shrink:0;margin-top:1px;
-  }}
-  .hiw-title{{margin:0 0 3px;font-size:0.95rem;font-weight:700;color:#fff;}}
-  .hiw-desc{{margin:0;font-size:0.83rem;color:rgba(255,255,255,0.42);line-height:1.55;}}
   /* Example cards */
   .ex-card{{
     background:#0f0f0f;border:1px solid rgba(255,255,255,0.09);
