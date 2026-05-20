@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PillLink } from "@/components/pill-cta";
 import { cn } from "@/lib/utils";
 
 /** Horizontal padding shared by SiteNav and site Footer so edges align. */
@@ -15,9 +16,6 @@ export const siteNavLogoClass =
 
 const navPillClass =
   "inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition";
-
-const navDownloadClass =
-  "inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 active:scale-[0.98] transition";
 
 export function SiteNavLogo({
   href,
@@ -77,17 +75,17 @@ export function NavBackLink({ href = "/", label = "Back" }: { href?: string; lab
 /** Marketing / download pages — sign-in entry. */
 export function SignInNavLink() {
   return (
-    <Link href="/login?step=email" className={navPillClass}>
+    <PillLink href="/login?step=email" size="sm" variant="secondary">
       Sign in
-    </Link>
+    </PillLink>
   );
 }
 
 /** Login and pricing — download entry (install first). */
 export function GetAppNavLink() {
   return (
-    <Link href="/download" className={navDownloadClass}>
+    <PillLink href="/download" size="sm" variant="primary">
       Download
-    </Link>
+    </PillLink>
   );
 }
