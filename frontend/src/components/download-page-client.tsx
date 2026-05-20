@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { IosInstallModal } from "@/components/ios-install-modal";
+import { OrryonAvatar } from "@/components/orryon-avatar";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
   defaultDownloadTab,
@@ -66,7 +66,7 @@ function ctaFor(tab: DownloadTab, installable: boolean): string {
 function footnoteFor(tab: DownloadTab): string | null {
   switch (tab) {
     case "mac":
-      return "macOS 12 or later";
+      return "macOS 12+. If macOS blocks the app, right-click Orryon → Open.";
     case "windows":
       return "Windows 10 or later";
     case "linux":
@@ -135,13 +135,7 @@ export function DownloadPageClient() {
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
         <div>
-          <Image
-            src="/avatar.png"
-            alt="Orryon"
-            width={88}
-            height={88}
-            className="rounded-full object-cover ring-1 ring-white/10 mx-auto mb-8"
-          />
+          <OrryonAvatar size={88} className="ring-1 ring-white/10 mx-auto mb-8" priority />
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
             Open Orryon
           </h1>
@@ -164,14 +158,7 @@ export function DownloadPageClient() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <div>
-        <Image
-          src="/avatar.png"
-          alt="Orryon"
-          width={88}
-          height={88}
-          className="rounded-full object-cover ring-1 ring-white/10 mx-auto mb-8"
-          priority
-        />
+        <OrryonAvatar size={88} className="ring-1 ring-white/10 mx-auto mb-8" priority />
 
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 font-[family-name:var(--font-playfair)] text-balance">
           {headlineFor(selected)}

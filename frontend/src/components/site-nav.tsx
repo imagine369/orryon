@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { OrryonAvatar } from "@/components/orryon-avatar";
 import { cn } from "@/lib/utils";
 
 /** Homepage nav shell — shared padding, blur, and ORRYON wordmark. */
@@ -21,14 +21,7 @@ export function SiteNavLogo({
 }) {
   const mark = (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <Image
-        src="/avatar.png"
-        alt=""
-        width={32}
-        height={32}
-        className="size-8 rounded-full object-cover ring-1 ring-white/10"
-        priority
-      />
+      <OrryonAvatar size={32} alt="" className="ring-1 ring-white/10" priority />
       <span className={siteNavLogoClass}>ORRYON</span>
     </span>
   );

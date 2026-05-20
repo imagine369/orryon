@@ -205,7 +205,7 @@ function HowItWorksDemo() {
                       alt="Orryon"
                       width={28}
                       height={28}
-                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10"
                     />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
@@ -221,7 +221,7 @@ function HowItWorksDemo() {
                       alt="Orryon"
                       width={28}
                       height={28}
-                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                      className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10"
                     />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
@@ -430,7 +430,7 @@ function ChatDemo() {
               alt="Orryon"
               width={28}
               height={28}
-              className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+              className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10"
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
@@ -447,7 +447,7 @@ function ChatDemo() {
               alt="Orryon"
               width={28}
               height={28}
-              className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+              className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10"
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className={CHAT_ASSISTANT_BUBBLE_CLASS}>
@@ -628,7 +628,7 @@ function AppTourDemo() {
           {/* Home screen */}
           {!isChatMode && (
             <div className="flex-1 flex flex-col items-center justify-center px-4" style={{ paddingBottom: "max(50px, calc(20px + env(safe-area-inset-bottom)))" }}>
-              <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover mb-5 ring-1 ring-white/10" />
+              <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover object-[center_12%] mb-5 ring-1 ring-white/10" />
               <p className="text-white/60 text-[14px] mb-6 max-w-[220px] text-center leading-tight">Hello.</p>
               <div className="mb-6 flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/[0.03]">
                 <span className="text-white/30 text-sm">✦</span>
@@ -669,7 +669,7 @@ function AppTourDemo() {
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={chatScrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" style={{ scrollbarWidth: "none" }}>
                 <div className="flex justify-center pb-1 pt-2">
-                  <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover ring-1 ring-white/10" />
+                  <Image src="/avatar.png" alt="Orryon" width={80} height={80} className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
                 </div>
                 <div className="min-h-0 flex-1" />
                 {currentBubble && (
@@ -679,7 +679,7 @@ function AppTourDemo() {
                 )}
                 {thinking && (
                   <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className={CHAT_ASSISTANT_BUBBLE_CLASS}><ThinkingIndicator /></div>
                     </div>
@@ -687,7 +687,7 @@ function AppTourDemo() {
                 )}
                 {currentResponse && (
                   <div className="flex w-full min-w-0 gap-3" style={{ animation: "msgIn 0.18s ease-out both" }}>
-                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                    <Image src="/avatar.png" alt="Orryon" width={28} height={28} className="mt-0.5 size-7 shrink-0 rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className={`${CHAT_ASSISTANT_BUBBLE_CLASS} whitespace-pre-line`}>
                         {currentResponse}
@@ -991,7 +991,7 @@ function AIChatPreview() {
 
       {/* Orryon response */}
       <div className="flex items-start gap-2">
-        <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover mt-0.5 shrink-0" />
+        <Image src="/avatar.png" alt="Orryon" width={20} height={20} className="rounded-full object-cover object-[center_12%] mt-0.5 shrink-0" />
         <div className="bg-[#1a1a1a] border border-white/[0.06] rounded-2xl rounded-bl-sm px-3.5 py-2 text-[0.72rem] text-white/65 max-w-[88%] text-left leading-relaxed">
           Great month — you&rsquo;re down 8% overall. Dining is the only category running a bit hot, everything else is under budget.
           <span className="inline-block w-[1.5px] h-[0.8em] bg-white/35 ml-0.5 align-middle animate-pulse" />
@@ -1355,7 +1355,7 @@ function OrbitSection() {
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
               transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity }}
             >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10" />
+              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
             </motion.div>
           </div>
 
@@ -1399,7 +1399,7 @@ function OrbitSection() {
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity }}
           >
-            <Image src="/avatar.png" alt="Orryon" width={64} height={64} className="rounded-full object-cover ring-1 ring-white/10" />
+            <Image src="/avatar.png" alt="Orryon" width={64} height={64} className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
           </motion.div>
         </div>
         <div className="grid grid-cols-2 gap-3 max-w-[360px] mx-auto">
@@ -1478,7 +1478,7 @@ export default function LandingPage() {
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
           >
-            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[100px] h-[100px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover ring-1 ring-white/10" />
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[100px] h-[100px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-cover object-[center_12%] ring-1 ring-white/10" />
           </motion.div>
           <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/65 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
@@ -1582,7 +1582,7 @@ export default function LandingPage() {
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
               transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
             >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
@@ -1623,7 +1623,7 @@ export default function LandingPage() {
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
               transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
             >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>

@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { IosInstallInstructions } from "@/components/app-install-instructions";
+import { OrryonAvatar } from "@/components/orryon-avatar";
 
 export function IosInstallModal({ onClose }: { onClose: () => void }) {
   return (
@@ -23,13 +23,7 @@ export function IosInstallModal({ onClose }: { onClose: () => void }) {
         <div>
           <div>
             <div>
-              <Image
-                src="/avatar.png"
-                alt="Orryon"
-                width={40}
-                height={40}
-                className="rounded-xl object-cover ring-1 ring-white/[0.08]"
-              />
+              <OrryonAvatar size={40} className="ring-1 ring-white/[0.08]" />
               <p className="text-[15px] font-semibold text-white">Install on iPhone & iPad</p>
             </div>
             <button

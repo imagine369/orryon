@@ -404,7 +404,7 @@ export function OrroyonBuddy({
               alt="Orryon"
               width={AVATAR_SIZE}
               height={AVATAR_SIZE}
-              className="rounded-full object-cover ring-1 ring-white/10 select-none"
+              className="rounded-full object-cover object-[center_12%] ring-1 ring-white/10 select-none"
               draggable={false}
               priority
             />
