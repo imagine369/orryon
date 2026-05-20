@@ -28,7 +28,7 @@ def load_source() -> Image.Image:
 def pad_to_square(img: Image.Image) -> Image.Image:
     w, h = img.size
     side = max(w, h)
-    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 255))
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     canvas.paste(img, ((side - w) // 2, (side - h) // 2), img)
     return canvas
 

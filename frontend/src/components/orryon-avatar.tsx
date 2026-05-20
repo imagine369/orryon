@@ -19,7 +19,7 @@ export function OrryonAvatar({
   return (
     <span
       className={cn(
-        "relative inline-block shrink-0 overflow-hidden rounded-full bg-black",
+        "relative inline-block shrink-0 overflow-hidden rounded-full",
         className,
       )}
       style={{ width: size, height: size }}

@@ -199,7 +199,7 @@ export function ChatThread({
               alt="Orryon"
               width={28}
               height={28}
-              className="mt-0.5 size-7 shrink-0 rounded-full object-contain ring-1 ring-white/[0.08] bg-black"
+              className="mt-0.5 size-7 shrink-0 rounded-full object-contain ring-1 ring-white/[0.08]"
             />
 
             {/* Content column */}
