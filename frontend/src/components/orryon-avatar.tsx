@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type OrryonAvatarProps = {
@@ -9,7 +8,7 @@ type OrryonAvatarProps = {
   priority?: boolean;
 };
 
-/** Square avatar frame — never stretches the source image. */
+/** Renders the portrait avatar without Next/Image resize distortion. */
 export function OrryonAvatar({
   size,
   className,
@@ -17,22 +16,17 @@ export function OrryonAvatar({
   priority,
 }: OrryonAvatarProps) {
   return (
-    <span
-      className={cn(
-        "relative inline-block shrink-0 overflow-hidden rounded-full",
-        className,
-      )}
+    // eslint-disable-next-line @next/next/no-img-element -- fixed aspect; avoids optimizer stretch
+    <img
+      src="/avatar.png"
+      alt={alt}
+      width={size}
+      height={size}
+      decoding="async"
+      loading={priority ? "eager" : "lazy"}
+      draggable={false}
+      className={cn("aspect-square shrink-0 rounded-full object-contain", className)}
       style={{ width: size, height: size }}
-    >
-      <Image
-        src="/avatar.png"
-        alt={alt}
-        fill
-        sizes={`${size}px`}
-        className="object-contain"
-        priority={priority}
-        draggable={false}
-      />
-    </span>
+    />
   );
 }

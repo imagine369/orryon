@@ -19,6 +19,7 @@
       "output": "dist"
     },
     "files": ["main.js", "package.json", "build/icon.png"],
+    "afterPack": "./scripts/electron-after-pack.cjs",
     "dmg": {
       "title": "Orryon"
     },
@@ -30,7 +31,9 @@
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
       "target": ["dmg"],
-      "artifactName": "Orryon-mac.${ext}"
+      "artifactName": "Orryon-mac.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
     "win": {
       "icon": "build/icon.png",
