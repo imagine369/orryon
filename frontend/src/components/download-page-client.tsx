@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { IosInstallModal } from "@/components/ios-install-modal";
 import { MacInstallHelp } from "@/components/mac-install-help";
-import { OrryonAvatar } from "@/components/orryon-avatar";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
   defaultDownloadTab,
@@ -21,6 +21,10 @@ import {
   markDesktopDownloadStarted,
   type DesktopOs,
 } from "@/lib/desktop-download";
+
+/** Matches landing page hero avatar (page.tsx). */
+const HERO_AVATAR_CLASS =
+  "w-[150px] h-[150px] sm:w-[155px] sm:h-[155px] lg:w-[195px] lg:h-[195px] rounded-full object-contain ring-1 ring-white/10";
 
 const PLATFORM_LINKS: { id: DownloadTab; label: string }[] = [
   { id: "mac", label: "macOS" },
@@ -104,7 +108,7 @@ export function DownloadPageClient() {
   if (!mounted) {
     return (
       <main className="flex-1 flex items-center justify-center px-6">
-        <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
+        <div className={`${HERO_AVATAR_CLASS} bg-white/10 animate-pulse`} />
       </main>
     );
   }
@@ -113,7 +117,14 @@ export function DownloadPageClient() {
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
         <div>
-          <OrryonAvatar size={88} className="ring-1 ring-white/10 mx-auto mb-8" priority />
+          <Image
+            src="/avatar.png"
+            alt="Orryon"
+            width={195}
+            height={195}
+            priority
+            className={`${HERO_AVATAR_CLASS} mx-auto mb-8`}
+          />
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
             Open Orryon
           </h1>
@@ -136,7 +147,14 @@ export function DownloadPageClient() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <div>
-        <OrryonAvatar size={88} className="ring-1 ring-white/10 mx-auto mb-8" priority />
+        <Image
+          src="/avatar.png"
+          alt="Orryon"
+          width={195}
+          height={195}
+          priority
+          className={`${HERO_AVATAR_CLASS} mx-auto mb-8`}
+        />
 
         <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md mx-auto leading-relaxed">
           {isMobile
