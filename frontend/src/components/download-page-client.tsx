@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { motion } from "framer-motion";
+import { PillButton, PillLink } from "@/components/pill-cta";
 import { IosInstallModal } from "@/components/ios-install-modal";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
@@ -41,21 +41,6 @@ const PLATFORM_LINKS: { id: DownloadTab; label: string }[] = [
 
 function isDesktopTab(tab: DownloadTab): tab is DesktopOs {
   return tab === "mac" || tab === "windows" || tab === "linux";
-}
-
-function ctaFor(tab: DownloadTab, installable: boolean): string {
-  switch (tab) {
-    case "mac":
-      return "Download for macOS";
-    case "windows":
-      return "Download for Windows";
-    case "linux":
-      return "Download for Linux";
-    case "ios":
-      return "Install for iPhone & iPad";
-    case "android":
-      return installable ? "Install Orryon" : "Install for Android";
-  }
 }
 
 function footnoteFor(tab: DownloadTab): string | null {
@@ -137,12 +122,9 @@ export function DownloadPageClient() {
           <p className="text-white/50 text-lg mb-10 max-w-sm">
             You&apos;re all set. Sign in to continue.
           </p>
-          <Link
-            href="/login?step=email"
-            className="inline-flex items-center justify-center rounded-full bg-white px-10 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors"
-          >
+          <PillLink href="/login?step=email" size="sm" variant="secondary">
             Sign in
-          </Link>
+          </PillLink>
       </main>
     );
   }
@@ -174,14 +156,15 @@ export function DownloadPageClient() {
         </p>
       )}
 
-      <button
+      <PillButton
         type="button"
         onClick={handlePrimary}
         disabled={primaryDisabled}
-        className="inline-flex min-w-[240px] items-center justify-center rounded-full bg-white px-10 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        size="sm"
+        variant="primary"
       >
-        {ctaFor(selected, isInstallable)}
-      </button>
+        Download
+      </PillButton>
 
       {footnoteFor(selected) && (
         <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
