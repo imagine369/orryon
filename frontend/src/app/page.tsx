@@ -1478,7 +1478,7 @@ export default function LandingPage() {
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
             transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
           >
-            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={103} height={103} className="w-[100px] h-[100px] sm:w-[103px] sm:h-[103px] lg:w-[130px] lg:h-[130px] rounded-full object-contain ring-1 ring-white/10" />
+            <Image src="/avatar.png" alt="Orryon — otherworldly personal concierge" width={195} height={195} className="w-[150px] h-[150px] sm:w-[155px] sm:h-[155px] lg:w-[195px] lg:h-[195px] rounded-full object-contain ring-1 ring-white/10" />
           </motion.div>
           <p className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/65 mb-[6px]" style={{ fontFamily: "Helvetica, Arial, sans-serif" }}>
             Hi, I&rsquo;m Orryon.
@@ -1582,7 +1582,7 @@ export default function LandingPage() {
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
               transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
             >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-contain ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+              <Image src="/avatar.png" alt="Orryon" width={195} height={195} className="w-[155px] h-[155px] rounded-full object-contain ring-1 ring-white/10 lg:w-[195px] lg:h-[195px]" />
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
@@ -1623,7 +1623,7 @@ export default function LandingPage() {
               animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
               transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
             >
-              <Image src="/avatar.png" alt="Orryon" width={103} height={103} className="rounded-full object-contain ring-1 ring-white/10 lg:w-[130px] lg:h-[130px]" />
+              <Image src="/avatar.png" alt="Orryon" width={195} height={195} className="w-[155px] h-[155px] rounded-full object-contain ring-1 ring-white/10 lg:w-[195px] lg:h-[195px]" />
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
