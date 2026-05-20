@@ -15,12 +15,34 @@ const ENV_URL: Record<string, string | undefined> = {
   linux: process.env.DESKTOP_DOWNLOAD_LINUX_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_LINUX,
 };
 
+async function externalDownloadOk(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "follow" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveDownload(platform: string) {
   const meta = FILES[platform];
   if (!meta) return { error: NextResponse.json({ error: "Unknown platform" }, { status: 400 }) };
 
   const external = ENV_URL[platform]?.trim();
-  if (external) return { redirect: external };
+  if (external) {
+    if (await externalDownloadOk(external)) return { redirect: external };
+    return {
+      error: NextResponse.json(
+        {
+          error: "Mac installer URL is not reachable.",
+          hint:
+            "If the DMG is on a private GitHub repo, uploads are not public — host the file on a public URL (GitHub public repo, Vercel Blob, S3) and set DESKTOP_DOWNLOAD_MAC_URL or NEXT_PUBLIC_DESKTOP_DOWNLOAD_MAC in Vercel.",
+          configuredUrl: external,
+        },
+        { status: 503 },
+      ),
+    };
+  }
 
   const filePath = path.join(process.cwd(), "public", "downloads", meta.filename);
   try {

@@ -4,17 +4,8 @@ const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://orryon.vercel.app")
 
 export type DesktopOs = "mac" | "windows" | "linux";
 
-/** Same-origin download route — serves file or redirects to hosted release URL. */
+/** Always same-origin — API redirects to a hosted file when configured server-side. */
 export function getDesktopDownloadUrl(platform: DesktopOs): string {
-  const explicit =
-    platform === "mac"
-      ? process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_MAC
-      : platform === "windows"
-        ? process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_WINDOWS
-        : process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_LINUX;
-
-  if (explicit) return explicit;
-
   return `${APP_URL}/api/download/${platform}`;
 }
 

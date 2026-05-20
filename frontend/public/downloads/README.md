@@ -5,14 +5,17 @@ The Mac app is **~100MB** — too large to ship inside Vercel’s static files b
 ## Production (required for orryon.vercel.app)
 
 1. Build: `cd desktop && npm install && npm run dist:mac`
-2. Create a [GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github) and upload `Orryon-mac.dmg`
-3. In **Vercel → Environment Variables**, set:
+2. Host `Orryon-mac.dmg` at a **public** URL (~100MB).  
+   **Private GitHub repos cannot serve public downloads** — use a **public** repo release, [Vercel Blob](https://vercel.com/docs/storage/vercel-blob), S3, etc.
+3. In **Vercel → project orryon → Environment Variables**, set:
 
 ```
-NEXT_PUBLIC_DESKTOP_DOWNLOAD_MAC=https://github.com/YOUR_ORG/orryon/releases/download/v1.0.0/Orryon-mac.dmg
+DESKTOP_DOWNLOAD_MAC_URL=https://your-public-host/Orryon-mac.dmg
 ```
 
-Redeploy. The download button uses `/api/download/mac`, which redirects to that URL.
+4. Redeploy. The site downloads via `/api/download/mac`, which redirects to that URL.
+
+Copy the asset link from GitHub only if the repository is **public** (right-click `Orryon-mac.dmg` on the release page → Copy link address).
 
 ## Local dev
 
