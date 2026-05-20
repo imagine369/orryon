@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { IosInstallModal } from "@/components/ios-install-modal";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
@@ -24,6 +25,11 @@ import {
 /** Matches landing page hero avatar (page.tsx). */
 const HERO_AVATAR_CLASS =
   "w-[150px] h-[150px] sm:w-[155px] sm:h-[155px] lg:w-[195px] lg:h-[195px] rounded-full object-contain ring-1 ring-white/10";
+
+const AVATAR_FLOAT = {
+  animate: { y: [0, -6, 0], scale: [1, 1.025, 1] },
+  transition: { duration: 3.8, ease: "easeInOut" as const, repeat: Infinity, repeatType: "loop" as const },
+};
 
 const PLATFORM_LINKS: { id: DownloadTab; label: string }[] = [
   { id: "mac", label: "macOS" },
@@ -116,14 +122,16 @@ export function DownloadPageClient() {
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
         <div>
-          <Image
-            src="/avatar.png"
-            alt="Orryon"
-            width={195}
-            height={195}
-            priority
-            className={`${HERO_AVATAR_CLASS} mx-auto mb-8`}
-          />
+          <motion.div className="mx-auto mb-8" {...AVATAR_FLOAT}>
+            <Image
+              src="/avatar.png"
+              alt="Orryon"
+              width={195}
+              height={195}
+              priority
+              className={HERO_AVATAR_CLASS}
+            />
+          </motion.div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
             Open Orryon
           </h1>
@@ -146,14 +154,16 @@ export function DownloadPageClient() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <div>
-        <Image
-          src="/avatar.png"
-          alt="Orryon"
-          width={195}
-          height={195}
-          priority
-          className={`${HERO_AVATAR_CLASS} mx-auto mb-8`}
-        />
+        <motion.div className="mx-auto mb-8" {...AVATAR_FLOAT}>
+          <Image
+            src="/avatar.png"
+            alt="Orryon"
+            width={195}
+            height={195}
+            priority
+            className={HERO_AVATAR_CLASS}
+          />
+        </motion.div>
 
         <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md mx-auto leading-relaxed">
           {isMobile
