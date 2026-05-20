@@ -1566,14 +1566,6 @@ export default function LandingPage() {
             {/* Divider */}
             <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
 
-            {/* Orryon avatar + CTA */}
-            <motion.div
-              className="mb-6 lg:mb-8"
-              animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-              transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-            >
-              <Image src="/avatar.png" alt="Orryon" width={195} height={195} className="w-[155px] h-[155px] rounded-full object-contain ring-1 ring-white/10 lg:w-[195px] lg:h-[195px]" />
-            </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
           </>
@@ -1606,14 +1598,6 @@ export default function LandingPage() {
             {/* Divider */}
             <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
 
-            {/* Orryon avatar + CTA */}
-            <motion.div
-              className="mb-6 lg:mb-8"
-              animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-              transition={{ duration: 3.8, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
-            >
-              <Image src="/avatar.png" alt="Orryon" width={195} height={195} className="w-[155px] h-[155px] rounded-full object-contain ring-1 ring-white/10 lg:w-[195px] lg:h-[195px]" />
-            </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
             <PillLink href="/home" size="sm">Access All Features</PillLink>
