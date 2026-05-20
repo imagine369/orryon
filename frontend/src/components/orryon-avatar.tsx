@@ -18,7 +18,10 @@ export function OrryonAvatar({
 }: OrryonAvatarProps) {
   return (
     <span
-      className={cn("relative inline-block shrink-0 overflow-hidden rounded-full", className)}
+      className={cn(
+        "relative inline-block shrink-0 overflow-hidden rounded-full bg-black",
+        className,
+      )}
       style={{ width: size, height: size }}
     >
       <Image
@@ -26,7 +29,7 @@ export function OrryonAvatar({
         alt={alt}
         fill
         sizes={`${size}px`}
-        className="object-cover object-[center_12%]"
+        className="object-contain"
         priority={priority}
         draggable={false}
       />

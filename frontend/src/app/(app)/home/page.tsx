@@ -671,7 +671,7 @@ export default function HomePage() {
                   alt="Orryon"
                   width={96}
                   height={96}
-                  className="rounded-full object-cover object-[center_12%] ring-1 ring-white/[0.09]"
+                  className="rounded-full object-contain ring-1 ring-white/[0.09] bg-black"
                 />
               </motion.div>
 
