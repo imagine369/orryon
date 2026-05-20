@@ -4,9 +4,9 @@ const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://orryon.vercel.app")
 
 export type DesktopOs = "mac" | "windows" | "linux";
 
-/** Always same-origin — API redirects to a hosted file when configured server-side. */
+/** Same-origin API route — redirects to hosted installer when configured server-side. */
 export function getDesktopDownloadUrl(platform: DesktopOs): string {
-  return `${APP_URL}/api/download/${platform}`;
+  return `/api/download/${platform}`;
 }
 
 export function desktopPlatformFromDetected(platform: Platform): DesktopOs | null {
@@ -40,8 +40,8 @@ export function hasStartedDesktopDownload(): boolean {
 export async function isDesktopDownloadAvailable(platform: DesktopOs): Promise<boolean> {
   const url = getDesktopDownloadUrl(platform);
   try {
-    const res = await fetch(url, { method: "HEAD", cache: "no-store" });
-    return res.ok;
+    const res = await fetch(url, { method: "HEAD", cache: "no-store", redirect: "manual" });
+    return res.ok || res.status === 302 || res.status === 301;
   } catch {
     return false;
   }
