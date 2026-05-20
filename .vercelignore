@@ -1,3 +1,5 @@
-.env.local
-frontend/.env.local
-**/.env.local
+desktop/dist/
+desktop/node_modules/
+frontend/public/downloads/*.dmg
+frontend/public/downloads/*.exe
+frontend/public/downloads/*.AppImage
