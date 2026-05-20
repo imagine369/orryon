@@ -1138,7 +1138,7 @@ function FeatureSection() {
   const atEnd   = scrollProgress >= 0.99;
 
   return (
-    <section className="pt-0 pb-16 sm:pb-20 border-b border-white/5">
+    <section className="pt-0 pb-16 sm:pb-20">
       {/* Header */}
       <div className="text-center px-4 sm:px-6 mb-8 sm:mb-10 pt-[48px] sm:pt-[60px]">
         <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">
@@ -1534,7 +1534,7 @@ export default function LandingPage() {
       `}</style>
 
       {/* Bottom CTA */}
-      <section className="border-t border-white/5">
+      <section>
       <div className="max-w-lg lg:max-w-2xl mx-auto px-4 sm:px-6 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
         {!loggedIn && (
           <>
