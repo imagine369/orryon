@@ -1538,6 +1538,12 @@ export default function LandingPage() {
       <div className="max-w-lg lg:max-w-2xl mx-auto px-4 sm:px-6 pt-12 pb-12 sm:pt-16 sm:pb-16 lg:pt-24 lg:pb-24 text-center flex flex-col items-center">
         {!loggedIn && (
           <>
+            <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Less noise. More you.</h2>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
+
+            {/* Divider */}
+            <div className="w-px h-12 bg-white/10 mb-8 sm:mb-10 lg:mb-12" />
+
             {/* Breathing orb */}
             <motion.div
               animate={{ scale: [1, 1.1, 1], opacity: [0.75, 0.92, 0.75] }}
@@ -1562,17 +1568,17 @@ export default function LandingPage() {
             </div>
 
             <PillLink href="/download" size="sm">Download</PillLink>
-
-            {/* Divider */}
-            <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
-
-            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
           </>
         )}
 
         {loggedIn && (
           <>
+            <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Less noise. More you.</h2>
+            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
+
+            {/* Divider */}
+            <div className="w-px h-12 bg-white/10 mb-8 sm:mb-10 lg:mb-12" />
+
             {/* Breathing orb + belief statement */}
             <motion.div
               animate={{ scale: [1, 1.1, 1], opacity: [0.75, 0.92, 0.75] }}
@@ -1595,11 +1601,6 @@ export default function LandingPage() {
 
             <PillLink href="/breathe" size="sm">Try breathing — it&rsquo;s free</PillLink>
 
-            {/* Divider */}
-            <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
-
-            <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
-            <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
             <PillLink href="/home" size="sm">Access All Features</PillLink>
             
           </>
