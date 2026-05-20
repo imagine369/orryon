@@ -84,7 +84,7 @@ export function SignInNavLink() {
 export function GetAppNavLink() {
   return (
     <Link href="/download" className={navPillClass}>
-      Get the app
+      Download
     </Link>
   );
 }

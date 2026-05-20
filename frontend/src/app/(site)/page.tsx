@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 const StarEight = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
     <polygon points="12,2 13.5,8.3 19.1,4.9 15.7,10.5 22,12 15.7,13.5 19.1,19.1 13.5,15.7 12,22 10.5,15.7 4.9,19.1 8.3,13.5 2,12 8.3,10.5 4.9,4.9 10.5,8.3" />
@@ -14,7 +13,7 @@ import { hasToken } from "@/lib/api";
 import { FadeIn } from "@/components/motion";
 import { motion } from "framer-motion";
 import { PillLink, PillButton } from "@/components/pill-cta";
-import { SiteNav } from "@/components/site-nav";
+import { GetAppNavLink, SignInNavLink, SiteNav } from "@/components/site-nav";
 import {
   CHAT_ASSISTANT_BUBBLE_CLASS,
   CHAT_USER_BUBBLE_CLASS,
@@ -1432,9 +1431,6 @@ function OrbitSection() {
   );
 }
 
-// ─── Get the app button ───────────────────────────────────────────────────────
-
-
 // ─── Landing page ─────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -1447,21 +1443,16 @@ export default function LandingPage() {
   const navActions = loggedIn ? (
     <PillLink href="/home" variant="primary" size="sm">Go to app</PillLink>
   ) : (
-    // Prior version was `text-xs text-white/50` plain text — the tap area
-    // was only ~14px tall on iPhone, well under Apple's 44px min target.
-    // Padded pill so it registers reliably on touch and matches Apple HIG.
-    <Link
-      href="/login?step=email"
-      className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/25 active:scale-[0.98] transition"
-    >
-      Sign in
-    </Link>
+    <>
+      <SignInNavLink />
+      <GetAppNavLink />
+    </>
   );
 
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/download" size="sm">Get the app</PillLink>
+    <PillLink href="/download" size="sm">Download</PillLink>
   );
 
   return (
@@ -1570,7 +1561,7 @@ export default function LandingPage() {
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <PillLink href="/download" size="sm">Get the app</PillLink>
+            <PillLink href="/download" size="sm">Download</PillLink>
 
             {/* Divider */}
             <div className="w-px h-12 bg-white/10 mt-8 sm:mt-10 lg:mt-12 mb-8 sm:mb-10 lg:mb-12" />
@@ -1585,7 +1576,6 @@ export default function LandingPage() {
             </motion.div>
             <h2 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-3 sm:mb-4 lg:mb-5 font-[family-name:var(--font-playfair)]">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50 mb-8 sm:mb-10 lg:mb-12">Private by design. Your data stays yours.</p>
-            <PillLink href="/download" size="sm">Get the app</PillLink>
           </>
         )}
 
