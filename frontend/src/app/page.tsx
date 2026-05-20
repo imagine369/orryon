@@ -1472,7 +1472,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <FadeIn>
-        <div className="flex flex-col items-center text-center pt-[90px] sm:pt-[150px] lg:pt-[210px] pb-0 px-4 sm:px-6 border-b border-white/5">
+        <div className="flex flex-col items-center text-center pt-[45px] sm:pt-[75px] lg:pt-[105px] pb-0 px-4 sm:px-6 border-b border-white/5">
           <motion.div
             className="mt-0 mb-2.5 lg:mb-4"
             animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
