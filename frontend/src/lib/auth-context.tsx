@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
 import { migrateHabitsToServer } from "./migrate-habits";
+import { invalidateSigningKey, prefetchSigningKey } from "./signing";
 
 interface User {
   id: string;
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .get<User>("/api/auth/me")
       .then((u) => {
         setUser(u);
+        prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
       })
       .catch((err) => {
@@ -72,10 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Cookies were set by /api/auth/login (or /api/auth/demo-login); we just
     // need to remember the user object in React state.
     setUser(u);
+    prefetchSigningKey().catch(() => {});
   }, []);
 
   const logout = useCallback(async () => {
     clearToken();
+    invalidateSigningKey();
     if (typeof window !== "undefined") localStorage.removeItem("orryon_demo");
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });

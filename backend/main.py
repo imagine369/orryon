@@ -109,11 +109,15 @@ async def lifespan(app: FastAPI):
     from core.grok_agent import close_http_client
     from core.scheduler import start_scheduler, stop_scheduler
 
+    from backend.signing import get_signing_mode, validate_signing_config
+
     init_pool()
     await init_redis()
     init_db()
+    validate_signing_config()
     start_scheduler()
     logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
+    logger.info("Request signing mode: %s", get_signing_mode())
     _log_email_config_status()
 
     if XAI_API_KEY:

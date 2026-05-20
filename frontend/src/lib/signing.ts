@@ -8,12 +8,27 @@
  * Protected endpoints today: `/api/chat`, `/api/voice/stt`, `/api/voice/tts`.
  */
 
-import { clientHeaders } from "@/lib/api";
+import { clientHeaders, getCsrfToken } from "@/lib/api";
 
 type SignKey = { key: string; kid: string; iat: number };
 
+function legacyBearer(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const token = localStorage.getItem("orryon_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 let _cached: SignKey | null = null;
 let _inflight: Promise<SignKey | null> | null = null;
+
+function csrfHeader(): Record<string, string> {
+  const csrf = getCsrfToken();
+  return csrf ? { "X-CSRF-Token": csrf } : {};
+}
 
 async function fetchSignKey(): Promise<SignKey | null> {
   try {
@@ -21,7 +36,7 @@ async function fetchSignKey(): Promise<SignKey | null> {
       method: "POST",
       headers: {
         ...clientHeaders(),
-        // CSRF double-submit — must match the Next proxy's rules.
+        ...legacyBearer(),
         ...csrfHeader(),
       },
       credentials: "same-origin",
@@ -33,16 +48,6 @@ async function fetchSignKey(): Promise<SignKey | null> {
   }
 }
 
-function csrfHeader(): Record<string, string> {
-  if (typeof document === "undefined") return {};
-  const parts = document.cookie.split(";");
-  for (const raw of parts) {
-    const [k, ...v] = raw.trim().split("=");
-    if (k === "orryon_csrf") return { "X-CSRF-Token": decodeURIComponent(v.join("=")) };
-  }
-  return {};
-}
-
 async function ensureKey(): Promise<SignKey | null> {
   if (_cached) return _cached;
   if (!_inflight) _inflight = fetchSignKey().finally(() => { _inflight = null; });
@@ -52,6 +57,16 @@ async function ensureKey(): Promise<SignKey | null> {
 
 export function invalidateSigningKey(): void {
   _cached = null;
+  _inflight = null;
+}
+
+/**
+ * Warm the in-memory signing key after login or session restore so the first
+ * chat/voice request is not rejected when the backend enforces signatures.
+ */
+export async function prefetchSigningKey(): Promise<boolean> {
+  const key = await ensureKey();
+  return key !== null;
 }
 
 async function hmacSha256Hex(keyHex: string, data: string): Promise<string> {
@@ -97,7 +112,12 @@ export async function signRequest(
   path: string,
   body: BodyInit | null | undefined,
 ): Promise<Record<string, string>> {
-  const key = await ensureKey();
+  let key = await ensureKey();
+  // One retry — cookie may not be visible until right after login redirect.
+  if (!key) {
+    _cached = null;
+    key = await ensureKey();
+  }
   if (!key) return {};
 
   const ts = Math.floor(Date.now() / 1000).toString();

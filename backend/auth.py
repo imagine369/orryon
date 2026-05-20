@@ -123,6 +123,19 @@ def decode_token(token: str) -> dict[str, Any]:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
 
 
+def jwt_iat_unix(payload: dict[str, Any]) -> int:
+    """Normalize JWT `iat` to unix seconds for signing-key derivation."""
+    iat = payload.get("iat")
+    if iat is None:
+        return 0
+    if isinstance(iat, (int, float)):
+        return int(iat)
+    if isinstance(iat, datetime):
+        dt = iat if iat.tzinfo else iat.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+    return 0
+
+
 async def _check_session_valid(jti: str) -> bool:
     """Check if a session is still active (not revoked). Cached for 60s."""
     if not jti:
@@ -169,7 +182,12 @@ async def get_current_user(
     if not await _check_session_valid(jti):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session revoked")
 
-    return {"user_id": payload["sub"], "email": payload["email"], "jti": jti}
+    return {
+        "user_id": payload["sub"],
+        "email": payload["email"],
+        "jti": jti,
+        "iat": jwt_iat_unix(payload),
+    }
 
 
 # ── WebSocket tickets ────────────────────────────────────────────────────────

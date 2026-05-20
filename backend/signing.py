@@ -72,17 +72,46 @@ def _jwt_secret() -> bytes:
     return secret.encode("utf-8")
 
 
-def _signing_mode() -> str:
-    # Legacy flag wins so nothing breaks for existing dev envs.
+def get_signing_mode() -> str:
+    """Return the active request-signing mode: off | warn | enforce."""
+    from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION
+
     if os.getenv("DISABLE_REQUEST_SIGNING", "").lower() in {"1", "true", "yes"}:
-        return "off"
+        if IS_PRODUCTION:
+            logger.error(
+                "DISABLE_REQUEST_SIGNING is set but ignored in production — "
+                "remove it and use REQUEST_SIGNING_MODE instead."
+            )
+        else:
+            return "off"
+
     mode = (os.getenv("REQUEST_SIGNING_MODE") or "").strip().lower()
     if mode in {"off", "warn", "enforce"}:
         return mode
-    # No explicit mode → off in dev, enforce in prod. Fail closed: any
-    # non-local environment enforces signatures by default.
-    from backend.deps import IS_LOCAL_DEV
+
+    # Default: off in local dev, enforce everywhere else (staging/prod).
     return "off" if IS_LOCAL_DEV else "enforce"
+
+
+def _signing_mode() -> str:
+    return get_signing_mode()
+
+
+def validate_signing_config() -> None:
+    """Fail fast on boot when production cannot enforce signed expensive routes."""
+    from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION
+
+    mode = get_signing_mode()
+    if IS_PRODUCTION and mode != "enforce":
+        raise RuntimeError(
+            f"REQUEST_SIGNING_MODE must be 'enforce' in production (got {mode!r}). "
+            "Unset DISABLE_REQUEST_SIGNING and set REQUEST_SIGNING_MODE=enforce."
+        )
+    if IS_PRODUCTION and not os.getenv("JWT_SECRET", "").strip():
+        raise RuntimeError(
+            "JWT_SECRET must be set in production — session tokens and signing "
+            "keys are derived from it."
+        )
 
 
 def derive_signing_key(user_id: str, iat: int) -> str:
@@ -94,9 +123,11 @@ def derive_signing_key(user_id: str, iat: int) -> str:
 
 def issue_signing_key_for_token(token: str) -> dict[str, str | int]:
     """Return `{key, kid, iat}` for a raw JWT string."""
+    from backend.auth import jwt_iat_unix
+
     payload = decode_token(token)
     uid = payload["sub"]
-    iat = int(payload.get("iat") or 0)
+    iat = jwt_iat_unix(payload)
     return {
         "key": derive_signing_key(uid, iat),
         "kid": f"{uid[:8]}:{iat}",
@@ -178,20 +209,13 @@ async def require_signed_request(
     else:
         body = await request.body()
 
-    # The JWT iat is needed to derive the key. We reuse the Authorization
-    # bearer that get_current_user already validated above rather than
-    # re-reading from the socket.
-    auth = request.headers.get("authorization", "")
-    if not auth.lower().startswith("bearer "):
-        _fail(mode, "missing bearer token", path, uid)
+    # Signing key is derived from user_id + JWT iat (already validated by
+    # get_current_user). The Next.js proxy injects Authorization from the
+    # HttpOnly session cookie — we do not require the browser to send Bearer.
+    iat = int(user.get("iat") or 0)
+    if not iat:
+        _fail(mode, "missing session iat for signing key", path, uid)
         return user
-    token = auth.split(" ", 1)[1].strip()
-    try:
-        payload = decode_token(token)
-    except HTTPException:
-        _fail(mode, "bearer token invalid during signature check", path, uid)
-        return user
-    iat = int(payload.get("iat") or 0)
     key = derive_signing_key(uid, iat)
 
     expected = _compute_signature(key, request.method, path, body, ts, nonce)
