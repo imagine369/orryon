@@ -34,21 +34,6 @@ function isDesktopTab(tab: DownloadTab): tab is DesktopOs {
   return tab === "mac" || tab === "windows" || tab === "linux";
 }
 
-function headlineFor(tab: DownloadTab): string {
-  switch (tab) {
-    case "mac":
-      return "Download Orryon for macOS";
-    case "windows":
-      return "Download Orryon for Windows";
-    case "linux":
-      return "Download Orryon for Linux";
-    case "ios":
-      return "Install Orryon on iPhone & iPad";
-    case "android":
-      return "Install Orryon on Android";
-  }
-}
-
 function ctaFor(tab: DownloadTab, installable: boolean): string {
   switch (tab) {
     case "mac":
@@ -174,10 +159,6 @@ export function DownloadPageClient() {
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <div>
         <OrryonAvatar size={88} className="ring-1 ring-white/10 mx-auto mb-8" priority />
-
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 font-[family-name:var(--font-playfair)] text-balance">
-          {headlineFor(selected)}
-        </h1>
 
         <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md mx-auto leading-relaxed">
           {isMobile
