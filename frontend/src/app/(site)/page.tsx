@@ -1058,7 +1058,7 @@ export default function LandingPage() {
             <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50">Private by design. Your data stays yours.</p>
 
-            <div className="h-[200px]" aria-hidden />
+            <div className="h-[160px]" aria-hidden />
 
             {/* Breathing orb */}
             <motion.div
@@ -1092,7 +1092,7 @@ export default function LandingPage() {
             <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Less noise. More you.</h2>
             <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/50">Private by design. Your data stays yours.</p>
 
-            <div className="h-[200px]" aria-hidden />
+            <div className="h-[160px]" aria-hidden />
 
             {/* Breathing orb + belief statement */}
             <motion.div
