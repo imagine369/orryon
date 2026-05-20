@@ -84,6 +84,8 @@ export function DownloadPageClient() {
   const [detected, setDetected] = useState<Platform>("unknown");
   const [selected, setSelected] = useState<DownloadTab>("mac");
   const [iosModalOpen, setIosModalOpen] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const { isInstallable, install } = usePwaInstall();
 
   useEffect(() => {
@@ -103,18 +105,30 @@ export function DownloadPageClient() {
   const isMobile = mounted && downloadKindForPlatform(detected) === "pwa";
   const iosNeedsSafari = mounted && selected === "ios" && !isIosSafari();
 
-  const handlePrimary = () => {
+  const handlePrimary = async () => {
     if (isDesktopTab(selected)) {
-      markDesktopDownloadStarted();
+      setDownloadError(null);
+      setDownloading(true);
       const url = getDesktopDownloadUrl(selected);
-      const filename = url.split("/").pop() || "Orryon.dmg";
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      try {
+        const res = await fetch(url, { method: "HEAD", redirect: "manual" });
+        if (res.ok || res.status === 302 || res.status === 301) {
+          markDesktopDownloadStarted();
+          window.location.assign(url);
+          return;
+        }
+        const detail = (await fetch(url).then((r) => r.json()).catch(() => null)) as {
+          error?: string;
+        } | null;
+        setDownloadError(
+          detail?.error ??
+            "The Mac installer is not available yet. It needs to be uploaded to a public file host first.",
+        );
+      } catch {
+        setDownloadError("Could not reach the download server. Try again in a moment.");
+      } finally {
+        setDownloading(false);
+      }
       return;
     }
     if (selected === "ios") {
@@ -179,12 +193,16 @@ export function DownloadPageClient() {
 
         <button
           type="button"
-          onClick={handlePrimary}
-          disabled={primaryDisabled}
+          onClick={() => void handlePrimary()}
+          disabled={primaryDisabled || downloading}
           className="inline-flex min-w-[240px] items-center justify-center rounded-full bg-white px-10 py-3.5 text-base font-semibold text-black hover:bg-white/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {ctaFor(selected, isInstallable)}
+          {downloading ? "Starting download…" : ctaFor(selected, isInstallable)}
         </button>
+
+        {downloadError && (
+          <p className="mt-4 text-sm text-amber-400/90 max-w-sm mx-auto leading-relaxed">{downloadError}</p>
+        )}
 
         {footnoteFor(selected) && (
           <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>

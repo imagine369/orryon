@@ -54,7 +54,7 @@ async function resolveDownload(platform: string) {
         error: NextResponse.json(
           {
             error: "Desktop installer is not configured for production yet.",
-            hint: `Set NEXT_PUBLIC_DESKTOP_DOWNLOAD_${platform.toUpperCase()} to a hosted installer URL (e.g. GitHub Releases).`,
+            hint: `Upload Orryon-${platform === "mac" ? "mac.dmg" : platform === "windows" ? "windows.exe" : "linux.AppImage"} to a public URL (Vercel Blob, public GitHub Release, S3), then set DESKTOP_DOWNLOAD_${platform.toUpperCase()}_URL in Vercel and redeploy.`,
           },
           { status: 503 },
         ),
