@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+/** Horizontal padding shared by SiteNav and site Footer so edges align. */
+export const siteChromePaddingX = "px-4 sm:px-6 lg:px-16";
+
 /** Homepage nav shell — shared padding, blur, and ORRYON wordmark. */
-export const siteNavClass =
-  "sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-16 py-3.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/5";
+export const siteNavClass = cn(
+  "sticky top-0 z-50 flex items-center justify-between py-3.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/5",
+  siteChromePaddingX,
+);
 
 export const siteNavLogoClass =
   "text-white font-extrabold tracking-widest uppercase text-[0.95rem] sm:text-[1.03rem] font-[family-name:var(--font-playfair)]";
