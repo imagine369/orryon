@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { IosInstallModal } from "@/components/ios-install-modal";
-import { MacInstallHelp } from "@/components/mac-install-help";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
   defaultDownloadTab,
@@ -56,7 +55,7 @@ function ctaFor(tab: DownloadTab, installable: boolean): string {
 function footnoteFor(tab: DownloadTab): string | null {
   switch (tab) {
     case "mac":
-      return "macOS 12+. If macOS blocks the app, right-click Orryon → Open.";
+      return "macOS 12+";
     case "windows":
       return "Windows 10 or later";
     case "linux":
@@ -180,8 +179,6 @@ export function DownloadPageClient() {
         {footnoteFor(selected) && (
           <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
         )}
-
-        {selected === "mac" && <MacInstallHelp />}
 
         <nav
           className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
