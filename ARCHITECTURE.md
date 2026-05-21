@@ -6,35 +6,20 @@ This document describes the system architecture, folder responsibilities, data f
 
 ## System Overview
 
-Orryon has two UI paths that share the same Python core:
-
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         MODERN STACK (primary)                       │
-│                                                                      │
-│  ┌──────────────┐    REST + SSE     ┌────────────────────────────┐  │
-│  │  Next.js 16  │ ◄──────────────►  │  FastAPI                   │  │
-│  │  React 19    │  :3000 ↔ :8000    │  backend/main.py           │  │
-│  │  Tailwind 4  │                   │  + routers/ (6 modules)    │  │
-│  │  PWA         │                   │                            │  │
-│  └──────────────┘                   └─────────┬──────────────────┘  │
-│                                               │                      │
-│                        ┌──────────────────────┼────────────────┐    │
-│                        │                      │                │    │
-│                   core/grok_agent.py       db.py          scheduler │
-│                   (xAI Grok SSE)        (SQLite)       (APScheduler)│
-│                        │                      │                │    │
-│                   core/tools.py          config.py     email_sender │
-│                   core/system_prompt.py                              │
-│                                                                      │
-├──────────────────────────────────────────────────────────────────────┤
-│                    LEGACY STACK (maintenance mode)                    │
-│                                                                      │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  Streamlit (app.py + ui/ + pages/)                           │   │
-│  │  Self-contained: renders UI, calls core/ directly, no API    │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────┘
+┌──────────────┐    REST + SSE/WS    ┌────────────────────────────┐
+│  Next.js 16  │ ◄─────────────────► │  FastAPI                   │
+│  React 19    │  :3000 ↔ :8000      │  backend/main.py           │
+│  Tailwind 4  │                     │  + routers/                │
+│  PWA         │                     └─────────┬──────────────────┘
+└──────────────┘                               │
+                    ┌──────────────────────────┼──────────────────┐
+                    │                          │                  │
+               core/grok_agent.py          db.py            scheduler
+               (xAI Grok SSE)           (SQLite/PG)       (APScheduler)
+                    │                          │                  │
+               core/tools/               config.py        email_sender
+               core/system_prompt.py
 ```
 
 ---
@@ -71,12 +56,16 @@ The primary UI. Key files:
 
 ### `core/` — Shared Business Logic
 
-Used by both the FastAPI backend and the Streamlit app. This is the "brain" of orryon:
+The "brain" of orryon — used by the FastAPI backend:
 
 | File | Purpose |
 |------|---------|
 | `grok_agent.py` | Streaming xAI Grok agent with tool calling, memory extraction |
-| `tools/` | Tool schemas (`schemas.py`), handlers (`helpers.py`), registry (`registry.py`) |
+| `context_cache.py` | Redis-backed agent context snapshot (shared across workers) |
+| `tools/handlers/` | Domain tool handlers (expenses, bills, calendar, …) |
+| `tools/shared.py` | Shared handler utilities (cycles, budgets, dates) |
+| `tools/` | Tool schemas (`schemas.py`), registry (`registry.py`), shim (`helpers.py`) |
+| `db/` | Database package (connection, schema, crud, domain modules) |
 | `canonical_tools.py` | Single source of truth for advertised tool names |
 | `system_prompt.py` | Finance-first system prompt (v6; must match `_TOOL_MAP`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
@@ -87,10 +76,9 @@ Used by both the FastAPI backend and the Streamlit app. This is the "brain" of o
 
 | File | Purpose |
 |------|---------|
-| `db.py` | SQLite schema, auto-migrations, CRUD helpers. Shared by all paths. |
+| `db.py` | SQLite/Postgres schema, auto-migrations, CRUD helpers |
 | `config.py` | Environment variable loading from `.env` |
 | `email_sender.py` | SMTP email sending (OTP codes, digests) |
-| `app.py` | Legacy Streamlit UI (maintenance mode, not actively developed) |
 
 ---
 
@@ -161,7 +149,7 @@ background memory extraction. Metered in `user_api_spend` via `record_token_spen
 
 Two server-side safety nets wrap the dispatcher:
 
-1. **`normalize_args`** (`core/tools.py`) — coerces loose dates to ISO
+1. **`normalize_args`** (`core/tools/normalize.py`) — coerces loose dates to ISO
    (`YYYY-MM-DD` for date-only fields, `YYYY-MM-DDTHH:MM:SS` for `start`/`end`),
    snaps categories/moods/frequencies to canonical values via fuzzy match,
    and forces amounts to positive floats. Runs on every `execute_tool` call.
@@ -217,16 +205,6 @@ uvicorn backend.main:app --reload --port 8000
 # API docs at http://localhost:8000/docs
 ```
 
-### Streamlit Only (legacy)
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-# Open http://localhost:8501
-```
-
----
-
 ## Self-Hosting
 
 ### Docker
@@ -277,9 +255,8 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 
 ### Long-Term
 
-7. **Streamlit Deprecation** — Once all features are in the Next.js UI, archive `app.py` and `ui/`.
-8. **Multi-Device Sync** — WebSocket layer for real-time updates across devices.
-9. **Mobile App** — React Native wrapper around the API, or enhanced PWA.
+7. **Multi-Device Sync** — WebSocket layer for real-time updates across devices (chat WebSocket exists; broaden to dashboard).
+8. **Mobile App** — Capacitor PWA / native shells (see `frontend/` and `desktop/`).
 
 ---
 
@@ -293,4 +270,4 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 | JWT over sessions | Stateless auth fits the decoupled frontend/backend architecture |
 | SSE over WebSocket | Simpler for one-directional streaming; sufficient for chat |
 | APScheduler over Celery | No Redis/broker dependency; fits single-process deployment |
-| Shared `core/` | Avoids duplicating business logic between Streamlit and FastAPI paths |
+| Shared `core/` | Single agent + tools layer behind all API routes |

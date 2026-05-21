@@ -8,7 +8,7 @@ Jobs:
   4. advance_bill_dates — every 60s, rolls forward past-due recurring bill dates
   5. send_weekly_report — every 60s (fires once per week per user)
 
-Started as a daemon thread from app.py so it doesn't block Streamlit.
+Started from FastAPI lifespan in backend/main.py (idempotent).
 """
 
 from __future__ import annotations

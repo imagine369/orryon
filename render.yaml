@@ -19,7 +19,7 @@ services:
       - key: DB_PATH
         value: /data/finance.db
       - key: GROK_MODEL
-        value: grok-3-mini
+        value: grok-4.3
       - key: FRONTEND_URL
         sync: false
       - key: APP_URL

@@ -70,6 +70,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   // All other requests — network-first, no offline fallback
-  // (Streamlit requires a live server; we don't pretend otherwise)
+  // Network-first for API and dynamic routes
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });

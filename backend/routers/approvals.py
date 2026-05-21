@@ -1,10 +1,13 @@
 """
-backend/routers/approvals.py — Approval Gate for sensitive AI actions.
+backend/routers/approvals.py — Approval requests and agent action audit trail.
+
+Agent delete tools log completed actions as status=approved (see registry.execute_tool).
+Human-in-the-loop approve/reject is reserved for future UI.
 
 GET  /api/approvals              — list pending approval requests
 POST /api/approvals/{id}/approve — approve an action
 POST /api/approvals/{id}/reject  — reject an action
-GET  /api/approvals/history      — all resolved approvals
+GET  /api/approvals/history      — resolved + agent audit entries
 """
 
 from __future__ import annotations

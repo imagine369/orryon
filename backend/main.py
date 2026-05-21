@@ -25,7 +25,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.middleware import OriginEnforcementMiddleware, PerIpRateLimitMiddleware
-from backend.routers import auth, chat, finance, organize, account, connections, contact, calendar_sync, voice, habits, admin, memory, health, location, briefings, approvals
+from backend.routers import auth, chat, finance, organize, account, connections, contact, calendar_sync, voice, habits, admin, memory, health, location, briefings, approvals, waitlist
 from config import XAI_API_KEY
 
 # ── Sentry Setup ─────────────────────────────────────────────────────────────
@@ -199,6 +199,7 @@ app.include_router(health.router)
 app.include_router(location.router)
 app.include_router(briefings.router)
 app.include_router(approvals.router)
+app.include_router(waitlist.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

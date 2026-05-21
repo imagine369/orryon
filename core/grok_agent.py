@@ -12,10 +12,10 @@ Architecture (v4 — speed-optimized):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
-import threading
 import itertools
 from datetime import datetime
 from typing import Any, AsyncGenerator
@@ -25,6 +25,12 @@ import httpx
 from config import XAI_API_KEY, XAI_API_KEYS, GROK_MODEL
 from core.canonical_tools import build_reprompt_note
 from core.system_prompt import get_system_prompt
+from core.context_cache import (
+    get_context_snapshot_text,
+    invalidate_context_cache,
+    schedule_context_refresh,
+)
+from core.tool_labels import get_tool_label
 from core.tools import GROK_TOOL_SCHEMAS, execute_tool
 from db import fetch_rows
 
@@ -117,79 +123,8 @@ async def close_http_client() -> None:
         _http_client = None
 
 
-_TOOL_LABELS = {
-    # Canonical 16
-    "log_bill": "Logging bill",
-    "get_bills": "Loading bills",
-    "log_expense": "Logging expense",
-    "get_expenses": "Loading expenses",
-    "add_calendar_event": "Adding to calendar",
-    "get_calendar": "Loading calendar",
-    "add_note": "Saving note",
-    "get_notes": "Loading notes",
-    "log_journal_entry": "Saving journal entry",
-    "get_journal": "Loading journal",
-    "create_goal": "Creating goal",
-    "update_goal": "Updating goal",
-    "get_goals": "Loading goals",
-    "generate_insights": "Generating insights",
-    "generate_forecast": "Running forecast",
-    "generate_yearly_summary": "Building yearly summary",
-
-    # Full-CRUD additions
-    "edit_bill": "Updating bill",
-    "delete_goal": "Removing goal",
-    "edit_journal_entry": "Updating journal entry",
-    "delete_journal_entry": "Removing journal entry",
-    "delete_list": "Deleting list",
-
-    # Legacy aliases (still emitted by older histories / back-compat)
-    "add_expense": "Logging expense",
-    "add_recurring_bill": "Logging bill",
-    "add_goal": "Creating goal",
-    "update_goal_progress": "Updating goal",
-    "get_upcoming_schedule": "Loading calendar",
-
-    # Orphan tools
-    "set_balance": "Setting balance",
-    "add_money": "Adding to balance",
-    "get_balance": "Checking balance",
-    "add_grocery_items": "Updating grocery list",
-    "add_task": "Creating task",
-    "set_budget": "Setting budget",
-    "check_grocery_item": "Checking off item",
-    "complete_task": "Completing task",
-    "get_spending_summary": "Checking spending",
-    "get_net_worth": "Calculating net worth",
-    "get_budget_status": "Checking budgets",
-    "get_spending_recap": "Building recap",
-    "add_custom_category": "Creating category",
-    "get_money_left_after_goals": "Calculating free money",
-    "set_notification_preferences": "Updating preferences",
-    "delete_expense": "Removing expense",
-    "delete_event": "Removing event",
-    "delete_task": "Removing task",
-    "edit_expense": "Updating expense",
-    "add_recurring_income": "Tracking income",
-    "edit_event": "Updating event",
-    "edit_task": "Updating task",
-    "delete_note": "Removing note",
-    "search_notes": "Searching notes",
-    "edit_note": "Updating note",
-    "pin_note": "Pinning note",
-    "delete_bill": "Cancelling bill",
-    "split_expense": "Splitting expense",
-    "get_spending_patterns": "Analysing patterns",
-    "search_transactions": "Searching transactions",
-    "get_subscription_health": "Checking subscriptions",
-    "create_list": "Creating list",
-    "add_list_items": "Adding to list",
-    "get_user_lists": "Loading lists",
-    "get_mood_spending_report": "Analysing mood patterns",
-}
-
 _UNDO_TABLE_MAP = {
-    # Canonical 16 — write tools only
+    # Write tools that support undo
     "log_expense": "transactions",
     "log_bill": "subscriptions",
     "add_calendar_event": "events",
@@ -290,7 +225,12 @@ async def run_orryon_stream(
 
     system_prompt = get_system_prompt(user_name=user_name, tier=tier, mode=mode)
     memories = _get_user_memories(user_id)
-    messages = _build_messages(system_prompt, chat_history or [], user_message, user_id, memories)
+    context_snip = await get_context_snapshot_text(
+        user_id, lambda: _compute_context_snapshot(user_id),
+    )
+    messages = _build_messages(
+        system_prompt, chat_history or [], user_message, user_id, memories, context_snip,
+    )
 
     actions_taken: list[dict] = []
     all_tabs: set[str] = set()
@@ -359,8 +299,10 @@ async def run_orryon_stream(
                     })
                     continue
 
-                _try_extract_memories(user_message, full_content, user_id)
-                schedule_context_refresh(user_id)
+                _schedule_memory_extraction(user_message, full_content, user_id)
+                schedule_context_refresh(
+                    user_id, lambda: _compute_context_snapshot(user_id),
+                )
                 yield {
                     "type": "done", "message": full_content,
                     "actions": actions_taken, "tabs": list(all_tabs),
@@ -370,7 +312,7 @@ async def run_orryon_stream(
 
             for tc in tool_calls_buf:
                 fn_name = tc["function"]["name"]
-                label = _TOOL_LABELS.get(fn_name, fn_name.replace("_", " ").title())
+                label = get_tool_label(fn_name)
                 yield {"type": "tool", "name": fn_name, "label": label}
 
                 try:
@@ -380,6 +322,8 @@ async def run_orryon_stream(
 
                 result, tabs = execute_tool(fn_name, tool_args, user_id)
                 all_tabs.update(tabs)
+                if tabs:
+                    invalidate_context_cache(user_id)
                 actions_taken.append({"tool": fn_name, "args": tool_args, "result": result})
 
                 if result.get("id") and fn_name in _UNDO_TABLE_MAP:
@@ -393,7 +337,7 @@ async def run_orryon_stream(
                     "content": json.dumps(result),
                 })
 
-        schedule_context_refresh(user_id)
+        schedule_context_refresh(user_id, lambda: _compute_context_snapshot(user_id))
         yield {
             "type": "done",
             "message": "Done! Let me know if you need anything else.",
@@ -489,26 +433,6 @@ async def _call_grok_async(messages: list[dict]) -> dict:
     return resp.json()
 
 
-def _call_grok(messages: list[dict]) -> dict:
-    """Sync non-streaming call to Grok (used in background threads for memory extraction)."""
-    api_key = _next_api_key()
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json; charset=utf-8",
-    }
-    payload: dict[str, Any] = {
-        "model": GROK_MODEL,
-        "messages": messages,
-        "temperature": 0,
-        "max_tokens": 256,
-    }
-    body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-    with httpx.Client(timeout=15.0) as sync_client:
-        resp = sync_client.post(XAI_API_URL, headers=headers, content=body)
-        resp.raise_for_status()
-        return resp.json()
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # MESSAGE BUILDING
 # ─────────────────────────────────────────────────────────────────────────────
@@ -519,8 +443,8 @@ def _build_messages(
     user_message: str,
     user_id: str,
     memories: list[str] | None = None,
+    context_snip: str = "(context unavailable)",
 ) -> list[dict]:
-    context_snip = _get_context_snapshot(user_id)
     memory_block = ""
     if memories:
         facts = "\n".join(f"- {m}" for m in memories[:30])
@@ -550,63 +474,10 @@ def _build_messages(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CONTEXT HELPERS (stale-while-revalidate)
+# CONTEXT SNAPSHOT (compute body — caching in core/context_cache.py)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_context_cache: dict[str, tuple[float, str]] = {}
-_CONTEXT_TTL_FRESH = 300
-_CONTEXT_TTL_STALE = 900
-_context_refreshing: set[str] = set()
-
-
-def _get_context_snapshot(user_id: str) -> str:
-    """Return the user's financial context for the system prompt.
-
-    Uses a stale-while-revalidate strategy:
-      - <5 min old  → return immediately (fresh)
-      - 5–15 min old → return immediately, refresh in background (stale)
-      - >15 min old  → compute synchronously (cold miss, rare)
-    """
-    import time
-    now = time.monotonic()
-    cached = _context_cache.get(user_id)
-
-    if cached:
-        age = now - cached[0]
-        if age < _CONTEXT_TTL_FRESH:
-            return cached[1]
-        if age < _CONTEXT_TTL_STALE:
-            schedule_context_refresh(user_id)
-            return cached[1]
-
-    return _compute_context_snapshot(user_id)
-
-
-def schedule_context_refresh(user_id: str) -> None:
-    """Trigger a non-blocking background refresh of the context cache."""
-    if user_id in _context_refreshing:
-        return
-    _context_refreshing.add(user_id)
-    try:
-        t = threading.Thread(
-            target=_context_refresh_worker, args=(user_id,), daemon=True,
-        )
-        t.start()
-    except Exception:
-        _context_refreshing.discard(user_id)
-
-
-def _context_refresh_worker(user_id: str) -> None:
-    try:
-        _compute_context_snapshot(user_id)
-    except Exception as exc:
-        logger.debug("Background context refresh failed: %s", exc)
-    finally:
-        _context_refreshing.discard(user_id)
-
-
 def _compute_context_snapshot(user_id: str) -> str:
-    import time
     try:
         from core.tools import (
             _get_spending_summary, _get_budget_status,
@@ -666,9 +537,7 @@ def _compute_context_snapshot(user_id: str) -> str:
         except Exception:
             pass
 
-        result = "\n".join(lines)
-        _context_cache[user_id] = (time.monotonic(), result)
-        return result
+        return "\n".join(lines)
     except Exception as exc:
         logger.warning("Context snapshot failed: %s", exc)
         return "(context unavailable)"
@@ -687,24 +556,26 @@ def _get_user_memories(user_id: str) -> list[str]:
         return []
 
 
-def _try_extract_memories(user_message: str, assistant_response: str, user_id: str) -> None:
+def _schedule_memory_extraction(
+    user_message: str, assistant_response: str, user_id: str,
+) -> None:
     if not _all_keys or len(user_message) < 15:
         return
     try:
-        t = threading.Thread(
-            target=_extract_memories_worker,
-            args=(user_message, assistant_response, user_id),
-            daemon=True,
+        loop = asyncio.get_running_loop()
+        loop.create_task(
+            _extract_memories_async(user_message, assistant_response, user_id)
         )
-        t.start()
-    except Exception:
+    except RuntimeError:
         pass
 
 
-def _extract_memories_worker(user_message: str, assistant_response: str, user_id: str) -> None:
+async def _extract_memories_async(
+    user_message: str, assistant_response: str, user_id: str,
+) -> None:
     try:
         from backend.deps import get_monthly_spend_cap, get_monthly_token_cap, resolve_plan_for_user
-        from db import get_monthly_spend, get_monthly_token_usage, record_token_spend
+        from db import get_monthly_spend, get_monthly_token_usage, record_token_spend, save_user_memory
 
         plan = resolve_plan_for_user(user_id)["plan"]
         if get_monthly_spend(user_id) >= get_monthly_spend_cap(plan):
@@ -717,7 +588,7 @@ def _extract_memories_worker(user_message: str, assistant_response: str, user_id
         if len(existing) > 100:
             return
 
-        result = _call_grok([
+        result = await _call_grok_async([
             {
                 "role": "system",
                 "content": (
@@ -743,7 +614,6 @@ def _extract_memories_worker(user_message: str, assistant_response: str, user_id
         content = result["choices"][0]["message"]["content"].strip()
         facts = _parse_json_array(content)
 
-        from db import save_user_memory
         for fact in facts[:3]:
             if isinstance(fact, str) and len(fact.strip()) > 5:
                 save_user_memory(user_id, fact.strip())

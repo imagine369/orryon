@@ -4,31 +4,32 @@ from __future__ import annotations
 import logging
 
 import core.tools.helpers as h
+from core.tool_labels import is_destructive_tool
 from core.tools.normalize import normalize_args
 
 logger = logging.getLogger(__name__)
 
 _TOOL_MAP = {
-    # Canonical 16 — Bills
+    # Bills
     "log_bill": h._add_recurring_bill,
     "get_bills": h._get_bills,
-    # Canonical 16 — Expenses
+    # Expenses
     "log_expense": h._add_expense,
     "get_expenses": h._get_expenses,
-    # Canonical 16 — Calendar
+    # Calendar
     "add_calendar_event": h._add_calendar_event,
     "get_calendar": h._get_upcoming_schedule,
-    # Canonical 16 — Notes
+    # Notes
     "add_note": h._add_note,
     "get_notes": h._get_notes,
-    # Canonical 16 — Journal
+    # Journal
     "log_journal_entry": h._log_journal_entry,
     "get_journal": h._get_journal,
-    # Canonical 16 — Goals
+    # Goals
     "create_goal": h._add_goal,
     "update_goal": h._update_goal_progress,
     "get_goals": h._get_goals,
-    # Canonical 16 — Analytical
+    # Analysis
     "generate_insights": h._generate_insights,
     "generate_forecast": h._generate_forecast,
     "generate_yearly_summary": h._generate_yearly_summary,
@@ -91,8 +92,25 @@ _TOOL_MAP = {
     "cross_feature_search": h._cross_feature_search,
 }
 
+def _log_destructive_action(
+    user_id: str, tool_name: str, args: dict, result: dict,
+) -> None:
+    """Audit trail for agent-driven deletes (visible under GET /api/approvals/history)."""
+    try:
+        from db import create_approval_request
+        create_approval_request(
+            user_id,
+            action_type=tool_name,
+            description=f"Agent completed {tool_name.replace('_', ' ')}",
+            payload={"args": args, "result": result},
+            expires_hours=720,
+            status="approved",
+        )
+    except Exception as exc:
+        logger.warning("Destructive action audit log failed: %s", exc)
+
+
 _TAB_REFRESH_MAP = {
-    # Canonical 16
     "log_bill": ["schedule", "forecast"],
     "get_bills": [],
     "log_expense": ["dashboard", "budget"],
@@ -185,6 +203,8 @@ def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[s
         result = fn(args, user_id)
         tabs = _TAB_REFRESH_MAP.get(tool_name, [])
         logger.info("Tool %s executed: %s", tool_name, result)
+        if is_destructive_tool(tool_name) and not result.get("error"):
+            _log_destructive_action(user_id, tool_name, args, result)
         return result, tabs
     except Exception as exc:
         logger.error("Tool %s error: %s", tool_name, exc)

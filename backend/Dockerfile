@@ -5,7 +5,7 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-COPY config.py email_sender.py db.py ./
+COPY config.py email_sender.py db/ ./db/
 COPY core/ ./core/
 COPY backend/ ./backend/
 

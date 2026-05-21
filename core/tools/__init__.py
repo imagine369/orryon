@@ -15,7 +15,7 @@ validate_canonical_schemas(TOOL_SCHEMAS)
 # Subset sent to Grok on each chat request; full TOOL_SCHEMAS kept for tests/docs.
 GROK_TOOL_SCHEMAS = filter_schemas_for_grok(TOOL_SCHEMAS)
 from core.tools.seed import seed_sample_data
-from core.tools.helpers import (
+from core.tools.shared import (
     _uid,
     _now_iso,
     _today,
@@ -26,6 +26,8 @@ from core.tools.helpers import (
     _check_spending_alert,
     _get_category_spending_cycle,
     _get_category_budget,
+)
+from core.tools.handlers import (
     _get_spending_recap,
     _get_balance,
     _get_spending_summary,

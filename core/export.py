@@ -1,5 +1,5 @@
 """
-core/export.py — User data export (shared between FastAPI and Streamlit).
+core/export.py — User data export (ZIP bundle for account export).
 
 Builds a ZIP file containing a copy of the SQLite database and a
 filtered JSON dump of all user-owned rows.
@@ -23,8 +23,7 @@ def build_user_export_zip(user_id: str) -> bytes:
       - finance.db  — full copy of the SQLite database
       - data.json   — JSON export of only this user's rows
 
-    Both the FastAPI export endpoint and the Streamlit settings panel
-    call this function to ensure consistent export behavior.
+    Called by the FastAPI account export endpoint.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         db_copy = os.path.join(tmpdir, "finance.db")

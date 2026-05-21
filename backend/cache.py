@@ -115,6 +115,14 @@ async def cache_set(key: str, value: Any, ttl_seconds: int = 60) -> None:
     _mem_cache[key] = (time.time() + ttl_seconds, value)
 
 
+async def cache_delete(key: str) -> None:
+    """Remove a cache entry (Redis or in-memory)."""
+    if _USE_REDIS and _redis:
+        await _redis.delete(f"cache:{key}")
+        return
+    _mem_cache.pop(key, None)
+
+
 # ── Nonce replay protection ───────────────────────────────────────────────────
 # Used by backend/signing.py to reject replayed HMAC-signed requests. A nonce is
 # "consumed" at most once within its TTL. Redis-backed when available so the

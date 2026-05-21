@@ -38,7 +38,7 @@ from backend.schemas import (
     EmailChangeVerifyReq,
     SettingsUpdate,
 )
-from config import APP_URL, SMTP_ENABLED, XAI_API_KEY
+from config import APP_URL, GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from db import (
     create_verification_code,
     get_connection,
@@ -201,7 +201,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
     d = {k: v for k, v in dict(row).items() if k in _SETTINGS_READ_FIELDS}
     d["smtp_enabled"] = SMTP_ENABLED
     d["ai_connected"] = bool(XAI_API_KEY)
-    d["grok_model"] = os.getenv("GROK_MODEL", "grok-3-mini")
+    d["grok_model"] = GROK_MODEL
     return d
 
 
@@ -431,7 +431,7 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(requir
     b64 = base64.b64encode(contents).decode("utf-8")
 
     payload = {
-        "model": "grok-2-vision-1212",
+        "model": GROK_MODEL,
         "messages": [
             {
                 "role": "user",

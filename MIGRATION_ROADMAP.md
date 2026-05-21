@@ -2,20 +2,16 @@
 
 ## Current Architecture (v2)
 
-The primary stack is **Next.js 16 + FastAPI**, with the legacy Streamlit UI preserved for quick demos.
+The primary stack is **Next.js 16 + FastAPI** (Streamlit UI removed).
 
 ```
-Modern Stack (primary):
-  Next.js 16 (frontend/) ← REST + SSE → FastAPI (backend/)
-      ├── backend/routers/     (6 modular router files)
+  Next.js 16 (frontend/) ← REST + SSE/WS → FastAPI (backend/)
+      ├── backend/routers/     (modular API routers)
       ├── core/grok_agent.py   → xAI Grok API (streaming + tool calling)
-      ├── core/tools.py        → 30+ AI tool implementations
+      ├── core/tools/          → AI tool schemas, registry, handlers
       ├── core/scheduler.py    → APScheduler (background jobs)
-      ├── db.py                → SQLite (single-file, local-first)
+      ├── db.py                → SQLite or Postgres
       └── email_sender.py      → SMTP (OTP, digests)
-
-Legacy Stack (maintenance mode):
-  Streamlit (app.py + ui/ + pages/) → same core/ and db.py
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram.
@@ -33,6 +29,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram.
 | Subscription Billing | **Done** | Stripe integration with trial support |
 | Receipt Scanning | **Done** | Grok Vision-based receipt OCR |
 | Documentation | **Done** | README, ARCHITECTURE.md, this roadmap |
+| Streamlit removal | **Done** | Removed `app.py`, `ui/`, `pages/`, root `requirements.txt` |
 
 ---
 
@@ -123,27 +120,19 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 
 ---
 
-## Phase E: Streamlit Deprecation
+## Phase E: Streamlit Deprecation — **Done**
 
-Once all features are in the Next.js UI:
-
-| Step | Action |
-|------|--------|
-| 1 | Feature parity audit (compare `app.py` tabs vs frontend pages) |
-| 2 | Add any missing Streamlit-only features to the frontend |
-| 3 | Move `app.py`, `ui/`, `pages/` into an `archive/` directory |
-| 4 | Remove root `requirements.txt` (Streamlit deps) |
-| 5 | Update Railway/Render configs to only deploy FastAPI |
+Removed `app.py`, `ui/`, `pages/`, root `requirements.txt`, and `legacy/README.md`. Production already deployed FastAPI + Next.js only.
 
 ---
 
 ## Shared Module Extraction Progress
 
-Logic that was duplicated between `app.py` and `backend/` is being consolidated into `core/`:
+Business logic consolidated in `core/`:
 
 | Module | Status | What it contains |
 |--------|--------|-----------------|
-| `core/export.py` | **Done** | `build_user_export_zip()` — used by both stacks |
+| `core/export.py` | **Done** | `build_user_export_zip()` — used by account router |
 | `core/sharing.py` | Planned | Share token resolution and creation |
 | `core/search.py` | Planned | Multi-table global search |
 | `core/dashboard.py` | Planned | Dashboard snapshot aggregation |
@@ -156,11 +145,10 @@ Logic that was duplicated between `app.py` and `backend/` is being consolidated 
 |------|---------|-----------------|
 | `db.py` | All data access | Replace with SQLAlchemy (Phase B) |
 | `core/grok_agent.py` | AI agent | Stable — no change needed |
-| `core/tools.py` | Tool implementations | Stable — shared by both stacks |
+| `core/tools/` | Tool implementations | Stable — schemas + helpers + registry |
 | `core/scheduler.py` | Background jobs | Replace with Celery (Phase B) |
 | `core/google_calendar.py` | GCal sync | Expand from scaffold (Phase A) |
 | `core/csv_importer.py` | CSV parsing | Wire into connections router (Phase A) |
 | `config.py` | All env vars | Add `DATABASE_URL` (Phase B) |
 | `backend/` | FastAPI app | Primary — actively developed |
 | `frontend/` | Next.js app | Primary — actively developed |
-| `app.py` | Streamlit UI | Maintenance mode → deprecate (Phase E) |

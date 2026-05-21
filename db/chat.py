@@ -1,0 +1,144 @@
+"""
+db.chat — Chat messages and sessions.
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import datetime, timezone
+
+from db.connection import get_connection
+from db.crud import insert_row
+
+logger = logging.getLogger(__name__)
+
+
+def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "session_id": session_id,
+        "role": msg.get("role", "user"),
+        "content": msg.get("content", ""),
+        "agent": msg.get("agent", ""),
+        "status": msg.get("status", ""),
+        "summary": msg.get("summary", ""),
+        "confidence": msg.get("confidence", 0),
+        "evidence": msg.get("evidence", ""),
+        "next_steps": msg.get("next_steps_or_question", ""),
+        "created_at": now,
+    }
+    ok = insert_row("chat_messages", row)
+    if ok and session_id:
+        try:
+            conn = get_connection()
+            conn.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?", (now, session_id))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+    return ok
+
+
+def load_chat_history(user_id: str, limit: int = 100, session_id: str = "") -> list[dict]:
+    try:
+        conn = get_connection()
+        if session_id:
+            rows = conn.execute(
+                "SELECT * FROM ("
+                "  SELECT * FROM chat_messages"
+                "  WHERE user_id = ? AND session_id = ?"
+                "  ORDER BY created_at DESC LIMIT ?"
+                ") sub ORDER BY created_at ASC",
+                (user_id, session_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM ("
+                "  SELECT * FROM chat_messages"
+                "  WHERE user_id = ?"
+                "  ORDER BY created_at DESC LIMIT ?"
+                ") sub ORDER BY created_at ASC",
+                (user_id, limit),
+            ).fetchall()
+        conn.close()
+        msgs = []
+        for r in rows:
+            d = dict(r)
+            d["next_steps_or_question"] = d.pop("next_steps", "")
+            msgs.append(d)
+        return msgs
+    except Exception as exc:
+        logger.error("load_chat_history error: %s", exc)
+        return []
+
+
+# ── Chat session helpers ──────────────────────────────────────────────────────
+
+def create_chat_session(user_id: str, title: str = "") -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    session_id = str(uuid.uuid4())
+    insert_row("chat_sessions", {
+        "id": session_id, "user_id": user_id, "title": title,
+        "created_at": now, "updated_at": now,
+    })
+    return {"id": session_id, "title": title, "created_at": now, "updated_at": now}
+
+
+def list_chat_sessions(user_id: str, limit: int = 50) -> list[dict]:
+    try:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM chat_sessions WHERE user_id=? ORDER BY updated_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            first_msg = conn.execute(
+                "SELECT content FROM chat_messages WHERE session_id=? AND role='user' ORDER BY created_at ASC LIMIT 1",
+                (d["id"],),
+            ).fetchone()
+            d["preview"] = (first_msg["content"][:80] if first_msg else "") if first_msg else ""
+            msg_count = conn.execute(
+                "SELECT COUNT(*) as cnt FROM chat_messages WHERE session_id=?", (d["id"],)
+            ).fetchone()
+            d["message_count"] = msg_count["cnt"] if isinstance(msg_count, dict) else msg_count[0]
+            result.append(d)
+        conn.close()
+        return result
+    except Exception as exc:
+        logger.error("list_chat_sessions error: %s", exc)
+        return []
+
+
+def delete_chat_session(user_id: str, session_id: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute("DELETE FROM chat_messages WHERE session_id=? AND user_id=?", (session_id, user_id))
+        conn.execute("DELETE FROM chat_sessions WHERE id=? AND user_id=?", (session_id, user_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("delete_chat_session error: %s", exc)
+        return False
+
+
+def update_chat_session_title(user_id: str, session_id: str, title: str) -> bool:
+    try:
+        conn = get_connection()
+        conn.execute(
+            "UPDATE chat_sessions SET title=? WHERE id=? AND user_id=?",
+            (title, session_id, user_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("update_chat_session_title error: %s", exc)
+        return False
+
+
+# ── Ensure directories exist ──────────────────────────────────────────────────

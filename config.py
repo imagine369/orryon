@@ -28,16 +28,13 @@ LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "grok")
 
 # ── Grok (xAI) — direct API, OpenAI-compatible ──────────────────────────────
 # Get your key at https://console.x.ai
-# Recommended models (set GROK_MODEL in .env):
-#   grok-4-fast-non-reasoning-latest  — lowest TTFT, ideal for consumer chat
-#   grok-3-mini-fast                  — budget fallback, still fast
-#   grok-3-mini                       — balanced (previous default)
-#   grok-3                            — smarter, slower, complex queries only
+# Orryon uses grok-4.3 for chat, memory extraction, and vision (receipt scan).
+# Override GROK_MODEL only for debugging against another xAI release.
 XAI_API_KEY: str = os.getenv("XAI_API_KEY", "")
 XAI_API_KEYS: list[str] = [
     k.strip() for k in os.getenv("XAI_API_KEYS", "").split(",") if k.strip()
 ]
-GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-4-fast-non-reasoning-latest")
+GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-4.3")
 
 # Ollama (local fallback — not used in v1 rebuild but kept for compatibility)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -121,16 +118,9 @@ CONTACT_EMAIL: str = os.getenv("CONTACT_EMAIL", "") or SMTP_USER
 SMTP_FROM: str = os.getenv("SMTP_FROM", "") or SMTP_USER or CONTACT_EMAIL
 
 ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
-# ── ElevenLabs (orb / breathing voice) ───────────────────────────────────────
-# Used exclusively for the breathing orb and Reset Anchor session cues.
-# Get your key at https://elevenlabs.io — free tier includes 10k chars/month.
-ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 
 # ── ElevenLabs (orb / breathing voice) ───────────────────────────────────────
-# Used exclusively for the breathing orb and Reset Anchor session cues.
-# Get your key at https://elevenlabs.io — free tier includes 10k chars/month.
-# Voice used: "Erin - Meditation Guide" (ID: DKfKzHbGIi7qsCsZWN8G)
-# A soft, gentle, peaceful female voice purpose-built for guided meditation.
+# Optional. Used for breathing orb / Reset Anchor when xAI TTS is not used.
 ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 
 # ── Stripe (billing) ──────────────────────────────────────────────────────────

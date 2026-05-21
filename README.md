@@ -2,13 +2,13 @@
 
 Our guide to organized life and calmer days.
 
-> **Local-first.** All data stays on your device in a single SQLite file. No cloud. No accounts required for the demo.
+> **Local dev** uses SQLite on disk. **Production** can use Postgres + Redis on Railway; OTP sign-in is required outside demo mode.
 
 ---
 
 ## Architecture
 
-Orryon runs as a **Next.js frontend + FastAPI backend**. The legacy Streamlit UI is preserved for quick demos but is no longer the primary interface.
+Orryon runs as a **Next.js frontend + FastAPI backend**.
 
 ```
 ┌─────────────────┐       REST + SSE        ┌──────────────────────┐
@@ -110,19 +110,6 @@ Orryon takes a **tiered approach to transaction import**, progressing from maxim
 
 ---
 
-## Legacy Streamlit UI
-
-The original Streamlit interface is still functional for quick demos:
-
-```bash
-pip install -r requirements.txt      # root requirements.txt (Streamlit deps)
-streamlit run app.py                  # opens http://localhost:8501
-```
-
-> **Note:** The Streamlit UI is in maintenance mode. New features target the Next.js + FastAPI stack exclusively.
-
----
-
 ## Deploy
 
 ### Railway (recommended)
@@ -153,7 +140,7 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 |---|---|---|
 | `XAI_API_KEY` | **Yes** | xAI Grok API key — enables the AI chat |
 | `JWT_SECRET` | Prod | Secret for JWT signing (auto-generated in dev) |
-| `GROK_MODEL` | No | Model name (default: `grok-3-mini`) |
+| `GROK_MODEL` | No | xAI model (default: `grok-4.3`) |
 | `SMTP_HOST` | No | SMTP server for OTP emails and reminders |
 | `SMTP_PORT` | No | SMTP port (default: `587`) |
 | `SMTP_USER` | No | SMTP username / sender address |
@@ -255,15 +242,16 @@ orryon/
 │
 ├── core/                       # Shared business logic
 │   ├── grok_agent.py           #   xAI Grok streaming agent + memory
-│   ├── tools.py                #   AI tool definitions and execution
+│   ├── context_cache.py        #   Redis-backed prompt context cache
+│   ├── tools/handlers/         #   Domain tool implementations
+│   ├── tools/shared.py         #   Shared tool utilities
+│   ├── tools/                  #   Schemas, registry, helpers shim
 │   ├── system_prompt.py        #   System prompt construction
 │   ├── scheduler.py            #   APScheduler background jobs
 │   ├── csv_importer.py         #   Bank CSV parsing (Chase, Amex, generic)
-│   ├── export.py               #   User data export (shared)
 │   └── google_calendar.py      #   Google Calendar sync (scaffold)
 │
-├── app.py                      # Legacy Streamlit UI (maintenance mode)
-├── db.py                       # SQLite schema, migrations, CRUD helpers
+├── db/                         # Database package (SQLite / Postgres)
 ├── config.py                   # Environment variable loading
 ├── email_sender.py             # SMTP email sending
 │

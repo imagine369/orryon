@@ -154,7 +154,7 @@ const DEMO_SETTINGS: Settings = {
   weekly_report_enabled: 0,
   smtp_enabled: false,
   ai_connected: false,
-  grok_model: "grok-3-mini",
+  grok_model: "grok-4.3",
 };
 
 const VIEW_TITLES: Record<string, string> = {

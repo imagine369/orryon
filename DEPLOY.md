@@ -30,7 +30,7 @@ NODE_ENV=production
 # LLM
 LLM_PROVIDER=grok
 XAI_API_KEY=          ← your xAI key from console.x.ai
-GROK_MODEL=grok-3-mini
+GROK_MODEL=grok-4.3
 
 # Auth — generate with: python -c "import secrets; print(secrets.token_hex(32))"
 JWT_SECRET=           ← generate a random 64-char hex string
