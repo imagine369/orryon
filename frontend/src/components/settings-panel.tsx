@@ -27,7 +27,6 @@ import {
   Activity,
   MapPin,
   Sunrise,
-  CheckCircle2,
   Accessibility,
   Trash2,
   Plus,
@@ -87,7 +86,6 @@ type View =
   | "health"
   | "location"
   | "briefing"
-  | "approvals"
   | "accessibility";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -174,7 +172,6 @@ const VIEW_TITLES: Record<string, string> = {
   health: "Health",
   location: "My Places",
   briefing: "Daily Briefing",
-  approvals: "Approvals",
   accessibility: "Accessibility",
 };
 
@@ -541,12 +538,6 @@ export function SettingsPanel() {
               title="Daily Briefing"
               description="Morning summary preferences"
               onClick={() => setView("briefing")}
-            />
-            <NavItem
-              icon={<CheckCircle2 className="h-5 w-5" strokeWidth={1.5} />}
-              title="Approvals"
-              description="Pending AI actions awaiting your approval"
-              onClick={() => setView("approvals")}
             />
           </>
         )}
@@ -1087,6 +1078,40 @@ export function SettingsPanel() {
             </span>
           }
         />
+        {/* AI usage allowance (chat + tools) */}
+        {chatUsage && sub.is_active_pro && (chatUsage.spend_cap_usd ?? 0) > 0 && (
+          <div className="px-3 py-3 border-b border-white/5 space-y-2">
+            <div className="flex justify-between text-xs text-white/45">
+              <span>AI allowance this month</span>
+              <span>
+                ${(chatUsage.spend_usd ?? 0).toFixed(2)} / ${(chatUsage.spend_cap_usd ?? 0).toFixed(2)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  chatUsage.at_limit ? "bg-amber-500" : "bg-white/30"
+                }`}
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      ((chatUsage.spend_usd ?? 0) / (chatUsage.spend_cap_usd ?? 1)) * 100,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
+            {(chatUsage.at_limit || chatUsage.near_limit) && chatUsage.upgrade_plan && (
+              <p className="text-xs text-amber-200/80">
+                {chatUsage.at_limit
+                  ? "Allowance reached — upgrade for more headroom."
+                  : "Running low — upgrade for a higher monthly allowance."}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Voice minute usage meter */}
         {voiceUsage && sub.is_active_pro && (
           <div className="px-3 py-3 border-b border-white/5">
@@ -1186,9 +1211,6 @@ export function SettingsPanel() {
     <BriefingView prefs={prefs} onUpdate={updatePrefs} />
   );
 
-  // ── Approvals view ──────────────────────────────────────────────────────────
-  const renderApprovals = () => <ApprovalsView />;
-
   // ── Accessibility view ──────────────────────────────────────────────────────
   const renderAccessibility = () => (
     <AccessibilityView prefs={prefs} onUpdate={updatePrefs} sub={sub} />
@@ -1210,7 +1232,6 @@ export function SettingsPanel() {
       case "health": return renderHealth();
       case "location": return renderLocation();
       case "briefing": return renderBriefing();
-      case "approvals": return renderApprovals();
       case "accessibility": return renderAccessibility();
       default: return renderMainMenu();
     }
@@ -1557,49 +1578,6 @@ function BriefingView({ prefs, onUpdate }: { prefs: ReturnType<typeof usePrefere
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ── Approvals View ────────────────────────────────────────────────────────────
-
-interface Approval { id: string; action_type: string; description: string; created_at: string; status: string; }
-
-function ApprovalsView() {
-  const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = () => {
-    api.get<{ approvals: Approval[] }>("/api/approvals").then((d) => setApprovals(d.approvals)).catch(() => {}).finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const resolve = async (id: string, action: "approve" | "reject") => {
-    setApprovals((p) => p.filter((a) => a.id !== id));
-    try { await api.post(`/api/approvals/${id}/${action}`, {}); } catch { /* non-fatal */ }
-  };
-
-  if (loading) return <div className="py-8 flex justify-center"><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-white/50" /></div>;
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-white/35 leading-relaxed">
-        Sensitive actions Orryon wants to take on your behalf require your explicit approval.
-      </p>
-      {approvals.length === 0 && <p className="py-6 text-center text-sm text-white/20">No pending approvals.</p>}
-      {approvals.map((a) => (
-        <div key={a.id} className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 space-y-3">
-          <div>
-            <p className="text-xs text-white/30 uppercase tracking-wider mb-1">{a.action_type.replace(/_/g, " ")}</p>
-            <p className="text-sm text-white/75 leading-relaxed">{a.description}</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => resolve(a.id, "approve")} className="flex-1 min-h-[44px] rounded-xl bg-white/10 text-sm text-white/80 hover:bg-white/[0.15] transition font-medium">Approve</button>
-            <button onClick={() => resolve(a.id, "reject")} className="flex-1 min-h-[44px] rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/35 hover:text-white/55 transition">Reject</button>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

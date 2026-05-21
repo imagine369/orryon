@@ -76,8 +76,9 @@ Used by both the FastAPI backend and the Streamlit app. This is the "brain" of o
 | File | Purpose |
 |------|---------|
 | `grok_agent.py` | Streaming xAI Grok agent with tool calling, memory extraction |
-| `tools.py` | 30+ AI tool schemas and `execute_tool()` dispatcher |
-| `system_prompt.py` | Dynamic system prompt with user context injection |
+| `tools/` | Tool schemas (`schemas.py`), handlers (`helpers.py`), registry (`registry.py`) |
+| `canonical_tools.py` | Single source of truth for advertised tool names |
+| `system_prompt.py` | Finance-first system prompt (v6; must match `_TOOL_MAP`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
 | `csv_importer.py` | Bank CSV parsing (for future import feature) |
 | `google_calendar.py` | Google Calendar OAuth scaffold |
@@ -106,7 +107,7 @@ The most complex flow is the streaming chat, which connects the frontend to the 
 6. Streams SSE from xAI Grok API
 7. For each chunk:
    - Text tokens → yield {"type": "token", "content": "..."} → SSE to frontend
-   - Tool calls → execute via core/tools.py → append result → loop back to step 6
+   - Tool calls → execute via core/tools/ → append result → loop back to step 6
 8. Final message → yield {"type": "done", ...} → SSE to frontend
 9. Save to chat_messages table, extract memories in background thread
 ```
@@ -124,11 +125,27 @@ data: {"type": "error",  "message": "..."}
 data: [DONE]
 ```
 
-### Canonical Tool Surface (16 tools, 9 sections)
+### Canonical Tool Surface
 
-Grok is taught about these 16 names in `core/system_prompt.py`. Legacy aliases
-and ~30 orphan utility tools remain registered in `_TOOL_MAP` for back-compat
-but are not advertised in the prompt.
+Grok is taught the names in `core/canonical_tools.py` (also listed in
+`core/system_prompt.py` v6). Only those names are sent in `GROK_TOOL_SCHEMAS`
+(each chat request). Legacy aliases remain in `_TOOL_MAP` so old tool-call IDs
+still execute, but are not sent to the API. Memory is injected by
+`grok_agent.py` (background extraction) — not via `save_memory` tools.
+
+### Usage limits by plan (`backend/deps.py`)
+
+| Plan | Price/mo | Chat msgs/mo | API spend cap (~27% of price) | Voice min |
+|------|----------|--------------|-------------------------------|-----------|
+| trial (14d) | $0 | 3,000 | $2.00 (fixed) | 0 |
+| pro | $22 | 3,000 | $5.94 | 300 |
+| premium | $33 | unlimited* | $8.91 | 650 |
+| premium_plus | $49 | unlimited* | $13.23 | 1,200 |
+
+Token caps scale with spend cap (~375k tokens per $1 of API budget).
+\*Unlimited messages are bounded by monthly spend + token caps (fair use).
+Enforced via `check_monthly_api_quota()` on chat, voice, receipt vision, and
+background memory extraction. Metered in `user_api_spend` via `record_token_spend`.
 
 | Section  | Write tool(s)               | Read/analysis tool(s)   |
 |----------|-----------------------------|--------------------------|

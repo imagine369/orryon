@@ -23,8 +23,9 @@ from typing import Any, AsyncGenerator
 import httpx
 
 from config import XAI_API_KEY, XAI_API_KEYS, GROK_MODEL
+from core.canonical_tools import build_reprompt_note
 from core.system_prompt import get_system_prompt
-from core.tools import TOOL_SCHEMAS, execute_tool
+from core.tools import GROK_TOOL_SCHEMAS, execute_tool
 from db import fetch_rows
 
 logger = logging.getLogger(__name__)
@@ -60,24 +61,7 @@ _ACTION_VERB_RE = re.compile(
 
 _TRAILING_QUESTION_RE = re.compile(r"\?\s*$")
 
-_REPROMPT_SYSTEM_NOTE = (
-    "SYSTEM CORRECTION: The previous user turn required a tool call from the "
-    "40 canonical CRUD tools across 9 sections (BILLS: log_bill, get_bills, "
-    "edit_bill, delete_bill; EXPENSES: log_expense, get_expenses, edit_expense, "
-    "delete_expense, split_expense; CALENDAR: add_calendar_event, get_calendar, "
-    "edit_event, delete_event; NOTES: add_note, get_notes, edit_note, pin_note, "
-    "delete_note; JOURNAL: log_journal_entry, get_journal, edit_journal_entry, "
-    "delete_journal_entry; GOALS: create_goal, get_goals, update_goal, "
-    "delete_goal; TASKS: add_task, edit_task, complete_task, delete_task; "
-    "LISTS: create_list, get_user_lists, add_list_items, delete_list, "
-    "add_grocery_items, check_grocery_item, get_grocery_list; ANALYSIS: "
-    "generate_insights, generate_forecast, generate_yearly_summary). You "
-    "produced no tool call and did not ask a clarifying question. Either "
-    "call the correct tool now with extracted arguments (ISO dates, positive "
-    "amounts, canonical category/mood, resolved IDs for edit/delete via the "
-    "matching read tool), OR ask ONE clarifying question if intent is truly "
-    "ambiguous. Do not apologise — just act."
-)
+_REPROMPT_SYSTEM_NOTE = build_reprompt_note()
 
 
 def _needs_tool_reprompt(
@@ -465,7 +449,7 @@ async def _call_grok_stream(
         "messages": messages,
         "temperature": CHAT_TEMPERATURE,
         "max_tokens": CHAT_MAX_TOKENS,
-        "tools": TOOL_SCHEMAS,
+        "tools": GROK_TOOL_SCHEMAS,
         "tool_choice": "auto",
         "stream": True,
         "stream_options": {"include_usage": True},
@@ -719,6 +703,16 @@ def _try_extract_memories(user_message: str, assistant_response: str, user_id: s
 
 def _extract_memories_worker(user_message: str, assistant_response: str, user_id: str) -> None:
     try:
+        from backend.deps import get_monthly_spend_cap, get_monthly_token_cap, resolve_plan_for_user
+        from db import get_monthly_spend, get_monthly_token_usage, record_token_spend
+
+        plan = resolve_plan_for_user(user_id)["plan"]
+        if get_monthly_spend(user_id) >= get_monthly_spend_cap(plan):
+            return
+        token_usage = get_monthly_token_usage(user_id)
+        if token_usage["total_tokens"] >= get_monthly_token_cap(plan):
+            return
+
         existing = _get_user_memories(user_id)
         if len(existing) > 100:
             return
@@ -739,6 +733,12 @@ def _extract_memories_worker(user_message: str, assistant_response: str, user_id
                 "content": f"User said: {user_message}\nAssistant responded: {assistant_response[:500]}",
             },
         ])
+
+        usage = result.get("usage") or {}
+        pt = int(usage.get("prompt_tokens") or 0)
+        ct = int(usage.get("completion_tokens") or 0)
+        if pt or ct:
+            record_token_spend(user_id, pt, ct)
 
         content = result["choices"][0]["message"]["content"].strip()
         facts = _parse_json_array(content)

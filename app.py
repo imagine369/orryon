@@ -1,12 +1,8 @@
 """
 app.py — orryon legacy Streamlit UI (maintenance mode).
 
-STATUS: This is the original v1 interface. The primary stack is now
-        Next.js (frontend/) + FastAPI (backend/). See README.md and
-        ARCHITECTURE.md for the current recommended setup.
-
-        This file is kept as a functional quick-demo option but is not
-        actively developed. New features go into the FastAPI backend.
+STATUS: Legacy / maintenance mode only. Primary stack: Next.js + FastAPI.
+        See legacy/README.md and ARCHITECTURE.md. Do not add new features here.
 
 Run:
     pip install -r requirements.txt

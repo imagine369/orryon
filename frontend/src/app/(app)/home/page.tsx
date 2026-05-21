@@ -8,12 +8,23 @@ import { useSearchParams } from "next/navigation";
 import { Clock, X, SquarePen, Trash2, MessageSquare, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/use-subscription";
-import { streamChatAuto, warmConnection, connectChatWs, disconnectChatWs, api } from "@/lib/api";
+import {
+  streamChatAuto,
+  warmConnection,
+  connectChatWs,
+  disconnectChatWs,
+  api,
+  PlanLimitError,
+  type PlanLimitDetail,
+} from "@/lib/api";
 import { VoiceLimitError, textToSpeech } from "@/lib/voice";
 import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { VoiceLimitModal } from "@/components/voice-limit-modal";
-import { ChatLimitModal } from "@/components/chat-limit-modal";
+import { UpgradeLimitModal, type LimitKind } from "@/components/upgrade-limit-modal";
+import { UsageUpgradeBanner } from "@/components/usage-upgrade-banner";
+import { useChatUsage } from "@/lib/use-chat-usage";
+import { useSubscriptionService } from "@/lib/subscription-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
@@ -79,6 +90,8 @@ const POST_CHECKOUT_SESSION_KEY = "orryon_post_checkout_pending";
 export default function HomePage() {
   const { user } = useAuth();
   const { sub, refresh: refreshSub } = useSubscription();
+  const { showPaywall } = useSubscriptionService();
+  const { usage: chatUsage, reload: reloadChatUsage } = useChatUsage();
   const searchParams = useSearchParams();
 
 
@@ -116,13 +129,31 @@ export default function HomePage() {
     limitMinutes: number;
   } | null>(null);
 
-  // ── Chat limit modal ─────────────────────────────────────────────────────────
-  const [chatLimitOpen, setChatLimitOpen] = useState(false);
-  const [chatLimitInfo, setChatLimitInfo] = useState<{
-    messagesUsed: number;
-    limit: number;
+  // ── Plan limit modal (messages or API allowance) ─────────────────────────────
+  const [planLimitOpen, setPlanLimitOpen] = useState(false);
+  const [planLimitInfo, setPlanLimitInfo] = useState<{
+    kind: LimitKind;
     plan: string;
+    upgradePlan?: string | null;
+    messagesUsed: number;
+    messageLimit: number;
+    spendUsd: number;
+    spendCapUsd: number;
   } | null>(null);
+
+  const openPlanLimitModal = useCallback((detail: PlanLimitDetail) => {
+    const isUsage = detail.code === "usage_limit_reached";
+    setPlanLimitInfo({
+      kind: isUsage ? "usage" : "messages",
+      plan: detail.plan ?? sub?.plan ?? "pro",
+      upgradePlan: detail.upgrade_plan ?? null,
+      messagesUsed: detail.messages_used ?? chatUsage?.messages_used ?? 0,
+      messageLimit: detail.limit ?? chatUsage?.limit ?? 0,
+      spendUsd: detail.spend_usd ?? chatUsage?.spend_usd ?? 0,
+      spendCapUsd: detail.cap_usd ?? chatUsage?.spend_cap_usd ?? 0,
+    });
+    setPlanLimitOpen(true);
+  }, [sub?.plan, chatUsage]);
 
   // Auto-clear voice errors so they don't linger.
   useEffect(() => {
@@ -369,11 +400,33 @@ export default function HomePage() {
           const tabs = Array.isArray(event.tabs) ? (event.tabs as string[]) : [];
           if (tabs.length > 0) dispatchDataChanged(tabs);
         } else if (event.type === "error") {
+          if (event.limit?.code) {
+            openPlanLimitModal(event.limit);
+            setMessages((prev) => prev.slice(0, -1));
+            return;
+          }
+          const msg = event.message || "";
+          if (
+            msg.includes("usage limit") ||
+            msg.includes("usage allowance") ||
+            msg.includes("monthly AI")
+          ) {
+            openPlanLimitModal({
+              code: "usage_limit_reached",
+              message: msg,
+              plan: sub?.plan,
+              upgrade_plan: chatUsage?.upgrade_plan,
+              spend_usd: chatUsage?.spend_usd,
+              cap_usd: chatUsage?.spend_cap_usd,
+            });
+            setMessages((prev) => prev.slice(0, -1));
+            return;
+          }
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {
               role: "assistant",
-              content: event.message || "Something went wrong.",
+              content: msg || "Something went wrong.",
               isError: true,
             };
             return updated;
@@ -382,16 +435,9 @@ export default function HomePage() {
       }
     } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") return;
-      // Detect chat quota error (429 with code=chat_limit_reached)
-      const anyErr = err as { status?: number; detail?: { code?: string; messages_used?: number; limit?: number; plan?: string } };
-      if (anyErr?.status === 429 && anyErr?.detail?.code === "chat_limit_reached") {
-        setChatLimitInfo({
-          messagesUsed: anyErr.detail.messages_used ?? 0,
-          limit: anyErr.detail.limit ?? 0,
-          plan: anyErr.detail.plan ?? "starter",
-        });
-        setChatLimitOpen(true);
-        setMessages((prev) => prev.slice(0, -1)); // remove empty assistant bubble
+      if (err instanceof PlanLimitError) {
+        openPlanLimitModal(err.detail);
+        setMessages((prev) => prev.slice(0, -1));
         return;
       }
       setMessages((prev) => {
@@ -408,6 +454,7 @@ export default function HomePage() {
       setThinking(false);
       setToolLabel("");
       abortRef.current = null;
+      reloadChatUsage();
     }
   };
 
@@ -477,18 +524,21 @@ export default function HomePage() {
         limitMinutes={voiceLimitInfo?.limitMinutes}
       />
 
-      {/* ── Chat limit modal ──────────────────────────────────────────────── */}
-      <ChatLimitModal
-        open={chatLimitOpen}
-        onClose={() => setChatLimitOpen(false)}
+      {/* ── Plan limit → upgrade modal ───────────────────────────────────── */}
+      <UpgradeLimitModal
+        open={planLimitOpen}
+        onClose={() => setPlanLimitOpen(false)}
         onUpgrade={() => {
-          setChatLimitOpen(false);
-          const panels = document.querySelector("[data-panel-open-settings]");
-          if (panels) (panels as HTMLButtonElement).click();
+          setPlanLimitOpen(false);
+          showPaywall("plan-limit");
         }}
-        messagesUsed={chatLimitInfo?.messagesUsed ?? 0}
-        limit={chatLimitInfo?.limit ?? 0}
-        plan={chatLimitInfo?.plan ?? "starter"}
+        kind={planLimitInfo?.kind ?? "usage"}
+        plan={planLimitInfo?.plan ?? sub?.plan ?? "pro"}
+        upgradePlan={planLimitInfo?.upgradePlan}
+        messagesUsed={planLimitInfo?.messagesUsed ?? 0}
+        messageLimit={planLimitInfo?.messageLimit ?? 0}
+        spendUsd={planLimitInfo?.spendUsd ?? 0}
+        spendCapUsd={planLimitInfo?.spendCapUsd ?? 0}
       />
 
       {/* ── History sidebar ───────────────────────────────────────────────── */}
@@ -820,6 +870,11 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          <UsageUpgradeBanner
+            usage={chatUsage}
+            onUpgrade={() => showPaywall("usage-near-limit")}
+          />
 
           {/* Scrollable messages — container width consistent with input */}
           <ScrollArea className="min-h-0 flex-1">

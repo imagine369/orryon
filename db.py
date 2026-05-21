@@ -1437,18 +1437,42 @@ def record_token_spend(user_id: str, prompt_tokens: int, completion_tokens: int)
 
 
 def get_monthly_spend(user_id: str) -> float:
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    return get_monthly_token_usage(user_id)["cost_usd"]
+
+
+def get_monthly_token_usage(user_id: str, month: str | None = None) -> dict:
+    """Return prompt/completion token totals and estimated cost for the month."""
+    if month is None:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    empty = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "cost_usd": 0.0,
+        "month": month,
+    }
     try:
         conn = get_connection()
         row = conn.execute(
-            "SELECT cost_usd FROM user_api_spend WHERE user_id=? AND month=?",
+            "SELECT prompt_tokens, completion_tokens, cost_usd FROM user_api_spend "
+            "WHERE user_id=? AND month=?",
             (user_id, month),
         ).fetchone()
         conn.close()
-        return float(row["cost_usd"]) if row else 0.0
+        if not row:
+            return empty
+        prompt = int(row["prompt_tokens"] or 0)
+        completion = int(row["completion_tokens"] or 0)
+        return {
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "total_tokens": prompt + completion,
+            "cost_usd": float(row["cost_usd"] or 0),
+            "month": month,
+        }
     except Exception as exc:
-        logger.error("get_monthly_spend error: %s", exc)
-        return 0.0
+        logger.error("get_monthly_token_usage error: %s", exc)
+        return empty
 
 
 # ── Voice minute usage helpers ────────────────────────────────────────────────

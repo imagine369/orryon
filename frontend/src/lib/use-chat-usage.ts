@@ -8,6 +8,13 @@ export interface ChatUsage {
   limit: number;
   unlimited: boolean;
   plan: string;
+  spend_usd?: number;
+  spend_cap_usd?: number;
+  tokens_used?: number;
+  token_cap?: number;
+  upgrade_plan?: string | null;
+  at_limit?: boolean;
+  near_limit?: boolean;
 }
 
 export function useChatUsage() {

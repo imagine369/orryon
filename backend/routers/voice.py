@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field
 from backend.auth import get_current_user
 from backend.cache import check_rate_limit_async
 from backend.deps import (
-    MONTHLY_SPEND_CAP_USD,
+    check_monthly_api_quota,
     get_voice_limit_minutes,
     require_voice_plan,
     resolve_plan_for_user,
@@ -44,7 +44,6 @@ from backend.deps import (
 from backend.signing import require_signed_request
 from config import XAI_API_KEY, ELEVENLABS_API_KEY
 from db import (
-    get_monthly_spend,
     get_voice_seconds_used,
     get_voice_topup_minutes,
     record_voice_seconds,
@@ -131,8 +130,8 @@ async def _enforce_voice_quota(uid: str, kind: str) -> None:
         logger.warning("Global voice %s rate limit hit (user=%s).", kind, uid)
         raise HTTPException(status_code=429, detail="Voice service is temporarily busy — please try again soon.")
 
-    if get_monthly_spend(uid) >= MONTHLY_SPEND_CAP_USD:
-        raise HTTPException(status_code=402, detail="You have reached your monthly usage limit. It resets on the 1st of next month.")
+    plan_info = resolve_plan_for_user(uid)
+    check_monthly_api_quota(uid, plan_info["plan"])
 
     # Voice-minute cap check
     limit_min, secs_used, topup_min = _get_voice_budget(uid)

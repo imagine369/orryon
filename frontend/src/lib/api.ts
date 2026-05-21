@@ -227,6 +227,18 @@ export const api = {
 };
 
 
+export interface PlanLimitDetail {
+  code: "chat_limit_reached" | "usage_limit_reached";
+  message: string;
+  plan?: string;
+  upgrade_plan?: string | null;
+  messages_used?: number;
+  limit?: number;
+  spend_usd?: number;
+  cap_usd?: number;
+  kind?: string;
+}
+
 export interface ChatEvent {
   type: "token" | "tool" | "done" | "error" | "session";
   content?: string;
@@ -238,6 +250,37 @@ export interface ChatEvent {
   undo_info?: { table: string; id: string; tool: string; label: string } | null;
   session_id?: string;
   voice_overlay?: boolean;
+  limit?: PlanLimitDetail;
+}
+
+/** Thrown by streamChat when monthly message or API caps are hit. */
+export class PlanLimitError extends Error {
+  status: number;
+  detail: PlanLimitDetail;
+
+  constructor(status: number, detail: PlanLimitDetail) {
+    super(detail.message || "Plan limit reached");
+    this.name = "PlanLimitError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function parseLimitResponse(res: Response): Promise<PlanLimitDetail | null> {
+  try {
+    const body = await res.json();
+    const detail = body?.detail;
+    if (
+      detail &&
+      typeof detail === "object" &&
+      (detail.code === "chat_limit_reached" || detail.code === "usage_limit_reached")
+    ) {
+      return detail as PlanLimitDetail;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 
@@ -292,7 +335,18 @@ export async function* streamChat(
     return;
   }
 
+  if (res.status === 402 || res.status === 429) {
+    const limit = await parseLimitResponse(res);
+    if (limit) {
+      throw new PlanLimitError(res.status, limit);
+    }
+  }
+
   if (!res.ok || !res.body) {
+    const limit = await parseLimitResponse(res);
+    if (limit) {
+      throw new PlanLimitError(res.status, limit);
+    }
     yield { type: "error", message: "Connection failed" };
     return;
   }

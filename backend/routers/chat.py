@@ -24,9 +24,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.deps import (
-    MONTHLY_SPEND_CAP_USD, RATE_LIMIT_CHAT,
-    check_rate_limit, check_chat_quota,
-    require_active_plan, resolve_plan_for_user,
+    check_monthly_api_quota,
+    check_rate_limit,
+    check_chat_quota,
+    get_rate_limit_chat,
+    require_active_plan,
+    resolve_plan_for_user,
 )
 from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_current_user
 from backend.signing import require_signed_request
@@ -36,7 +39,6 @@ from db import (
     delete_chat_session,
     get_chat_message_count,
     get_connection,
-    get_monthly_spend,
     get_user_preferences,
     increment_chat_message_count,
     list_chat_sessions,
@@ -102,14 +104,14 @@ async def chat_stream(
     without a separate HTTP roundtrip.
     """
     uid = user["user_id"]
-    check_rate_limit(uid, RATE_LIMIT_CHAT)
+    ctx = _get_user_context(uid)
+    check_rate_limit(uid, get_rate_limit_chat(ctx["plan"]))
     message = body.message.strip()
     if not message:
         raise HTTPException(400, "Empty message")
 
-    ctx = _get_user_context(uid)
-    # Enforce monthly chat message quota before processing
     check_chat_quota(uid, ctx["plan"])
+    check_monthly_api_quota(uid, ctx["plan"])
 
     session_id, auto_created = _resolve_session(uid, body.session_id or "")
 
@@ -121,12 +123,6 @@ async def chat_stream(
     async def event_generator():
         if auto_created:
             yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
-
-        current_spend = get_monthly_spend(uid)
-        if current_spend >= MONTHLY_SPEND_CAP_USD:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'You have reached your monthly usage limit. It resets on the 1st of next month.'})}\n\n"
-            yield "data: [DONE]\n\n"
-            return
 
         from core.grok_agent import run_orryon_stream
 
@@ -236,17 +232,33 @@ async def chat_ws(ws: WebSocket):
                 await ws.send_json({"type": "error", "message": "Empty message"})
                 continue
 
+            ctx = _get_user_context(uid)
             try:
-                check_rate_limit(uid, RATE_LIMIT_CHAT)
+                check_rate_limit(uid, get_rate_limit_chat(ctx["plan"]))
             except HTTPException as exc:
                 await ws.send_json({"type": "error", "message": exc.detail})
                 continue
 
-            ctx = _get_user_context(uid)
             try:
                 check_chat_quota(uid, ctx["plan"])
             except HTTPException as exc:
-                await ws.send_json({"type": "error", "message": exc.detail if isinstance(exc.detail, str) else exc.detail.get("message", "Chat limit reached.")})
+                detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+                await ws.send_json({
+                    "type": "error",
+                    "message": detail.get("message", "Chat limit reached."),
+                    "limit": detail,
+                })
+                continue
+
+            try:
+                check_monthly_api_quota(uid, ctx["plan"])
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+                await ws.send_json({
+                    "type": "error",
+                    "message": detail.get("message", "Monthly usage limit reached."),
+                    "limit": detail,
+                })
                 continue
 
             req_session_id = data.get("session_id") or ""
@@ -254,11 +266,6 @@ async def chat_ws(ws: WebSocket):
 
             if auto_created:
                 await ws.send_json({"type": "session", "session_id": session_id})
-
-            current_spend = get_monthly_spend(uid)
-            if current_spend >= MONTHLY_SPEND_CAP_USD:
-                await ws.send_json({"type": "error", "message": "Monthly usage limit reached."})
-                continue
 
             history = load_chat_history(uid, session_id=session_id)
             user_msg = {"role": "user", "content": message, "created_at": datetime.now(timezone.utc).isoformat()}

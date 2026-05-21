@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
-import { motion } from "framer-motion";
+import { AnimatedHeroAvatar, HeroAvatarSkeleton } from "@/components/animated-hero-avatar";
 import { PillButton, PillLink } from "@/components/pill-cta";
 import { IosInstallModal } from "@/components/ios-install-modal";
 import { usePwaInstall } from "@/lib/use-pwa-install";
@@ -21,15 +20,6 @@ import {
   markDesktopDownloadStarted,
   type DesktopOs,
 } from "@/lib/desktop-download";
-
-/** Matches landing page hero avatar (page.tsx). */
-const HERO_AVATAR_CLASS =
-  "w-[150px] h-[150px] sm:w-[155px] sm:h-[155px] lg:w-[195px] lg:h-[195px] rounded-full object-contain ring-1 ring-white/10";
-
-const AVATAR_FLOAT = {
-  animate: { y: [0, -6, 0], scale: [1, 1.025, 1] },
-  transition: { duration: 3.8, ease: "easeInOut" as const, repeat: Infinity, repeatType: "loop" as const },
-};
 
 const PLATFORM_LINKS: { id: DownloadTab; label: string }[] = [
   { id: "mac", label: "macOS" },
@@ -73,6 +63,10 @@ function footnoteFor(tab: DownloadTab): string | null {
   }
 }
 
+function DownloadAvatar({ priority }: { priority?: boolean }) {
+  return <AnimatedHeroAvatar size="hero" priority={priority} wrapperClassName="mb-8" />;
+}
+
 export function DownloadPageClient() {
   const [mounted, setMounted] = useState(false);
   const [detected, setDetected] = useState<Platform>("unknown");
@@ -113,7 +107,7 @@ export function DownloadPageClient() {
   if (!mounted) {
     return (
       <main className="flex-1 flex items-center justify-center px-6">
-        <div className={`${HERO_AVATAR_CLASS} bg-white/10 animate-pulse`} />
+        <HeroAvatarSkeleton />
       </main>
     );
   }
@@ -121,25 +115,16 @@ export function DownloadPageClient() {
   if (installed) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
-        <motion.div className="mb-8" {...AVATAR_FLOAT}>
-            <Image
-              src="/avatar.png"
-              alt="Orryon"
-              width={195}
-              height={195}
-              priority
-              className={HERO_AVATAR_CLASS}
-            />
-          </motion.div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
-            Open Orryon
-          </h1>
-          <p className="text-white/50 text-lg mb-10 max-w-sm">
-            You&apos;re all set. Sign in to continue.
-          </p>
-          <PillLink href="/login?step=email" size="sm" variant="secondary">
-            Sign in
-          </PillLink>
+        <DownloadAvatar priority />
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
+          Open Orryon
+        </h1>
+        <p className="text-white/50 text-lg mb-10 max-w-sm">
+          You&apos;re all set. Sign in to continue.
+        </p>
+        <PillLink href="/login?step=email" size="sm" variant="secondary">
+          Sign in
+        </PillLink>
       </main>
     );
   }
@@ -148,22 +133,13 @@ export function DownloadPageClient() {
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
-      <motion.div className="mb-8" {...AVATAR_FLOAT}>
-          <Image
-            src="/avatar.png"
-            alt="Orryon"
-            width={195}
-            height={195}
-            priority
-            className={HERO_AVATAR_CLASS}
-          />
-        </motion.div>
+      <DownloadAvatar priority />
 
       <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
-          {isMobile
-            ? "Add Orryon to your home screen, then open the app to sign up."
-            : "Install the app, then open Orryon from your dock to sign up."}
-        </p>
+        {isMobile
+          ? "Add Orryon to your home screen, then open the app to sign up."
+          : "Install the app, then open Orryon from your dock to sign up."}
+      </p>
 
       {iosNeedsSafari && (
         <p className="text-sm text-white/40 mb-6 max-w-sm">

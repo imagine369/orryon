@@ -22,7 +22,16 @@ from pydantic import BaseModel
 
 from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import check_rate_limit_async
-from backend.deps import IS_LOCAL_DEV, IS_PRODUCTION, MONTHLY_SPEND_CAP_USD, require_active_plan, resolve_plan
+from backend.deps import (
+    IS_LOCAL_DEV,
+    IS_PRODUCTION,
+    check_monthly_api_quota,
+    require_active_plan,
+    resolve_plan,
+    resolve_plan_for_user,
+    get_monthly_spend_cap,
+    get_monthly_token_cap,
+)
 from backend.schemas import (
     CheckoutReq,
     EmailChangeSendReq,
@@ -405,9 +414,8 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(requir
         logger.warning("Global receipt scan rate limit hit (user=%s).", uid)
         raise HTTPException(status_code=429, detail="Receipt scanning is temporarily paused — please try again soon.")
 
-    # Budget gate — same check as chat so a user can't bypass monthly cap via vision.
-    if get_monthly_spend(uid) >= MONTHLY_SPEND_CAP_USD:
-        raise HTTPException(status_code=402, detail="You have reached your monthly usage limit. It resets on the 1st of next month.")
+    plan_info = resolve_plan_for_user(uid)
+    check_monthly_api_quota(uid, plan_info["plan"])
 
     mime = (file.content_type or "image/jpeg").lower()
     if mime not in _RECEIPT_ALLOWED_MIME:
@@ -1067,16 +1075,37 @@ async def update_prefs(body: PrefsReq, user: dict = Depends(get_current_user)):
 
 @router.get("/api/chat/usage")
 async def chat_usage(user: dict = Depends(get_current_user)):
-    from backend.deps import get_chat_limit
-    conn = get_connection()
-    user_row = conn.execute("SELECT plan FROM users WHERE id=?", (user["user_id"],)).fetchone()
-    conn.close()
-    plan = (user_row["plan"] if user_row else None) or "free"
-    count = get_chat_message_count(user["user_id"])
+    from backend.deps import (
+        USAGE_NEAR_LIMIT_RATIO,
+        get_chat_limit,
+        get_suggested_upgrade_plan,
+    )
+    from db import get_monthly_token_usage
+
+    uid = user["user_id"]
+    plan_info = resolve_plan_for_user(uid)
+    plan = plan_info["plan"]
+    count = get_chat_message_count(uid)
     limit = get_chat_limit(plan)
+    token_usage = get_monthly_token_usage(uid)
+    spend_cap = get_monthly_spend_cap(plan)
+    token_cap = get_monthly_token_cap(plan)
+    spend_usd = round(token_usage["cost_usd"], 4)
+    at_message_limit = limit != -1 and count >= limit
+    at_spend_limit = spend_cap > 0 and spend_usd >= spend_cap
+    near_spend_limit = (
+        spend_cap > 0 and spend_usd >= spend_cap * USAGE_NEAR_LIMIT_RATIO
+    )
     return {
         "messages_used": count,
         "limit": limit,
         "unlimited": limit == -1,
         "plan": plan,
+        "spend_usd": spend_usd,
+        "spend_cap_usd": spend_cap,
+        "tokens_used": token_usage["total_tokens"],
+        "token_cap": token_cap,
+        "upgrade_plan": get_suggested_upgrade_plan(plan),
+        "at_limit": at_message_limit or at_spend_limit,
+        "near_limit": near_spend_limit and not at_spend_limit,
     }

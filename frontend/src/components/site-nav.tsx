@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { PillLink } from "@/components/pill-cta";
+import { siteChromePaddingX } from "@/lib/site-chrome";
 import { cn } from "@/lib/utils";
-
-/** Horizontal padding shared by SiteNav and site Footer so edges align. */
-export const siteChromePaddingX = "px-4 sm:px-6 lg:px-16";
 
 /** Homepage nav shell — shared padding, blur, and ORRYON wordmark. */
 export const siteNavClass = cn(

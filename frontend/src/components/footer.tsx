@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { siteChromePaddingX } from "@/components/site-nav";
+import { siteChromePaddingX } from "@/lib/site-chrome";
 import { cn } from "@/lib/utils";
 
 export function Footer() {
