@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWA from "@ducanh2912/next-pwa";
+
+const appRoot = path.dirname(fileURLToPath(import.meta.url));
 // Content-Security-Policy is set per-request in `src/middleware.ts` (nonce +
 // strict-dynamic) so Next.js can auto-attach the nonce to its inline script
 // tags. Everything below is static and safe to serve from the edge.
@@ -28,6 +32,9 @@ const BUILD_SHA = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_S
 const CANARY = `orr-${BUILD_SHA}`;
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: appRoot,
+  },
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   compiler: {

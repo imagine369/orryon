@@ -1,8 +1,4 @@
 {
-  "experimentalServices": {
-    "web": {
-      "routePrefix": "/",
-      "framework": "nextjs"
-    }
-  }
+  "installCommand": "npm ci --include=dev",
+  "buildCommand": "npm run build"
 }
