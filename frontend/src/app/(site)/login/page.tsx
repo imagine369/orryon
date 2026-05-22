@@ -319,7 +319,7 @@ function LoginPageInner() {
       )}
 
       {/* ── Signed-in upgrade from /pricing (checkout redirect in useEffect) ── */}
-      {step === "email" && hasTierParam && (authLoading || authedUser) && (
+      {step === "email" && hasTierParam && (authLoading || !!authedUser) && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
           <h1 className="text-2xl font-bold text-white mb-1">Opening checkout…</h1>
           <p className="text-sm text-white/50 mb-6 text-center">
@@ -332,8 +332,8 @@ function LoginPageInner() {
         </div>
       )}
 
-      {/* ── Step 1: Email (new sign-up only) ── */}
-      {step === "email" && !hasTierParam && (
+      {/* ── Step 1: Email (sign-up; tier checkout runs after verify or when already signed in) ── */}
+      {step === "email" && !(hasTierParam && (authLoading || authedUser)) && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
           <h1 className="text-2xl font-bold text-white mb-1">Enter your email</h1>
           <p className="text-sm text-white/50 mb-6">
