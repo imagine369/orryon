@@ -14,6 +14,7 @@ NEXT_PUBLIC_API_URL environment variable (default: http://localhost:8000).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -89,14 +90,66 @@ def _log_email_config_status() -> None:
         logger.info("%s (dev mode: codes will be shown on-screen)", msg)
 
 
+_startup_ready = False
+_startup_error: str | None = None
+
+
+async def _run_startup() -> None:
+    """Heavy init runs in the background so /api/health can answer during Railway healthchecks."""
+    global _startup_ready, _startup_error
+    from db import init_pool, close_pool, init_db
+    from backend.cache import init_redis
+    from core.scheduler import start_scheduler
+    from backend.signing import get_signing_mode
+
+    try:
+        try:
+            init_pool()
+        except Exception as exc:
+            import db.connection as conn_mod
+
+            db_path = os.getenv("DB_PATH", "").strip()
+            if db_path:
+                logger.error(
+                    "DATABASE_URL is set but Postgres is unreachable (%s). "
+                    "Using SQLite at %s. Unset DATABASE_URL on Railway if you do not use Postgres.",
+                    exc,
+                    db_path,
+                )
+                conn_mod._USE_PG = False
+                conn_mod._pg_pool = None
+            else:
+                raise
+
+        await init_redis()
+        init_db()
+        start_scheduler()
+        logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
+        logger.info("Request signing mode: %s", get_signing_mode())
+        _log_email_config_status()
+
+        if XAI_API_KEY:
+            try:
+                from core.grok_agent import get_http_client
+                client = get_http_client()
+                await client.head("https://api.x.ai/v1/models", timeout=5.0)
+                logger.info("xAI connection prewarmed")
+            except Exception:
+                pass
+
+        _startup_ready = True
+        _startup_error = None
+    except Exception as exc:
+        _startup_error = str(exc)
+        logger.exception("Background startup failed: %s", exc)
+        raise
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Startup:
-      1. Postgres connection pool (if DATABASE_URL is set)
-      2. Redis connection (if REDIS_URL is set)
-      3. Database schema migration
-      4. APScheduler background jobs
+    Fail fast on bad production config, then yield immediately so health probes
+    succeed while DB/Redis/scheduler init finish in the background.
 
     Shutdown:
       1. Close httpx client
@@ -104,50 +157,29 @@ async def lifespan(app: FastAPI):
       3. Close Postgres pool
       4. Stop scheduler
     """
-    from db import init_pool, close_pool, init_db
-    from backend.cache import init_redis, close_redis
+    from db import close_pool
+    from backend.cache import close_redis
     from core.grok_agent import close_http_client
-    from core.scheduler import start_scheduler, stop_scheduler
-
-    from backend.signing import get_signing_mode, validate_signing_config
+    from core.scheduler import stop_scheduler
+    from backend.signing import validate_signing_config
 
     validate_signing_config()
+    logger.info("orryon backend listening — finishing startup in background")
 
-    try:
-        init_pool()
-    except Exception as exc:
-        import db.connection as conn_mod
-
-        db_path = os.getenv("DB_PATH", "").strip()
-        if db_path:
-            logger.error(
-                "DATABASE_URL is set but Postgres is unreachable (%s). "
-                "Using SQLite at %s. Unset DATABASE_URL on Railway if you do not use Postgres.",
-                exc,
-                db_path,
-            )
-            conn_mod._USE_PG = False
-            conn_mod._pg_pool = None
-        else:
-            raise
-
-    await init_redis()
-    init_db()
-    start_scheduler()
-    logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
-    logger.info("Request signing mode: %s", get_signing_mode())
-    _log_email_config_status()
-
-    if XAI_API_KEY:
-        try:
-            from core.grok_agent import get_http_client
-            client = get_http_client()
-            await client.head("https://api.x.ai/v1/models", timeout=5.0)
-            logger.info("xAI connection prewarmed")
-        except Exception:
-            pass
+    startup_task = asyncio.create_task(_run_startup())
 
     yield
+
+    if not startup_task.done():
+        startup_task.cancel()
+        try:
+            await startup_task
+        except asyncio.CancelledError:
+            pass
+    else:
+        exc = startup_task.exception()
+        if exc:
+            logger.warning("Startup task ended with error during shutdown: %s", exc)
 
     await close_http_client()
     await close_redis()
@@ -227,7 +259,11 @@ app.include_router(waitlist.router)
 async def health():
     """Liveness probe for Railway / Render / Docker health checks.
 
-    Returns only the status string. Infrastructure details are not exposed
-    publicly to avoid information disclosure.
+    Returns 200 while the process is up (even during background DB init) so
+    deploy healthchecks do not time out. Readiness is implied once status is ok.
     """
+    if _startup_error:
+        return {"status": "error"}
+    if not _startup_ready:
+        return {"status": "starting"}
     return {"status": "ok"}

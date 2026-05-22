@@ -48,8 +48,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install and lint
+      - name: Install and build
         working-directory: frontend
+        env:
+          # Placeholders so Next.js build succeeds without real secrets in CI
+          JWT_SECRET: ci-build-jwt-secret-minimum-32-characters-long
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: |
           npm ci
-          npm run lint
+          npm run build

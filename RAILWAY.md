@@ -19,7 +19,7 @@ Logs should then show `All imports OK` and `Database mode: SQLite (/data/finance
 
 ## Deploy failed: Healthcheck failure (~5 min)
 
-Build/deploy succeeded but **Network → Healthcheck** failed. The container never returned `200` on `/api/health` in time.
+Build/deploy succeeded but **Network → Healthcheck** failed. The container never returned `200` on `/api/health` in time (often because startup was blocked on DB/Redis init, or the process crashed in a loop).
 
 **Check Deploy Logs** (scroll *above* “Healthcheck failure”) for:
 
@@ -52,7 +52,9 @@ After fixing vars, redeploy. Success logs:
 ```
 DATABASE_URL=(unset — SQLite)
 All imports OK
+orryon backend listening — finishing startup in background
 Starting uvicorn (workers=1)...
+orryon backend started (AI: enabled)
 ```
 
 Then: `curl https://api.orryon.com/api/health`

@@ -43,9 +43,14 @@ if db_url:
         init_pool()
         print('Postgres connection: OK')
     except Exception as exc:
-        print('FATAL: DATABASE_URL is set but Postgres is not reachable.')
-        print(exc)
-        sys.exit(1)
+        if os.getenv('DB_PATH', '').strip():
+            print('WARN: Postgres unreachable; will fall back to SQLite at', db_path)
+            print(exc)
+        else:
+            print('FATAL: DATABASE_URL is set but Postgres is not reachable.')
+            print('Unset DATABASE_URL or set DB_PATH=/data/finance.db for SQLite.')
+            print(exc)
+            sys.exit(1)
     finally:
         close_pool()
 else:
