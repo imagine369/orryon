@@ -67,7 +67,11 @@ def init_pool() -> None:
     try:
         _pg_pool.wait(timeout=20)
     except Exception as exc:
-        logger.error("Postgres pool failed to connect within 20s: %s", exc)
+        logger.error(
+            "Postgres pool failed to connect within 20s: %s — "
+            "check DATABASE_URL or unset it to use SQLite (DB_PATH=/data/finance.db)",
+            exc,
+        )
         raise
     logger.info("Postgres connection pool ready (min=1, max=10)")
 
