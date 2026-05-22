@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import Link from "next/link";
 import { Subscription } from "@/lib/use-subscription";
-import { useSubscriptionService } from "@/lib/subscription-service";
 
 interface Props {
   sub: Subscription;
@@ -11,7 +11,6 @@ interface Props {
 
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
-  const { startCheckout, checkoutPending } = useSubscriptionService();
 
   if (sub.plan === "pro" || dismissed) return null;
 
@@ -38,14 +37,12 @@ export function TrialBanner({ sub }: Props) {
     >
       <div className="flex items-center justify-between">
         {isExpired ? (
-          <button
-            type="button"
-            onClick={() => void startCheckout("monthly")}
-            disabled={checkoutPending}
-            className="text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors text-left disabled:opacity-50"
+          <Link
+            href="/pricing"
+            className="text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors"
           >
-            {checkoutPending ? "Opening checkout…" : message}
-          </button>
+            {message}
+          </Link>
         ) : (
           <span className="text-white/50 flex-1">{message}</span>
         )}
