@@ -15,7 +15,7 @@ This document describes the system architecture, folder responsibilities, data f
 └──────────────┘                               │
                     ┌──────────────────────────┼──────────────────┐
                     │                          │                  │
-               core/grok_agent.py          db.py            scheduler
+               core/grok_agent.py          db/               scheduler
                (xAI Grok SSE)           (SQLite/PG)       (APScheduler)
                     │                          │                  │
                core/tools/               config.py        email_sender
@@ -67,7 +67,7 @@ The "brain" of orryon — used by the FastAPI backend:
 | `tools/` | Tool schemas (`schemas.py`), registry (`registry.py`), shim (`helpers.py`) |
 | `db/` | Database package (connection, schema, crud, domain modules) |
 | `canonical_tools.py` | Single source of truth for advertised tool names |
-| `system_prompt.py` | Finance-first system prompt (v6; must match `_TOOL_MAP`) |
+| `system_prompt.py` | Life OS system prompt (v7; health Grok-style + disclaimers; must match `_TOOL_MAP`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
 | `csv_importer.py` | Bank CSV parsing (for future import feature) |
 | `google_calendar.py` | Google Calendar OAuth scaffold |
@@ -76,7 +76,7 @@ The "brain" of orryon — used by the FastAPI backend:
 
 | File | Purpose |
 |------|---------|
-| `db.py` | SQLite/Postgres schema, auto-migrations, CRUD helpers |
+| `db/` | Database package: schema, connection pool, domain CRUD (`from db import …`) |
 | `config.py` | Environment variable loading from `.env` |
 | `email_sender.py` | SMTP email sending (OTP codes, digests) |
 
@@ -167,7 +167,7 @@ Single SQLite file (`finance.db` by default, configurable via `DB_PATH`).
 
 Key tables: `users`, `transactions`, `events`, `goals`, `notes`, `action_items`, `grocery_items`, `subscriptions`, `budget_categories`, `chat_messages`, `user_memory`, `recurring_income`, `net_worth_snapshots`, `user_lists`, `list_items`, `share_tokens`.
 
-`db.py` handles schema creation and auto-migration on import. No ORM — all queries are raw SQL with parameterized values.
+The `db/` package handles schema creation and auto-migration on import (`db/schema.py`). No ORM — all queries are raw SQL with parameterized values.
 
 ---
 

@@ -75,6 +75,14 @@ from core.tools.handlers.analysis import (
     _compare_periods,
     _cross_feature_search,
 )
+from core.tools.handlers.health import (
+    _log_health_vital,
+    _get_health_vitals,
+    _log_medication,
+    _get_medications,
+    _add_health_appointment,
+    _get_health_appointments,
+)
 
 __all__ = [
     "_add_expense",
@@ -137,4 +145,10 @@ __all__ = [
     "_get_wellness_history",
     "_compare_periods",
     "_cross_feature_search",
+    "_log_health_vital",
+    "_get_health_vitals",
+    "_log_medication",
+    "_get_medications",
+    "_add_health_appointment",
+    "_get_health_appointments",
 ]

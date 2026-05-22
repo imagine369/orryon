@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 import core.tools.helpers as h
-from core.tool_labels import is_destructive_tool
+from core.tool_labels import get_tool_label, is_destructive_tool
 from core.tools.normalize import normalize_args
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,14 @@ _TOOL_MAP = {
     "get_wellness_history": h._get_wellness_history,
     "compare_periods": h._compare_periods,
     "cross_feature_search": h._cross_feature_search,
+
+    # Health tracking
+    "log_health_vital": h._log_health_vital,
+    "get_health_vitals": h._get_health_vitals,
+    "log_medication": h._log_medication,
+    "get_medications": h._get_medications,
+    "add_health_appointment": h._add_health_appointment,
+    "get_health_appointments": h._get_health_appointments,
 }
 
 def _log_destructive_action(
@@ -184,6 +192,12 @@ _TAB_REFRESH_MAP = {
     "get_wellness_history": [],
     "compare_periods": [],
     "cross_feature_search": [],
+    "log_health_vital": [],
+    "get_health_vitals": [],
+    "log_medication": [],
+    "get_medications": [],
+    "add_health_appointment": [],
+    "get_health_appointments": [],
 }
 
 
@@ -199,7 +213,19 @@ def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[s
     if fn is None:
         return {"error": f"Unknown tool: {tool_name}"}, []
     try:
-        args = normalize_args(tool_name, args or {})
+        args = dict(args or {})
+        args = normalize_args(tool_name, args)
+        if is_destructive_tool(tool_name) and not args.pop("user_confirmed", False):
+            label = get_tool_label(tool_name)
+            return {
+                "needs_confirmation": True,
+                "message": (
+                    f"This will permanently {label.lower()}. "
+                    "Ask the user to reply yes to confirm (then retry this tool with "
+                    "user_confirmed=true) or cancel if they decline."
+                ),
+                "action": tool_name,
+            }, []
         result = fn(args, user_id)
         tabs = _TAB_REFRESH_MAP.get(tool_name, [])
         logger.info("Tool %s executed: %s", tool_name, result)

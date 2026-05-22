@@ -49,7 +49,7 @@ export default function LandingPage() {
             Hi, I&rsquo;m Orryon.
           </p>
           <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/65 mb-[28px] sm:mb-[36px] lg:mb-[48px] -mt-[3px]">
-            Your all-in-one personal concierge
+            Your Life OS
           </p>
           <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mt-[10px] mb-[59px] sm:mb-[67px] lg:mb-[75px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
             Your guide to organized life

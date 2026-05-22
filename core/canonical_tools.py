@@ -38,6 +38,10 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "search_transactions",
     "get_net_worth", "get_subscription_health", "get_mood_spending_report",
     "add_recurring_income",
+    # Health tracking
+    "log_health_vital", "get_health_vitals",
+    "log_medication", "get_medications",
+    "add_health_appointment", "get_health_appointments",
 )
 
 # Legacy names kept in _TOOL_MAP only (old chat tool_calls / aliases) — not sent to Grok.
@@ -78,6 +82,8 @@ _REPROMPT_SECTIONS = (
     "ANALYSIS: generate_insights, generate_forecast, generate_yearly_summary",
     "BALANCE/BUDGET: set_balance, add_money, get_balance, set_budget, get_budget_status, "
     "get_spending_summary, get_spending_recap, get_spending_patterns",
+    "HEALTH: log_health_vital, get_health_vitals, log_medication, get_medications, "
+    "add_health_appointment, get_health_appointments",
 )
 
 

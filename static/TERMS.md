@@ -36,7 +36,7 @@ These Terms constitute a legally binding agreement between you and Orryon. Your 
 
 ## 3. Description of Service and Modifications
 
-Orryon is a personal finance, productivity, AI concierge, and wellness platform. The Service may include, without limitation, transaction tracking, budgeting tools, goal setting, AI-powered chat assistance (including third-party large language models such as xAI Grok), breathing and meditation exercises, scheduling, notifications, data export, and related features. We reserve the right, at any time and in our sole discretion, to modify, suspend, discontinue, or terminate the Service or any feature thereof, temporarily or permanently, with or without notice, and without liability to you or any third party. Continued use of the Service after any modification constitutes acceptance of the modified Service.
+Orryon is a Life OS platform — personal finance, organization, AI concierge, and wellness in one place. The Service may include, without limitation, transaction tracking, budgeting tools, goal setting, AI-powered chat assistance (including third-party large language models such as xAI Grok), breathing and meditation exercises, scheduling, notifications, data export, and related features. We reserve the right, at any time and in our sole discretion, to modify, suspend, discontinue, or terminate the Service or any feature thereof, temporarily or permanently, with or without notice, and without liability to you or any third party. Continued use of the Service after any modification constitutes acceptance of the modified Service.
 
 ## 4. Not Professional Advice; Assumption of Risk; Multiple Disclaimers
 

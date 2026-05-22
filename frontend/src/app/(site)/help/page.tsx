@@ -51,7 +51,7 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "What is Orryon?",
-        a: "Orryon is your AI personal concierge. It helps you manage your budget, schedule, goals, notes, habits, and wellness \u2014 all through natural conversation. Think of it as one place that handles the managing so you can focus on living.",
+        a: "Orryon is your Life OS. It helps you manage money, schedule, goals, notes, habits, and wellbeing \u2014 and answer everyday health and life questions through natural conversation (with clear limits: not a doctor, not for coding). Think of it as one place that handles the managing so you can focus on living.",
       },
       {
         q: "How do I talk to Orryon?",

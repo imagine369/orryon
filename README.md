@@ -1,6 +1,6 @@
 # orryon
 
-Our guide to organized life and calmer days.
+Your **Life OS** — organized money, schedule, wellbeing, and everyday questions in one place.
 
 > **Local dev** uses SQLite on disk. **Production** can use Postgres + Redis on Railway; OTP sign-in is required outside demo mode.
 
@@ -19,8 +19,8 @@ Orryon runs as a **Next.js frontend + FastAPI backend**.
                                                     │
                                  ┌──────────────────┼───────────────┐
                                  │                  │               │
-                            core/grok_agent.py   db.py         core/scheduler.py
-                            (xAI Grok SSE)     (SQLite)       (APScheduler)
+                            core/grok_agent.py   db/           core/scheduler.py
+                            (xAI Grok SSE)     (SQLite/PG)    (APScheduler)
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and migration roadmap.
@@ -29,7 +29,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 
 ## Features
 
-- **AI Chat** — powered by xAI Grok; type naturally to add expenses, events, tasks, or goals
+**Life OS pillars:** Finance · Organize · Wellbeing — plus conversational help on health and daily life (informational, not medical advice).
+
+- **AI Chat** — powered by xAI Grok; act on your data (expenses, calendar, tasks, health vitals) or ask everyday questions
 - **Dashboard** — net balance, monthly spending, top categories, upcoming events
 - **Budget** — transaction history, category breakdown, quick-add expense form
 - **Forecast** — spending trends and projections

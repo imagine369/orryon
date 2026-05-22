@@ -1241,4 +1241,98 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_health_vital",
+            "description": "Log a health vital (blood pressure, weight, heart rate, glucose, etc.).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "description": "Vital type, e.g. blood_pressure, weight, heart_rate"},
+                    "value": {"type": "number", "description": "Numeric reading"},
+                    "unit": {"type": "string", "description": "Unit, e.g. mmHg, lb, bpm"},
+                    "note": {"type": "string", "description": "Optional note"},
+                    "recorded_at": {"type": "string", "description": "ISO datetime or date; defaults to now"},
+                },
+                "required": ["type", "value"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_health_vitals",
+            "description": "List logged health vitals, optionally filtered by type.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "description": "Optional vital type filter"},
+                    "limit": {"type": "integer", "description": "Max rows (default 20)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_medication",
+            "description": "Add a medication the user takes (name, dose, schedule).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Medication name"},
+                    "dose": {"type": "string", "description": "Dose, e.g. 10mg"},
+                    "frequency": {"type": "string", "description": "e.g. daily, twice daily"},
+                    "next_dose_at": {"type": "string", "description": "Optional next dose ISO datetime"},
+                    "notes": {"type": "string", "description": "Optional notes"},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_medications",
+            "description": "List the user's medications.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "active_only": {"type": "boolean", "description": "Only active meds (default true)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_health_appointment",
+            "description": "Schedule a health appointment (doctor, dentist, therapy, etc.).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "description": "Appointment type"},
+                    "provider": {"type": "string", "description": "Provider or clinic name"},
+                    "date": {"type": "string", "description": "ISO date or datetime"},
+                    "location": {"type": "string", "description": "Location"},
+                    "notes": {"type": "string", "description": "Optional notes"},
+                },
+                "required": ["provider", "date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_health_appointments",
+            "description": "List health appointments, upcoming by default.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "upcoming_only": {"type": "boolean", "description": "Only future appointments (default true)"},
+                },
+            },
+        },
+    },
 ]

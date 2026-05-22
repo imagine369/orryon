@@ -142,7 +142,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="orryon",
     version="3.0",
-    description="Intelligent personal finance concierge — REST + SSE API",
+    description="Orryon Life OS concierge — REST + SSE API",
     lifespan=lifespan,
 )
 

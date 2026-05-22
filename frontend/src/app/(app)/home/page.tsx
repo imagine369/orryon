@@ -30,6 +30,8 @@ import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
 import { DailyBriefingCard } from "@/components/daily-briefing-card";
 import { OrroyonBuddy } from "@/components/orryon-buddy";
+import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
+import { HEALTH_DISCLAIMER_SHORT } from "@/lib/life-os-copy";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -725,9 +727,13 @@ export default function HomePage() {
                 />
               </motion.div>
 
-              <p className="mb-5 max-w-[220px] text-center text-[15px] leading-tight text-white/50">
+              <p className="mb-2 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
                 {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
               </p>
+              <p className="mb-4 max-w-[280px] text-center text-[12px] leading-snug text-white/35">
+                Your Life OS — ask anything about your day, or tap a starter below.
+              </p>
+              <ChatStarterPrompts onPick={handleSend} disabled={streaming} />
 
               {tasksDueToday !== null && tasksDueToday > 0 && (
                 <Link
@@ -795,6 +801,9 @@ export default function HomePage() {
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={handleVoiceError}
                 />
+                <p className="mt-2 text-center text-[10px] leading-snug text-white/25 px-2">
+                  {HEALTH_DISCLAIMER_SHORT}
+                </p>
               </div>
             </div>
 
@@ -910,6 +919,9 @@ export default function HomePage() {
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={handleVoiceError}
               />
+              <p className="mt-2 text-center text-[10px] leading-snug text-white/25 px-2">
+                {HEALTH_DISCLAIMER_SHORT}
+              </p>
             </div>
           </div>
         </div>

@@ -68,6 +68,12 @@ _TOOL_LABELS: dict[str, str] = {
     "get_wellness_history": "Loading wellness history",
     "compare_periods": "Comparing periods",
     "cross_feature_search": "Searching",
+    "log_health_vital": "Logging health vital",
+    "get_health_vitals": "Loading health vitals",
+    "log_medication": "Saving medication",
+    "get_medications": "Loading medications",
+    "add_health_appointment": "Scheduling appointment",
+    "get_health_appointments": "Loading appointments",
 }
 
 def get_tool_label(tool_name: str) -> str:

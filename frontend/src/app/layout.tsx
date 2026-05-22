@@ -12,24 +12,27 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"] });
 
+const META_DESCRIPTION =
+  "Orryon is your Life OS — money, schedule, wellbeing, and everyday questions with an AI concierge that helps you act and think clearly.";
+
 export const metadata: Metadata = {
   title: "orryon",
-  description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
+  description: META_DESCRIPTION,
   manifest: "/manifest.json",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://orryon.vercel.app"),
   openGraph: {
-    title: "orryon",
-    description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
+    title: "orryon — Your Life OS",
+    description: META_DESCRIPTION,
     url: "/",
     siteName: "orryon",
     locale: "en_US",
     type: "website",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "orryon — AI personal concierge" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "orryon — Your Life OS" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "orryon",
-    description: "Your AI personal concierge — budget, goals, schedule, notes, and bills through natural conversation.",
+    title: "orryon — Your Life OS",
+    description: META_DESCRIPTION,
     images: ["/og-image.png"],
   },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "orryon" },
