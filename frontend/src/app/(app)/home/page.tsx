@@ -35,7 +35,7 @@ import {
   DeleteConfirmModal,
   type PendingDestructiveAction,
 } from "@/components/delete-confirm-modal";
-import { HEALTH_DISCLAIMER_SHORT } from "@/lib/life-os-copy";
+import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY } from "@/lib/life-os-copy";
 import {
   POST_CHECKOUT_SESSION_KEY,
   readCheckoutIntent,
@@ -778,7 +778,7 @@ export default function HomePage() {
                 {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
               </p>
               <p className="mb-4 max-w-[280px] text-center text-[12px] leading-snug text-white/35">
-                Your Life OS — ask anything about your day, or tap a starter below.
+                {LIFE_OS_CHAT_EMPTY}
               </p>
               <ChatStarterPrompts onPick={handleSend} disabled={streaming} />
 

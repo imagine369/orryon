@@ -67,7 +67,7 @@ The "brain" of orryon — used by the FastAPI backend:
 | `tools/` | Tool schemas (`schemas.py`), registry (`registry.py`), shim (`helpers.py`) |
 | `db/` | Database package (connection, schema, crud, domain modules) |
 | `canonical_tools.py` | Single source of truth for advertised tool names |
-| `system_prompt.py` | Life OS system prompt (v8; Grok breadth + tools for data/live facts; see `docs/CAPABILITIES.md`) |
+| `system_prompt.py` | Life OS system prompt (v10; broad chat + tools; three limits: porn/code/images; see `docs/CAPABILITIES.md`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
 | `csv_importer.py` | Bank CSV parsing (for future import feature) |
 | `google_calendar.py` | Google Calendar OAuth scaffold |

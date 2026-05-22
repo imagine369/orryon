@@ -1,6 +1,6 @@
 # orryon
 
-Your **Life OS** — organized money, schedule, wellbeing, and everyday questions in one place.
+Your **Life OS** — ask almost anything in chat; when it's about your life here, Orryon actually does something.
 
 > **Local dev** uses SQLite on disk. **Production** can use Postgres + Redis on Railway; OTP sign-in is required outside demo mode.
 
@@ -29,9 +29,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 
 ## Features
 
-**Life OS pillars:** Finance · Organize · Wellbeing — plus conversational help on health and daily life (informational, not medical advice).
+**Life OS pillars:** Finance · Organize · Wellbeing — plus broad AI chat (ChatGPT/Grok-style), minus porn, substantial code, and images.
 
-- **AI Chat** — powered by xAI Grok; act on your data (expenses, calendar, tasks, health vitals) or ask everyday questions
+- **AI Chat** — powered by xAI Grok; broad conversation or tools on your data (expenses, calendar, tasks, health vitals)
 - **Dashboard** — net balance, monthly spending, top categories, upcoming events
 - **Budget** — transaction history, category breakdown, quick-add expense form
 - **Forecast** — spending trends and projections

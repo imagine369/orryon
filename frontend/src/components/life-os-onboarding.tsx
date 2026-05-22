@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
-const STORAGE_KEY = "orryon_life_os_onboarding_v1";
+const STORAGE_KEY = "orryon_life_os_onboarding_v2";
 
 const STEPS = [
   {
-    title: "Do",
-    body: "Manage money, calendar, tasks, notes, lists, and habits — Orryon updates your Life OS when you ask.",
+    title: "Ask",
+    body: "Chat works like a broad assistant — writing, planning, how-tos, health education, and almost anything else. No porn, code projects, or image generation.",
   },
   {
-    title: "Talk",
-    body: "Ask about health, life, planning, and everyday how-tos. Not for coding. Health answers include a medical disclaimer.",
+    title: "Do",
+    body: "When it's your life in Orryon — money, calendar, tasks, notes, lists — Orryon actually does it. Log spending, check your week, set goals.",
   },
   {
     title: "Later",

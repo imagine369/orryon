@@ -1,8 +1,16 @@
 # Orryon capabilities (source of truth)
 
-Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v8).
+Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10).
 
-**Principle:** Grok-style breadth on daily life. **Tools** only when facts must come from the user's Orryon data or a live API.
+## Product promise
+
+**“Ask almost anything — when it’s about your life, Orryon actually does something.”**
+
+| Layer | What it means |
+|-------|----------------|
+| **Chat** | Broad assistant (ChatGPT/Grok-style) for explanations, writing, planning, how-tos, health education, opinions, tutoring (non-code), and more |
+| **Tools** | Their Orryon data + live weather — log, read, update; never guess amounts or IDs |
+| **Not offered** | Porn / explicit sexual content · substantial **code** (IDE/homework) · **images** (generate/edit/analyze as a product) |
 
 ---
 
@@ -10,19 +18,20 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v8).
 
 | Kind | When | Examples |
 |------|------|----------|
-| **Chat** | Default — planning, advice, explanations | "Should I fly or drive?", "I'm stressed about work", "Is this email a scam?" |
+| **Chat** | Default — most questions | "Explain inflation", "How does this email sound?", "How do I hem a shirt?" |
 | **Tool** | Their stored data or live facts | "Log $40 groceries", "What's on my calendar?", "Weather in Boston today" |
 
 ---
 
 ## Yes — chat (no tool required)
 
-- Daily planning and priorities
-- Relationships, errands, travel prep, household decisions
-- Health and wellness **education** (with medical disclaimer in chat — not a doctor)
-- General discussion of politics, religion, life topics (respectful)
-- Brief tech explanations for **daily life** (what a term means, basic device/app hygiene)
-- Short answers about code concepts — **not** building or debugging projects (see below)
+- General Q&A, explanations, brainstorming, study help (not programming assignments)
+- Writing: drafts, tone, proofreading, emails, bios
+- Life skills: sewing, cooking, repairs, hobbies — step-by-step
+- Planning, relationships, travel, errands, scams, devices
+- Health and wellness **education** (medical disclaimer — not a doctor)
+- Respectful discussion of politics, religion, life topics
+- Brief tech tips (what a term means) — not repo debugging
 
 ---
 
@@ -38,16 +47,19 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v8).
 | **Weather** | `get_weather` — live conditions for a city/place |
 | **Search** | Cross-feature search across their data |
 
-Morning **briefing**: compiled summary in the app Dashboard (chat can suggest opening it).
+Morning **briefing**: Dashboard in the app (chat can suggest opening it).
 
 ---
 
-## Not a coding assistant
+## Three limits (vs full ChatGPT/Grok)
 
-| OK | Not OK |
-|----|--------|
-| "What does git push mean?" (brief) | Write a full app, debug a repo, homework code |
-| "Why might my bank app crash?" (general) | Act as Cursor / IDE replacement |
+| Limit | Not OK | OK |
+|-------|--------|-----|
+| **Porn** | Explicit sexual content, roleplay, minors | — (hard block; see Never) |
+| **Code** | Apps, repos, homework code, sustained debug | One-line plain-language tip; redirect to Cursor etc. |
+| **Images** | Generate/edit/analyze images, logos, Lightroom workflows | One sentence on phone document photo |
+
+Everyday **writing** (emails, tone) is not code. **Sewing/cooking** how-tos are core chat.
 
 ---
 
@@ -58,6 +70,7 @@ Morning **briefing**: compiled summary in the app Dashboard (chat can suggest op
 - Read **live** bank balance from a linked bank (use manual balance, expenses, CSV import)
 - Send email on the user's behalf
 - Shop on external sites
+- Live web/X search (unless added later)
 
 **Alternatives:** calendar, tasks, reminders, `get_weather`, log expenses, link to official site.
 
@@ -81,7 +94,7 @@ Morning **briefing**: compiled summary in the app Dashboard (chat can suggest op
 
 ## Tier note
 
-Subscription tier affects **usage limits** (messages, voice, etc.), not whether Orryon helps with daily life or weather. Billing state is separate from this policy.
+Subscription tier affects **usage limits** (messages, voice, etc.), not whether Orryon helps in chat or with weather. Billing state is separate from this policy.
 
 ---
 

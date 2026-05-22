@@ -51,15 +51,15 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "What is Orryon?",
-        a: "Orryon is your Life OS \u2014 money, schedule, notes, wellbeing, and everyday life in one place. Chat is Grok-style breadth for daily questions; tools kick in when something must use your stored data (spending, calendar, tasks) or live facts (like weather). Orryon is not a coding IDE or explicit-content site.",
+        a: "Orryon is your Life OS: ask almost anything in chat (like ChatGPT or Grok), and when it\u2019s about your life here \u2014 spending, calendar, tasks, notes \u2014 Orryon actually does it with tools. Not a coding IDE, image generator, or explicit-content site.",
       },
       {
         q: "What can Orryon help with in chat?",
-        a: "Most daily-life questions: planning your day, stress, relationships, errands, travel prep, health education (not a doctor), and quick plain-language tech tips. For your numbers and schedule, ask Orryon to log or look things up \u2014 it will use tools so data stays accurate. It cannot book rides, order food, or read your live bank balance yet; it can remind you, block calendar time, and log what you tell it.",
+        a: "Broad chat: explanations, writing and tone checks, planning, study help (non-code), health education (not a doctor), sewing, cooking, opinions, and most everyday questions. When you ask about your Orryon data (\u201cwhat did I spend?\u201d, \u201cadd a task\u201d), it uses tools so numbers stay accurate. It cannot book rides, order food, or read your live bank balance yet.",
       },
       {
-        q: "Can Orryon help me write code?",
-        a: "Not as a coding assistant. Orryon won\u2019t build apps, debug repositories, or complete homework assignments. Short explanations (\u201cwhat does this error mean?\u201d) are fine when they help your daily life; for real development work, use a dedicated coding tool.",
+        q: "What is Orryon not built for?",
+        a: "Three limits: (1) no porn or explicit sexual content, (2) no substantial coding \u2014 apps, repos, or programming homework (brief plain-language tips are OK), (3) no images \u2014 generating, editing, or analyzing pictures/logos. Use Cursor, Midjourney, or similar for those. Everything else in normal chat is fair game.",
       },
       {
         q: "How do I talk to Orryon?",
