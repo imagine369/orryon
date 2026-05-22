@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Wind, Sparkles, Zap } from "lucide-react";
 import { SiteNav, SignInNavLink } from "@/components/site-nav";
+import { PricingTierCta } from "@/components/pricing-tier-cta";
 import { RESET_ANCHORS } from "@/lib/reset-scripts";
+import type { TierId } from "@/lib/tier-checkout";
 
 type Billing = "monthly" | "annual";
 
@@ -28,7 +30,6 @@ const TIERS = [
     accentBorder: "rgba(20,184,166,0.18)",
     popular: false,
     cta: "Start for free",
-    ctaHref: "/login?step=email",
     features: [...STARTER_FEATURES],
   },
   {
@@ -44,7 +45,6 @@ const TIERS = [
     accentBorder: "rgba(168,85,247,0.20)",
     popular: true,
     cta: "Start 14-day trial",
-    ctaHref: "/login?step=email",
     features: [
       "Personal AI concierge (text & voice)",
       "Budget tracking & spending insights",
@@ -73,7 +73,6 @@ const TIERS = [
     accentBorder: "rgba(251,191,36,0.18)",
     popular: false,
     cta: "Get Premium",
-    ctaHref: "/login?step=email",
     features: [
       "Everything in Pro",
       "Unlimited chat messages (subject to Fair Usage Policy)",
@@ -100,7 +99,6 @@ const TIERS = [
     accentBorder: "rgba(56,189,248,0.18)",
     popular: false,
     cta: "Get Premium Plus",
-    ctaHref: "/login?step=email",
     features: [
       "Everything in Premium",
       "1,200 voice minutes / month",
@@ -233,17 +231,13 @@ function PricingTierCard({ tier }: { tier: Tier }) {
         {isFree && <p className="text-white/40 text-sm mt-2">No credit card required</p>}
       </div>
 
-      <Link
-        href={isFree ? tier.ctaHref : `/login?tier=${tier.id}&plan=${billing}`}
-        className="block text-center rounded-xl py-3 text-base font-semibold transition-all duration-200 mb-7"
-        style={
-          tier.popular
-            ? { background: "rgba(168,85,247,0.25)", color: "rgba(216,180,254,0.95)", border: "1px solid rgba(168,85,247,0.35)" }
-            : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)", border: "1px solid rgba(255,255,255,0.10)" }
-        }
-      >
-        {tier.cta}
-      </Link>
+      <PricingTierCta
+        tierId={tier.id as TierId | "starter"}
+        label={tier.cta}
+        popular={tier.popular}
+        billing={billing}
+        isFree={isFree}
+      />
 
       <div className="border-t mb-6" style={{ borderColor: "rgba(255,255,255,0.06)" }} />
 

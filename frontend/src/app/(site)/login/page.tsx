@@ -1,32 +1,21 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
+import { useSearchParams as useNextSearchParams } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import {
+  startTierCheckout,
+  type BillingPlan,
+  type TierId,
+} from "@/lib/tier-checkout";
 import { Input } from "@/components/ui/input";
 import { PillButton } from "@/components/pill-cta";
 import { GetAppNavLink, SiteNav } from "@/components/site-nav";
 
-// Per-tier price IDs — used only for the upgrade checkout flow (already signed-in users)
-type Tier = "pro" | "premium" | "premium_plus";
-
-const PRICE_IDS: Record<Tier, Record<"monthly" | "annual", string>> = {
-  pro: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_ANNUAL  || "",
-  },
-  premium: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_MONTHLY || "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_ANNUAL  || "",
-  },
-  premium_plus: {
-    monthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_PLUS_MONTHLY || "",
-    annual:  process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM_PLUS_ANNUAL  || "",
-  },
-};
+type Tier = TierId;
 
 type Step = "breathe" | "email" | "code" | "name";
 
@@ -35,8 +24,7 @@ const NO_CARD_TRIAL: boolean =
   (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
 
 function LoginPageInner() {
-  const router = useRouter();
-  const { login, user: authedUser } = useAuth();
+  const { login, user: authedUser, loading: authLoading } = useAuth();
   const searchParams = useNextSearchParams();
 
   const flow       = searchParams.get("flow");
@@ -45,7 +33,9 @@ function LoginPageInner() {
   const tierParam  = searchParams.get("tier") as Tier | null;
   const nextParam  = searchParams.get("next") || "/home";
 
-  const hasTierParam = !!(tierParam && PRICE_IDS[tierParam]);
+  const hasTierParam = !!(tierParam && ["pro", "premium", "premium_plus"].includes(tierParam));
+  const selectedTier: Tier = hasTierParam ? tierParam! : "premium";
+  const selectedPlan: BillingPlan = planParam === "annual" ? "annual" : "monthly";
 
   const [breatheFlow, setBreatheFlow] = useState(flow === "breathe");
   const [step, setStep] = useState<Step>(() => {
@@ -53,6 +43,12 @@ function LoginPageInner() {
     if (stepParam === "name") return "name";
     return "email";
   });
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (flow === "breathe") {
@@ -61,14 +57,24 @@ function LoginPageInner() {
     }
   }, [flow]);
 
-  const [selectedTier] = useState<Tier>(hasTierParam ? tierParam! : "premium");
-  const [selectedPlan] = useState<"monthly" | "annual">(planParam === "annual" ? "annual" : "monthly");
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [devCode, setDevCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Signed-in user from /pricing → Stripe (skip email OTP)
+  useEffect(() => {
+    if (authLoading || !authedUser || !hasTierParam || breatheFlow) return;
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    startTierCheckout(selectedTier, selectedPlan, {
+      successUrl: `${window.location.origin}/home?upgraded=1`,
+      cancelUrl: `${window.location.origin}/pricing`,
+    }).catch((e: unknown) => {
+      if (cancelled) return;
+      setError(e instanceof Error ? e.message : "Could not open checkout");
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, authedUser, hasTierParam, selectedTier, selectedPlan, breatheFlow]);
 
   const [authUser, setAuthUser] = useState<{ id: string; email: string; display_name: string } | null>(null);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
@@ -195,25 +201,16 @@ function LoginPageInner() {
       setDisplayName(payload.user.display_name || "");
       login(payload.user);
 
-      // If a paid tier was passed from /pricing, auto-open Stripe checkout
+      // New sign-up from /pricing → Stripe after OTP
       if (hasTierParam && selectedTier) {
-        const priceId = PRICE_IDS[selectedTier]?.[selectedPlan];
-        if (priceId) {
-          try {
-            const origin = window.location.origin;
-            const data = await api.post<{ checkout_url: string }>(
-              "/api/subscription/checkout",
-              {
-                price_id: priceId,
-                success_url: `${origin}/login?step=name`,
-                cancel_url: `${origin}/pricing`,
-              },
-            );
-            window.location.href = data.checkout_url;
-            return;
-          } catch {
-            // Fall through to name step if checkout fails
-          }
+        try {
+          await startTierCheckout(selectedTier, selectedPlan, {
+            successUrl: `${window.location.origin}/login?step=name`,
+            cancelUrl: `${window.location.origin}/pricing`,
+          });
+          return;
+        } catch {
+          // Fall through to name step if checkout fails
         }
       }
 
@@ -228,33 +225,6 @@ function LoginPageInner() {
       }
       const msg = e instanceof Error ? e.message : "";
       setError(msg || "Couldn't reach the server. Please try again.");
-      setLoading(false);
-    }
-  };
-
-  // Already signed-in users clicking "Upgrade" land here: skip email/code
-  // and go straight to Stripe with the selected tier.
-  const handleUpgradeCheckout = async () => {
-    const priceId = PRICE_IDS[selectedTier][selectedPlan];
-    if (!priceId) {
-      setError("Stripe isn't configured for this tier yet.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const origin = window.location.origin;
-      const data = await api.post<{ checkout_url: string }>(
-        "/api/subscription/checkout",
-        {
-          price_id: priceId,
-          success_url: `${origin}/login?step=name`,
-          cancel_url: `${origin}/pricing`,
-        },
-      );
-      window.location.href = data.checkout_url;
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
     }
   };
@@ -348,8 +318,22 @@ function LoginPageInner() {
         </div>
       )}
 
-      {/* ── Step 1: Email ── */}
-      {step === "email" && (
+      {/* ── Signed-in upgrade from /pricing (checkout redirect in useEffect) ── */}
+      {step === "email" && hasTierParam && (authLoading || authedUser) && (
+        <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
+          <h1 className="text-2xl font-bold text-white mb-1">Opening checkout…</h1>
+          <p className="text-sm text-white/50 mb-6 text-center">
+            Redirecting you to Stripe to subscribe to {selectedTier.replace("_", " ")}.
+          </p>
+          {error && <p className="text-red-400 text-sm mb-3 w-full">{error}</p>}
+          {!error && (
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+          )}
+        </div>
+      )}
+
+      {/* ── Step 1: Email (new sign-up only) ── */}
+      {step === "email" && !hasTierParam && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full px-4">
           <h1 className="text-2xl font-bold text-white mb-1">Enter your email</h1>
           <p className="text-sm text-white/50 mb-6">
