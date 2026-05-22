@@ -112,7 +112,25 @@ async def lifespan(app: FastAPI):
     from backend.signing import get_signing_mode, validate_signing_config
 
     validate_signing_config()
-    init_pool()
+
+    try:
+        init_pool()
+    except Exception as exc:
+        import db.connection as conn_mod
+
+        db_path = os.getenv("DB_PATH", "").strip()
+        if db_path:
+            logger.error(
+                "DATABASE_URL is set but Postgres is unreachable (%s). "
+                "Using SQLite at %s. Unset DATABASE_URL on Railway if you do not use Postgres.",
+                exc,
+                db_path,
+            )
+            conn_mod._USE_PG = False
+            conn_mod._pg_pool = None
+        else:
+            raise
+
     await init_redis()
     init_db()
     start_scheduler()
@@ -205,6 +223,7 @@ app.include_router(waitlist.router)
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/health", tags=["health"])
+@app.get("/health", tags=["health"], include_in_schema=False)
 async def health():
     """Liveness probe for Railway / Render / Docker health checks.
 

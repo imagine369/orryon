@@ -52,6 +52,13 @@ else:
     print(f'Database mode: SQLite ({db_path})')
 "
 
-WORKERS="${WEB_CONCURRENCY:-1}"
+# SQLite cannot use multiple workers (file locks). Force 1 unless Postgres is configured.
+if [ -n "${DATABASE_URL:-}" ]; then
+  WORKERS="${WEB_CONCURRENCY:-1}"
+else
+  WORKERS=1
+fi
+echo "DATABASE_URL=${DATABASE_URL:-(unset — SQLite)}"
+echo "DB_PATH=${DB_PATH:-finance.db}"
 echo "Starting uvicorn (workers=${WORKERS})..."
 exec uvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers "${WORKERS}"

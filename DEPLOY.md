@@ -63,8 +63,13 @@ ADMIN_SECRET=         ← copy from .env
 SENTRY_DSN=           ← copy from .env.example if using Sentry
 ```
 
-5. **Add a Volume**: Railway service → Storage → Add Volume → mount at `/data`
-   (This keeps the SQLite database persistent across deploys)
+5. **Add a Volume**: Railway service → **Storage** → `orryon-volume` → **Mount Path must be `/data` only**
+
+   **Critical:** Do **not** mount at `/opt/orryon`, `/srv/orryon`, or `/app`. That replaces your app code with an empty disk and you will see:
+
+   `ERROR: /opt/orryon/config.py is missing`
+
+   Set variable: `DB_PATH=/data/finance.db`
 
 6. **Add custom domain**: Settings → Networking → Custom Domain → `api.orryon.com`
    Copy the Railway-provided CNAME target — you'll need it for DNS.
