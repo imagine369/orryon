@@ -2,14 +2,14 @@
 
 ## Deploy failed: `config.py is missing`
 
-Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of `/app` or `/opt/orryon`, which hides the Docker image (including `config.py`).
+Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of `/app`, `/opt/orryon`, or `/usr/local/lib/orryon`, which hides the Docker image (including `config.py`).
 
 **Fix (2 minutes):**
 
 1. Railway → **orryon** backend service (not frontend)
 2. **Settings** → **Volumes** (or **Storage** → `orryon-volume`)
 3. Set **Mount Path** to: `/data` **only**  
-   Remove any mount at `/app`, `/opt/orryon`, or `/srv/orryon`
+   Remove any mount at `/app`, `/opt/orryon`, `/srv/orryon`, or `/usr/local/lib/orryon`
 4. **Variables** → `DB_PATH` = `/data/finance.db`
 5. **Redeploy** (Deployments → Redeploy, or push an empty commit)
 
@@ -17,9 +17,13 @@ Logs should then show `All imports OK` and `Database mode: SQLite (/data/finance
 
 ---
 
-## Deploy failed: Healthcheck failure (~5 min)
+## Deploy failed: Healthcheck failure
 
-Build/deploy succeeded but **Network → Healthcheck** failed. The container never returned `200` on `/api/health` in time (often because startup was blocked on DB/Redis init, or the process crashed in a loop).
+Build/deploy succeeded but **Network → Healthcheck** failed. Common causes: volume mounted over `/app` or `/opt/orryon` (hides app code), missing `JWT_SECRET`, or process never bound to Railway's `PORT`.
+
+**This repo disables Railway HTTP healthchecks in `railway.json`** so deploys can go live; verify with `curl` after deploy. You can re-enable a health path in the Railway UI once `/api/health` returns 200.
+
+**App code path in Docker:** `/usr/local/lib/orryon` (do **not** mount a volume there).
 
 **Check Deploy Logs** (scroll *above* “Healthcheck failure”) for:
 
