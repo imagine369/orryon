@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+cd /app
 export PYTHONPATH="${PYTHONPATH:-/app}"
 echo "=== orryon backend starting ==="
 echo "PORT=${PORT:-8000}"
@@ -22,9 +23,9 @@ except Exception as e:
     exit(1)
 "
 
-# Workers: use WEB_CONCURRENCY env var, default to 4 in production, 1 in dev
-WORKERS=${WEB_CONCURRENCY:-${NODE_ENV:+4}}
-WORKERS=${WORKERS:-1}
+# Single worker by default — multi-worker duplicates lifespan (DB pool, scheduler) and
+# often fails Railway healthchecks on small instances. Override with WEB_CONCURRENCY if needed.
+WORKERS="${WEB_CONCURRENCY:-1}"
 
 echo "Starting uvicorn (workers=${WORKERS})..."
-exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS}
+exec uvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers "${WORKERS}"

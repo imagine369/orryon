@@ -55,11 +55,21 @@ def init_pool() -> None:
     from psycopg.rows import dict_row
     _pg_pool = ConnectionPool(
         conninfo=DATABASE_URL,
-        min_size=2,
-        max_size=20,
-        kwargs={"row_factory": dict_row, "autocommit": False},
+        min_size=1,
+        max_size=10,
+        timeout=10,
+        kwargs={
+            "row_factory": dict_row,
+            "autocommit": False,
+            "connect_timeout": 10,
+        },
     )
-    logger.info("Postgres connection pool created (min=2, max=20)")
+    try:
+        _pg_pool.wait(timeout=20)
+    except Exception as exc:
+        logger.error("Postgres pool failed to connect within 20s: %s", exc)
+        raise
+    logger.info("Postgres connection pool ready (min=1, max=10)")
 
 
 def close_pool() -> None:
