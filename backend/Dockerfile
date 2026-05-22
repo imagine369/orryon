@@ -19,4 +19,4 @@ RUN chmod +x backend/start.sh \
 
 EXPOSE 8000
 
-CMD ["sh", "backend/start.sh"]
+CMD ["sh", "/image-root/backend/start.sh"]

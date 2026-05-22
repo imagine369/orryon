@@ -4,7 +4,9 @@
 
 Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of the **app directory** (`/code`, `/app`, `/opt/orryon`, etc.), which hides `config.py` and crashes the container.
 
-**Symptom in logs:** `config.py is missing` or `volume likely mounted over app code`.
+**Symptom in logs:** `config.py is missing`, `backend/start.sh: not found`, or restart loop right after `Mounting volume`.
+
+**Start command must be** `sh /image-root/backend/start.sh` (absolute path). If Railway uses `sh backend/start.sh` and the volume is on `/code`, the script is hidden and the container crashes.
 
 **Fix (2 minutes):**
 

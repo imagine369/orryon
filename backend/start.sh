@@ -1,43 +1,47 @@
 #!/bin/sh
 set -e
 
-PRIMARY="${APP_ROOT:-/code}"
-STASH="/image-root"
-
-# Railway volumes are often mounted on /app, /code, or /opt/orryon — that hides image files.
-# Fall back to the immutable build-time copy so the process can still start.
-if [ ! -f "${PRIMARY}/config.py" ] && [ -f "${STASH}/config.py" ]; then
-  echo "WARN: ${PRIMARY} has no config.py (volume likely mounted over app code)."
-  echo "WARN: Running from ${STASH} instead. Set volume Mount Path to /data ONLY."
-  PRIMARY="${STASH}"
-fi
-
-cd "$PRIMARY"
-export PYTHONPATH="${PYTHONPATH:-$PRIMARY}"
+# Always run from the immutable image copy — never from /code (Railway volumes often mount there).
+ROOT="/image-root"
+cd "$ROOT"
+export PYTHONPATH="$ROOT"
 
 echo "=== orryon backend starting ==="
-echo "ROOT=${PRIMARY}"
+echo "ROOT=${ROOT}"
 echo "PORT=${PORT:-8000}"
 echo "PYTHONPATH=${PYTHONPATH}"
 echo "Python: $(python --version 2>&1)"
 
-if [ ! -f "${PRIMARY}/config.py" ]; then
-  echo "ERROR: config.py missing at ${PRIMARY} and ${STASH}."
-  echo "Fix Railway: Storage -> orryon-volume -> Mount Path = /data (not /code, /app, /opt/orryon)."
-  ls -la "${PRIMARY}" 2>/dev/null | head -15 || true
+if [ ! -f "${ROOT}/config.py" ]; then
+  echo "ERROR: ${ROOT}/config.py missing — Docker image did not build correctly."
   exit 1
 fi
 
-# Database always on the volume mount, never inside app code
-DB_PATH_VAL="${DB_PATH:-/data/finance.db}"
-DB_DIR="$(dirname "$DB_PATH_VAL")"
-mkdir -p "$DB_DIR" 2>/dev/null || true
-if [ ! -d "$DB_DIR" ] || [ ! -w "$DB_DIR" ]; then
-  echo "ERROR: database directory not writable: ${DB_DIR}"
+# Pick first writable SQLite location (prefer persistent /data volume)
+if [ -n "${DB_PATH:-}" ]; then
+  _db_candidates="${DB_PATH}"
+else
+  _db_candidates="/data/finance.db /tmp/orryon/finance.db ${ROOT}/finance.db"
+fi
+DB_PATH_VAL=""
+for candidate in $_db_candidates; do
+  _dir="$(dirname "$candidate")"
+  mkdir -p "$_dir" 2>/dev/null || true
+  if [ -d "$_dir" ] && [ -w "$_dir" ]; then
+    DB_PATH_VAL="$candidate"
+    break
+  fi
+done
+if [ -z "$DB_PATH_VAL" ]; then
+  echo "ERROR: no writable directory for SQLite."
   echo "Mount orryon-volume at /data and set DB_PATH=/data/finance.db"
   exit 1
 fi
-echo "DB_PATH=${DB_PATH_VAL}"
+export DB_PATH="$DB_PATH_VAL"
+echo "DB_PATH=${DB_PATH}"
+if [ "$(dirname "$DB_PATH")" != "/data" ]; then
+  echo "WARN: SQLite is not on /data — set volume Mount Path=/data and DB_PATH=/data/finance.db for persistence."
+fi
 
 echo "NODE_ENV=${NODE_ENV:-(unset)}"
 echo "DATABASE_URL=${DATABASE_URL:-(unset — SQLite)}"
