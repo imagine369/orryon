@@ -2,14 +2,16 @@
 
 ## Deploy failed: `config.py is missing`
 
-Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of `/app`, `/opt/orryon`, or `/usr/local/lib/orryon`, which hides the Docker image (including `config.py`).
+Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of the **app directory** (`/code`, `/app`, `/opt/orryon`, etc.), which hides `config.py` and crashes the container.
+
+**Symptom in logs:** `config.py is missing` or `volume likely mounted over app code`.
 
 **Fix (2 minutes):**
 
 1. Railway → **orryon** backend service (not frontend)
 2. **Settings** → **Volumes** (or **Storage** → `orryon-volume`)
 3. Set **Mount Path** to: `/data` **only**  
-   Remove any mount at `/app`, `/opt/orryon`, `/srv/orryon`, or `/usr/local/lib/orryon`
+   Remove any mount at `/code`, `/app`, `/opt/orryon`, `/srv/orryon`, or `/usr/local/lib/orryon`
 4. **Variables** → `DB_PATH` = `/data/finance.db`
 5. **Redeploy** (Deployments → Redeploy, or push an empty commit)
 
@@ -23,7 +25,7 @@ Build/deploy succeeded but **Network → Healthcheck** failed. Common causes: vo
 
 **This repo disables Railway HTTP healthchecks in `railway.json`** so deploys can go live; verify with `curl` after deploy. You can re-enable a health path in the Railway UI once `/api/health` returns 200.
 
-**App code path in Docker:** `/usr/local/lib/orryon` (do **not** mount a volume there).
+**App code in Docker:** `/code` (with fallback `/image-root`). **Data only:** `/data` via `DB_PATH=/data/finance.db`.
 
 **Check Deploy Logs** (scroll *above* “Healthcheck failure”) for:
 

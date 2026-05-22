@@ -1,37 +1,47 @@
 #!/bin/sh
 set -e
 
-# Fixed path from Docker image — not affected by volumes mounted at /app or /opt/orryon
-ROOT="${APP_ROOT:-/usr/local/lib/orryon}"
-cd "$ROOT"
-export PYTHONPATH="${PYTHONPATH:-$ROOT}"
+PRIMARY="${APP_ROOT:-/code}"
+STASH="/image-root"
+
+# Railway volumes are often mounted on /app, /code, or /opt/orryon — that hides image files.
+# Fall back to the immutable build-time copy so the process can still start.
+if [ ! -f "${PRIMARY}/config.py" ] && [ -f "${STASH}/config.py" ]; then
+  echo "WARN: ${PRIMARY} has no config.py (volume likely mounted over app code)."
+  echo "WARN: Running from ${STASH} instead. Set volume Mount Path to /data ONLY."
+  PRIMARY="${STASH}"
+fi
+
+cd "$PRIMARY"
+export PYTHONPATH="${PYTHONPATH:-$PRIMARY}"
 
 echo "=== orryon backend starting ==="
-echo "ROOT=${ROOT}"
+echo "ROOT=${PRIMARY}"
 echo "PORT=${PORT:-8000}"
 echo "PYTHONPATH=${PYTHONPATH}"
 echo "Python: $(python --version 2>&1)"
 
-if [ ! -f "${ROOT}/config.py" ]; then
-  echo "ERROR: ${ROOT}/config.py is missing — image build is broken."
+if [ ! -f "${PRIMARY}/config.py" ]; then
+  echo "ERROR: config.py missing at ${PRIMARY} and ${STASH}."
+  echo "Fix Railway: Storage -> orryon-volume -> Mount Path = /data (not /code, /app, /opt/orryon)."
+  ls -la "${PRIMARY}" 2>/dev/null | head -15 || true
   exit 1
 fi
 
-# Ensure database directory exists and is writable; fall back to app dir for SQLite
+# Database always on the volume mount, never inside app code
 DB_PATH_VAL="${DB_PATH:-/data/finance.db}"
 DB_DIR="$(dirname "$DB_PATH_VAL")"
-mkdir -p "$DB_DIR" /data 2>/dev/null || true
+mkdir -p "$DB_DIR" 2>/dev/null || true
 if [ ! -d "$DB_DIR" ] || [ ! -w "$DB_DIR" ]; then
-  echo "WARN: ${DB_DIR} not writable — using ${ROOT}/finance.db (set volume mount to /data)"
-  export DB_PATH="${ROOT}/finance.db"
-  DB_DIR="${ROOT}"
+  echo "ERROR: database directory not writable: ${DB_DIR}"
+  echo "Mount orryon-volume at /data and set DB_PATH=/data/finance.db"
+  exit 1
 fi
-echo "DB_PATH=${DB_PATH:-/data/finance.db}"
+echo "DB_PATH=${DB_PATH_VAL}"
 
 echo "NODE_ENV=${NODE_ENV:-(unset)}"
 echo "DATABASE_URL=${DATABASE_URL:-(unset — SQLite)}"
 
-# Skip slow preflight — uvicorn import will surface errors in logs
 WORKERS=1
 if [ -n "${DATABASE_URL:-}" ]; then
   WORKERS="${WEB_CONCURRENCY:-1}"

@@ -65,9 +65,7 @@ SENTRY_DSN=           ← copy from .env.example if using Sentry
 
 5. **Add a Volume**: Railway service → **Storage** → `orryon-volume` → **Mount Path must be `/data` only**
 
-   **Critical:** Do **not** mount at `/app`, `/opt/orryon`, or `/srv/orryon`. That replaces your app code with an empty disk and you will see:
-
-   `ERROR: .../config.py is missing`
+   **Critical:** Mount path must be **`/data` only**. Do **not** mount at `/code`, `/app`, `/opt/orryon`, or `/srv/orryon` — that hides app code and you will see `config.py is missing` in logs.
 
    Set variable: `DB_PATH=/data/finance.db`
 
