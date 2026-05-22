@@ -136,6 +136,19 @@ DNS propagates in 5–30 minutes.
 
 ## Step 6 — Verify
 
+From your machine after deploy:
+
+```bash
+# Env checklist (uses local .env for prod var names)
+VERIFY_PROD_URL=https://api.orryon.com python scripts/verify_prod.py
+
+# Local smoke (tools + API, no Grok)
+python scripts/smoke_test.py
+SMOKE_BASE_URL=https://api.orryon.com python scripts/smoke_test.py
+```
+
+After every push to `main`, confirm Railway **backend** redeployed (new deployment log for latest commit).
+
 - [ ] `https://api.orryon.com/api/health` returns `{"status":"ok"}`
 - [ ] `https://www.orryon.com` loads the site
 - [ ] Sign-up OTP email arrives

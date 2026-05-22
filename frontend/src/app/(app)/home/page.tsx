@@ -31,6 +31,10 @@ import { usePreferences } from "@/lib/use-preferences";
 import { DailyBriefingCard } from "@/components/daily-briefing-card";
 import { OrroyonBuddy } from "@/components/orryon-buddy";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
+import {
+  DeleteConfirmModal,
+  type PendingDestructiveAction,
+} from "@/components/delete-confirm-modal";
 import { HEALTH_DISCLAIMER_SHORT } from "@/lib/life-os-copy";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +119,8 @@ export default function HomePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [pendingDelete, setPendingDelete] =
+    useState<PendingDestructiveAction | null>(null);
 
   // ── Preferences (voice overlay, golden mode) ────────────────────────────────
   const { prefs, update: updatePrefs } = usePreferences();
@@ -384,6 +390,14 @@ export default function HomePage() {
         } else if (event.type === "tool") {
           setThinking(false);
           setToolLabel(event.label || event.name || "Working…");
+        } else if (event.type === "confirm_required") {
+          setThinking(false);
+          setToolLabel("");
+          setPendingDelete({
+            action: event.action || "delete",
+            message: event.message || "",
+            args: event.args,
+          });
         } else if (event.type === "done") {
           const final = event.message || aiText;
           setMessages((prev) => {
@@ -461,8 +475,30 @@ export default function HomePage() {
   };
 
   const handleSend = (text: string, source: MessageSource = "text") => {
+    setPendingDelete(null);
     setMessages((prev) => [...prev, { role: "user", content: text, source }]);
     runAI(text);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    const argsJson = JSON.stringify(pendingDelete.args || {});
+    const text = [
+      `Yes, I confirm. Proceed with ${pendingDelete.action} using user_confirmed=true.`,
+      `Use these exact arguments: ${argsJson}`,
+    ].join(" ");
+    setPendingDelete(null);
+    setMessages((prev) => [...prev, { role: "user", content: "Yes, confirm delete." }]);
+    runAI(text);
+  };
+
+  const handleCancelDelete = () => {
+    setPendingDelete(null);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: "Cancel — do not delete anything." },
+    ]);
+    runAI("Cancel — do not delete anything.");
   };
 
   const handleRetry = () => {
@@ -503,6 +539,11 @@ export default function HomePage() {
 
   return (
     <>
+      <DeleteConfirmModal
+        pending={pendingDelete}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
       {/* ── Live Orryon floating companion — Premium / Premium Plus only, user-controllable */}
       {sub?.is_active_pro && sub?.plan !== "starter" && prefs.live_orryon_enabled && (
         <OrroyonBuddy

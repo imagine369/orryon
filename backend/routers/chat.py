@@ -140,7 +140,7 @@ async def chat_stream(
                 if event["type"] == "token":
                     full_text += event["content"]
                     yield f"data: {json.dumps(event)}\n\n"
-                elif event["type"] == "tool":
+                elif event["type"] in ("tool", "retry", "confirm_required"):
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "done":
                     final_text = event.get("message", full_text)

@@ -326,6 +326,14 @@ async def run_orryon_stream(
                     invalidate_context_cache(user_id)
                 actions_taken.append({"tool": fn_name, "args": tool_args, "result": result})
 
+                if result.get("needs_confirmation"):
+                    yield {
+                        "type": "confirm_required",
+                        "action": fn_name,
+                        "message": result.get("message", "Confirmation required."),
+                        "args": tool_args,
+                    }
+
                 if result.get("id") and fn_name in _UNDO_TABLE_MAP:
                     last_undo_info = {
                         "table": _UNDO_TABLE_MAP[fn_name],

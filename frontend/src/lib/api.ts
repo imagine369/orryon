@@ -240,11 +240,20 @@ export interface PlanLimitDetail {
 }
 
 export interface ChatEvent {
-  type: "token" | "tool" | "done" | "error" | "session";
+  type:
+    | "token"
+    | "tool"
+    | "done"
+    | "error"
+    | "session"
+    | "retry"
+    | "confirm_required";
   content?: string;
   name?: string;
   label?: string;
   message?: string;
+  action?: string;
+  args?: Record<string, unknown>;
   actions?: unknown[];
   tabs?: string[];
   undo_info?: { table: string; id: string; tool: string; label: string } | null;
