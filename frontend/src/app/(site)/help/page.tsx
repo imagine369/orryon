@@ -51,7 +51,15 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "What is Orryon?",
-        a: "Orryon is your Life OS. It helps you manage money, schedule, goals, notes, habits, and wellbeing \u2014 and answer everyday health and life questions through natural conversation (with clear limits: not a doctor, not for coding). Think of it as one place that handles the managing so you can focus on living.",
+        a: "Orryon is your Life OS \u2014 money, schedule, notes, wellbeing, and everyday life in one place. Chat is Grok-style breadth for daily questions; tools kick in when something must use your stored data (spending, calendar, tasks) or live facts (like weather). Orryon is not a coding IDE or explicit-content site.",
+      },
+      {
+        q: "What can Orryon help with in chat?",
+        a: "Most daily-life questions: planning your day, stress, relationships, errands, travel prep, health education (not a doctor), and quick plain-language tech tips. For your numbers and schedule, ask Orryon to log or look things up \u2014 it will use tools so data stays accurate. It cannot book rides, order food, or read your live bank balance yet; it can remind you, block calendar time, and log what you tell it.",
+      },
+      {
+        q: "Can Orryon help me write code?",
+        a: "Not as a coding assistant. Orryon won\u2019t build apps, debug repositories, or complete homework assignments. Short explanations (\u201cwhat does this error mean?\u201d) are fine when they help your daily life; for real development work, use a dedicated coding tool.",
       },
       {
         q: "How do I talk to Orryon?",
