@@ -74,6 +74,7 @@ _TOOL_LABELS: dict[str, str] = {
     "get_medications": "Loading medications",
     "add_health_appointment": "Scheduling appointment",
     "get_health_appointments": "Loading appointments",
+    "get_weather": "Checking weather",
 }
 
 def get_tool_label(tool_name: str) -> str:

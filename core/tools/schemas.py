@@ -1335,4 +1335,28 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": (
+                "Get live weather for a city or place. Use when the user asks about "
+                "weather today, temperature, rain, or what to wear. Pulls current "
+                "conditions and today's high/low."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": (
+                            "City, neighborhood, or place name, e.g. 'San Francisco' or "
+                            "'Seattle'. If omitted, uses the user's saved Home address "
+                            "when configured."
+                        ),
+                    },
+                },
+            },
+        },
+    },
 ]

@@ -98,6 +98,7 @@ _TOOL_MAP = {
     "get_medications": h._get_medications,
     "add_health_appointment": h._add_health_appointment,
     "get_health_appointments": h._get_health_appointments,
+    "get_weather": h._get_weather,
 }
 
 def _log_destructive_action(

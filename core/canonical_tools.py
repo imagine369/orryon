@@ -42,6 +42,8 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "log_health_vital", "get_health_vitals",
     "log_medication", "get_medications",
     "add_health_appointment", "get_health_appointments",
+    # World / live context
+    "get_weather",
 )
 
 # Legacy names kept in _TOOL_MAP only (old chat tool_calls / aliases) — not sent to Grok.
@@ -83,7 +85,8 @@ _REPROMPT_SECTIONS = (
     "BALANCE/BUDGET: set_balance, add_money, get_balance, set_budget, get_budget_status, "
     "get_spending_summary, get_spending_recap, get_spending_patterns",
     "HEALTH: log_health_vital, get_health_vitals, log_medication, get_medications, "
-    "add_health_appointment, get_health_appointments",
+    "add_health_appointment, get_health_appointments; "
+    "WORLD: get_weather",
 )
 
 
