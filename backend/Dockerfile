@@ -1,9 +1,9 @@
 FROM python:3.12-slim
 
-# Keep application code outside /app so a Railway volume mounted at /app cannot
-# hide config.py, db/, and core/ (a common misconfiguration).
-WORKDIR /srv/orryon
-ENV PYTHONPATH=/srv/orryon
+# Application code lives under /opt/orryon. Persist data only at /data (Railway volume).
+# Never mount orryon-volume at /opt/orryon, /srv/orryon, or /app.
+WORKDIR /opt/orryon
+ENV PYTHONPATH=/opt/orryon
 
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt

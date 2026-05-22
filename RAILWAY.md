@@ -8,7 +8,9 @@
 | `DB_PATH` | `/data/finance.db` |
 | `DATABASE_URL` | **Unset** (delete if present) |
 
-Do **not** mount the volume at `/app` — it hides the application and causes `No module named 'config'`.
+Do **not** mount the volume at `/app`, `/srv/orryon`, or `/opt/orryon` — that hides `config.py` and causes:
+
+`ERROR: .../config.py is missing`
 
 ## Required env vars (backend service)
 

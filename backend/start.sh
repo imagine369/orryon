@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
-cd /srv/orryon
-export PYTHONPATH="${PYTHONPATH:-/srv/orryon}"
+cd /opt/orryon
+export PYTHONPATH="${PYTHONPATH:-/opt/orryon}"
 echo "=== orryon backend starting ==="
 echo "PORT=${PORT:-8000}"
 echo "PYTHONPATH=${PYTHONPATH}"
@@ -9,14 +9,14 @@ echo "Python: $(python --version)"
 
 if [ ! -f "${PYTHONPATH}/config.py" ]; then
   echo "ERROR: ${PYTHONPATH}/config.py is missing."
-  echo "If a Railway volume is mounted at /app or /srv/orryon, remount it at /data only."
+  echo "Your Railway volume is mounted over the app directory."
+  echo "Fix: open orryon-volume -> set Mount Path to /data (NOT /app, /srv/orryon, or /opt/orryon)."
   exit 1
 fi
 
-# SQLite DB lives on the volume (mount orryon-volume at /data).
 mkdir -p /data
 if [ ! -d /data ] || [ ! -w /data ]; then
-  echo "ERROR: /data is not writable — mount orryon-volume at /data (not /app)."
+  echo "ERROR: /data is not writable — mount orryon-volume at /data only."
   exit 1
 fi
 
@@ -45,17 +45,11 @@ if db_url:
     except Exception as exc:
         print('FATAL: DATABASE_URL is set but Postgres is not reachable.')
         print(exc)
-        print('Fix: add Railway Postgres and reference its DATABASE_URL,')
-        print('     OR unset DATABASE_URL and use DB_PATH=/data/finance.db + volume at /data.')
         sys.exit(1)
     finally:
         close_pool()
 else:
     print(f'Database mode: SQLite ({db_path})')
-    parent = os.path.dirname(db_path) or '.'
-    if parent and parent != '.' and not os.path.isdir(parent):
-        print(f'ERROR: database directory {parent!r} does not exist')
-        sys.exit(1)
 "
 
 WORKERS="${WEB_CONCURRENCY:-1}"
