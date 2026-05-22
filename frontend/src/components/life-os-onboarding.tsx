@@ -9,7 +9,7 @@ const STORAGE_KEY = "orryon_life_os_onboarding_v2";
 const STEPS = [
   {
     title: "Ask",
-    body: "Chat works like a broad assistant — writing, planning, how-tos, health education, and almost anything else. No porn, code projects, or image generation.",
+    body: "Chat is broad like ChatGPT — planning, writing, how-tos, and more. Voice: Premium speaks to Live Orryon (text replies); Premium Plus can hear Orryon when you turn that on.",
   },
   {
     title: "Do",

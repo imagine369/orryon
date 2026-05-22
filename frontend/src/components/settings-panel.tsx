@@ -1120,7 +1120,7 @@ export function SettingsPanel() {
         )}
 
         {/* Voice minute usage meter */}
-        {voiceUsage && sub.is_active_pro && (
+        {voiceUsage && (sub.plan === "premium" || sub.plan === "premium_plus") && (
           <div className="px-3 py-3 border-b border-white/5">
             <VoiceUsageMeter usage={voiceUsage} variant="full" />
             {voiceAtLimit && (
@@ -1583,7 +1583,9 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
   onUpdate: ReturnType<typeof usePreferences>["update"];
   sub: ReturnType<typeof useSubscription>["sub"];
 }) {
-  const isPro = sub?.is_active_pro && sub?.plan !== "starter";
+  const plan = sub?.plan;
+  const isPlus = plan === "premium_plus";
+  const isPremiumTier = plan === "premium" || plan === "premium_plus";
 
   return (
     <div className="space-y-4">
@@ -1608,14 +1610,13 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
         </button>
       </div>
 
-      {/* Voice overlay */}
-      {isPro && (
+      {/* TTS — Premium Plus only */}
+      {isPlus && (
         <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
           <div>
             <p className="text-sm text-white/80 font-medium">Speak responses aloud</p>
             <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-              Orryon reads every response out loud. Text is always shown too.
-              Uses voice minutes.
+              Hear Orryon read each reply (Premium Plus). Off = text only. Uses voice minutes.
             </p>
           </div>
           <button
@@ -1631,20 +1632,21 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
         </div>
       )}
 
-      {!isPro && (
+      {!isPlus && sub?.is_active_pro && (
         <p className="text-xs text-white/25 leading-relaxed">
-          Voice responses (TTS) are available on Pro and Premium plans.
+          Pro and Premium use text replies. Premium Plus can turn on spoken replies.
+          Premium can speak to Live Orryon (text replies in chat).
         </p>
       )}
 
-      {/* Live Orryon floating companion */}
-      {(sub?.plan === "premium" || sub?.plan === "premium_plus") && (
+      {/* Live Orryon — Premium speak-in, text replies */}
+      {isPremiumTier && (
         <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
           <div>
             <p className="text-sm text-white/80 font-medium">Live Orryon</p>
             <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-              Show the floating Orryon companion that follows your cursor.
-              Click her to speak with voice. Turn off to use only the chat box.
+              Floating companion — click or press ` to speak. Orryon replies in text
+              {isPlus ? "; turn on Speak responses aloud to hear replies too." : " (Premium Plus hears replies aloud)."}
             </p>
           </div>
           <button

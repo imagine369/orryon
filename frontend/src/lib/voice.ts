@@ -1,7 +1,7 @@
 /**
  * Voice helpers for orryon — xAI Speech-to-Text and Text-to-Speech.
  *
- * Orryon speaks with the eve voice for Pro, Premium, and Premium Plus (minute caps per plan).
+ * STT (speak to Orryon): Premium + Premium Plus. TTS (hear Orryon): Premium Plus only.
  * Breathing / Reset Anchor sessions use synthesized soundscapes (Web Audio API) with no TTS.
  *
  * Keys are never exposed to the browser — injected server-side.

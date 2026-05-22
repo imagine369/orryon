@@ -1,7 +1,7 @@
 /**
  * Orryon voice configuration.
  *
- * Orryon speaks exclusively with xAI `eve` — available on Premium and Premium Plus only.
+ * Orryon chat TTS uses xAI `eve` — Premium Plus only (toggle on). Premium Live Orryon is speak-in, text replies.
  * Breathing / Reset Anchor sessions use Web Audio API soundscapes — no TTS.
  */
 

@@ -35,7 +35,7 @@ def get_system_prompt(
     year = now.year
     current_month = now.strftime("%Y-%m")
     is_golden = mode == "golden"
-    has_voice = voice_enabled and tier in ("premium", "premium_plus")
+    has_voice = voice_enabled and tier == "premium_plus"
 
     personality_block = _golden_personality(user_name) if is_golden else _adult_personality(user_name)
     voice_note = (

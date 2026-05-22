@@ -51,6 +51,17 @@ Morning **briefing**: Dashboard in the app (chat can suggest opening it).
 
 ---
 
+## Voice by plan
+
+| Plan | You speak | Orryon speaks (TTS) |
+|------|-----------|---------------------|
+| Free / Starter | — (Breathe only) | — |
+| Trial / Pro | Text only | Text only |
+| Premium | Live Orryon speak-in | Text only |
+| Premium Plus | Mic + Live Orryon | Yes, when **Speak responses aloud** is on |
+
+---
+
 ## Three limits (vs full ChatGPT/Grok)
 
 | Limit | Not OK | OK |

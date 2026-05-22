@@ -14,10 +14,9 @@ Rate-limited per user (in-memory + Redis-backed bucket) and billed against the
 same monthly spend cap as chat so voice can't be used to sidestep quota.
 
 Voice minute caps (see backend/deps.VOICE_LIMITS_MINUTES):
-    Free/Starter/pre-pay trial : 0 min  (no /api/voice/* access)
-    Pro                         : 300 min / month
-    Premium                     : 650 min / month
-    Premium Plus                : 1,200 min / month
+    Free/Starter/trial/Pro      : no STT/TTS (text chat only; breathe uses orb-tts)
+    Premium                     : 650 min / month STT (Live Orryon speak-in; text replies)
+    Premium Plus                : 1,200 min / month STT + TTS when overlay enabled
 
 Users can purchase 60-minute top-ups ($6) via /api/voice/topup.
 """
@@ -38,7 +37,8 @@ from backend.cache import check_rate_limit_async
 from backend.deps import (
     check_monthly_api_quota,
     get_voice_limit_minutes,
-    require_voice_plan,
+    require_voice_input_plan,
+    require_voice_output_plan,
     resolve_plan_for_user,
 )
 from backend.signing import require_signed_request
@@ -51,7 +51,7 @@ from db import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["voice"], dependencies=[Depends(require_voice_plan)])
+router = APIRouter(tags=["voice"])
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ async def _enforce_voice_quota(uid: str, kind: str) -> None:
 @router.post("/api/voice/stt")
 async def speech_to_text(
     file: UploadFile = File(...),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_voice_input_plan),
     _signed: dict = Depends(require_signed_request),
 ) -> dict:
     """
@@ -226,14 +226,13 @@ async def speech_to_text(
 @router.post("/api/voice/tts")
 async def text_to_speech(
     body: TTSReq,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(require_voice_output_plan),
     _signed: dict = Depends(require_signed_request),
 ) -> Response:
     """
     Synthesize speech from text using xAI TTS using Orryon's voice (eve).
 
-    Only Premium and Premium Plus users can reach this endpoint — all others
-    are blocked at the router level (403). Eve is Orryon's only voice.
+    Premium Plus only — Pro/Premium get text replies. Eve is Orryon's chat voice.
 
     Body: {"text": "hello"}
     Returns: audio/mpeg (MP3 bytes)
@@ -347,9 +346,6 @@ async def orb_text_to_speech(
     Body: {"text": "Breathe in."}
     Returns: audio/mpeg (MP3 bytes)
     """
-    uid = user["user_id"]
-    await _enforce_voice_quota(uid, "tts")
-
     text = body.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Empty text.")

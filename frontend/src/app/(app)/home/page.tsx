@@ -18,6 +18,12 @@ import {
   type PlanLimitDetail,
 } from "@/lib/api";
 import { VoiceLimitError, textToSpeech } from "@/lib/voice";
+import {
+  planAllowsLiveOrryon,
+  planAllowsVoiceInput,
+  planAllowsVoiceOutput,
+  planShowsSpeakResponsesToggle,
+} from "@/lib/voice-plan";
 import { ChatInput, type VoiceStatus, type MessageSource } from "@/components/chat-input";
 import { ChatThread } from "@/components/chat-thread";
 import { VoiceLimitModal } from "@/components/voice-limit-modal";
@@ -131,7 +137,9 @@ export default function HomePage() {
 
   // ── Preferences (voice overlay, golden mode) ────────────────────────────────
   const { prefs, update: updatePrefs } = usePreferences();
-  const voiceOverlayOn = prefs.voice_overlay_enabled && sub?.is_active_pro && sub?.plan !== "starter";
+  const voiceInputOn = planAllowsVoiceInput(sub?.plan);
+  const voiceOverlayOn = planAllowsVoiceOutput(sub?.plan, prefs.voice_overlay_enabled);
+  const showSpeakToggle = planShowsSpeakResponsesToggle(sub?.plan);
 
   // ── Voice ───────────────────────────────────────────────────────────────────
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -551,7 +559,7 @@ export default function HomePage() {
         onCancel={handleCancelDelete}
       />
       {/* ── Live Orryon floating companion — Premium / Premium Plus only, user-controllable */}
-      {sub?.is_active_pro && sub?.plan !== "starter" && prefs.live_orryon_enabled && (
+      {planAllowsLiveOrryon(sub?.plan) && prefs.live_orryon_enabled && (
         <OrroyonBuddy
           onActivate={() => {
             setVoiceStatus("listening");
@@ -705,11 +713,11 @@ export default function HomePage() {
           {/* Top action bar — aligned with chat container */}
           <div className={`${CONTAINER} flex shrink-0 items-center justify-end py-3`}>
             {/* Voice overlay toggle in empty state too */}
-            {sub?.is_active_pro && sub?.plan !== "starter" && (
+            {showSpeakToggle && (
               <button
                 onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
               className={`flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
-                  title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
+                  title={voiceOverlayOn ? "Orryon speaks replies" : "Text replies only"}
               >
                 {voiceOverlayOn
                   ? <Volume2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -844,6 +852,7 @@ export default function HomePage() {
                 <ChatInput
                   onSend={handleSend}
                   disabled={streaming}
+                  enableMic={voiceInputOn && sub?.plan === "premium_plus"}
                   externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={handleVoiceError}
@@ -895,12 +904,12 @@ export default function HomePage() {
               )}
 
               <div className="flex items-center gap-1">
-              {/* Voice overlay toggle — Pro/Premium only */}
-              {sub?.is_active_pro && sub?.plan !== "starter" && (
+              {/* Speak responses — Premium Plus only */}
+              {showSpeakToggle && (
                 <button
                   onClick={() => updatePrefs({ voice_overlay_enabled: !prefs.voice_overlay_enabled })}
                   className={`flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-white/[0.08] ${voiceOverlayOn ? "text-white/70" : "text-white/25"}`}
-                  title={voiceOverlayOn ? "Voice responses on" : "Voice responses off"}
+                  title={voiceOverlayOn ? "Orryon speaks replies" : "Text replies only"}
                 >
                   {voiceOverlayOn
                     ? <Volume2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -962,6 +971,7 @@ export default function HomePage() {
               <ChatInput
                 onSend={handleSend}
                 disabled={streaming}
+                enableMic={voiceInputOn && sub?.plan === "premium_plus"}
                 externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={handleVoiceError}

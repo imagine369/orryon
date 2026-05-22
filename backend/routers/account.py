@@ -1045,6 +1045,12 @@ async def create_voice_topup_checkout(
     if not row:
         raise HTTPException(404, "User not found")
     row = dict(row)
+    plan_info = resolve_plan(row)
+    if plan_info["plan"] != "premium_plus":
+        raise HTTPException(
+            403,
+            "Voice minute top-ups are for Premium Plus. Premium includes speak-in via Live Orryon; spoken replies require Premium Plus.",
+        )
 
     frontend_url = os.getenv("FRONTEND_URL", os.getenv("APP_URL", "http://localhost:3000"))
     success_url = _validate_stripe_return_url(

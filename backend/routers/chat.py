@@ -157,8 +157,10 @@ async def chat_stream(
                             usage.get("prompt_tokens", 0),
                             usage.get("completion_tokens", 0),
                         )
-                    # Attach voice_overlay flag so the frontend knows to trigger TTS
-                    event["voice_overlay"] = ctx["voice_overlay"]
+                    # TTS only for Premium Plus with speak-responses preference on
+                    event["voice_overlay"] = (
+                        ctx["plan"] == "premium_plus" and ctx["voice_overlay"]
+                    )
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "error":
                     yield f"data: {json.dumps(event)}\n\n"
@@ -298,7 +300,9 @@ async def chat_ws(ws: WebSocket):
                         usage = event.get("usage") or {}
                         if usage.get("prompt_tokens") or usage.get("completion_tokens"):
                             record_token_spend(uid, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
-                        event["voice_overlay"] = ctx["voice_overlay"]
+                        event["voice_overlay"] = (
+                            ctx["plan"] == "premium_plus" and ctx["voice_overlay"]
+                        )
                     await ws.send_json(event)
             except Exception as exc:
                 logger.error("WS chat error: %s", exc, exc_info=True)

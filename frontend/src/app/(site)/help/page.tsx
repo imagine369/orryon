@@ -230,8 +230,8 @@ const FAQ: FAQCategory[] = [
     icon: <Mic className="h-5 w-5" strokeWidth={1.5} />,
     items: [
       {
-        q: "Can I use voice input?",
-        a: "Yes. Tap the microphone icon in the chat bar to speak your message. Orryon will transcribe it and respond. Voice input works in most modern browsers.",
+        q: "Can I speak to Orryon or hear Orryon speak?",
+        a: "Pro and in-app trial: text chat only (type messages; Orryon replies in text). Premium: speak to Live Orryon (floating companion); replies stay in text. Premium Plus: chat mic + optional Speak responses aloud (hear Orryon). Free/Starter: Breathe only — no Life OS chat voice.",
       },
       {
         q: "How accurate is the AI?",

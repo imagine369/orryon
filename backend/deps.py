@@ -180,14 +180,15 @@ def check_monthly_api_quota(user_id: str, plan: str) -> None:
 
 
 # ── Voice minute caps by plan ─────────────────────────────────────────────────
-# Aligned with frontend pricing copy. Plans with 0 cannot call /api/voice/*.
+# STT (speak to Orryon): Premium + Premium Plus. TTS (Orryon speaks): Premium Plus only.
+# Pro / trial / free / starter: text chat only — no /api/voice/stt or /api/voice/tts.
 VOICE_LIMITS_MINUTES: dict[str, int] = {
     "free":          0,
     "starter":       0,
-    "trial":         0,   # pre-checkout app trial — text-only until Pro+ checkout
-    "pro":           300,
-    "premium":       650,
-    "premium_plus":  1200,
+    "trial":         0,
+    "pro":           0,
+    "premium":       650,   # Live Orryon speak-in (STT); replies stay text
+    "premium_plus":  1200,  # STT + optional TTS when voice_overlay_enabled
 }
 
 # On-demand top-up pricing
@@ -285,16 +286,45 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
-async def require_voice_plan(user: dict = Depends(get_current_user)) -> dict:
-    """Require a plan that includes monthly voice (STT/TTS) minutes."""
+def plan_allows_voice_input(plan: str) -> bool:
+    """STT / mic — Premium (Live Orryon) and Premium Plus (Live Orryon + chat mic)."""
+    return plan in ("premium", "premium_plus")
+
+
+def plan_allows_voice_output(plan: str) -> bool:
+    """TTS — Premium Plus only."""
+    return plan == "premium_plus"
+
+
+async def require_voice_input_plan(user: dict = Depends(get_current_user)) -> dict:
+    """Require Premium or Premium Plus for speech-to-text (speak to Orryon)."""
     info = resolve_plan_for_user(user["user_id"])
     plan = info["plan"]
-    if get_voice_limit_minutes(plan) <= 0:
+    if not plan_allows_voice_input(plan):
         raise HTTPException(
             403,
-            "Voice isn’t included on your current plan. Pro, Premium, and Premium Plus include monthly voice minutes — open Pricing to upgrade.",
+            "Speaking to Orryon is available on Premium and Premium Plus. "
+            "Pro uses text chat only — upgrade to Premium to use Live Orryon voice input.",
         )
     return user
+
+
+async def require_voice_output_plan(user: dict = Depends(get_current_user)) -> dict:
+    """Require Premium Plus for Orryon spoken replies (TTS)."""
+    info = resolve_plan_for_user(user["user_id"])
+    plan = info["plan"]
+    if not plan_allows_voice_output(plan):
+        raise HTTPException(
+            403,
+            "Hearing Orryon speak is a Premium Plus feature. "
+            "Premium and Pro get text replies; upgrade to Premium Plus and turn on Speak responses aloud.",
+        )
+    return user
+
+
+async def require_voice_plan(user: dict = Depends(get_current_user)) -> dict:
+    """Legacy alias — voice input (STT). Prefer require_voice_input_plan / require_voice_output_plan."""
+    return await require_voice_input_plan(user)
 
 
 # ── Chat message quota ────────────────────────────────────────────────────────
