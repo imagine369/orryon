@@ -26,8 +26,24 @@ export function useSubscription() {
   const [fetchError, setFetchError] = useState(false);
 
   const refresh = useCallback(() => {
-    api.get<Subscription>("/api/subscription")
-      .then((s) => { setSub(s); setFetchError(false); })
+    api
+      .get<Subscription>("/api/subscription")
+      .then((s) => {
+        setSub(s);
+        setFetchError(false);
+        // Belt-and-suspenders if GET reconcile did not run (older API deploy).
+        if (
+          (s.plan === "free" || s.plan === "trial") &&
+          !s.has_stripe_subscription
+        ) {
+          return api
+            .post<Subscription>("/api/subscription/sync")
+            .then((synced) => {
+              setSub(synced);
+            })
+            .catch(() => {});
+        }
+      })
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   }, []);

@@ -294,9 +294,10 @@ export function SettingsPanel() {
 
   // If Stripe charged but webhook missed, reconcile when opening Subscription settings.
   useEffect(() => {
-    if (view !== "subscription" || !sub || sub.plan !== "trial") return;
+    if (view !== "subscription" || !sub || sub.has_stripe_subscription) return;
+    if (sub.plan !== "trial" && sub.plan !== "free") return;
     api.post("/api/subscription/sync").then(() => refreshSub()).catch(() => {});
-  }, [view, sub?.plan, refreshSub]);
+  }, [view, sub?.plan, sub?.has_stripe_subscription, refreshSub]);
 
   // display name editing
   const [editingName, setEditingName] = useState(false);

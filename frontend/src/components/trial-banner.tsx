@@ -13,7 +13,15 @@ interface Props {
 export function TrialBanner({ sub }: Props) {
   const [dismissed, setDismissed] = useState(false);
 
-  if (sub.plan === "pro" || dismissed) return null;
+  if (
+    sub.has_stripe_subscription ||
+    sub.plan === "pro" ||
+    sub.plan === "premium" ||
+    sub.plan === "premium_plus" ||
+    dismissed
+  ) {
+    return null;
+  }
 
   const isExpired = sub.plan === "free" || sub.plan === "past_due";
   const daysLeft  = sub.trial_days_remaining;

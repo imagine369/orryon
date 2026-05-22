@@ -523,6 +523,60 @@ def _subscription_payload(user_row: dict) -> dict:
     return payload
 
 
+def _resolve_stripe_customer_id(stripe_lib: Any, user_row: dict) -> tuple[str, dict]:
+    """
+    Return Stripe customer id for this user, linking by stored id, email, or metadata.
+    Checkout can create a Stripe customer before our DB row is updated if the webhook fails.
+    """
+    row = dict(user_row)
+    uid = row["id"]
+    cid = (row.get("stripe_customer_id") or "").strip()
+
+    if cid:
+        try:
+            cust = stripe_lib.Customer.retrieve(cid)
+            if cust and not getattr(cust, "deleted", False):
+                return cid, row
+        except Exception:
+            logger.info("Stored Stripe customer %s invalid for user %s — re-resolving", cid, uid)
+
+    email = (row.get("email") or "").strip().lower()
+    if email:
+        try:
+            existing = stripe_lib.Customer.list(email=email, limit=5)
+            for c in existing.data or []:
+                found = c.id
+                with get_connection() as conn:
+                    conn.execute(
+                        "UPDATE users SET stripe_customer_id=? WHERE id=?",
+                        (found, uid),
+                    )
+                    conn.commit()
+                row["stripe_customer_id"] = found
+                logger.info("Linked Stripe customer %s to user %s by email", found, uid)
+                return found, row
+        except Exception as e:
+            logger.warning("Stripe customer list by email failed for %s: %s", uid, e)
+
+    try:
+        result = stripe_lib.Customer.search(query=f"metadata['user_id']:'{uid}'", limit=1)
+        if result.data:
+            found = result.data[0].id
+            with get_connection() as conn:
+                conn.execute(
+                    "UPDATE users SET stripe_customer_id=? WHERE id=?",
+                    (found, uid),
+                )
+                conn.commit()
+            row["stripe_customer_id"] = found
+            logger.info("Linked Stripe customer %s to user %s by metadata", found, uid)
+            return found, row
+    except Exception as e:
+        logger.warning("Stripe customer search failed for user %s: %s", uid, e)
+
+    return "", row
+
+
 def _plan_from_stripe_subscription(sub_obj: dict) -> tuple[str, str]:
     from config import PRICE_ID_TO_PLAN
 
@@ -542,8 +596,9 @@ def _plan_from_stripe_subscription(sub_obj: dict) -> tuple[str, str]:
 
 def _sync_user_plan_from_stripe(stripe_lib: Any, user_row: dict) -> dict:
     """Pull active/trialing subscription from Stripe and persist plan + sub id (webhook fallback)."""
-    customer_id = (user_row.get("stripe_customer_id") or "").strip()
+    customer_id, user_row = _resolve_stripe_customer_id(stripe_lib, user_row)
     if not customer_id:
+        logger.info("subscription sync: no Stripe customer for user %s", user_row.get("id"))
         return _subscription_payload(user_row)
 
     try:
@@ -590,7 +645,23 @@ async def get_subscription(user: dict = Depends(get_current_user)):
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
-    return _subscription_payload(dict(row))
+    row = dict(row)
+    resolved = resolve_plan(row)
+    needs_reconcile = resolved["plan"] in ("free", "trial") and not (
+        row.get("stripe_subscription_id") or ""
+    ).strip()
+    if needs_reconcile:
+        from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+
+        if STRIPE_ENABLED:
+            try:
+                import stripe as stripe_lib
+
+                stripe_lib.api_key = STRIPE_SECRET_KEY
+                return _sync_user_plan_from_stripe(stripe_lib, row)
+            except Exception as e:
+                logger.warning("subscription reconcile on GET failed for %s: %s", row.get("id"), e)
+    return _subscription_payload(row)
 
 
 @router.post("/api/subscription/sync")
