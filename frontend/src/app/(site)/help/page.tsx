@@ -231,7 +231,7 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "Can I speak to Orryon or hear Orryon speak?",
-        a: "Pro and in-app trial: text chat only (type messages; Orryon replies in text). Premium: speak to Live Orryon (floating companion); replies stay in text. Premium Plus: chat mic + optional Speak responses aloud (hear Orryon). Free/Starter: Breathe only — no Life OS chat voice.",
+        a: "Trial, Pro, Premium, and Premium Plus: type or tap the mic to speak in; Orryon replies in text. Trial includes 45 speak-in minutes to try voice. Premium adds Live Orryon (floating companion). Premium Plus can turn on Speak responses aloud to hear replies. Free/Starter: Breathe only.",
       },
       {
         q: "How accurate is the AI?",

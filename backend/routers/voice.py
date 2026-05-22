@@ -14,9 +14,10 @@ Rate-limited per user (in-memory + Redis-backed bucket) and billed against the
 same monthly spend cap as chat so voice can't be used to sidestep quota.
 
 Voice minute caps (see backend/deps.VOICE_LIMITS_MINUTES):
-    Free/Starter/trial/Pro      : no STT/TTS (text chat only; breathe uses orb-tts)
-    Premium                     : 650 min / month STT (Live Orryon speak-in; text replies)
-    Premium Plus                : 1,200 min / month STT + TTS when overlay enabled
+    Free/Starter                : no STT/TTS (Breathe only; orb-tts for wellness)
+    Trial                       : 45 min speak-in; text replies; no TTS
+    Pro / Premium               : speak-in pool; text replies only
+    Premium Plus                : larger pool + TTS when voice_overlay enabled
 
 Users can purchase 60-minute top-ups ($6) via /api/voice/topup.
 """

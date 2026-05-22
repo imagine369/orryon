@@ -41,7 +41,7 @@ import {
   DeleteConfirmModal,
   type PendingDestructiveAction,
 } from "@/components/delete-confirm-modal";
-import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY } from "@/lib/life-os-copy";
+import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY, TRIAL_VOICE_HINT } from "@/lib/life-os-copy";
 import {
   POST_CHECKOUT_SESSION_KEY,
   readCheckoutIntent,
@@ -849,10 +849,15 @@ export default function HomePage() {
                 {voiceError && (
                   <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
                 )}
+                {sub?.plan === "trial" && (
+                  <p className="mb-2 text-center text-[11px] leading-snug text-white/40 px-2">
+                    {TRIAL_VOICE_HINT}
+                  </p>
+                )}
                 <ChatInput
                   onSend={handleSend}
                   disabled={streaming}
-                  enableMic={voiceInputOn && sub?.plan === "premium_plus"}
+                  enableMic={voiceInputOn}
                   externalStatus={voiceStatus}
                   onVoiceStatusChange={setVoiceStatus}
                   onVoiceError={handleVoiceError}
@@ -968,10 +973,15 @@ export default function HomePage() {
               {voiceError && (
                 <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
               )}
+              {sub?.plan === "trial" && (
+                <p className="mb-2 text-center text-[11px] leading-snug text-white/40 px-2">
+                  {TRIAL_VOICE_HINT}
+                </p>
+              )}
               <ChatInput
                 onSend={handleSend}
                 disabled={streaming}
-                enableMic={voiceInputOn && sub?.plan === "premium_plus"}
+                enableMic={voiceInputOn}
                 externalStatus={voiceStatus}
                 onVoiceStatusChange={setVoiceStatus}
                 onVoiceError={handleVoiceError}

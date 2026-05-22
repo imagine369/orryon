@@ -53,12 +53,13 @@ Morning **briefing**: Dashboard in the app (chat can suggest opening it).
 
 ## Voice by plan
 
-| Plan | You speak | Orryon speaks (TTS) |
-|------|-----------|---------------------|
+| Plan | You speak (STT) | Orryon replies |
+|------|-----------------|----------------|
 | Free / Starter | — (Breathe only) | — |
-| Trial / Pro | Text only | Text only |
-| Premium | Live Orryon speak-in | Text only |
-| Premium Plus | Mic + Live Orryon | Yes, when **Speak responses aloud** is on |
+| **Trial** | Mic (45 min / trial) | **Text only** |
+| **Pro** | Mic (300 min / mo) | **Text only** |
+| **Premium** | Mic + Live Orryon (650 min / mo) | **Text only** |
+| **Premium Plus** | Mic + Live Orryon (1,200 min / mo) | **Text**; **TTS** when **Speak responses aloud** is on |
 
 ---
 

@@ -10,6 +10,10 @@ export const LIFE_OS_SHORT =
 export const LIFE_OS_CHAT_EMPTY =
   "Ask almost anything — spending, calendar, writing, how-tos, or just thinking out loud.";
 
+/** Active in-app trial — speak-in hint (45 min cap; text replies) */
+export const TRIAL_VOICE_HINT =
+  "Trial: tap the mic to speak in (45 min included). Orryon replies in text — Premium Plus adds spoken replies.";
+
 export const HEALTH_DISCLAIMER_SHORT =
   "Health answers are informational only — not medical advice. Consult a healthcare professional for medical decisions.";
 

@@ -1,7 +1,7 @@
 /**
  * Orryon voice configuration.
  *
- * Orryon chat TTS uses xAI `eve` — Premium Plus only (toggle on). Premium Live Orryon is speak-in, text replies.
+ * Chat TTS (eve): Premium Plus + toggle. Speak-in: trial (45 min), Pro/Premium/Plus; text replies unless Plus TTS on.
  * Breathing / Reset Anchor sessions use Web Audio API soundscapes — no TTS.
  */
 
