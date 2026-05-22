@@ -97,12 +97,14 @@ _startup_error: str | None = None
 async def _run_startup() -> None:
     """Heavy init runs in the background so /api/health can answer during Railway healthchecks."""
     global _startup_ready, _startup_error
-    from db import init_pool, close_pool, init_db
+    from db import init_pool, init_db
     from backend.cache import init_redis
     from core.scheduler import start_scheduler
-    from backend.signing import get_signing_mode
+    from backend.signing import get_signing_mode, validate_signing_config
 
     try:
+        validate_signing_config()
+
         try:
             init_pool()
         except Exception as exc:
@@ -141,15 +143,16 @@ async def _run_startup() -> None:
         _startup_error = None
     except Exception as exc:
         _startup_error = str(exc)
-        logger.exception("Background startup failed: %s", exc)
-        raise
+        logger.critical(
+            "Background startup failed (fix Railway env vars — see RAILWAY.md): %s", exc
+        )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Fail fast on bad production config, then yield immediately so health probes
-    succeed while DB/Redis/scheduler init finish in the background.
+    Yield immediately so Railway healthchecks get HTTP 200 while DB/Redis/scheduler
+    init and production config validation run in the background.
 
     Shutdown:
       1. Close httpx client
@@ -161,9 +164,7 @@ async def lifespan(app: FastAPI):
     from backend.cache import close_redis
     from core.grok_agent import close_http_client
     from core.scheduler import stop_scheduler
-    from backend.signing import validate_signing_config
 
-    validate_signing_config()
     logger.info("orryon backend listening — finishing startup in background")
 
     startup_task = asyncio.create_task(_run_startup())
@@ -259,11 +260,22 @@ app.include_router(waitlist.router)
 async def health():
     """Liveness probe for Railway / Render / Docker health checks.
 
-    Returns 200 while the process is up (even during background DB init) so
-    deploy healthchecks do not time out. Readiness is implied once status is ok.
+    Always returns HTTP 200 so deploy healthchecks pass while startup finishes.
+    Use /api/ready for readiness (DB + config validation complete).
     """
+    return {"status": "ok"}
+
+
+@app.get("/api/ready", tags=["health"], include_in_schema=False)
+async def ready():
+    """Readiness probe — 503 until background startup completes without error."""
+    from fastapi.responses import JSONResponse
+
     if _startup_error:
-        return {"status": "error"}
+        return JSONResponse(
+            {"status": "error", "detail": _startup_error},
+            status_code=503,
+        )
     if not _startup_ready:
-        return {"status": "starting"}
+        return JSONResponse({"status": "starting"}, status_code=503)
     return {"status": "ok"}

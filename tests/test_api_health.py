@@ -13,12 +13,19 @@ from backend.main import app
 async def test_api_health_ok():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        body = None
+        res = await client.get("/api/health")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_api_ready_after_startup():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         for _ in range(100):
-            res = await client.get("/api/health")
-            assert res.status_code == 200
-            body = res.json()
-            if body.get("status") == "ok":
-                break
+            res = await client.get("/api/ready")
+            if res.status_code == 200:
+                assert res.json() == {"status": "ok"}
+                return
             await asyncio.sleep(0.05)
-    assert body == {"status": "ok"}
+    pytest.fail("background startup did not become ready in time")

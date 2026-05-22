@@ -2,14 +2,14 @@
 
 ## Deploy failed: `config.py is missing`
 
-Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of `/opt/orryon`, which hides the Docker image (including `config.py`).
+Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top of `/app` or `/opt/orryon`, which hides the Docker image (including `config.py`).
 
 **Fix (2 minutes):**
 
 1. Railway → **orryon** backend service (not frontend)
 2. **Settings** → **Volumes** (or **Storage** → `orryon-volume`)
-3. Set **Mount Path** to: `/data`  
-   Remove any mount at `/opt/orryon`, `/srv/orryon`, or `/app`
+3. Set **Mount Path** to: `/data` **only**  
+   Remove any mount at `/app`, `/opt/orryon`, or `/srv/orryon`
 4. **Variables** → `DB_PATH` = `/data/finance.db`
 5. **Redeploy** (Deployments → Redeploy, or push an empty commit)
 
@@ -29,7 +29,12 @@ Build/deploy succeeded but **Network → Healthcheck** failed. The container nev
 | `REQUEST_SIGNING_MODE must be 'enforce'` | Set `REQUEST_SIGNING_MODE=enforce` |
 | `Postgres pool failed` / `DATABASE_URL` | **Unset `DATABASE_URL`** if using SQLite; set `DB_PATH=/data/finance.db` |
 | `config.py is missing` | Volume mount must be `/data` only (see above) |
+| `Background startup failed` | Usually `JWT_SECRET` or `REQUEST_SIGNING_MODE=enforce` — fix vars, then `curl …/api/ready` |
 | `IMPORT ERROR` | Open the traceback — missing env or bad package |
+
+**Healthcheck hostname:** Railway probes with `Host: healthcheck.railway.app`. Orryon does not block that host; if you add host filtering elsewhere, allow it.
+
+**Liveness vs readiness:** `/api/health` always returns `200` once uvicorn is up. `/api/ready` returns `503` until DB + config validation finish — use this to verify the app is actually usable after deploy.
 
 **Required for SQLite on Railway:**
 

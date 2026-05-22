@@ -1,9 +1,10 @@
 FROM python:3.12-slim
 
-# Application code lives under /opt/orryon. Persist data only at /data (Railway volume).
-# Never mount orryon-volume at /opt/orryon, /srv/orryon, or /app.
-WORKDIR /opt/orryon
-ENV PYTHONPATH=/opt/orryon
+# Application code lives under /app. Persist data only at /data (Railway volume).
+# Never mount orryon-volume at /app, /opt/orryon, or /srv/orryon.
+WORKDIR /app
+ENV PYTHONPATH=/app
+ENV APP_ROOT=/app
 
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
