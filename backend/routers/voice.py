@@ -69,12 +69,14 @@ _DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
 
 _STT_MAX_BYTES = 25 * 1024 * 1024
 _TTS_MAX_CHARS = 4000
+_ORB_TTS_MAX_CHARS = 240  # short breathing cues only
 
 _STT_ALLOWED_MIME_PREFIXES = ("audio/", "video/webm", "video/mp4")
 
 # MP3 at 128 kbps ≈ 16 000 bytes/second — used to estimate audio duration from
 # raw byte count for both TTS output and STT input.
 _BYTES_PER_SECOND_ESTIMATE = 16_000
+_MAX_STT_SECONDS_PER_REQUEST = 300  # 5 min — aligns with chat mic auto-stop
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ class TTSReq(BaseModel):
 
 
 class OrbTTSReq(BaseModel):
-    text: str = Field(min_length=1, max_length=_TTS_MAX_CHARS)
+    text: str = Field(min_length=1, max_length=_ORB_TTS_MAX_CHARS)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -153,6 +155,15 @@ async def _enforce_voice_quota(uid: str, kind: str) -> None:
         )
 
 
+async def _enforce_orb_quota(uid: str) -> None:
+    """Rate-limit breathe orb TTS — does not consume chat voice-minute pools."""
+    if not await check_rate_limit_async(f"voice:orb:user:{uid}", limit=30, window_seconds=60):
+        raise HTTPException(status_code=429, detail="Too many breathe audio requests — please wait.")
+    if not await check_rate_limit_async("voice:orb:global", limit=800, window_seconds=3600):
+        logger.warning("Global orb TTS rate limit hit (user=%s).", uid)
+        raise HTTPException(status_code=429, detail="Breathe audio is temporarily busy — try again soon.")
+
+
 # ── STT ───────────────────────────────────────────────────────────────────────
 
 @router.post("/api/voice/stt")
@@ -182,6 +193,11 @@ async def speech_to_text(
         raise HTTPException(status_code=400, detail="Empty audio upload.")
 
     audio_seconds = _estimate_audio_seconds(len(contents))
+    if audio_seconds > _MAX_STT_SECONDS_PER_REQUEST:
+        raise HTTPException(
+            status_code=413,
+            detail="Audio clip is too long. Record a shorter message (about 5 minutes max).",
+        )
 
     data = {"language": _DEFAULT_LANGUAGE, "format": "true"}
     files = {"file": (file.filename or "audio.webm", contents, mime)}
@@ -347,6 +363,9 @@ async def orb_text_to_speech(
     Body: {"text": "Breathe in."}
     Returns: audio/mpeg (MP3 bytes)
     """
+    uid = user["user_id"]
+    await _enforce_orb_quota(uid)
+
     text = body.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Empty text.")

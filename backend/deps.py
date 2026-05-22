@@ -182,6 +182,8 @@ def check_monthly_api_quota(user_id: str, plan: str) -> None:
 # ── Voice minute caps by plan (STT speak-in; TTS only on Premium Plus) ───────
 # Free/starter: no voice API. Trial: capped speak-in, text replies, no TTS.
 # Pro/Premium/Premium Plus: speak-in + text replies; Plus adds optional TTS.
+# All paid voice usage also hits check_monthly_api_quota (27% of plan price).
+# Chat abuse: CHAT_LIMITS + per-minute rate limits + require_signed_request on /api/chat.
 VOICE_LIMITS_MINUTES: dict[str, int] = {
     "free":          0,
     "starter":       0,
