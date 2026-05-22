@@ -32,10 +32,7 @@ export function useSubscription() {
         setSub(s);
         setFetchError(false);
         // Belt-and-suspenders if GET reconcile did not run (older API deploy).
-        if (
-          (s.plan === "free" || s.plan === "trial") &&
-          !s.has_stripe_subscription
-        ) {
+        if (s.plan === "free" || s.plan === "trial") {
           return api
             .post<Subscription>("/api/subscription/sync")
             .then((synced) => {

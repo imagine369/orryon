@@ -24,7 +24,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const { openPanel } = usePanels();
   const isPanelOpen = openPanel !== null;
-  const { sub, fetchError: subFetchError } = useSubscription();
+  const { sub, fetchError: subFetchError, refresh: refreshSub } = useSubscription();
 
   // Don't redirect on the Stripe success landing — the webhook may not have
   // fired yet, so plan/segment can still reflect the old free state for a
@@ -85,7 +85,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         style={{ transformOrigin: "center center", willChange: "transform" }}
       >
         <NavBar />
-        {sub && <TrialBanner sub={sub} />}
+        {sub && <TrialBanner sub={sub} onSubscriptionUpdated={refreshSub} />}
         <main className="flex-1 min-h-0">{children}</main>
       </motion.div>
 

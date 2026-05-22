@@ -523,120 +523,224 @@ def _subscription_payload(user_row: dict) -> dict:
     return payload
 
 
+def _stripe_val(obj: Any, key: str, default: Any = None) -> Any:
+    """Read a field from a Stripe SDK object or plain dict."""
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def _all_stripe_customer_ids(stripe_lib: Any, user_row: dict) -> tuple[list[str], dict]:
+    """Collect every Stripe customer id that might belong to this user (stored id + email matches)."""
+    row = dict(user_row)
+    uid = row["id"]
+    seen: set[str] = set()
+    ordered: list[str] = []
+
+    def add(cid: str | None) -> None:
+        if cid and cid not in seen:
+            seen.add(cid)
+            ordered.append(cid)
+
+    stored = (row.get("stripe_customer_id") or "").strip()
+    if stored:
+        try:
+            cust = stripe_lib.Customer.retrieve(stored)
+            if cust and not _stripe_val(cust, "deleted", False):
+                add(stored)
+        except Exception:
+            pass
+
+    email = (row.get("email") or "").strip().lower()
+    if email:
+        try:
+            for c in stripe_lib.Customer.list(email=email, limit=10).data or []:
+                add(_stripe_val(c, "id"))
+        except Exception as e:
+            logger.warning("Stripe customer list by email failed for %s: %s", uid, e)
+
+    try:
+        for c in stripe_lib.Customer.search(query=f"metadata['user_id']:'{uid}'", limit=5).data or []:
+            add(_stripe_val(c, "id"))
+    except Exception as e:
+        logger.warning("Stripe customer search failed for user %s: %s", uid, e)
+
+    if ordered:
+        row["stripe_customer_id"] = ordered[0]
+    return ordered, row
+
+
 def _resolve_stripe_customer_id(stripe_lib: Any, user_row: dict) -> tuple[str, dict]:
     """
     Return Stripe customer id for this user, linking by stored id, email, or metadata.
     Checkout can create a Stripe customer before our DB row is updated if the webhook fails.
     """
-    row = dict(user_row)
-    uid = row["id"]
-    cid = (row.get("stripe_customer_id") or "").strip()
-
-    if cid:
-        try:
-            cust = stripe_lib.Customer.retrieve(cid)
-            if cust and not getattr(cust, "deleted", False):
-                return cid, row
-        except Exception:
-            logger.info("Stored Stripe customer %s invalid for user %s — re-resolving", cid, uid)
-
-    email = (row.get("email") or "").strip().lower()
-    if email:
-        try:
-            existing = stripe_lib.Customer.list(email=email, limit=5)
-            for c in existing.data or []:
-                found = c.id
-                with get_connection() as conn:
-                    conn.execute(
-                        "UPDATE users SET stripe_customer_id=? WHERE id=?",
-                        (found, uid),
-                    )
-                    conn.commit()
-                row["stripe_customer_id"] = found
-                logger.info("Linked Stripe customer %s to user %s by email", found, uid)
-                return found, row
-        except Exception as e:
-            logger.warning("Stripe customer list by email failed for %s: %s", uid, e)
-
-    try:
-        result = stripe_lib.Customer.search(query=f"metadata['user_id']:'{uid}'", limit=1)
-        if result.data:
-            found = result.data[0].id
-            with get_connection() as conn:
-                conn.execute(
-                    "UPDATE users SET stripe_customer_id=? WHERE id=?",
-                    (found, uid),
-                )
-                conn.commit()
-            row["stripe_customer_id"] = found
-            logger.info("Linked Stripe customer %s to user %s by metadata", found, uid)
-            return found, row
-    except Exception as e:
-        logger.warning("Stripe customer search failed for user %s: %s", uid, e)
-
-    return "", row
+    ids, row = _all_stripe_customer_ids(stripe_lib, user_row)
+    return (ids[0] if ids else ""), row
 
 
-def _plan_from_stripe_subscription(sub_obj: dict) -> tuple[str, str]:
+_PLAN_RANK = {"premium_plus": 3, "premium": 2, "pro": 1}
+
+
+def _plan_from_stripe_price(price_obj: Any, price_id: str) -> str:
+    """Map Stripe price to plan; infer from amount when env price ids are missing."""
     from config import PRICE_ID_TO_PLAN
 
-    items = sub_obj.get("items", {}).get("data", [])
-    price_id = ""
-    if items:
-        p = items[0].get("price") or {}
-        price_id = p if isinstance(p, str) else (p.get("id") or "").strip()
-    new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
-    if price_id and price_id not in PRICE_ID_TO_PLAN:
+    if price_id and price_id in PRICE_ID_TO_PLAN:
+        return PRICE_ID_TO_PLAN[price_id]
+
+    unit_amount = _stripe_val(price_obj, "unit_amount")
+    if unit_amount is None:
+        recurring = _stripe_val(price_obj, "recurring") or {}
+        unit_amount = _stripe_val(recurring, "unit_amount")
+    try:
+        cents = int(unit_amount) if unit_amount is not None else 0
+    except (TypeError, ValueError):
+        cents = 0
+
+    if cents >= 4500:
+        return "premium_plus"
+    if cents >= 2800:
+        return "premium"
+    if cents >= 1500:
+        return "pro"
+
+    if price_id:
         logger.warning(
-            "Stripe subscription price_id=%r not in PRICE_ID_TO_PLAN — stored as pro",
+            "Unknown Stripe price_id=%r (unit_amount=%s) — defaulting to premium for paid checkout",
             price_id,
+            unit_amount,
         )
+        return "premium"
+    return "pro"
+
+
+def _plan_from_stripe_subscription(sub_obj: Any) -> tuple[str, str]:
+    items = _stripe_val(_stripe_val(sub_obj, "items"), "data") or []
+    price_id = ""
+    price_obj: Any = None
+    if items:
+        price_obj = _stripe_val(items[0], "price")
+        if isinstance(price_obj, str):
+            price_id = price_obj
+        else:
+            price_id = (_stripe_val(price_obj, "id") or "").strip()
+    new_plan = _plan_from_stripe_price(price_obj, price_id)
     return new_plan, price_id
 
 
-def _sync_user_plan_from_stripe(stripe_lib: Any, user_row: dict) -> dict:
-    """Pull active/trialing subscription from Stripe and persist plan + sub id (webhook fallback)."""
-    customer_id, user_row = _resolve_stripe_customer_id(stripe_lib, user_row)
-    if not customer_id:
-        logger.info("subscription sync: no Stripe customer for user %s", user_row.get("id"))
-        return _subscription_payload(user_row)
+def _pick_best_subscription(stripe_lib: Any, sub_obj: Any) -> tuple[str, str, str] | None:
+    """Return (sub_id, plan, price_id) for a subscription object."""
+    status = _stripe_val(sub_obj, "status")
+    if status not in ("active", "trialing", "past_due"):
+        return None
+    sub_id = _stripe_val(sub_obj, "id") or ""
+    plan, price_id = _plan_from_stripe_subscription(sub_obj)
+    if not sub_id:
+        return None
+    return sub_id, plan, price_id
 
-    try:
-        subs = stripe_lib.Subscription.list(customer=customer_id, status="all", limit=10)
-    except Exception as e:
-        logger.warning("subscription sync: list failed for user=%s: %s", user_row.get("id"), e)
-        return _subscription_payload(user_row)
 
-    active = None
-    for s in subs.get("data", []):
-        if s.get("status") in ("active", "trialing", "past_due"):
-            active = s
-            break
+def _find_paid_subscription(stripe_lib: Any, customer_ids: list[str], user_id: str) -> tuple[str, str, str, str] | None:
+    """
+    Find the best active subscription across customers and completed checkout sessions.
+    Returns (customer_id, sub_id, plan, price_id).
+    """
+    best: tuple[str, str, str, str] | None = None
+    best_rank = 0
 
-    if not active:
-        return _subscription_payload(user_row)
+    def consider(customer_id: str, sub_id: str, plan: str, price_id: str) -> None:
+        nonlocal best, best_rank
+        rank = _PLAN_RANK.get(plan, 0)
+        if rank > best_rank:
+            best_rank = rank
+            best = (customer_id, sub_id, plan, price_id)
 
-    new_plan, price_id = _plan_from_stripe_subscription(active)
-    sub_id = active.get("id")
+    for customer_id in customer_ids:
+        try:
+            subs = stripe_lib.Subscription.list(customer=customer_id, status="all", limit=20)
+            for s in _stripe_val(subs, "data") or []:
+                picked = _pick_best_subscription(stripe_lib, s)
+                if picked:
+                    sub_id, plan, price_id = picked
+                    consider(customer_id, sub_id, plan, price_id)
+        except Exception as e:
+            logger.warning("subscription list failed customer=%s user=%s: %s", customer_id, user_id, e)
+
+        try:
+            sessions = stripe_lib.checkout.Session.list(customer=customer_id, limit=15)
+            for sess in _stripe_val(sessions, "data") or []:
+                if _stripe_val(sess, "payment_status") != "paid":
+                    continue
+                if _stripe_val(sess, "mode") != "subscription":
+                    continue
+                sub_id = _stripe_val(sess, "subscription")
+                if not sub_id:
+                    continue
+                if isinstance(sub_id, str):
+                    sub_obj = stripe_lib.Subscription.retrieve(sub_id)
+                else:
+                    sub_obj = sub_id
+                picked = _pick_best_subscription(stripe_lib, sub_obj)
+                if picked:
+                    sub_id_s, plan, price_id = picked
+                    consider(customer_id, sub_id_s, plan, price_id)
+        except Exception as e:
+            logger.warning("checkout session list failed customer=%s user=%s: %s", customer_id, user_id, e)
+
+    return best
+
+
+def _persist_paid_plan(user_id: str, customer_id: str, sub_id: str, plan: str) -> None:
     with get_connection() as conn:
         conn.execute(
-            "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='' WHERE id=?",
-            (new_plan, sub_id, user_row["id"]),
+            "UPDATE users SET plan=?, stripe_customer_id=?, stripe_subscription_id=?, "
+            "trial_ends_at='', segment='' WHERE id=?",
+            (plan, customer_id, sub_id, user_id),
         )
         conn.commit()
 
+
+def _sync_user_plan_from_stripe(stripe_lib: Any, user_row: dict) -> dict:
+    """Pull active subscription from Stripe and persist plan (webhook fallback)."""
+    user_id = user_row.get("id")
+    customer_ids, user_row = _all_stripe_customer_ids(stripe_lib, user_row)
+
+    if not customer_ids:
+        logger.info("subscription sync: no Stripe customer for user %s", user_id)
+        out = _subscription_payload(user_row)
+        out["sync_message"] = "No Stripe customer found for your login email."
+        return out
+
+    found = _find_paid_subscription(stripe_lib, customer_ids, user_id)
+    if not found:
+        logger.info("subscription sync: no paid subscription for user %s customers=%s", user_id, customer_ids)
+        out = _subscription_payload(user_row)
+        out["sync_message"] = "No active Stripe subscription found for your account email."
+        return out
+
+    customer_id, sub_id, new_plan, price_id = found
+    _persist_paid_plan(user_id, customer_id, sub_id, new_plan)
+
     updated = dict(user_row)
     updated["plan"] = new_plan
+    updated["stripe_customer_id"] = customer_id
     updated["stripe_subscription_id"] = sub_id
     updated["trial_ends_at"] = ""
     logger.info(
-        "subscription sync: user=%s plan=%s sub=%s price_id=%s",
-        user_row["id"],
+        "subscription sync: user=%s plan=%s sub=%s price_id=%s customer=%s",
+        user_id,
         new_plan,
         sub_id,
         price_id,
+        customer_id,
     )
-    return _subscription_payload(updated)
+    out = _subscription_payload(updated)
+    out["sync_message"] = f"Restored {new_plan} from Stripe."
+    out["synced"] = True
+    return out
 
 
 @router.get("/api/subscription")
@@ -647,9 +751,7 @@ async def get_subscription(user: dict = Depends(get_current_user)):
         raise HTTPException(404, "User not found")
     row = dict(row)
     resolved = resolve_plan(row)
-    needs_reconcile = resolved["plan"] in ("free", "trial") and not (
-        row.get("stripe_subscription_id") or ""
-    ).strip()
+    needs_reconcile = resolved["plan"] in ("free", "trial")
     if needs_reconcile:
         from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
 
