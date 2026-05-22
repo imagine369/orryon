@@ -1,6 +1,8 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+# Project-root modules (config.py, db/, core/) must resolve when backend/* does `from config import …`
+ENV PYTHONPATH=/app
 
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt

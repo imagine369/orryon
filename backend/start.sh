@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+export PYTHONPATH="${PYTHONPATH:-/app}"
 echo "=== orryon backend starting ==="
 echo "PORT=${PORT:-8000}"
 echo "Python: $(python --version)"
