@@ -283,7 +283,7 @@ function NavItem({
 export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
-  const { sub } = useSubscription();
+  const { sub, refresh: refreshSub } = useSubscription();
   const { usage: voiceUsage, isAtLimit: voiceAtLimit } = useVoiceUsage();
   const { prefs, update: updatePrefs } = usePreferences();
   const { usage: chatUsage } = useChatUsage();
@@ -291,6 +291,12 @@ export function SettingsPanel() {
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [view, setView] = useState<View>(null);
+
+  // If Stripe charged but webhook missed, reconcile when opening Subscription settings.
+  useEffect(() => {
+    if (view !== "subscription" || !sub || sub.plan !== "trial") return;
+    api.post("/api/subscription/sync").then(() => refreshSub()).catch(() => {});
+  }, [view, sub?.plan, refreshSub]);
 
   // display name editing
   const [editingName, setEditingName] = useState(false);
@@ -1160,7 +1166,11 @@ export function SettingsPanel() {
               className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition"
             >
               <CreditCard className="h-4 w-4" strokeWidth={1.5} />
-              View plans &amp; upgrade
+              {sub.plan === "trial"
+                ? "Subscribe or change plan"
+                : sub.plan === "free" || sub.plan === "past_due"
+                  ? "View plans & upgrade"
+                  : "Change plan"}
             </button>
           </div>
         )}

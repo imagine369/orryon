@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { storeCheckoutIntent } from "@/lib/post-checkout";
 
 export type TierId = "pro" | "premium" | "premium_plus";
 export type BillingPlan = "monthly" | "annual";
@@ -104,7 +105,8 @@ export async function startTierCheckout(
     {
       price_id: priceId,
       tier,
-      success_url: options?.successUrl ?? `${origin}/home?upgraded=1`,
+      success_url:
+        options?.successUrl ?? `${origin}/home?upgraded=1&plan=${encodeURIComponent(tier)}`,
       cancel_url: options?.cancelUrl ?? `${origin}/upgrade`,
     },
   );
@@ -113,5 +115,6 @@ export async function startTierCheckout(
       `Server returned ${res.plan} checkout for ${TIER_LABELS[tier]}. Check Stripe price IDs on Railway.`,
     );
   }
+  storeCheckoutIntent(tier);
   window.location.href = res.checkout_url;
 }

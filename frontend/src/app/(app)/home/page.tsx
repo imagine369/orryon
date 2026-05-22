@@ -36,6 +36,15 @@ import {
   type PendingDestructiveAction,
 } from "@/components/delete-confirm-modal";
 import { HEALTH_DISCLAIMER_SHORT } from "@/lib/life-os-copy";
+import {
+  POST_CHECKOUT_SESSION_KEY,
+  readCheckoutIntent,
+  clearCheckoutIntent,
+  planDisplayName,
+  isCheckoutComplete,
+  storeCheckoutIntent,
+} from "@/lib/post-checkout";
+import type { Subscription } from "@/lib/use-subscription";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -85,9 +94,6 @@ function formatSessionDate(iso: string): string {
 
 // Shared max-width token used by every horizontal section
 const CONTAINER = "mx-auto w-full max-w-3xl px-4";
-
-/** Survives history.replaceState + React Strict Mode remounts during post-checkout polling. */
-const POST_CHECKOUT_SESSION_KEY = "orryon_post_checkout_pending";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page component
@@ -186,14 +192,18 @@ export default function HomePage() {
 
   // ── Side-effects ────────────────────────────────────────────────────────────
 
-  // ── Robust activation after Stripe success (works for Pro, Premium, Premium+ trial or paid) ──
+  // Post-Stripe: poll until DB reflects paid plan (webhook or /api/subscription/sync).
+  // Do NOT complete on is_active_pro — in-app trial users are active before checkout.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const urlUpgraded = searchParams.get("upgraded") === "1";
+    const planParam = searchParams.get("plan");
+
     if (urlUpgraded) {
       try {
         sessionStorage.setItem(POST_CHECKOUT_SESSION_KEY, "1");
+        if (planParam) storeCheckoutIntent(planParam);
       } catch {
         /* ignore */
       }
@@ -214,23 +224,26 @@ export default function HomePage() {
     if (postCheckoutPollStartedRef.current) return;
     postCheckoutPollStartedRef.current = true;
 
+    const expected = planParam || readCheckoutIntent();
     setActivating(true);
-    setActivationPlan("Pro");
+    setActivationPlan(planDisplayName(expected));
 
     if (urlUpgraded) {
       window.history.replaceState({}, "", "/home");
     }
 
+    const runSync = () =>
+      api.post<Subscription>("/api/subscription/sync").then(() => refreshSub()).catch(() => {});
+
+    void runSync();
+
     let attempts = 0;
     postCheckoutPollIntervalRef.current = setInterval(() => {
-      refreshSub();
+      if (attempts % 2 === 0) void runSync();
+      else refreshSub();
       attempts++;
       if (attempts >= 30) {
-        try {
-          sessionStorage.removeItem(POST_CHECKOUT_SESSION_KEY);
-        } catch {
-          /* ignore */
-        }
+        clearCheckoutIntent();
         postCheckoutPollStartedRef.current = false;
         if (postCheckoutPollIntervalRef.current) {
           clearInterval(postCheckoutPollIntervalRef.current);
@@ -249,30 +262,22 @@ export default function HomePage() {
     };
   }, [searchParams, refreshSub]);
 
-  // Refine activating headline once /api/subscription resolves a plan label
   useEffect(() => {
-    if (!activating || !sub?.plan) return;
-    setActivationPlan(
-      sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1).replace(/_/g, " "),
-    );
-  }, [activating, sub?.plan]);
-  useEffect(() => {
-    if (activating && sub?.is_active_pro) {
-      try {
-        sessionStorage.removeItem(POST_CHECKOUT_SESSION_KEY);
-      } catch {
-        /* ignore */
-      }
-      postCheckoutPollStartedRef.current = false;
-      if (postCheckoutPollIntervalRef.current) {
-        clearInterval(postCheckoutPollIntervalRef.current);
-        postCheckoutPollIntervalRef.current = null;
-      }
-      setActivating(false);
-      setUpgradeBanner(true);
-      const t = setTimeout(() => setUpgradeBanner(false), 8000);
-      return () => clearTimeout(t);
+    if (!activating || !sub) return;
+    const expected = readCheckoutIntent();
+    if (!isCheckoutComplete(sub, expected)) return;
+
+    clearCheckoutIntent();
+    postCheckoutPollStartedRef.current = false;
+    if (postCheckoutPollIntervalRef.current) {
+      clearInterval(postCheckoutPollIntervalRef.current);
+      postCheckoutPollIntervalRef.current = null;
     }
+    setActivating(false);
+    setActivationPlan(planDisplayName(sub.plan));
+    setUpgradeBanner(true);
+    const t = setTimeout(() => setUpgradeBanner(false), 8000);
+    return () => clearTimeout(t);
   }, [activating, sub]);
 
   useEffect(() => {

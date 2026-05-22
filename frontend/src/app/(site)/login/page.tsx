@@ -64,7 +64,7 @@ function LoginPageInner() {
     setLoading(true);
     setError("");
     startTierCheckout(selectedTier, selectedPlan, {
-      successUrl: `${window.location.origin}/home?upgraded=1`,
+      successUrl: `${window.location.origin}/home?upgraded=1&plan=${encodeURIComponent(selectedTier)}`,
       cancelUrl: `${window.location.origin}/pricing`,
     }).catch((e: unknown) => {
       if (cancelled) return;

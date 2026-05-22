@@ -158,11 +158,14 @@ def _build_checkout_session_params(
 
     is_free_breathe = db_row.get("segment") == "free_breathe"
     has_db_sub = bool(db_row.get("stripe_subscription_id"))
+    # In-app Pro trial (no Stripe sub yet): checkout converts to paid now — no second Stripe trial.
+    on_app_trial = current_plan.get("plan") == "trial" and not has_db_sub
     eligible_for_trial = (
         trial_days
         and current_plan.get("plan") in ("trial", "free")
         and not has_db_sub
         and not is_free_breathe
+        and not on_app_trial
     )
 
     if eligible_for_trial:
@@ -511,13 +514,103 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(requir
 
 # ── Subscription / Billing ────────────────────────────────────────────────────
 
+def _subscription_payload(user_row: dict) -> dict:
+    """API shape for /api/subscription — includes Stripe linkage for post-checkout polling."""
+    payload = resolve_plan(user_row)
+    payload["has_stripe_subscription"] = bool(
+        (user_row.get("stripe_subscription_id") or "").strip()
+    )
+    return payload
+
+
+def _plan_from_stripe_subscription(sub_obj: dict) -> tuple[str, str]:
+    from config import PRICE_ID_TO_PLAN
+
+    items = sub_obj.get("items", {}).get("data", [])
+    price_id = ""
+    if items:
+        p = items[0].get("price") or {}
+        price_id = p if isinstance(p, str) else (p.get("id") or "").strip()
+    new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
+    if price_id and price_id not in PRICE_ID_TO_PLAN:
+        logger.warning(
+            "Stripe subscription price_id=%r not in PRICE_ID_TO_PLAN — stored as pro",
+            price_id,
+        )
+    return new_plan, price_id
+
+
+def _sync_user_plan_from_stripe(stripe_lib: Any, user_row: dict) -> dict:
+    """Pull active/trialing subscription from Stripe and persist plan + sub id (webhook fallback)."""
+    customer_id = (user_row.get("stripe_customer_id") or "").strip()
+    if not customer_id:
+        return _subscription_payload(user_row)
+
+    try:
+        subs = stripe_lib.Subscription.list(customer=customer_id, status="all", limit=10)
+    except Exception as e:
+        logger.warning("subscription sync: list failed for user=%s: %s", user_row.get("id"), e)
+        return _subscription_payload(user_row)
+
+    active = None
+    for s in subs.get("data", []):
+        if s.get("status") in ("active", "trialing", "past_due"):
+            active = s
+            break
+
+    if not active:
+        return _subscription_payload(user_row)
+
+    new_plan, price_id = _plan_from_stripe_subscription(active)
+    sub_id = active.get("id")
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='' WHERE id=?",
+            (new_plan, sub_id, user_row["id"]),
+        )
+        conn.commit()
+
+    updated = dict(user_row)
+    updated["plan"] = new_plan
+    updated["stripe_subscription_id"] = sub_id
+    updated["trial_ends_at"] = ""
+    logger.info(
+        "subscription sync: user=%s plan=%s sub=%s price_id=%s",
+        user_row["id"],
+        new_plan,
+        sub_id,
+        price_id,
+    )
+    return _subscription_payload(updated)
+
+
 @router.get("/api/subscription")
 async def get_subscription(user: dict = Depends(get_current_user)):
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
-    return resolve_plan(dict(row))
+    return _subscription_payload(dict(row))
+
+
+@router.post("/api/subscription/sync")
+async def sync_subscription_from_stripe(user: dict = Depends(get_current_user)):
+    """Reconcile users.plan from Stripe when checkout webhook was delayed or missed."""
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+
+    if not STRIPE_ENABLED:
+        raise HTTPException(503, "Stripe is not configured")
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        raise HTTPException(503, "stripe package not installed")
+
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
+    if not row:
+        raise HTTPException(404, "User not found")
+    return _sync_user_plan_from_stripe(stripe_lib, dict(row))
 
 
 # Hosts we'll always trust for Stripe success/cancel redirects, in addition to

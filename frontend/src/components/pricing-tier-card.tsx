@@ -58,15 +58,21 @@ export function PricingTierCard({
   tier,
   context,
   currentPlan,
+  onAppTrial = false,
+  trialTierId = null,
 }: {
   tier: TierDefinition;
   context: CheckoutContext;
   currentPlan?: string | null;
+  /** User has in-app Pro trial (not yet on Stripe). */
+  onAppTrial?: boolean;
+  trialTierId?: string | null;
 }) {
   const [billing, setBilling] = useState<Billing>("monthly");
   const Icon = tier.icon;
   const isFree = tier.monthlyPrice === 0;
   const isCurrent = currentPlan === tier.id;
+  const isTrialTier = onAppTrial && trialTierId === tier.id;
 
   const displayPrice = isFree
     ? "Free"
@@ -74,9 +80,10 @@ export function PricingTierCard({
       ? `$${tier.monthlyPrice}`
       : `$${tier.annualMonthly.toFixed(2).replace(/\.00$/, "")}`;
 
-  const ctaLabel =
-    isCurrent
-      ? "Current plan"
+  const ctaLabel = isCurrent
+    ? "Current plan"
+    : isTrialTier
+      ? "Subscribe now"
       : context === "in-app" && tier.id === "pro"
         ? "Upgrade to Pro"
         : context === "in-app"
@@ -109,10 +116,10 @@ export function PricingTierCard({
         </div>
       )}
 
-      {isCurrent && (
+      {(isCurrent || isTrialTier) && (
         <div className="absolute top-4 right-4">
           <span className="text-[0.65rem] uppercase tracking-wider text-white/50 border border-white/15 rounded-full px-2 py-0.5">
-            Current
+            {isTrialTier ? "Trial" : "Current"}
           </span>
         </div>
       )}

@@ -11,9 +11,11 @@ export default function UpgradePage() {
   const subtitle =
     sub?.plan === "past_due"
       ? "Update your subscription to restore access."
-      : sub?.plan === "free" || sub?.plan === "trial"
-        ? "Choose a plan to unlock your Life OS concierge."
-        : "Change plan or billing — checkout opens in Stripe.";
+      : sub?.plan === "trial"
+        ? "You're on a free Pro trial. Subscribe anytime — checkout starts paid billing (no extra trial)."
+        : sub?.plan === "free"
+          ? "Choose a plan to unlock your Life OS concierge."
+          : "Change plan or billing — checkout opens in Stripe.";
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-y-auto bg-black">

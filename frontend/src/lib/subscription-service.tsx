@@ -29,6 +29,7 @@ import {
 } from "react";
 import { Paywall } from "@/components/subscription/paywall";
 import { api } from "@/lib/api";
+import { storeCheckoutIntent } from "@/lib/post-checkout";
 
 export type CheckoutPlan = "monthly" | "annual";
 
@@ -99,11 +100,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }, 15_000);
     try {
       const origin = window.location.origin;
+      storeCheckoutIntent("pro");
       const res = await api.post<{ checkout_url: string }>(
         "/api/subscription/checkout",
         {
           price_id: priceId,
-          success_url: `${origin}/home?upgraded=1`,
+          tier: "pro",
+          success_url: `${origin}/home?upgraded=1&plan=pro`,
           cancel_url: `${origin}/home`,
         },
       );

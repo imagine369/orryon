@@ -10,6 +10,8 @@ export interface Subscription {
   is_active_pro: boolean;
   /** True for plan="free" or "past_due" — no AI concierge access. */
   is_free_tier: boolean;
+  /** True once Stripe subscription id is stored (post-checkout or billing portal). */
+  has_stripe_subscription: boolean;
 }
 
 export function useSubscription() {

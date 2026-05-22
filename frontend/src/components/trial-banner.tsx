@@ -37,16 +37,16 @@ export function TrialBanner({ sub }: Props) {
       }}
     >
       <div className="flex items-center justify-between">
-        {isExpired ? (
-          <Link
-            href={UPGRADE_PATH}
-            className="text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors"
-          >
-            {message}
-          </Link>
-        ) : (
-          <span className="text-white/50 flex-1">{message}</span>
-        )}
+        <Link
+          href={UPGRADE_PATH}
+          className={
+            isExpired
+              ? "text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors"
+              : "text-white/50 hover:text-white/70 flex-1 underline underline-offset-2 transition-colors"
+          }
+        >
+          {isExpired ? message : `${message} Upgrade anytime.`}
+        </Link>
 
         {!isExpired && (
           <button
