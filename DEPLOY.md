@@ -67,7 +67,7 @@ SENTRY_DSN=           ← copy from .env.example if using Sentry
 
    **Critical:** Mount path must be **`/data` only**. Do **not** mount at `/code`, `/app`, `/opt/orryon`, or `/srv/orryon`.
 
-   **Start command** (Railway → Settings → Deploy): `sh /image-root/backend/start.sh` (not `sh backend/start.sh`).
+   **Start command** (Railway → Settings → Deploy): `sh /.orryon/backend/start.sh` — see `RAILWAY_VOLUME_FIX.md` if crashes continue.
 
    Set variable: `DB_PATH=/data/finance.db`
 

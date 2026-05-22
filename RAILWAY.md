@@ -6,7 +6,7 @@ Your **volume mount path is wrong**. Railway is mounting `orryon-volume` on top 
 
 **Symptom in logs:** `config.py is missing`, `backend/start.sh: not found`, or restart loop right after `Mounting volume`.
 
-**Start command must be** `sh /image-root/backend/start.sh` (absolute path). If Railway uses `sh backend/start.sh` and the volume is on `/code`, the script is hidden and the container crashes.
+**Start command must be** `sh /.orryon/backend/start.sh`. Logs must show `ORRYON_BOOT_v3` and `ROOT=/.orryon`. If you see `ROOT=/code`, the dashboard is overriding with an old command — update it and redeploy with cache cleared.
 
 **Fix (2 minutes):**
 

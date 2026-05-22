@@ -1,22 +1,21 @@
 FROM python:3.12-slim
 
-# Primary app tree (may be shadowed if a Railway volume is mounted on /code).
-# Immutable copy at /image-root — start.sh falls back here when config.py is missing.
-WORKDIR /code
-ENV PYTHONPATH=/code
-ENV APP_ROOT=/code
+# App lives at /.orryon — not /code, /app, or /image-root (Railway volumes often mount those).
+COPY backend/requirements.txt /.orryon/backend/requirements.txt
+RUN pip install --no-cache-dir -r /.orryon/backend/requirements.txt
 
-COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY config.py email_sender.py /.orryon/
+COPY db/ /.orryon/db/
+COPY core/ /.orryon/core/
+COPY backend/ /.orryon/backend/
 
-COPY config.py email_sender.py db/ ./db/
-COPY core/ ./core/
-COPY backend/ ./backend/
-
-RUN chmod +x backend/start.sh \
- && cp -a /code /image-root \
+RUN chmod +x /.orryon/backend/start.sh \
+ && test -f /.orryon/config.py \
  && mkdir -p /data
+
+ENV PYTHONPATH=/.orryon
+WORKDIR /.orryon
 
 EXPOSE 8000
 
-CMD ["sh", "/image-root/backend/start.sh"]
+CMD ["sh", "/.orryon/backend/start.sh"]

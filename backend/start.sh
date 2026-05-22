@@ -1,23 +1,24 @@
 #!/bin/sh
 set -e
 
-# Always run from the immutable image copy — never from /code (Railway volumes often mount there).
-ROOT="/image-root"
+# ORRYON_BOOT_v3 — if logs do not show this, Railway is running an old start command/image.
+ROOT="/.orryon"
 cd "$ROOT"
 export PYTHONPATH="$ROOT"
+unset APP_ROOT
 
-echo "=== orryon backend starting ==="
+echo "=== orryon backend ORRYON_BOOT_v3 ==="
 echo "ROOT=${ROOT}"
 echo "PORT=${PORT:-8000}"
 echo "PYTHONPATH=${PYTHONPATH}"
 echo "Python: $(python --version 2>&1)"
 
 if [ ! -f "${ROOT}/config.py" ]; then
-  echo "ERROR: ${ROOT}/config.py missing — Docker image did not build correctly."
+  echo "ERROR: ${ROOT}/config.py missing — rebuild the Docker image."
   exit 1
 fi
 
-# Pick first writable SQLite location (prefer persistent /data volume)
+# SQLite: prefer /data volume, then /tmp, then app dir
 if [ -n "${DB_PATH:-}" ]; then
   _db_candidates="${DB_PATH}"
 else
@@ -34,13 +35,13 @@ for candidate in $_db_candidates; do
 done
 if [ -z "$DB_PATH_VAL" ]; then
   echo "ERROR: no writable directory for SQLite."
-  echo "Mount orryon-volume at /data and set DB_PATH=/data/finance.db"
+  echo "Set volume Mount Path=/data and DB_PATH=/data/finance.db"
   exit 1
 fi
 export DB_PATH="$DB_PATH_VAL"
 echo "DB_PATH=${DB_PATH}"
 if [ "$(dirname "$DB_PATH")" != "/data" ]; then
-  echo "WARN: SQLite is not on /data — set volume Mount Path=/data and DB_PATH=/data/finance.db for persistence."
+  echo "WARN: DB not on /data — change volume mount to /data for persistence."
 fi
 
 echo "NODE_ENV=${NODE_ENV:-(unset)}"
