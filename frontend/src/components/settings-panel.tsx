@@ -1155,7 +1155,7 @@ export function SettingsPanel() {
           <div className="px-3 py-3">
             <button
               onClick={() => {
-                window.location.href = "/pricing";
+                window.location.href = "/upgrade";
               }}
               className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white font-semibold border border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition"
             >

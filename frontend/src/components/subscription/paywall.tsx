@@ -316,9 +316,16 @@ export function Paywall({ open, onClose, onCheckout, checkoutPending, checkoutEr
                 </p>
               )}
 
+              <a
+                href="/upgrade"
+                className="mt-4 text-[0.72rem] uppercase tracking-[2px] text-white/45 hover:text-white/70 transition-colors underline underline-offset-2"
+              >
+                Compare Pro, Premium & Premium Plus
+              </a>
+
               <button
                 onClick={onClose}
-                className="mt-4 text-[0.72rem] uppercase tracking-[3px] text-white/35 hover:text-white/65 transition-colors"
+                className="mt-3 text-[0.72rem] uppercase tracking-[3px] text-white/35 hover:text-white/65 transition-colors"
               >
                 Maybe later — keep breathing for free
               </button>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import Link from "next/link";
+import { UPGRADE_PATH } from "@/lib/pricing-tiers";
 import { Subscription } from "@/lib/use-subscription";
 
 interface Props {
@@ -38,7 +39,7 @@ export function TrialBanner({ sub }: Props) {
       <div className="flex items-center justify-between">
         {isExpired ? (
           <Link
-            href="/pricing"
+            href={UPGRADE_PATH}
             className="text-white/70 hover:text-white flex-1 underline underline-offset-2 transition-colors"
           >
             {message}

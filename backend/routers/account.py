@@ -570,13 +570,69 @@ def _validate_stripe_return_url(url: str, field: str) -> str:
     raise HTTPException(400, f"{field} points to an untrusted host")
 
 
+@router.get("/api/subscription/plans")
+async def get_subscription_plans():
+    """Public plan → Stripe price_id map (from server env). Frontend must use this, not guessed IDs."""
+    from config import (
+        PRICE_ID_TO_PLAN,
+        STRIPE_PRICE_PREMIUM_ANNUAL,
+        STRIPE_PRICE_PREMIUM_MONTHLY,
+        STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
+        STRIPE_PRICE_PREMIUM_PLUS_MONTHLY,
+        STRIPE_PRICE_PRO_ANNUAL,
+        STRIPE_PRICE_PRO_MONTHLY,
+    )
+
+    plans = {
+        "pro": {
+            "monthly": STRIPE_PRICE_PRO_MONTHLY or None,
+            "annual": STRIPE_PRICE_PRO_ANNUAL or None,
+        },
+        "premium": {
+            "monthly": STRIPE_PRICE_PREMIUM_MONTHLY or None,
+            "annual": STRIPE_PRICE_PREMIUM_ANNUAL or None,
+        },
+        "premium_plus": {
+            "monthly": STRIPE_PRICE_PREMIUM_PLUS_MONTHLY or None,
+            "annual": STRIPE_PRICE_PREMIUM_PLUS_ANNUAL or None,
+        },
+    }
+
+    seen: dict[str, str] = {}
+    warnings: list[str] = []
+    for tier, periods in plans.items():
+        for period, pid in periods.items():
+            if not pid:
+                continue
+            label = f"{tier}/{period}"
+            if pid in seen:
+                warnings.append(
+                    f"{label} uses the same Stripe price_id as {seen[pid]} ({pid})"
+                )
+            seen[pid] = label
+
+    return {"plans": plans, "warnings": warnings, "price_id_to_plan": PRICE_ID_TO_PLAN}
+
+
 @router.post("/api/subscription/checkout")
 async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_user)):
-    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY, ALLOWED_STRIPE_PRICES, get_trial_days
+    from config import PRICE_ID_TO_PLAN, STRIPE_ENABLED, STRIPE_SECRET_KEY, ALLOWED_STRIPE_PRICES, get_trial_days
     if not STRIPE_ENABLED:
         raise HTTPException(503, "Stripe is not configured. Set STRIPE_SECRET_KEY in .env")
     if ALLOWED_STRIPE_PRICES and body.price_id not in ALLOWED_STRIPE_PRICES:
         raise HTTPException(400, "Invalid price ID")
+
+    mapped_plan = PRICE_ID_TO_PLAN.get(body.price_id)
+    if body.tier:
+        tier = body.tier.strip().lower()
+        if mapped_plan and tier != mapped_plan:
+            raise HTTPException(
+                400,
+                f"You selected {tier}, but the configured Stripe price is for {mapped_plan}. "
+                f"Fix STRIPE_PRICE_{tier.upper()}_* on the server (must differ from other tiers).",
+            )
+        if not mapped_plan:
+            raise HTTPException(400, f"Unknown price_id for tier {tier}")
     try:
         import stripe as stripe_lib
         stripe_lib.api_key = STRIPE_SECRET_KEY
@@ -659,7 +715,10 @@ async def create_checkout(body: CheckoutReq, user: dict = Depends(get_current_us
     except Exception as e:
         logger.exception("Unexpected error in checkout: %s", e)
         raise HTTPException(500, f"Checkout setup failed: {type(e).__name__}: {e}")
-    return {"checkout_url": session.url}
+    return {
+        "checkout_url": session.url,
+        "plan": mapped_plan or PRICE_ID_TO_PLAN.get(body.price_id),
+    }
 
 
 @router.post("/api/subscription/portal")

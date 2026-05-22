@@ -193,6 +193,7 @@ class CheckoutReq(BaseModel):
     price_id: str
     success_url: str
     cancel_url: str
+    tier: str | None = None  # pro | premium | premium_plus — validated against price_id
 
 
 # ── Connections / Import ──────────────────────────────────────────────────────

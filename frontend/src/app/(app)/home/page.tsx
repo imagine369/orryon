@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, X, SquarePen, Trash2, MessageSquare, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useSubscription } from "@/lib/use-subscription";
@@ -96,7 +96,8 @@ const POST_CHECKOUT_SESSION_KEY = "orryon_post_checkout_pending";
 export default function HomePage() {
   const { user } = useAuth();
   const { sub, refresh: refreshSub } = useSubscription();
-  const { showPaywall } = useSubscriptionService();
+  const router = useRouter();
+  const { openUpgradePlans } = useSubscriptionService();
   const { usage: chatUsage, reload: reloadChatUsage } = useChatUsage();
   const searchParams = useSearchParams();
 
@@ -560,8 +561,8 @@ export default function HomePage() {
         onClose={() => setVoiceLimitOpen(false)}
         onContinueText={() => setVoiceLimitOpen(false)}
         onUpgrade={() => {
-          const panels = document.querySelector("[data-panel-open-settings]");
-          if (panels) (panels as HTMLButtonElement).click();
+          setVoiceLimitOpen(false);
+          router.push("/upgrade");
         }}
         minutesUsed={voiceLimitInfo?.minutesUsed}
         limitMinutes={voiceLimitInfo?.limitMinutes}
@@ -573,7 +574,7 @@ export default function HomePage() {
         onClose={() => setPlanLimitOpen(false)}
         onUpgrade={() => {
           setPlanLimitOpen(false);
-          showPaywall("plan-limit");
+          router.push("/upgrade");
         }}
         kind={planLimitInfo?.kind ?? "usage"}
         plan={planLimitInfo?.plan ?? sub?.plan ?? "pro"}
@@ -923,7 +924,7 @@ export default function HomePage() {
 
           <UsageUpgradeBanner
             usage={chatUsage}
-            onUpgrade={() => showPaywall("usage-near-limit")}
+            onUpgrade={() => router.push("/upgrade")}
           />
 
           {/* Scrollable messages — container width consistent with input */}

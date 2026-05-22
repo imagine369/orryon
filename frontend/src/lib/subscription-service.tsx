@@ -49,6 +49,8 @@ export interface SubscriptionServiceValue {
   paywallReason?: string;
   /** Kick off a Stripe Checkout session and redirect the browser to it. */
   startCheckout: (plan: CheckoutPlan) => Promise<void>;
+  /** In-app plan picker (Pro / Premium / Premium Plus). */
+  openUpgradePlans: () => void;
   /** True while a checkout call is in-flight. */
   checkoutPending: boolean;
   /** Non-null when the last checkout attempt failed. Cleared on next attempt. */
@@ -75,13 +77,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setCheckoutError(null);
   }, []);
 
+  const openUpgradePlans = useCallback(() => {
+    window.location.href = "/upgrade";
+  }, []);
+
   const startCheckout = useCallback(async (plan: CheckoutPlan) => {
     const priceId = plan === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
 
     // No Stripe configured (dev / self-hosted) → fall through to the legacy
     // login route which can also drive provisioning. Mirrors trial-banner.tsx.
     if (!priceId) {
-      window.location.href = "/pricing";
+      window.location.href = "/upgrade";
       return;
     }
 
@@ -119,10 +125,20 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       isPaywallOpen: state.open,
       paywallReason: state.reason,
       startCheckout,
+      openUpgradePlans,
       checkoutPending,
       checkoutError,
     }),
-    [showPaywall, hidePaywall, state.open, state.reason, startCheckout, checkoutPending, checkoutError],
+    [
+      showPaywall,
+      hidePaywall,
+      state.open,
+      state.reason,
+      startCheckout,
+      openUpgradePlans,
+      checkoutPending,
+      checkoutError,
+    ],
   );
 
   return (

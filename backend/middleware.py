@@ -44,6 +44,7 @@ _ORIGIN_EXEMPT_PATHS: frozenset[str] = frozenset({
     "/api/health",
     "/health",
     "/api/ready",
+    "/api/subscription/plans",
     "/api/waitlist",
     "/api/contact",
     "/api/auth/send-code",
@@ -119,7 +120,7 @@ class PerIpRateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if path in {"/api/health", "/health", "/api/ready"}:
+        if path in {"/api/health", "/health", "/api/ready", "/api/subscription/plans"}:
             return await call_next(request)
         if not path.startswith("/api/"):
             return await call_next(request)
