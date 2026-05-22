@@ -93,6 +93,18 @@ export function clientHeaders(): Record<string, string> {
   };
 }
 
+/** Normalize FastAPI error bodies (`detail` string or validation array). */
+export function parseApiDetail(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (typeof first?.msg === "string") return first.msg;
+  }
+  return fallback;
+}
+
 function networkErrorMessage(): string {
   const isBrowser = typeof window !== "undefined";
   const onLocalhost =
@@ -162,7 +174,7 @@ async function request<T = unknown>(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `Request failed: ${res.status}`);
+    throw new Error(parseApiDetail(body, `Request failed: ${res.status}`));
   }
   return res.json() as Promise<T>;
 }

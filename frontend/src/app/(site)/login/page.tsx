@@ -57,6 +57,19 @@ function LoginPageInner() {
     }
   }, [flow]);
 
+  useEffect(() => {
+    api
+      .get<{ configured: boolean }>("/api/auth/email-status")
+      .then((s) => {
+        if (!s.configured) {
+          setError(
+            "Sign-in email is not configured on the server. Contact support@orryon.com for help signing in.",
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Signed-in user from /pricing → Stripe (skip email OTP)
   useEffect(() => {
     if (authLoading || !authedUser || !hasTierParam || breatheFlow) return;
@@ -102,7 +115,11 @@ function LoginPageInner() {
       setStep("code");
       setResendCountdown(30);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to send code");
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Failed to send code. Check your connection and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -385,7 +402,17 @@ function LoginPageInner() {
                 Code sent to <span className="text-white font-medium break-all">{email}</span>
               </p>
               <p className="text-[0.7rem] text-white/25 text-center mt-1">
-                Don&apos;t see it? Check your spam/junk folder.
+                Don&apos;t see it? Check spam/junk and Promotions. Codes expire in 10 minutes.
+              </p>
+              <p className="text-[0.7rem] text-white/20 text-center mt-2">
+                Still nothing? Wait 60s and tap Resend, or email{" "}
+                <a
+                  href="mailto:support@orryon.com"
+                  className="underline underline-offset-2 hover:text-white/40"
+                >
+                  support@orryon.com
+                </a>{" "}
+                from the same address you used here.
               </p>
             </div>
           )}

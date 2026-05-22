@@ -1072,7 +1072,7 @@ def _notify_admin_new_subscriber(email: str, plan: str, billing_interval: str) -
     msg.attach(MIMEText(html, "html"))
 
     try:
-        ok = _send_email(admin, msg)
+        ok, _ = _send_email(admin, msg)
         if ok:
             logger.info("Admin notified of new subscriber: %s plan=%s", email, plan)
         else:

@@ -252,7 +252,7 @@ def _notify_admin(email: str, joined_at: str, total: int, approve_token: str) ->
 
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html, "html"))
-        ok = _send_email(admin, msg)
+        ok, _ = _send_email(admin, msg)
         if ok:
             logger.info("Waitlist signup admin notification sent to %s for %s", admin, email)
         else:
@@ -531,7 +531,7 @@ def _send_welcome_email(email: str) -> None:
 
         msg.attach(MIMEText(plain, "plain"))
         msg.attach(MIMEText(html, "html"))
-        _send_email(email, msg)
+        _send_email(email, msg)  # noqa: F841 — welcome email best-effort
         logger.info("Welcome email sent to %s", email)
     except Exception as exc:
         logger.warning("Failed to send welcome email to %s: %s", email, exc)

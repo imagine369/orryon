@@ -88,7 +88,7 @@ def orryon_email_header_html() -> str:
     )
 
 
-def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool:
+def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> tuple[bool, str]:
     """Send using Resend's HTTP API — works on Railway (no SMTP ports needed)."""
     payload = json.dumps({
         "from": SMTP_FROM or f"orryon <noreply@orryon.com>",
@@ -115,14 +115,15 @@ def _send_via_resend(to_email: str, subject: str, html: str, plain: str) -> bool
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode()
             logger.info("Resend: sent email to %s (id=%s)", to_email, json.loads(body).get("id"))
-            return True
+            return True, ""
     except urllib.error.HTTPError as exc:
         body = exc.read().decode() if exc.fp else ""
         logger.error("Resend HTTP %s sending to %s: %s", exc.code, to_email, body)
-        return False
+        detail = body[:240] if body else str(exc)
+        return False, f"Resend error {exc.code}: {detail}"
     except Exception as exc:
         logger.exception("Resend error sending to %s: %s", to_email, exc)
-        return False
+        return False, str(exc)[:240]
 
 
 # ── Email templates ───────────────────────────────────────────────────────────
@@ -227,24 +228,24 @@ def send_verification_code(to_email: str, code: str) -> dict:
         }
 
     msg = _build_email(to_email, code)
-    if _send_email(to_email, msg):
+    ok, provider_detail = _send_email(to_email, msg)
+    if ok:
         logger.info("Verification code sent to %s", to_email)
         return {"sent": True, "reason": "sent", "detail": f"Code sent to {to_email}"}
 
-    # _send_email already logged the underlying provider error with detail.
     return {
         "sent": False,
         "reason": "send_failed",
-        "detail": (
-            "Email provider rejected the request. Check backend logs for the "
-            "underlying Resend/SMTP error."
+        "detail": provider_detail or (
+            "Email provider rejected the request. If this keeps happening, "
+            "contact support@orryon.com."
         ),
     }
 
 
 # ── Shared SMTP sender ────────────────────────────────────────────────────────
 
-def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
+def _send_email(to_email: str, msg: MIMEMultipart) -> tuple[bool, str]:
     """Send an already-built MIMEMultipart message.
 
     Prefers Resend HTTP API (RESEND_API_KEY) over SMTP — Resend works on Railway
@@ -260,7 +261,8 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
                 html = part.get_payload(decode=True).decode("utf-8", errors="replace")
             elif ct == "text/plain":
                 plain = part.get_payload(decode=True).decode("utf-8", errors="replace")
-        return _send_via_resend(to_email, subject, html or plain, plain)
+        ok, detail = _send_via_resend(to_email, subject, html or plain, plain)
+        return ok, detail
 
     if not SMTP_ENABLED:
         logger.warning(
@@ -271,7 +273,7 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             bool(SMTP_USER),
             bool(SMTP_PASS),
         )
-        return False
+        return False, "SMTP not configured on server"
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
             server.ehlo()
@@ -280,7 +282,7 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM or SMTP_USER, [to_email], msg.as_string())
         logger.info("SMTP: sent email to %s via %s:%s", to_email, SMTP_HOST, SMTP_PORT)
-        return True
+        return True, ""
     except smtplib.SMTPAuthenticationError as exc:
         logger.error(
             "SMTP auth failed for %s (user=%s). With Gmail you MUST use a 16-char "
@@ -290,7 +292,7 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             SMTP_USER,
             exc,
         )
-        return False
+        return False, f"SMTP authentication failed: {exc}"
     except smtplib.SMTPSenderRefused as exc:
         logger.error(
             "SMTP sender refused (%s). Likely From header (%s) does not match the "
@@ -300,10 +302,10 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             SMTP_USER,
             exc,
         )
-        return False
+        return False, f"SMTP sender refused: {exc}"
     except smtplib.SMTPRecipientsRefused as exc:
         logger.error("SMTP rejected recipient %s: %s", to_email, exc)
-        return False
+        return False, f"SMTP rejected recipient: {exc}"
     except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, TimeoutError) as exc:
         logger.error(
             "SMTP connection issue to %s:%s — some hosting providers block outbound "
@@ -312,10 +314,10 @@ def _send_email(to_email: str, msg: MIMEMultipart) -> bool:
             SMTP_PORT,
             exc,
         )
-        return False
+        return False, f"SMTP connection failed: {exc}"
     except Exception as exc:
         logger.exception("Failed to send email to %s: %s", to_email, exc)
-        return False
+        return False, str(exc)[:240]
 
 
 def smtp_diagnostics(to_email: str | None = None) -> dict:
@@ -337,7 +339,7 @@ def smtp_diagnostics(to_email: str | None = None) -> dict:
     if RESEND_ENABLED:
         report["stage"] = "resend_send"
         if to_email:
-            ok = _send_via_resend(
+            ok, err = _send_via_resend(
                 to_email,
                 "orryon email diagnostic test",
                 "<p>If you received this, Resend is working. — orryon</p>",
@@ -346,7 +348,7 @@ def smtp_diagnostics(to_email: str | None = None) -> dict:
             report["ok"] = ok
             report["sent_to"] = to_email if ok else None
             if not ok:
-                report["error"] = "Resend API call failed — check logs for details."
+                report["error"] = err or "Resend API call failed — check logs for details."
         else:
             report["ok"] = True
             report["stage"] = "resend_configured"
@@ -521,7 +523,7 @@ def send_event_reminder(
         )
         return False
     msg = _build_reminder_email(to_email, event_title, event_date, event_time, minutes_before)
-    sent = _send_email(to_email, msg)
+    sent, _ = _send_email(to_email, msg)
     if sent:
         logger.info("Reminder sent to %s for '%s'", to_email, event_title)
     return sent
@@ -651,7 +653,7 @@ def send_daily_digest(
 
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
-    sent = _send_email(to_email, msg)
+    sent, _ = _send_email(to_email, msg)
     if sent:
         logger.info("Daily digest sent to %s", to_email)
     return sent
@@ -782,7 +784,7 @@ def send_weekly_report(
 
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
-    sent = _send_email(to_email, msg)
+    sent, _ = _send_email(to_email, msg)
     if sent:
         logger.info("Weekly report sent to %s", to_email)
     return sent

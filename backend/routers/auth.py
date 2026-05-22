@@ -104,7 +104,7 @@ def _notify_admin_new_signup(email: str, display_name: str, segment: str) -> Non
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
 
-    ok = _send_email(admin, msg)
+    ok, _ = _send_email(admin, msg)
     if ok:
         logger.info("Admin notified of new signup: %s (segment=%s)", email, segment or "standard")
     else:
@@ -121,6 +121,20 @@ _PUBLIC_USER_FIELDS = {
 def _safe_user(user: dict) -> dict:
     """Strip sensitive fields before sending user data to the client."""
     return {k: v for k, v in user.items() if k in _PUBLIC_USER_FIELDS}
+
+
+@router.get("/api/auth/email-status")
+async def auth_email_status():
+    """Public check: is outbound email configured? (no send, no secrets.)"""
+    from config import RESEND_ENABLED, SMTP_ENABLED
+
+    if RESEND_ENABLED:
+        provider = "resend"
+    elif SMTP_ENABLED:
+        provider = "smtp"
+    else:
+        provider = "none"
+    return {"configured": provider != "none", "provider": provider}
 
 
 @router.post("/api/auth/send-code")
@@ -162,8 +176,11 @@ async def auth_send_code(body: SendCodeReq, request: Request):
             )
         raise HTTPException(
             502,
-            "We couldn't send your verification email right now. "
-            "Please try again in a minute, or contact support@orryon.com if it keeps failing.",
+            result.get("detail")
+            or (
+                "We couldn't send your verification email right now. "
+                "Please try again in a minute, or contact support@orryon.com if it keeps failing."
+            ),
         )
 
     return {

@@ -216,7 +216,7 @@ async def submit_contact(body: ContactRequest, request: Request):
         raise HTTPException(status_code=503, detail="Contact recipient not configured.")
 
     msg = _build_contact_email(name, email, subject, message)
-    sent = _send_email(CONTACT_EMAIL, msg)
+    sent, _ = _send_email(CONTACT_EMAIL, msg)
 
     if not sent:
         logger.error("Failed to deliver contact form email from %s to %s.", email, CONTACT_EMAIL)

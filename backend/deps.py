@@ -96,8 +96,9 @@ MONTHLY_SPEND_CAP_USD_BY_PLAN: dict[str, float] = _compute_monthly_spend_caps()
 # Deprecated global cap — use get_monthly_spend_cap(plan) instead.
 MONTHLY_SPEND_CAP_USD = MONTHLY_SPEND_CAP_USD_BY_PLAN["pro"]
 
-RATE_LIMIT_OTP = 5
-RATE_LIMIT_OTP_IP = 10
+# OTP sends: generous enough for resend clicks; still blocks scripted abuse.
+RATE_LIMIT_OTP = 12
+RATE_LIMIT_OTP_IP = 30
 
 # Per-minute chat requests (abuse throttle; separate from monthly message cap).
 RATE_LIMIT_CHAT_BY_PLAN: dict[str, int] = {
@@ -221,8 +222,14 @@ async def check_rate_limit_redis(user_id: str, limit: int = RATE_LIMIT_DEFAULT) 
 def check_otp_rate_limit(request: Request, email: str) -> None:
     """Rate-limit OTP sends by both email and client IP to prevent abuse."""
     client_ip = request.client.host if request.client else "unknown"
-    check_rate_limit(f"otp:email:{email}", RATE_LIMIT_OTP)
-    check_rate_limit(f"otp:ip:{client_ip}", RATE_LIMIT_OTP_IP)
+    try:
+        check_rate_limit(f"otp:email:{email}", RATE_LIMIT_OTP)
+        check_rate_limit(f"otp:ip:{client_ip}", RATE_LIMIT_OTP_IP)
+    except HTTPException:
+        raise HTTPException(
+            429,
+            "Too many code requests. Wait a minute, then tap Resend code — or check spam for an earlier email.",
+        ) from None
 
 
 # ── Subscription Plan Resolution ──────────────────────────────────────────────
