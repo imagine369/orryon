@@ -2,7 +2,7 @@
 
 ## Current Architecture (v2)
 
-The primary stack is **Next.js 16 + FastAPI** (Streamlit UI removed).
+The primary stack is **Next.js 16 + FastAPI**.
 
 ```
   Next.js 16 (frontend/) ← REST + SSE/WS → FastAPI (backend/)
@@ -29,7 +29,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram.
 | Subscription Billing | **Done** | Stripe integration with trial support |
 | Receipt Scanning | **Done** | Grok Vision-based receipt OCR |
 | Documentation | **Done** | README, ARCHITECTURE.md, this roadmap |
-| Streamlit removal | **Done** | Removed `app.py`, `ui/`, `pages/`, root `requirements.txt` |
 
 ---
 
@@ -117,12 +116,6 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 - Current: Grok-only (by design)
 - Future option: model router for specialized tasks (vision, embeddings)
 - Keep Grok as primary reasoning engine
-
----
-
-## Phase E: Streamlit Deprecation — **Done**
-
-Removed `app.py`, `ui/`, `pages/`, root `requirements.txt`, and `legacy/README.md`. Production already deployed FastAPI + Next.js only.
 
 ---
 
