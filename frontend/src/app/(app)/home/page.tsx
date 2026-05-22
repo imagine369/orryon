@@ -41,7 +41,7 @@ import {
   DeleteConfirmModal,
   type PendingDestructiveAction,
 } from "@/components/delete-confirm-modal";
-import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY, TRIAL_VOICE_HINT } from "@/lib/life-os-copy";
+import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY, PRO_TEXT_ONLY_HINT } from "@/lib/life-os-copy";
 import {
   POST_CHECKOUT_SESSION_KEY,
   readCheckoutIntent,
@@ -849,9 +849,9 @@ export default function HomePage() {
                 {voiceError && (
                   <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
                 )}
-                {sub?.plan === "trial" && (
+                {(sub?.plan === "pro" || sub?.plan === "trial") && (
                   <p className="mb-2 text-center text-[11px] leading-snug text-white/40 px-2">
-                    {TRIAL_VOICE_HINT}
+                    {PRO_TEXT_ONLY_HINT}
                   </p>
                 )}
                 <ChatInput
@@ -973,9 +973,9 @@ export default function HomePage() {
               {voiceError && (
                 <p className="mb-2 text-center text-[12px] text-white/55">{voiceError}</p>
               )}
-              {sub?.plan === "trial" && (
+              {(sub?.plan === "pro" || sub?.plan === "trial") && (
                 <p className="mb-2 text-center text-[11px] leading-snug text-white/40 px-2">
-                  {TRIAL_VOICE_HINT}
+                  {PRO_TEXT_ONLY_HINT}
                 </p>
               )}
               <ChatInput

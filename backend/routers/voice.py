@@ -15,8 +15,8 @@ same monthly spend cap as chat so voice can't be used to sidestep quota.
 
 Voice minute caps (see backend/deps.VOICE_LIMITS_MINUTES):
     Free/Starter                : no STT/TTS (Breathe only; orb-tts for wellness)
-    Trial                       : 45 min speak-in; text replies; no TTS
-    Pro / Premium               : speak-in pool; text replies only
+    Trial / Pro                 : no STT/TTS (text Life OS only)
+    Premium                     : speak-in pool; text replies; Live Orryon
     Premium Plus                : larger pool + TTS when voice_overlay enabled
 
 Users can purchase 60-minute top-ups ($6) via /api/voice/topup.
@@ -249,7 +249,7 @@ async def text_to_speech(
     """
     Synthesize speech from text using xAI TTS using Orryon's voice (eve).
 
-    Premium Plus only — Pro/Premium get text replies. Eve is Orryon's chat voice.
+    Premium Plus only — Premium gets text replies. Eve is Orryon's chat voice.
 
     Body: {"text": "hello"}
     Returns: audio/mpeg (MP3 bytes)

@@ -1,7 +1,7 @@
 /**
  * Orryon voice configuration.
  *
- * Chat TTS (eve): Premium Plus + toggle. Speak-in: trial (45 min), Pro/Premium/Plus; text replies unless Plus TTS on.
+ * Chat TTS (eve): Premium Plus + toggle. Speak-in: Premium/Plus. Pro/trial text-only.
  * Breathing / Reset Anchor sessions use Web Audio API soundscapes — no TTS.
  */
 

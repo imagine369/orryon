@@ -110,12 +110,6 @@ export function TrialBanner({ sub, onSubscriptionUpdated }: Props) {
         <p className="text-white/55 text-[0.7rem] leading-snug">{restoreMsg}</p>
       )}
 
-      {!isExpired && sub.plan === "trial" && (
-        <p className="text-white/40 text-[0.65rem] leading-snug">
-          Try the mic — speak in, read text replies. Premium Plus adds spoken replies.
-        </p>
-      )}
-
       {!isExpired && (
         <Link
           href={UPGRADE_PATH}

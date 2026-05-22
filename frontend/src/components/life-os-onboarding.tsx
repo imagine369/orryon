@@ -9,11 +9,11 @@ const STORAGE_KEY = "orryon_life_os_onboarding_v2";
 const STEPS = [
   {
     title: "Ask",
-    body: "Chat is broad like ChatGPT — planning, writing, how-tos, and more. On trial and paid plans you can speak in (mic); Orryon replies in text. Premium Plus can also read replies aloud when you turn that on.",
+    body: "Chat is broad like ChatGPT — planning, writing, how-tos, and more. Pro is text-only. Premium adds speak-in and Live Orryon. Premium Plus can read replies aloud when you turn that on.",
   },
   {
     title: "Do",
-    body: "When it's your life in Orryon — money, calendar, tasks, notes, lists — Orryon actually does it. Log spending, check your week, set goals.",
+    body: "When it's your life in Orryon — money, calendar, tasks, notes — Orryon actually does it. Log spending, check your week, set goals.",
   },
   {
     title: "Later",

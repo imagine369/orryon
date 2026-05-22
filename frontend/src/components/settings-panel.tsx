@@ -1120,7 +1120,7 @@ export function SettingsPanel() {
         )}
 
         {/* Voice minute usage meter */}
-        {voiceUsage && (sub.plan === "trial" || sub.plan === "pro" || sub.plan === "premium" || sub.plan === "premium_plus") && (
+        {voiceUsage && (sub.plan === "premium" || sub.plan === "premium_plus") && (
           <div className="px-3 py-3 border-b border-white/5">
             <VoiceUsageMeter usage={voiceUsage} variant="full" />
             {voiceAtLimit && (
@@ -1632,10 +1632,14 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
         </div>
       )}
 
-      {!isPlus && sub?.is_active_pro && (
+      {sub?.plan === "pro" && (
         <p className="text-xs text-white/25 leading-relaxed">
-          Trial, Pro, and Premium: speak or type — Orryon replies in text.
-          Premium Plus can turn on spoken replies aloud.
+          Pro is text-only. Upgrade to Premium to speak to Orryon (mic or Live Orryon).
+        </p>
+      )}
+      {sub?.plan === "premium" && (
+        <p className="text-xs text-white/25 leading-relaxed">
+          Premium: speak or type — Orryon replies in text. Premium Plus adds spoken replies.
         </p>
       )}
 

@@ -2,11 +2,9 @@
 
 export type VoicePlan = string | undefined | null;
 
-const VOICE_INPUT_PLANS = new Set(["trial", "pro", "premium", "premium_plus"]);
-
-/** Speak to Orryon (STT / chat mic). Trial = capped; paid tiers = monthly pool. */
+/** Speak to Orryon (STT / mic) — Premium + Premium Plus only */
 export function planAllowsVoiceInput(plan: VoicePlan): boolean {
-  return !!plan && VOICE_INPUT_PLANS.has(plan);
+  return plan === "premium" || plan === "premium_plus";
 }
 
 /** Hear Orryon read replies (TTS) — Premium Plus only, when overlay toggle is on */

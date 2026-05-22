@@ -56,8 +56,7 @@ export const PRICING_TIERS: readonly TierDefinition[] = [
     popular: true,
     cta: "Start 14-day trial",
     features: [
-      "Personal AI concierge — type or speak in; text replies",
-      "300 speak-in minutes / month",
+      "Personal AI concierge — full Life OS chat (text)",
       "Budget tracking & spending insights",
       "Health vitals, medications & appointments",
       "Location intelligence & commute awareness",
@@ -73,7 +72,7 @@ export const PRICING_TIERS: readonly TierDefinition[] = [
   {
     id: "premium",
     name: "Premium",
-    tagline: "Unlimited AI + long-term memory.",
+    tagline: "Talk to Orryon — voice in, text replies.",
     monthlyPrice: 33,
     annualTotal: 297,
     annualMonthly: 24.75,
@@ -86,8 +85,8 @@ export const PRICING_TIERS: readonly TierDefinition[] = [
     features: [
       "Everything in Pro",
       "Unlimited chat messages (subject to Fair Usage Policy)",
-      "Everything in Pro speak-in",
-      "Live Orryon floating companion",
+      "Everything in Pro",
+      "Speak in — mic + Live Orryon companion",
       "650 speak-in minutes / month",
       "Long-term memory (persistent context)",
       "Proactive suggestions & smart briefings",
