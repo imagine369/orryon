@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+import urllib.request
 from urllib.request import urlopen
 from urllib.error import URLError
 
@@ -26,12 +27,13 @@ load_dotenv(ROOT / ".env")
 
 from config import (
     DATABASE_URL,
-    JWT_SECRET,
     REDIS_URL,
     RESEND_ENABLED,
     SMTP_ENABLED,
     XAI_API_KEY,
 )
+
+JWT_SECRET = os.getenv("JWT_SECRET", "")
 
 
 def _ok(msg: str) -> None:
@@ -98,17 +100,22 @@ def main() -> int:
     base = os.getenv("VERIFY_PROD_URL", "").rstrip("/")
     if base:
         print(f"\nLive probe ({base})")
-        try:
-            with urlopen(f"{base}/api/health", timeout=10) as resp:
-                body = resp.read().decode()
-            if '"ok"' in body or "ok" in body:
-                _ok("/api/health responded")
-            else:
-                _fail(f"unexpected health body: {body[:120]}")
+        for path in ("/api/health", "/api/ready"):
+            try:
+                req = urllib.request.Request(
+                    f"{base}{path}",
+                    headers={"User-Agent": "OrryonVerifyProd/1.0"},
+                )
+                with urlopen(req, timeout=15) as resp:
+                    body = resp.read().decode()
+                if resp.status == 200 and "ok" in body:
+                    _ok(f"{path} responded")
+                else:
+                    _fail(f"{path} unexpected: {body[:120]}")
+                    errors += 1
+            except URLError as exc:
+                _fail(f"{path} failed: {exc}")
                 errors += 1
-        except URLError as exc:
-            _fail(f"health check failed: {exc}")
-            errors += 1
     else:
         print("\nLive probe skipped (set VERIFY_PROD_URL=https://api.orryon.com)")
 
