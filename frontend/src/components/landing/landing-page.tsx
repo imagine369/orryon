@@ -164,10 +164,7 @@ export default function LandingPage() {
               <p>The advanced features are optional. Only pay if you use them.</p>
             </div>
 
-            <PillLink href="/breathe" size="sm">Try breathing — it&rsquo;s free</PillLink>
-
-            <PillLink href="/home" size="sm">Access All Features</PillLink>
-
+            <PillLink href="/home" size="sm">Go to app</PillLink>
           </>
         )}
       </div>
