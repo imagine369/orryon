@@ -261,7 +261,7 @@ const VIEW_TITLES: Record<string, string> = {
   data: "Data",
   notifications: "Notifications",
   financial: "Financial Preferences",
-  subscription: "Plan & Usuage",
+  subscription: "Plan & Usage",
   app: "App",
   memory: "Memory",
   health: "Health",
@@ -436,7 +436,7 @@ export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [view, setView] = useState<View>(null);
 
-  // Refresh plan + usage when opening Plan & Usuage (pulls billing period from Stripe).
+  // Refresh plan + usage when opening Plan & Usage (pulls billing period from Stripe).
   useEffect(() => {
     if (view !== "subscription") return;
     refreshSub();
@@ -592,6 +592,7 @@ export function SettingsPanel() {
   const renderMainMenu = () => (
     <>
       <div>
+        {/* ── Account ── */}
         <NavItem
           icon={<User className="h-5 w-5" strokeWidth={1.5} />}
           title="Account information"
@@ -601,7 +602,7 @@ export function SettingsPanel() {
         {sub && (
           <NavItem
             icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
-            title="Plan & Usuage"
+            title="Plan & Usage"
             description={
               sub.plan === "trial"
                 ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
@@ -612,6 +613,64 @@ export function SettingsPanel() {
             onClick={() => setView("subscription")}
           />
         )}
+
+        {/* ── Easy to use ── */}
+        {sub?.is_active_pro && (
+          <NavItem
+            icon={<Accessibility className="h-5 w-5" strokeWidth={1.5} />}
+            title="Accessibility"
+            description="Golden Mode, font size, animations"
+            onClick={() => setView("accessibility")}
+          />
+        )}
+        <NavItem
+          icon={<Bell className="h-5 w-5" strokeWidth={1.5} />}
+          title="Notifications"
+          description="Reminders, digests, and email reports"
+          onClick={() => setView("notifications")}
+        />
+        <NavItem
+          icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
+          title="App"
+          description="Install Orryon on your device"
+          onClick={() => setView("app")}
+        />
+
+        {/* ── Your day ── */}
+        {sub?.is_active_pro && (
+          <>
+            <div className="my-3 border-t border-white/[0.04]" />
+            <NavItem
+              icon={<Sunrise className="h-5 w-5" strokeWidth={1.5} />}
+              title="Daily Briefing"
+              description="Morning summary preferences"
+              onClick={() => setView("briefing")}
+            />
+            <NavItem
+              icon={<Activity className="h-5 w-5" strokeWidth={1.5} />}
+              title="Health"
+              description="Vitals, medications, and appointments"
+              onClick={() => setView("health")}
+            />
+          </>
+        )}
+        <NavItem
+          icon={<DollarSign className="h-5 w-5" strokeWidth={1.5} />}
+          title="Financial Preferences"
+          description="Currency, budget cycle, and spending alerts"
+          onClick={() => setView("financial")}
+        />
+        {sub?.is_active_pro && (
+          <NavItem
+            icon={<MapPin className="h-5 w-5" strokeWidth={1.5} />}
+            title="My Places"
+            description="Home, work, and commute"
+            onClick={() => setView("location")}
+          />
+        )}
+
+        {/* ── Account access & privacy ── */}
+        <div className="my-3 border-t border-white/[0.04]" />
         <NavItem
           icon={<Shield className="h-5 w-5" strokeWidth={1.5} />}
           title="Security & Account Access"
@@ -624,68 +683,18 @@ export function SettingsPanel() {
           description="Manage your data and privacy settings"
           onClick={() => setView("privacy-safety")}
         />
-        <NavItem
-          icon={<Bell className="h-5 w-5" strokeWidth={1.5} />}
-          title="Notifications"
-          description="Reminders, digests, and email reports"
-          onClick={() => setView("notifications")}
-        />
-        <NavItem
-          icon={<DollarSign className="h-5 w-5" strokeWidth={1.5} />}
-          title="Financial Preferences"
-          description="Currency, budget cycle, and spending alerts"
-          onClick={() => setView("financial")}
-        />
-        <NavItem
-          icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
-          title="App"
-          description="Install Orryon on your device"
-          onClick={() => setView("app")}
-        />
 
-        {/* ── Separator ── */}
-        {sub?.is_active_pro && (
-          <div className="my-3 border-t border-white/[0.04]" />
-        )}
-
-        {/* ── AI & intelligence ── */}
+        {/* ── AI transparency ── */}
         {sub?.is_active_pro && (
           <>
+            <div className="my-3 border-t border-white/[0.04]" />
             <NavItem
               icon={<Brain className="h-5 w-5" strokeWidth={1.5} />}
               title="Memory"
               description="What Orryon knows about you"
               onClick={() => setView("memory")}
             />
-            <NavItem
-              icon={<Activity className="h-5 w-5" strokeWidth={1.5} />}
-              title="Health"
-              description="Vitals, medications, and appointments"
-              onClick={() => setView("health")}
-            />
-            <NavItem
-              icon={<MapPin className="h-5 w-5" strokeWidth={1.5} />}
-              title="My Places"
-              description="Home, work, and commute"
-              onClick={() => setView("location")}
-            />
-            <NavItem
-              icon={<Sunrise className="h-5 w-5" strokeWidth={1.5} />}
-              title="Daily Briefing"
-              description="Morning summary preferences"
-              onClick={() => setView("briefing")}
-            />
           </>
-        )}
-
-        {/* ── Accessibility ── */}
-        {sub?.is_active_pro && (
-          <NavItem
-            icon={<Accessibility className="h-5 w-5" strokeWidth={1.5} />}
-            title="Accessibility"
-            description="Golden Mode, font size, animations"
-            onClick={() => setView("accessibility")}
-          />
         )}
       </div>
 

@@ -11,7 +11,7 @@ interface PlanUsageSectionProps {
 }
 
 /**
- * Plan & Usuage — single monthly pool that keeps Orryon working (chat, tools, voice replies).
+ * Plan & Usage — single monthly pool that keeps Orryon working (chat, tools, voice replies).
  */
 export function PlanUsageSection({ plan, chatUsage }: PlanUsageSectionProps) {
   const showChat =
