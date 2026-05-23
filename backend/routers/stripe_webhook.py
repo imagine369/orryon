@@ -112,9 +112,11 @@ async def stripe_webhook(request: Request):
 
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
+    from stripe import SignatureVerificationError
+
     try:
         event = stripe_lib.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-    except stripe_lib.errors.SignatureVerificationError:
+    except SignatureVerificationError:
         raise HTTPException(400, "Invalid Stripe signature")
 
     event_id = event.get("id", "")
