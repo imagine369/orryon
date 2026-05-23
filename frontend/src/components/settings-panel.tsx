@@ -262,7 +262,7 @@ const VIEW_TITLES: Record<string, string> = {
   data: "Data",
   notifications: "Notifications",
   financial: "Financial Preferences",
-  subscription: "Plan + Usage",
+  subscription: "Plan & Usuage",
   app: "App",
   memory: "Memory",
   health: "Health",
@@ -617,7 +617,7 @@ export function SettingsPanel() {
         {sub && (
           <NavItem
             icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
-            title="Plan + Usage"
+            title="Plan & Usuage"
             description={
               sub.plan === "trial"
                 ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
