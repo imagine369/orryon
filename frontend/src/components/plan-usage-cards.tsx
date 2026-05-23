@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { BillingPeriodToggle } from "@/components/billing-period-toggle";
 import {
   PRICING_TIERS,
   UPGRADE_PATH,
+  type Billing,
   type TierDefinition,
 } from "@/lib/pricing-tiers";
-import type { TierId } from "@/lib/tier-checkout";
+import { startTierCheckout, type TierId } from "@/lib/tier-checkout";
 import type { Subscription } from "@/lib/use-subscription";
 import { formatUsageResetLabel } from "@/lib/format-usage-reset";
 import { cn } from "@/lib/utils";
@@ -71,6 +74,95 @@ function currentPlanTitle(sub: Subscription): string {
     default:
       return "Free";
   }
+}
+
+function formatAnnualMonthly(amount: number): string {
+  return amount.toFixed(2).replace(/\.00$/, "");
+}
+
+function upgradePriceLabel(tier: TierDefinition, billing: Billing): string {
+  if (billing === "monthly") {
+    return `$${tier.monthlyPrice}/mo`;
+  }
+  return `$${formatAnnualMonthly(tier.annualMonthly)}/mo`;
+}
+
+function UpgradeAvailableCard({
+  upgradeId,
+  upgradeTier,
+}: {
+  upgradeId: TierId;
+  upgradeTier: TierDefinition;
+}) {
+  const [billing, setBilling] = useState<Billing>("monthly");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpgrade = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      const origin = window.location.origin;
+      await startTierCheckout(upgradeId, billing, {
+        successUrl: `${origin}/home?upgraded=1&plan=${encodeURIComponent(upgradeId)}`,
+        cancelUrl: `${origin}/settings`,
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Checkout failed");
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-4 flex flex-col min-h-[140px]">
+      <p className="text-[10px] font-medium tracking-wider text-white/35 uppercase">
+        Upgrade available
+      </p>
+      <p className="mt-2 text-lg font-semibold text-white/95 leading-tight">
+        {upgradeTier.name}{" "}
+        <span className="text-white/55 font-medium">
+          {upgradePriceLabel(upgradeTier, billing)}
+        </span>
+      </p>
+      <div className="mt-2">
+        <BillingPeriodToggle billing={billing} onChange={setBilling} compact />
+      </div>
+      {billing === "annual" ? (
+        <p className="mt-1.5 text-[11px] text-white/45">
+          ${upgradeTier.annualTotal} billed annually · save 25%
+        </p>
+      ) : (
+        <p className="mt-1.5 text-[11px] text-white/40">
+          or ${formatAnnualMonthly(upgradeTier.annualMonthly)}/mo · ${upgradeTier.annualTotal}/yr
+        </p>
+      )}
+      <p className="mt-1.5 text-xs text-white/40 flex-1 leading-relaxed">
+        {UPGRADE_TAGLINE[upgradeId]}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void handleUpgrade()}
+          disabled={pending}
+          className="px-3 py-1.5 text-xs font-semibold text-[#0a0a0a]
+            bg-sky-300 hover:bg-sky-200 rounded-lg transition disabled:opacity-40"
+        >
+          {pending
+            ? "Opening checkout…"
+            : billing === "annual"
+              ? `Upgrade · $${upgradeTier.annualTotal}/yr`
+              : "Upgrade"}
+        </button>
+        <Link
+          href={UPGRADE_PATH}
+          className="text-[11px] text-white/40 hover:text-white/60 transition"
+        >
+          All plans
+        </Link>
+      </div>
+      {error && <p className="mt-2 text-[11px] text-red-400/90">{error}</p>}
+    </div>
+  );
 }
 
 function currentPriceLabel(sub: Subscription): string {
@@ -170,29 +262,8 @@ export function PlanUsageCards({
           ) : null}
         </div>
 
-        {/* Upgrade */}
         {upgradeId && upgradeTier && (
-          <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-4 flex flex-col min-h-[140px]">
-            <p className="text-[10px] font-medium tracking-wider text-white/35 uppercase">
-              Upgrade available
-            </p>
-            <p className="mt-2 text-lg font-semibold text-white/95 leading-tight">
-              {upgradeTier.name}{" "}
-              <span className="text-white/55 font-medium">
-                ${upgradeTier.monthlyPrice}/mo
-              </span>
-            </p>
-            <p className="mt-1.5 text-xs text-white/40 flex-1 leading-relaxed">
-              {UPGRADE_TAGLINE[upgradeId]}
-            </p>
-            <Link
-              href={UPGRADE_PATH}
-              className="mt-3 self-start px-3 py-1.5 text-xs font-semibold text-[#0a0a0a]
-                bg-sky-300 hover:bg-sky-200 rounded-lg transition"
-            >
-              Upgrade
-            </Link>
-          </div>
+          <UpgradeAvailableCard upgradeId={upgradeId} upgradeTier={upgradeTier} />
         )}
       </div>
     </div>
