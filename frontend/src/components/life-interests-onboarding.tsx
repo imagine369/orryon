@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LifePrioritiesPicker } from "@/components/life-priorities-picker";
-import {
-  serializeLifePriorities,
-  type LifePriorityId,
-} from "@/lib/life-priorities";
+import type { LifePriorityId } from "@/lib/life-priorities";
 import { usePreferences } from "@/lib/use-preferences";
 
 /**
@@ -34,7 +31,7 @@ export function LifeInterestsOnboarding() {
     setSaving(true);
     try {
       await update({
-        life_priorities: serializeLifePriorities(picks),
+        life_priorities: picks,
         life_priorities_set: true,
         onboarding_complete: true,
       });
