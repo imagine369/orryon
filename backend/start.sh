@@ -41,7 +41,7 @@ fi
 export DB_PATH="$DB_PATH_VAL"
 echo "DB_PATH=${DB_PATH}"
 if [ "$(dirname "$DB_PATH")" != "/data" ]; then
-  echo "WARN: DB not on /data — change volume mount to /data for persistence."
+  echo "NOTICE: DB_PATH is not on /data (${DB_PATH}) — for Railway persistence, mount a volume at /data and set DB_PATH=/data/finance.db"
 fi
 
 echo "NODE_ENV=${NODE_ENV:-(unset)}"

@@ -1,5 +1,3 @@
-import { access, readFile, stat } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
 
 const FILES: Record<string, { filename: string; contentType: string }> = {
@@ -24,7 +22,7 @@ async function externalDownloadOk(url: string): Promise<boolean> {
   }
 }
 
-async function resolveDownload(platform: string) {
+async function resolveDownload(request: Request, platform: string) {
   const meta = FILES[platform];
   if (!meta) return { error: NextResponse.json({ error: "Unknown platform" }, { status: 400 }) };
 
@@ -44,72 +42,38 @@ async function resolveDownload(platform: string) {
     };
   }
 
-  const filePath = path.join(process.cwd(), "public", "downloads", meta.filename);
-  try {
-    await access(filePath);
-    return { meta, filePath };
-  } catch {
-    if (process.env.VERCEL) {
-      return {
-        error: NextResponse.json(
-          {
-            error: "Desktop installer is not configured for production yet.",
-            hint: `Upload Orryon-${platform === "mac" ? "mac.dmg" : platform === "windows" ? "windows.exe" : "linux.AppImage"} to a public URL (Vercel Blob, public GitHub Release, S3), then set DESKTOP_DOWNLOAD_${platform.toUpperCase()}_URL in Vercel and redeploy.`,
-          },
-          { status: 503 },
-        ),
-      };
-    }
+  if (process.env.NODE_ENV === "production") {
     return {
       error: NextResponse.json(
-        { error: `Installer not found: ${meta.filename}` },
-        { status: 404 },
+        {
+          error: "Desktop installer is not configured for production yet.",
+          hint: `Set DESKTOP_DOWNLOAD_${platform.toUpperCase()}_URL (or NEXT_PUBLIC_DESKTOP_DOWNLOAD_${platform.toUpperCase()}) to a public installer URL and redeploy.`,
+        },
+        { status: 503 },
       ),
     };
   }
+
+  // Local dev: serve from `public/downloads/` (no fs — avoids Turbopack NFT tracing warnings).
+  return { redirect: new URL(`/downloads/${meta.filename}`, request.url).toString() };
 }
 
 export async function HEAD(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ platform: string }> },
 ) {
   const { platform } = await context.params;
-  const resolved = await resolveDownload(platform);
+  const resolved = await resolveDownload(request, platform);
   if ("error" in resolved && resolved.error) return resolved.error;
-  if ("redirect" in resolved && resolved.redirect) {
-    return NextResponse.redirect(resolved.redirect, 302);
-  }
-  const { meta, filePath } = resolved as { meta: (typeof FILES)[string]; filePath: string };
-  const info = await stat(filePath);
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      "Content-Type": meta.contentType,
-      "Content-Disposition": `attachment; filename="${meta.filename}"`,
-      "Content-Length": String(info.size),
-    },
-  });
+  return NextResponse.redirect(resolved.redirect!, 302);
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ platform: string }> },
 ) {
   const { platform } = await context.params;
-  const resolved = await resolveDownload(platform);
+  const resolved = await resolveDownload(request, platform);
   if ("error" in resolved && resolved.error) return resolved.error;
-  if ("redirect" in resolved && resolved.redirect) {
-    return NextResponse.redirect(resolved.redirect, 302);
-  }
-  const { meta, filePath } = resolved as { meta: (typeof FILES)[string]; filePath: string };
-  const body = await readFile(filePath);
-  return new NextResponse(body, {
-    status: 200,
-    headers: {
-      "Content-Type": meta.contentType,
-      "Content-Disposition": `attachment; filename="${meta.filename}"`,
-      "Content-Length": String(body.length),
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
+  return NextResponse.redirect(resolved.redirect!, 302);
 }

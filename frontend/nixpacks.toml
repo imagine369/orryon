@@ -1,11 +1,15 @@
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
+[variables]
+# Railway injects NPM_CONFIG_DEVDIR; npm 10 logs "Unknown env config devdir" (counts as deploy warning).
+NPM_CONFIG_DEVDIR = ""
+
 [phases.install]
-cmds = ["npm install --include=dev"]
+cmds = ["env -u NPM_CONFIG_DEVDIR npm install --include=dev"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["node node_modules/next/dist/bin/next build"]
 
 [start]
 cmd = "node node_modules/next/dist/bin/next start -H 0.0.0.0 -p ${PORT:-3000}"

@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
-import path from "path";
-import { fileURLToPath } from "url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWA from "@ducanh2912/next-pwa";
 
@@ -48,15 +48,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
-  async redirects() {
-    return [
-      {
-        source: "/downloads/Orryon-mac.dmg",
-        destination: "/api/download/mac",
-        permanent: true,
-      },
-    ];
-  },
+  // Legacy DMG URL: `src/app/downloads/Orryon-mac.dmg/route.ts` (keeps next.config out of NFT trace).
   // API proxy: `app/api/[[...path]]/route.ts` (runtime BACKEND_URL), not rewrites (build-time).
 };
 
