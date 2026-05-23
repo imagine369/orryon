@@ -68,7 +68,11 @@ const pwaConfig = withPWA({
 
 export default withSentryConfig(pwaConfig, {
   silent: true,
-  disableLogger: true,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
 
   // Source map uploads (only when SENTRY_AUTH_TOKEN is set)
   ...(process.env.SENTRY_AUTH_TOKEN && {

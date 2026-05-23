@@ -8,4 +8,4 @@ cmds = ["npm install --include=dev"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "node node_modules/next/dist/bin/next start -H 0.0.0.0 -p ${PORT:-3000}"
