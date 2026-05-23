@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
-import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check, RefreshCw } from "lucide-react";
@@ -10,6 +9,9 @@ import {
   ThinkingIndicator,
   assistantBubbleClass,
 } from "@/components/chat-bubble-primitives";
+import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
+import { OrryonAvatar } from "@/components/orryon-avatar";
+import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 
 export interface ChatThreadMessage {
   role: "user" | "assistant";
@@ -25,6 +27,8 @@ interface ChatThreadProps {
   copiedIndex: number | null;
   onCopy: (content: string, index: number) => void;
   onRetry: () => void;
+  /** Glow / breathe on the latest assistant avatar while Orryon is active. */
+  aliveState?: OrryonAliveState;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +173,13 @@ export function ChatThread({
   copiedIndex,
   onCopy,
   onRetry,
+  aliveState = "idle",
 }: ChatThreadProps) {
+  const lastAssistantIndex = messages.reduce(
+    (acc, msg, i) => (msg.role === "assistant" ? i : acc),
+    -1,
+  );
+
   return (
     <div className="flex w-full flex-col gap-6">
       {messages.map((msg, i) => {
@@ -193,14 +203,16 @@ export function ChatThread({
 
         return (
           <div key={i} className="group flex w-full min-w-0 items-start gap-3.5">
-            {/* Avatar */}
-            <Image
-              src="/avatar.png"
-              alt="Orryon"
-              width={28}
-              height={28}
-              className="mt-0.5 size-7 shrink-0 rounded-full object-contain ring-1 ring-white/[0.08]"
-            />
+            {i === lastAssistantIndex ? (
+              <OrryonAliveAvatar
+                size={28}
+                state={aliveState}
+                idlePulse
+                className="mt-0.5"
+              />
+            ) : (
+              <OrryonAvatar size={28} className="mt-0.5 ring-1 ring-white/[0.08]" />
+            )}
 
             {/* Content column */}
             <div className="flex min-w-0 flex-1 flex-col">

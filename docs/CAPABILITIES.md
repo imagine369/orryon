@@ -8,7 +8,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 
 | Layer | What it means |
 |-------|----------------|
-| **Chat** | Broad assistant (ChatGPT/Grok-style) for explanations, writing, planning, how-tos, health education, opinions, tutoring (non-code), and more |
+| **Chat** | Broad assistant for explanations, writing, planning, how-tos, health education, opinions, tutoring (non-code), and more |
 | **Tools** | Their Orryon data + live weather — log, read, update; never guess amounts or IDs |
 | **Not offered** | Porn / explicit sexual content · substantial **code** (IDE/homework) · **images** (generate/edit/analyze as a product) |
 
@@ -57,17 +57,17 @@ Morning **briefing**: Dashboard in the app (chat can suggest opening it).
 |------|-----------------|----------------|
 | Free / Starter | — (Breathe only) | — |
 | **Trial / Pro** | — (text chat only) | **Text only** |
-| **Premium** | Mic + Live Orryon (650 min / mo) | **Text only** |
-| **Premium Plus** | Mic + Live Orryon (1,200 min / mo) | **Text**; **TTS** when **Speak responses aloud** is on |
+| **Premium** | Mic in chat (650 min / mo) | **Text only** |
+| **Premium Plus** | Mic in chat (1,200 min / mo) | **Text**; **TTS** when **Speak responses aloud** is on |
 
 ---
 
-## Three limits (vs full ChatGPT/Grok)
+## Three limits
 
 | Limit | Not OK | OK |
 |-------|--------|-----|
 | **Porn** | Explicit sexual content, roleplay, minors | — (hard block; see Never) |
-| **Code** | Apps, repos, homework code, sustained debug | One-line plain-language tip; redirect to Cursor etc. |
+| **Code** | Apps, repos, homework code, sustained debug | One-line plain-language tip; redirect to a dedicated coding tool |
 | **Images** | Generate/edit/analyze images, logos, Lightroom workflows | One sentence on phone document photo |
 
 Everyday **writing** (emails, tone) is not code. **Sewing/cooking** how-tos are core chat.

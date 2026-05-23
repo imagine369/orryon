@@ -161,7 +161,7 @@ async def run_orryon(
     if not _all_keys:
         return {
             "message": (
-                "Grok API key not set. Add `XAI_API_KEY=your_key` to `.env`."
+                "AI API key not set. Add `XAI_API_KEY=your_key` to `.env`."
             ),
             "actions_taken": [],
             "tabs_to_refresh": [],
@@ -220,7 +220,7 @@ async def run_orryon_stream(
     session_id is forwarded as x-grok-conv-id for xAI prompt caching.
     """
     if not _all_keys:
-        yield {"type": "error", "message": "Grok API key not set."}
+        yield {"type": "error", "message": "Orryon's AI is not configured. Please try again later."}
         return
 
     system_prompt = get_system_prompt(user_name=user_name, tier=tier, mode=mode)
@@ -363,9 +363,9 @@ async def run_orryon_stream(
         elif status == 429:
             msg = "I'm getting a lot of requests right now. Give me a sec and try again."
         elif status >= 500:
-            msg = "xAI's servers are having a moment. Try again in a few seconds."
+            msg = "Orryon's AI is temporarily unavailable. Try again in a few seconds."
         else:
-            msg = f"Grok API error {status}. Try again shortly."
+            msg = "Orryon's AI hit a snag. Try again shortly."
         logger.error("Grok HTTP error %s: %s", status, exc)
         yield {"type": "error", "message": msg}
     except Exception as exc:

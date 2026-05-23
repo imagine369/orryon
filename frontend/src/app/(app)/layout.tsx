@@ -16,8 +16,6 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { useSubscription } from "@/lib/use-subscription";
 import { SubscriptionProvider } from "@/lib/subscription-service";
 import { usePreferences } from "@/lib/use-preferences";
-import { LifeOsOnboarding } from "@/components/life-os-onboarding";
-
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -96,7 +94,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <JournalPanel />
       <ResetAnchorPanel />
       <InstallPrompt />
-      <LifeOsOnboarding />
     </div>
   );
 }

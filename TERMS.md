@@ -36,7 +36,7 @@ These Terms constitute a legally binding agreement between you and Orryon. Your 
 
 ## 3. Description of Service and Modifications
 
-Orryon is a Life OS platform — personal finance, organization, AI concierge, and wellness in one place. The Service may include, without limitation, transaction tracking, budgeting tools, goal setting, AI-powered chat assistance (including third-party large language models such as xAI Grok), breathing and meditation exercises, scheduling, notifications, data export, and related features. We reserve the right, at any time and in our sole discretion, to modify, suspend, discontinue, or terminate the Service or any feature thereof, temporarily or permanently, with or without notice, and without liability to you or any third party. Continued use of the Service after any modification constitutes acceptance of the modified Service.
+Orryon is a Life OS platform — personal finance, organization, AI concierge, and wellness in one place. The Service may include, without limitation, transaction tracking, budgeting tools, goal setting, AI-powered chat assistance (including third-party large language models such as xAI), breathing and meditation exercises, scheduling, notifications, data export, and related features. We reserve the right, at any time and in our sole discretion, to modify, suspend, discontinue, or terminate the Service or any feature thereof, temporarily or permanently, with or without notice, and without liability to you or any third party. Continued use of the Service after any modification constitutes acceptance of the modified Service.
 
 ## 4. Not Professional Advice; Assumption of Risk; Multiple Disclaimers
 
@@ -44,7 +44,7 @@ Orryon is a Life OS platform — personal finance, organization, AI concierge, a
 
 ## 5. AI Limitations; No Reliance; Additional Disclaimers
 
-The AI assistant uses third-party large language models (including xAI Grok) and may produce inaccurate, incomplete, biased, hallucinated, outdated, inconsistent, or otherwise unreliable outputs. AI responses do not reflect the views of Orryon and are not verified, endorsed, or warranted by Orryon. **NOTWITHSTANDING ANY OTHER PROVISION OF THESE TERMS, YOU AGREE NOT TO RELY ON ANY AI OUTPUT FOR ANY PURPOSE, ESPECIALLY ANY DECISION WITH MATERIAL FINANCIAL, LEGAL, HEALTH, SAFETY, OR OTHER CONSEQUENCES. ORRYON MAKES NO WARRANTY, REPRESENTATION, OR GUARANTEE REGARDING THE ACCURACY, COMPLETENESS, OR SUITABILITY OF ANY AI OUTPUT. YOU ASSUME ALL RISK ASSOCIATED WITH THE USE OF AI FEATURES.** We reserve the right, at any time and without notice or liability, to modify, limit, suspend, or remove any AI feature or functionality.
+The AI assistant uses third-party large language models (including xAI) and may produce inaccurate, incomplete, biased, hallucinated, outdated, inconsistent, or otherwise unreliable outputs. AI responses do not reflect the views of Orryon and are not verified, endorsed, or warranted by Orryon. **NOTWITHSTANDING ANY OTHER PROVISION OF THESE TERMS, YOU AGREE NOT TO RELY ON ANY AI OUTPUT FOR ANY PURPOSE, ESPECIALLY ANY DECISION WITH MATERIAL FINANCIAL, LEGAL, HEALTH, SAFETY, OR OTHER CONSEQUENCES. ORRYON MAKES NO WARRANTY, REPRESENTATION, OR GUARANTEE REGARDING THE ACCURACY, COMPLETENESS, OR SUITABILITY OF ANY AI OUTPUT. YOU ASSUME ALL RISK ASSOCIATED WITH THE USE OF AI FEATURES.** We reserve the right, at any time and without notice or liability, to modify, limit, suspend, or remove any AI feature or functionality.
 
 ## 6. Subscription, Billing, Cancellation, and Refunds
 
@@ -68,7 +68,7 @@ Your use of the Service is subject to our Privacy Policy, which is incorporated 
 
 ## 11. Third-Party Services and Links
 
-The Service integrates with or links to third-party services (including xAI Grok, Stripe, and optional SMTP providers). We are not responsible for any third-party service, its content, availability, or practices. Your use of third-party services is at your own risk and subject to their respective terms and privacy policies.
+The Service integrates with or links to third-party services (including xAI, Stripe, and optional SMTP providers). We are not responsible for any third-party service, its content, availability, or practices. Your use of third-party services is at your own risk and subject to their respective terms and privacy policies.
 
 ## 12. Beta and Experimental Features
 

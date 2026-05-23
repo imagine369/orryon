@@ -16,7 +16,7 @@ This document describes the system architecture, folder responsibilities, data f
                     ┌──────────────────────────┼──────────────────┐
                     │                          │                  │
                core/grok_agent.py          db/               scheduler
-               (xAI Grok SSE)           (SQLite/PG)       (APScheduler)
+               (xAI SSE)              (SQLite/PG)       (APScheduler)
                     │                          │                  │
                core/tools/               config.py        email_sender
                core/system_prompt.py
@@ -60,7 +60,7 @@ The "brain" of orryon — used by the FastAPI backend:
 
 | File | Purpose |
 |------|---------|
-| `grok_agent.py` | Streaming xAI Grok agent with tool calling, memory extraction |
+| `grok_agent.py` | Streaming AI agent with tool calling, memory extraction |
 | `context_cache.py` | Redis-backed agent context snapshot (shared across workers) |
 | `tools/handlers/` | Domain tool handlers (expenses, bills, calendar, …) |
 | `tools/shared.py` | Shared handler utilities (cycles, budgets, dates) |
@@ -84,7 +84,7 @@ The "brain" of orryon — used by the FastAPI backend:
 
 ## Data Flow: AI Chat
 
-The most complex flow is the streaming chat, which connects the frontend to the Grok agent:
+The most complex flow is the streaming chat, which connects the frontend to the AI agent:
 
 ```
 1. User types message in frontend chat
@@ -92,7 +92,7 @@ The most complex flow is the streaming chat, which connects the frontend to the 
 3. backend/routers/chat.py validates auth, checks rate limit & spend cap
 4. Calls core/grok_agent.py → run_orryon_stream()
 5. grok_agent builds messages array (system prompt + context + history + user msg)
-6. Streams SSE from xAI Grok API
+6. Streams SSE from the AI provider API
 7. For each chunk:
    - Text tokens → yield {"type": "token", "content": "..."} → SSE to frontend
    - Tool calls → execute via core/tools/ → append result → loop back to step 6
@@ -115,7 +115,7 @@ data: [DONE]
 
 ### Canonical Tool Surface
 
-Grok is taught the names in `core/canonical_tools.py` (also listed in
+The model is taught the names in `core/canonical_tools.py` (also listed in
 `core/system_prompt.py` v6). Only those names are sent in `GROK_TOOL_SCHEMAS`
 (each chat request). Legacy aliases remain in `_TOOL_MAP` so old tool-call IDs
 still execute, but are not sent to the API. Memory is injected by
@@ -153,7 +153,7 @@ Two server-side safety nets wrap the dispatcher:
    (`YYYY-MM-DD` for date-only fields, `YYYY-MM-DDTHH:MM:SS` for `start`/`end`),
    snaps categories/moods/frequencies to canonical values via fuzzy match,
    and forces amounts to positive floats. Runs on every `execute_tool` call.
-2. **`_needs_tool_reprompt`** (`core/grok_agent.py`) — if Grok produces
+2. **`_needs_tool_reprompt`** (`core/grok_agent.py`) — if the model produces
    neither a tool call nor a clarifying question on a turn whose user
    message contained an action verb, a one-shot system correction is
    appended and the call is retried. Capped at one retry per turn; emits
@@ -266,7 +266,7 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 |----------|-----------|
 | SQLite over PostgreSQL | Local-first philosophy; zero external dependencies for self-hosting |
 | Raw SQL over ORM | Performance, transparency, fewer abstraction layers |
-| Grok-only AI | Policy decision; single-provider simplicity, xAI tool calling support |
+| Single AI provider | Policy decision; single-provider simplicity, tool calling support |
 | JWT over sessions | Stateless auth fits the decoupled frontend/backend architecture |
 | SSE over WebSocket | Simpler for one-directional streaming; sufficient for chat |
 | APScheduler over Celery | No Redis/broker dependency; fits single-process deployment |

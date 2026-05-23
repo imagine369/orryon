@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
-const STORAGE_KEY = "orryon_life_os_onboarding_v2";
+const STORAGE_KEY = "orryon_life_os_onboarding_v3";
 
 const STEPS = [
   {
     title: "Ask",
-    body: "Chat is broad like ChatGPT — planning, writing, how-tos, and more. Pro is text-only. Premium adds speak-in and Live Orryon. Premium Plus can read replies aloud when you turn that on.",
+    body: "Chat covers planning, writing, how-tos, and more. Pro is text-only. Premium adds speak-in via the chat mic. Premium Plus can read replies aloud when you turn that on.",
   },
   {
     title: "Do",
@@ -32,6 +32,11 @@ export function LifeOsOnboarding() {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("orryon-onboarding-open", open);
+    return () => document.body.classList.remove("orryon-onboarding-open");
+  }, [open]);
 
   function dismiss() {
     try {

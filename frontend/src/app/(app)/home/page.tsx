@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,7 +18,6 @@ import {
 } from "@/lib/api";
 import { VoiceLimitError, textToSpeech } from "@/lib/voice";
 import {
-  planAllowsLiveOrryon,
   planAllowsVoiceInput,
   planAllowsVoiceOutput,
   planShowsSpeakResponsesToggle,
@@ -35,7 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
 import { DailyBriefingCard } from "@/components/daily-briefing-card";
-import { OrroyonBuddy } from "@/components/orryon-buddy";
+import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
 import {
   DeleteConfirmModal,
@@ -144,6 +142,8 @@ export default function HomePage() {
   // ── Voice ───────────────────────────────────────────────────────────────────
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  const orryonAliveState = deriveOrryonAliveState(voiceStatus, streaming, thinking);
 
   // Voice limit modal — shown when the user exhausts their monthly minute cap.
   const [voiceLimitOpen, setVoiceLimitOpen] = useState(false);
@@ -558,15 +558,6 @@ export default function HomePage() {
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />
-      {/* ── Live Orryon floating companion — Premium / Premium Plus only, user-controllable */}
-      {planAllowsLiveOrryon(sub?.plan) && prefs.live_orryon_enabled && (
-        <OrroyonBuddy
-          onActivate={() => {
-            setVoiceStatus("listening");
-            document.querySelector<HTMLElement>("[data-chat-input]")?.focus();
-          }}
-        />
-      )}
 
       {/* ── Voice limit modal ─────────────────────────────────────────────── */}
       <VoiceLimitModal
@@ -761,27 +752,8 @@ export default function HomePage() {
           {/* Flex-1 body: greeting centered, input pinned to bottom */}
           <div className="flex flex-1 flex-col">
 
-            {/* Avatar + greeting — centered in the remaining space */}
+            {/* Greeting — centered in the remaining space */}
             <div className="flex flex-1 flex-col items-center justify-center">
-              <motion.div
-                className="mb-5"
-                animate={{ y: [0, -6, 0], scale: [1, 1.025, 1] }}
-                transition={{
-                  duration: 3.8,
-                  ease: "easeInOut",
-                  repeat: Infinity,
-                  repeatType: "loop",
-                }}
-              >
-                <Image
-                  src="/avatar.png"
-                  alt="Orryon"
-                  width={96}
-                  height={96}
-                  className="rounded-full object-contain ring-1 ring-white/[0.09]"
-                />
-              </motion.div>
-
               <p className="mb-2 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
                 {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
               </p>
@@ -838,7 +810,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Input — pinned to bottom, identical structure to chat view footer */}
+            {/* Input — pinned to bottom */}
             <div
               className="shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-3"
               style={{
@@ -957,6 +929,7 @@ export default function HomePage() {
                 copiedIndex={copiedIndex}
                 onCopy={handleCopy}
                 onRetry={handleRetry}
+                aliveState={orryonAliveState}
               />
               <div ref={bottomRef} className="h-4" />
             </div>

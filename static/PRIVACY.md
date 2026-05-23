@@ -25,7 +25,7 @@ Where applicable (including for users in the European Economic Area, United King
 
 ## 4. AI and Third-Party Processing; Subprocessors
 
-When you use the AI assistant, your messages and a limited, relevant summary of your data (e.g., recent transactions, current budgets, or active goals) may be transmitted to third-party AI providers such as xAI (Grok API). We do not transmit your full database or raw financial history. We maintain a list of subprocessors and service providers, which we update from time to time. Current subprocessors include xAI (for AI processing), Stripe (for billing), and optional SMTP providers (for transactional emails you configure). Review xAI's privacy policy at https://x.ai/legal/privacy-policy and Stripe's privacy policy at https://stripe.com/privacy. We require all subprocessors to maintain appropriate confidentiality and security measures.
+When you use the AI assistant, your messages and a limited, relevant summary of your data (e.g., recent transactions, current budgets, or active goals) may be transmitted to third-party AI providers such as xAI. We do not transmit your full database or raw financial history. We maintain a list of subprocessors and service providers, which we update from time to time. Current subprocessors include xAI (for AI processing), Stripe (for billing), and optional SMTP providers (for transactional emails you configure). Review xAI's privacy policy at https://x.ai/legal/privacy-policy and Stripe's privacy policy at https://stripe.com/privacy. We require all subprocessors to maintain appropriate confidentiality and security measures.
 
 ## 5. Sharing and Disclosure of Personal Information; No Sale of Data
 

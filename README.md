@@ -20,7 +20,7 @@ Orryon runs as a **Next.js frontend + FastAPI backend**.
                                  ┌──────────────────┼───────────────┐
                                  │                  │               │
                             core/grok_agent.py   db/           core/scheduler.py
-                            (xAI Grok SSE)     (SQLite/PG)    (APScheduler)
+                            (xAI SSE)          (SQLite/PG)    (APScheduler)
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and migration roadmap.
@@ -29,9 +29,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 
 ## Features
 
-**Life OS pillars:** Finance · Organize · Wellbeing — plus broad AI chat (ChatGPT/Grok-style), minus porn, substantial code, and images.
+**Life OS pillars:** Finance · Organize · Wellbeing — plus broad AI chat, minus porn, substantial code, and images.
 
-- **AI Chat** — powered by xAI Grok; broad conversation or tools on your data (expenses, calendar, tasks, health vitals)
+- **AI Chat** — broad conversation or tools on your data (expenses, calendar, tasks, health vitals)
 - **Dashboard** — net balance, monthly spending, top categories, upcoming events
 - **Budget** — transaction history, category breakdown, quick-add expense form
 - **Forecast** — spending trends and projections
@@ -41,7 +41,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 - **Lists** — multi-list system (Todoist-style custom lists)
 - **OTP Auth** — email-based sign-in (no passwords); demo mode for local development
 - **PWA** — installable as a mobile app (manifest + service worker)
-- **Receipt Scanner** — snap a photo to auto-extract expense data (Grok Vision)
+- **Receipt Scanner** — snap a photo to auto-extract expense data (AI vision)
 - **CSV Import** — upload bank CSVs with auto-detected column mapping (Chase, Amex, generic)
 - **Data Export** — download all your data as a ZIP (SQLite DB + JSON)
 - **Share Links** — generate read-only dashboard links
@@ -140,7 +140,7 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 
 | Variable | Required | Description |
 |---|---|---|
-| `XAI_API_KEY` | **Yes** | xAI Grok API key — enables the AI chat |
+| `XAI_API_KEY` | **Yes** | AI API key — enables the AI chat |
 | `JWT_SECRET` | Prod | Secret for JWT signing (auto-generated in dev) |
 | `GROK_MODEL` | No | xAI model (default: `grok-4.3`) |
 | `SMTP_HOST` | No | SMTP server for OTP emails and reminders |
@@ -243,7 +243,7 @@ orryon/
 │   └── package.json
 │
 ├── core/                       # Shared business logic
-│   ├── grok_agent.py           #   xAI Grok streaming agent + memory
+│   ├── grok_agent.py           #   AI streaming agent + memory
 │   ├── context_cache.py        #   Redis-backed prompt context cache
 │   ├── tools/handlers/         #   Domain tool implementations
 │   ├── tools/shared.py         #   Shared tool utilities
@@ -270,7 +270,7 @@ orryon/
 See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies (Effective Date: May 12, 2026 | Version 3.0). These are the authoritative versions and are harmonized with the live frontend legal pages.
 
 - **Local-first** — all data stays in a single SQLite file on your device.
-- **AI chat** sends your messages + a context summary to xAI Grok. No full database is shared.
+- **AI chat** sends your messages + a context summary to third-party AI providers. No full database is shared.
 - **Stripe** handles payments — we never store card details.
 - **Full data export** (ZIP) and **account deletion** are always available.
 

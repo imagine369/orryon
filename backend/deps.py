@@ -189,7 +189,7 @@ VOICE_LIMITS_MINUTES: dict[str, int] = {
     "starter":       0,
     "trial":         0,     # previews Pro — text-only Life OS
     "pro":           0,     # text chat only; no STT/TTS
-    "premium":       650,   # speak-in + Live Orryon; text replies
+    "premium":       650,   # speak-in via chat mic; text replies
     "premium_plus":  1200,  # + optional TTS when voice_overlay on
 }
 
@@ -306,7 +306,7 @@ async def require_voice_input_plan(user: dict = Depends(get_current_user)) -> di
         raise HTTPException(
             403,
             "Speaking to Orryon is included on Premium and Premium Plus. "
-            "Pro is text-only — upgrade to Premium to use the mic or Live Orryon.",
+            "Pro is text-only — upgrade to Premium to use the mic in chat.",
         )
     return user
 

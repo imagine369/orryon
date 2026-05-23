@@ -1049,7 +1049,7 @@ async def create_voice_topup_checkout(
     if plan_info["plan"] != "premium_plus":
         raise HTTPException(
             403,
-            "Voice minute top-ups are for Premium Plus. Premium includes speak-in via Live Orryon; spoken replies require Premium Plus.",
+            "Voice minute top-ups are for Premium Plus. Premium includes speak-in via the chat mic; spoken replies require Premium Plus.",
         )
 
     frontend_url = os.getenv("FRONTEND_URL", os.getenv("APP_URL", "http://localhost:3000"))

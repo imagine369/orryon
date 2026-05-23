@@ -51,7 +51,7 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "What is Orryon?",
-        a: "Orryon is your Life OS: ask almost anything in chat (like ChatGPT or Grok), and when it\u2019s about your life here \u2014 spending, calendar, tasks, notes \u2014 Orryon actually does it with tools. Not a coding IDE, image generator, or explicit-content site.",
+        a: "Orryon is your Life OS: ask almost anything in chat, and when it\u2019s about your life here \u2014 spending, calendar, tasks, notes \u2014 Orryon actually does it with tools. Not a coding IDE, image generator, or explicit-content site.",
       },
       {
         q: "What can Orryon help with in chat?",
@@ -59,7 +59,7 @@ const FAQ: FAQCategory[] = [
       },
       {
         q: "What is Orryon not built for?",
-        a: "Three limits: (1) no porn or explicit sexual content, (2) no substantial coding \u2014 apps, repos, or programming homework (brief plain-language tips are OK), (3) no images \u2014 generating, editing, or analyzing pictures/logos. Use Cursor, Midjourney, or similar for those. Everything else in normal chat is fair game.",
+        a: "Three limits: (1) no porn or explicit sexual content, (2) no substantial coding \u2014 apps, repos, or programming homework (brief plain-language tips are OK), (3) no images \u2014 generating, editing, or analyzing pictures/logos. Use dedicated coding or image tools for those. Everything else in normal chat is fair game.",
       },
       {
         q: "How do I talk to Orryon?",
@@ -231,11 +231,11 @@ const FAQ: FAQCategory[] = [
     items: [
       {
         q: "Can I speak to Orryon or hear Orryon speak?",
-        a: "Trial and Pro: type in chat only — full Life OS, text replies. Premium and Premium Plus: speak in (mic or Live Orryon); Orryon still replies in text. Premium Plus can turn on Speak responses aloud to hear replies. Free/Starter: Breathe only.",
+        a: "Trial and Pro: type in chat only — full Life OS, text replies. Premium and Premium Plus: speak in with the mic in chat; Orryon still replies in text. Premium Plus can turn on Speak responses aloud to hear replies. Free/Starter: Breathe only.",
       },
       {
         q: "How accurate is the AI?",
-        a: "Orryon uses xAI\u2019s Grok model, which is highly capable but can occasionally make mistakes. Always verify important financial information independently. The AI improves over time as it learns your preferences.",
+        a: "Orryon\u2019s AI is highly capable but can occasionally make mistakes. Always verify important financial information independently. The AI improves over time as it learns your preferences.",
       },
     ],
   },

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IntegrityGate } from "@/components/integrity-gate";
 import { ScrollToTopOnNavigate } from "@/components/scroll-to-top-on-navigate";
+import { SwBuildSync } from "@/components/sw-build-sync";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -68,6 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <AuthProvider>
             <ErrorBoundary>
               <TooltipProvider>
+                <SwBuildSync />
                 <ScrollToTopOnNavigate />
                 {children}
               </TooltipProvider>

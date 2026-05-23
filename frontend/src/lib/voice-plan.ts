@@ -12,11 +12,6 @@ export function planAllowsVoiceOutput(plan: VoicePlan, overlayEnabled: boolean):
   return plan === "premium_plus" && overlayEnabled;
 }
 
-/** Floating Live Orryon companion — Premium tiers */
-export function planAllowsLiveOrryon(plan: VoicePlan): boolean {
-  return plan === "premium" || plan === "premium_plus";
-}
-
 /** Show speaker toggle in chat */
 export function planShowsSpeakResponsesToggle(plan: VoicePlan): boolean {
   return plan === "premium_plus";

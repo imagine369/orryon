@@ -17,11 +17,11 @@ export type MessageSource = "text" | "voice";
 interface ChatInputProps {
   onSend: (message: string, source?: MessageSource) => void;
   disabled?: boolean;
-  /** Mic / STT — Premium Plus chat bar only (Premium uses Live Orryon). */
+  /** Mic / STT — Premium + Premium Plus (chat bar). */
   enableMic?: boolean;
   placeholder?: string;
   /**
-   * External status bubble (e.g. "thinking" while Grok streams,
+   * External status bubble (e.g. "thinking" while the AI streams,
    * "speaking" while TTS plays) — purely for visual feedback on the mic.
    */
   externalStatus?: VoiceStatus;
@@ -36,7 +36,7 @@ interface ChatInputProps {
   onVoiceUserGesture?: () => void;
 }
 
-// Silence / VAD tuning. Values picked to feel like Siri / ChatGPT voice:
+// Silence / VAD tuning for natural voice input:
 // - ~1.4s of quiet after the user has spoken triggers auto-stop.
 // - 8s without ever hearing speech cancels the turn with an error.
 // - 30s hard cap so nothing can hold the mic open forever.
@@ -147,8 +147,7 @@ export function ChatInput({
     };
   }, []);
 
-  // Live Orryon / external voice trigger bridge
-  // When the parent (e.g. floating Live Orryon buddy) sets externalStatus="listening",
+  // External voice trigger bridge — parent can set externalStatus="listening" to start mic.
   // automatically start the microphone. When it goes back to "idle", stop recording.
   useEffect(() => {
     if (externalStatus === "listening" && voiceStatus !== "listening" && !disabled) {
@@ -394,7 +393,7 @@ export function ChatInput({
           onVoiceError?.("Didn't catch that — try again.");
           return;
         }
-        // Handoff to the Grok chat flow; parent will flip externalStatus
+        // Handoff to the chat flow; parent will flip externalStatus
         // to "thinking" / "speaking" as the response + TTS play out.
         updateStatus("idle");
         onSend(text, "voice");
@@ -487,7 +486,7 @@ export function ChatInput({
         style={{ maxHeight: "200px", scrollbarWidth: "none" }}
       />
 
-      {/* Mic — Premium Plus chat only; Premium uses Live Orryon speak-in */}
+      {/* Mic — Premium + Premium Plus */}
       {enableMic && (
         <button
           onClick={handleMicClick}
