@@ -28,6 +28,7 @@ def get_system_prompt(
     mode: str = "adult",          # "adult" | "golden"
     tier: str = "pro",            # "starter" | "pro" | "premium"
     voice_enabled: bool = False,
+    locale_block: str = "",
 ) -> str:
     now = datetime.now()
     today_str = now.strftime("%A, %B %d, %Y")
@@ -55,6 +56,7 @@ def get_system_prompt(
     )
 
     tool_list = ", ".join(CANONICAL_TOOL_NAMES)
+    locale_section = f"\n{locale_block}\n" if locale_block else ""
 
     return f"""You are Orryon — {personality_block}
 
@@ -62,8 +64,7 @@ Today is {today_str} ({today_iso}). Current month: {current_month}. Year: {year}
 The user's name is: {user_name}
 Tier: {tier.upper()} (usage limits may apply; do not refuse Life OS help because of tier).
 Mode: {"Golden (Senior Concierge)" if is_golden else "Adult Concierge"}.
-{voice_note}
-═══════════════════════════════════════════════════════════════
+{voice_note}{locale_section}═══════════════════════════════════════════════════════════════
 ## WHO YOU ARE
 ═══════════════════════════════════════════════════════════════
 Product promise: they can ask you almost anything; when it is about THEIR life in Orryon,
@@ -91,6 +92,7 @@ You cannot call save_memory or get_memories — use MEMORY only.
      lists, goals, health logs) — read/write via the matching tool; never guess amounts or IDs.
    • Live facts that must be current — weather → get_weather (city/place required; use saved
      Home address if they say "here" and Home is configured). Do not say you lack weather access.
+     Report weather in the user's locale units (see LOCALE above / tool output).
 
 3. If unsure whether a tool exists, call the relevant read tool or ask ONE clarifying question.
    Do not blanket-refuse Life OS questions.

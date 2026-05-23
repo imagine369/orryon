@@ -25,6 +25,7 @@ import httpx
 from config import XAI_API_KEY, XAI_API_KEYS, GROK_MODEL
 from core.canonical_tools import build_reprompt_note
 from core.system_prompt import get_system_prompt
+from core.user_locale import get_user_locale
 from core.context_cache import (
     get_context_snapshot_text,
     invalidate_context_cache,
@@ -223,7 +224,13 @@ async def run_orryon_stream(
         yield {"type": "error", "message": "Orryon's AI is not configured. Please try again later."}
         return
 
-    system_prompt = get_system_prompt(user_name=user_name, tier=tier, mode=mode)
+    locale = get_user_locale(user_id)
+    system_prompt = get_system_prompt(
+        user_name=user_name,
+        tier=tier,
+        mode=mode,
+        locale_block=locale.prompt_block(),
+    )
     memories = _get_user_memories(user_id)
     context_snip = await get_context_snapshot_text(
         user_id, lambda: _compute_context_snapshot(user_id),
@@ -493,6 +500,9 @@ def _compute_context_snapshot(user_id: str) -> str:
         )
         from db import get_total_monthly_income
 
+        locale = get_user_locale(user_id)
+        fmt = locale.format_money
+
         bal_data = _get_balance({}, user_id)
         spend = _get_spending_summary({"period": "this_month"}, user_id)
         budget = _get_budget_status({}, user_id)
@@ -501,29 +511,29 @@ def _compute_context_snapshot(user_id: str) -> str:
         monthly_income = get_total_monthly_income(user_id)
 
         lines = [
-            f"- Balance: ${bal_data['balance']:,.0f}",
-            f"- Goals earmarked: ${bal_data['goals_earmarked']:,.0f}",
-            f"- Free to spend (balance after goals): ${bal_data['free_to_spend']:,.0f}",
-            f"- Monthly income: ${monthly_income:,.0f}" if monthly_income > 0 else "- Monthly income: not set",
-            f"- Monthly bills: ${bal_data['monthly_bills']:,.0f}",
-            f"- This month's spending: ${spend['total']:,.0f} ({spend['transaction_count']} transactions)",
+            f"- Balance: {fmt(bal_data['balance'])}",
+            f"- Goals earmarked: {fmt(bal_data['goals_earmarked'])}",
+            f"- Free to spend (balance after goals): {fmt(bal_data['free_to_spend'])}",
+            f"- Monthly income: {fmt(monthly_income)}" if monthly_income > 0 else "- Monthly income: not set",
+            f"- Monthly bills: {fmt(bal_data['monthly_bills'])}",
+            f"- This month's spending: {fmt(spend['total'])} ({spend['transaction_count']} transactions)",
         ]
         for cat in spend.get("by_category", [])[:3]:
-            lines.append(f"  . {cat['category']}: ${cat['total']:,.0f}")
+            lines.append(f"  . {cat['category']}: {fmt(cat['total'])}")
         for b in budget.get("categories", [])[:3]:
             lines.append(
-                f"  . Budget {b['category']}: ${b['spent']:,.0f}/${b['planned']:,.0f} ({b['pct_used']}%)"
+                f"  . Budget {b['category']}: {fmt(b['spent'])}/{fmt(b['planned'])} ({b['pct_used']}%)"
             )
         if goals.get("goals"):
             lines.append("- Goals:")
             for g in goals["goals"][:3]:
                 lines.append(
-                    f"  . {g['name']}: ${g['current_amount']:,.0f}/${g['target_amount']:,.0f} ({g['pct_complete']}%)"
+                    f"  . {g['name']}: {fmt(g['current_amount'])}/{fmt(g['target_amount'])} ({g['pct_complete']}%)"
                 )
         if schedule.get("items"):
             lines.append("- Upcoming (7 days):")
             for item in schedule["items"][:5]:
-                amt = f" ${item['amount']:,.0f}" if item.get("amount") else ""
+                amt = f" {fmt(item['amount'])}" if item.get("amount") else ""
                 lines.append(f"  . [{item['type']}] {item['title']} — {item.get('date', '')}{amt}")
 
         try:

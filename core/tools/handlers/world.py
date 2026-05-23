@@ -8,6 +8,7 @@ import urllib.request
 from typing import Any
 
 from db import get_user_places
+from core.user_locale import get_user_locale
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ def _geocode(location: str) -> dict | None:
         "name": row.get("name") or location,
         "admin1": row.get("admin1") or "",
         "country": row.get("country") or "",
+        "country_code": (row.get("country_code") or "").upper(),
         "latitude": row["latitude"],
         "longitude": row["longitude"],
         "timezone": row.get("timezone") or "auto",
@@ -99,11 +101,14 @@ def _get_weather(args: dict, user_id: str) -> dict:
 
         lat = geo["latitude"]
         lon = geo["longitude"]
+        locale = get_user_locale(user_id)
         forecast_url = (
             "https://api.open-meteo.com/v1/forecast?"
             f"latitude={lat}&longitude={lon}"
             "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m"
             "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+            f"&temperature_unit={locale.temperature_unit}"
+            f"&wind_speed_unit={locale.wind_speed_unit}"
             "&timezone=auto&forecast_days=2"
         )
         wx = _http_json(forecast_url)
@@ -144,6 +149,12 @@ def _get_weather(args: dict, user_id: str) -> dict:
                 "high": hi,
                 "low": lo,
                 "conditions": _wmo_label(today_code),
+            },
+            "user_locale": {
+                "country_code": locale.country_code,
+                "currency": locale.currency,
+                "temperature_preference": locale.temp_display,
+                "wind_preference": locale.wind_display,
             },
             "source": "Open-Meteo (live)",
             "fetched_at": current.get("time") or wx.get("timezone_abbreviation"),

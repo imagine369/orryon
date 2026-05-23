@@ -13,6 +13,8 @@ import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
 import { OrryonAvatar } from "@/components/orryon-avatar";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 
+const CHAT_AVATAR_SIZE = 35; // 25% larger than the previous 28px
+
 export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
@@ -205,13 +207,13 @@ export function ChatThread({
           <div key={i} className="group flex w-full min-w-0 items-start gap-3.5">
             {i === lastAssistantIndex ? (
               <OrryonAliveAvatar
-                size={28}
+                size={CHAT_AVATAR_SIZE}
                 state={aliveState}
                 idlePulse
                 className="mt-0.5"
               />
             ) : (
-              <OrryonAvatar size={28} className="mt-0.5 ring-1 ring-white/[0.08]" />
+              <OrryonAvatar size={CHAT_AVATAR_SIZE} className="mt-0.5 ring-1 ring-white/[0.08]" />
             )}
 
             {/* Content column */}
