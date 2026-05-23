@@ -33,6 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
 import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
+import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
 import {
   DeleteConfirmModal,
@@ -752,8 +753,16 @@ export default function HomePage() {
           {/* Flex-1 body: greeting centered, input pinned to bottom */}
           <div className="flex flex-1 flex-col">
 
-            {/* Greeting — centered in the remaining space */}
+            {/* Avatar + greeting — centered in the remaining space */}
             <div className="flex flex-1 flex-col items-center justify-center">
+              <div className="mb-5">
+                <OrryonAliveAvatar
+                  size={96}
+                  state={orryonAliveState}
+                  idlePulse
+                  priority
+                />
+              </div>
               <p className="mb-4 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
                 {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
               </p>
