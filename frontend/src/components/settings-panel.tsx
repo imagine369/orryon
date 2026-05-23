@@ -167,7 +167,7 @@ const VIEW_TITLES: Record<string, string> = {
   data: "Data",
   notifications: "Notifications",
   financial: "Financial Preferences",
-  subscription: "Subscription",
+  subscription: "Plan + usage",
   app: "App",
   memory: "Memory",
   health: "Health",
@@ -458,6 +458,20 @@ export function SettingsPanel() {
 
       {/* Navigation items */}
       <div>
+        {sub && (
+          <NavItem
+            icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
+            title="Plan + usage"
+            description={
+              sub.plan === "trial"
+                ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
+                : sub.plan === "pro"
+                ? "Pro — active"
+                : "Free — trial ended"
+            }
+            onClick={() => setView("subscription")}
+          />
+        )}
         <NavItem
           icon={<Shield className="h-5 w-5" strokeWidth={1.5} />}
           title="Security & Account Access"
@@ -482,32 +496,6 @@ export function SettingsPanel() {
           description="Currency, budget cycle, and spending alerts"
           onClick={() => setView("financial")}
         />
-        {sub && (
-          <NavItem
-            icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
-            title="Subscription"
-            description={
-              sub.plan === "trial"
-                ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
-                : sub.plan === "pro"
-                ? "Pro — active"
-                : "Free — trial ended"
-            }
-            onClick={() => setView("subscription")}
-          />
-        )}
-        {voiceUsage && sub?.is_active_pro && (
-          <NavItem
-            icon={<Mic className="h-5 w-5" strokeWidth={1.5} />}
-            title="Voice minutes"
-            description={
-              voiceAtLimit
-                ? "All included minutes used · Add more"
-                : `${Math.round(voiceUsage.minutes_used)} / ${voiceUsage.total_available_minutes} min used`
-            }
-            onClick={() => setView("subscription")}
-          />
-        )}
         <NavItem
           icon={<Download className="h-5 w-5" strokeWidth={1.5} />}
           title="App"
