@@ -1,56 +1,40 @@
 """
-backend/routers/account.py — Account settings, data portability, and preferences.
+backend/routers/account_settings.py — Profile settings, email change, preferences, chat usage.
 
-Stripe billing lives in backend/routers/billing.py and stripe_webhook.py (Phase 2b).
+Extracted from account.py (Phase 2c).
 """
-
 from __future__ import annotations
 
-import json
 import logging
-import os
-import secrets
-import uuid
-from datetime import datetime, timezone
-from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from backend.auth import _parse_device_name, create_token, get_current_user
-from backend.cache import check_rate_limit_async
 from backend.deps import (
     IS_LOCAL_DEV,
-    IS_PRODUCTION,
-    check_monthly_api_quota,
-    require_active_plan,
-    resolve_plan,
-    resolve_plan_for_user,
     get_monthly_spend_cap,
     get_monthly_token_cap,
+    resolve_plan,
 )
 from backend.schemas import (
     EmailChangeSendReq,
     EmailChangeVerifyReq,
     SettingsUpdate,
 )
-from config import APP_URL, GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
+from config import GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from core.display_name import normalize_display_name
 from db.preferences import normalize_life_priorities, parse_life_priorities
 from db import (
     create_verification_code,
+    get_chat_message_count,
     get_connection,
-    get_monthly_spend,
     get_user_preferences,
     upsert_user_preferences,
-    get_chat_message_count,
-    insert_row,
-    record_token_spend,
     update_row,
     verify_code,
 )
-from email_sender import send_verification_code, _send_email, orryon_email_header_html
+from email_sender import send_verification_code
 
 logger = logging.getLogger(__name__)
 
@@ -199,201 +183,6 @@ async def delete_account(user: dict = Depends(get_current_user)):
         conn.commit()
     return {"deleted": True}
 
-
-# ── Export ────────────────────────────────────────────────────────────────────
-
-@router.get("/api/export")
-async def export_data(user: dict = Depends(require_active_plan)):
-    """Download all user data as a ZIP file containing the SQLite DB and JSON."""
-    from core.export import build_user_export_zip
-
-    zip_bytes = build_user_export_zip(user["user_id"])
-    return Response(
-        content=zip_bytes,
-        media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=orryon_export.zip"},
-    )
-
-
-# ── Share ─────────────────────────────────────────────────────────────────────
-
-@router.post("/api/share")
-async def create_share_link(user: dict = Depends(require_active_plan)):
-    uid = user["user_id"]
-    with get_connection() as conn:
-        existing = conn.execute(
-            "SELECT token FROM share_tokens WHERE user_id=? AND is_active=1 AND view_type='finance_readonly'",
-            (uid,),
-        ).fetchone()
-    if existing:
-        return {"token": existing["token"], "url": f"{APP_URL}?share_token={existing['token']}"}
-    token = secrets.token_urlsafe(16)
-    insert_row("share_tokens", {
-        "id": str(uuid.uuid4()), "user_id": uid, "token": token,
-        "view_type": "finance_readonly", "is_active": 1,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"token": token, "url": f"{APP_URL}?share_token={token}"}
-
-
-@router.get("/api/share/{token}")
-async def get_shared_dashboard(token: str):
-    """Public endpoint — no auth required. Returns a read-only dashboard snapshot."""
-    from datetime import date
-    from db import get_balance
-
-    with get_connection() as conn:
-        tok_row = conn.execute(
-            "SELECT user_id FROM share_tokens WHERE token=? AND is_active=1 AND view_type='finance_readonly'",
-            (token,),
-        ).fetchone()
-        if not tok_row:
-            raise HTTPException(404, "Invalid or expired share link")
-        uid = tok_row["user_id"]
-        today = date.today()
-        month_start = today.replace(day=1).isoformat()
-
-        balance = get_balance(uid)
-        month_row = conn.execute(
-            "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
-            "WHERE user_id=? AND date>=? AND amount>0", (uid, month_start),
-        ).fetchone()
-        cats = conn.execute(
-            "SELECT category, SUM(amount) as total FROM transactions "
-            "WHERE user_id=? AND date>=? AND amount>0 GROUP BY category ORDER BY total DESC LIMIT 5",
-            (uid, month_start),
-        ).fetchall()
-
-    return {
-        "balance": balance,
-        "month_spend": float(month_row["total"]) if month_row else 0,
-        "top_categories": [{"category": c["category"], "total": float(c["total"])} for c in cats],
-    }
-
-
-# ── Receipt Scanning ─────────────────────────────────────────────────────────
-
-# Cap uploads at 5 MB (matches CSV import) and accept only common image types.
-_RECEIPT_MAX_BYTES = 5 * 1024 * 1024
-_RECEIPT_ALLOWED_MIME = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-}
-
-
-@router.post("/api/receipts/scan")
-async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(require_active_plan)):
-    """Use Grok Vision to extract structured data from a receipt image."""
-    import base64
-    import re as re_module
-    import httpx
-
-    uid = user["user_id"]
-
-    # Rate limit: 10 scans per 10 min per user, 200/hour globally.
-    if not await check_rate_limit_async(f"receipt:user:{uid}", limit=10, window_seconds=600):
-        raise HTTPException(status_code=429, detail="Too many receipt scans — please wait a minute.")
-    if not await check_rate_limit_async("receipt:global", limit=200, window_seconds=3600):
-        logger.warning("Global receipt scan rate limit hit (user=%s).", uid)
-        raise HTTPException(status_code=429, detail="Receipt scanning is temporarily paused — please try again soon.")
-
-    plan_info = resolve_plan_for_user(uid)
-    check_monthly_api_quota(uid, plan_info["plan"])
-
-    mime = (file.content_type or "image/jpeg").lower()
-    if mime not in _RECEIPT_ALLOWED_MIME:
-        raise HTTPException(status_code=415, detail="Unsupported file type. Upload a JPG, PNG, WEBP, or HEIC image.")
-
-    # Read with a hard cap; refuse anything larger.
-    contents = await file.read(_RECEIPT_MAX_BYTES + 1)
-    if len(contents) > _RECEIPT_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Receipt image is too large (max 5 MB).")
-    if not contents:
-        raise HTTPException(status_code=400, detail="Empty upload.")
-
-    b64 = base64.b64encode(contents).decode("utf-8")
-
-    payload = {
-        "model": GROK_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{mime};base64,{b64}"},
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "This is a receipt image. Extract the following and respond ONLY with valid JSON, no markdown:\n"
-                            '{"merchant": "store name", "amount": 12.34, "date": "YYYY-MM-DD", "category": "one of: Food & Dining, Groceries, Transport, Entertainment, Shopping, Health & Fitness, Utilities, Travel, Subscriptions, Personal Care, Education, Other", "items": ["item1", "item2"]}\n'
-                            "If you cannot determine a field, use null. Amount must be a number (total paid). Date must be YYYY-MM-DD format."
-                        ),
-                    },
-                ],
-            }
-        ],
-        "max_tokens": 300,
-        "temperature": 0,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload)
-    except httpx.TimeoutException:
-        logger.warning("Receipt scan timed out for user=%s", uid)
-        raise HTTPException(status_code=504, detail="Receipt scan timed out. Please try again.")
-    except httpx.HTTPError as exc:
-        logger.exception("Receipt scan network error for user=%s: %s", uid, exc)
-        raise HTTPException(status_code=502, detail="Could not reach the receipt scanner right now.")
-
-    if resp.status_code >= 400:
-        # Never leak raw xAI errors to the client — just log server-side.
-        logger.error("Receipt vision API error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
-        raise HTTPException(status_code=502, detail="The receipt scanner couldn't process that image. Please try another photo.")
-
-    try:
-        body_json = resp.json()
-    except Exception:
-        logger.error("Receipt vision returned non-JSON for user=%s: %s", uid, resp.text[:500])
-        raise HTTPException(status_code=502, detail="Receipt scanner returned an unexpected response.")
-
-    # Meter token spend so vision calls count toward the monthly cap.
-    try:
-        usage = body_json.get("usage") or {}
-        prompt_tokens = int(usage.get("prompt_tokens") or 0)
-        completion_tokens = int(usage.get("completion_tokens") or 0)
-        if prompt_tokens or completion_tokens:
-            record_token_spend(uid, prompt_tokens, completion_tokens)
-    except Exception as exc:
-        logger.warning("Failed to record receipt scan token spend for user=%s: %s", uid, exc)
-
-    try:
-        raw = body_json["choices"][0]["message"]["content"].strip()
-    except Exception:
-        logger.error("Receipt vision response missing choices for user=%s: %s", uid, str(body_json)[:500])
-        raise HTTPException(status_code=502, detail="Receipt scanner returned an unexpected response.")
-
-    raw = re_module.sub(r"^```[a-z]*\n?", "", raw)
-    raw = re_module.sub(r"\n?```$", "", raw)
-
-    try:
-        result = json.loads(raw)
-    except Exception:
-        logger.warning("Receipt vision returned unparseable JSON for user=%s: %s", uid, raw[:300])
-        raise HTTPException(status_code=422, detail="Could not read the receipt — try a clearer photo.")
-
-    return result
 # ── User preferences (voice overlay, golden mode, onboarding) ─────────────────
 
 class PrefsReq(BaseModel):

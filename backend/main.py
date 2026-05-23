@@ -31,7 +31,9 @@ from backend.routers import (
     chat,
     finance,
     organize,
-    account,
+    account_settings,
+    account_data,
+    receipts,
     billing,
     stripe_webhook,
     connections,
@@ -260,7 +262,9 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(finance.router)
 app.include_router(organize.router)
-app.include_router(account.router)
+app.include_router(account_settings.router)
+app.include_router(account_data.router)
+app.include_router(receipts.router)
 app.include_router(billing.router)
 app.include_router(stripe_webhook.router)
 app.include_router(connections.router)

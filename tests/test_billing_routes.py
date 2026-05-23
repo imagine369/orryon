@@ -92,8 +92,8 @@ def test_validate_stripe_return_url_rejects_untrusted():
     assert exc.value.status_code == 400
 
 
-def test_billing_routes_not_on_account_router():
-    from backend.routers import account as account_mod
+def test_billing_routes_not_on_account_settings_router():
+    from backend.routers import account_settings as account_mod
 
     paths = {getattr(r, "path", "") for r in account_mod.router.routes}
     assert "/api/subscription" not in paths
