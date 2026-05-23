@@ -53,7 +53,7 @@ export function UsageUpgradeBanner({ usage, onUpgrade }: UsageUpgradeBannerProps
             : `${pct}% of your monthly AI allowance used`}
         </p>
         <p className="text-xs text-white/40 mt-0.5 truncate">
-          ${spent.toFixed(2)} of ${cap.toFixed(2)} · resets on the 1st
+          {pct}% used · resets on the 1st
           {upgradeLabel ? ` · Upgrade to ${upgradeLabel} for more` : ""}
         </p>
       </div>

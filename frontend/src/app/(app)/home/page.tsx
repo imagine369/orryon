@@ -886,7 +886,7 @@ export default function HomePage() {
                 </Link>
               )}
 
-              <div className="flex items-center gap-1">
+              <div className="ml-auto flex items-center gap-1">
               {/* Speak responses — Premium Plus only */}
               {showSpeakToggle && (
                 <button

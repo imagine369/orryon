@@ -51,6 +51,10 @@ export function UpgradeLimitModal({
   const nextLabel = upgradePlan ? PLAN_LABELS[upgradePlan] ?? upgradePlan : null;
   const nextPrice = upgradePlan ? PLAN_PRICES[upgradePlan] : null;
   const isUsage = kind === "usage";
+  const usagePct =
+    spendCapUsd > 0
+      ? Math.min(100, Math.round((spendUsd / spendCapUsd) * 100))
+      : 0;
 
   return (
     <AnimatePresence>
@@ -94,7 +98,7 @@ export function UpgradeLimitModal({
                 </p>
                 <p className="text-xs text-white/35 mt-0.5">
                   {isUsage && spendCapUsd > 0
-                    ? `$${spendUsd.toFixed(2)} / $${spendCapUsd.toFixed(2)} · resets ${resetDate}`
+                    ? `${usagePct}% used · resets ${resetDate}`
                     : messageLimit > 0
                       ? `${messagesUsed} / ${messageLimit} · resets ${resetDate}`
                       : `Resets ${resetDate}`}

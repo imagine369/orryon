@@ -38,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
 import { useVoiceUsage, startVoiceTopup } from "@/lib/use-voice-usage";
+import { AiAllowanceMeter } from "@/components/ai-allowance-meter";
 import { VoiceUsageMeter } from "@/components/voice-usage-meter";
 import { InstallButton } from "@/components/install-prompt";
 import { usePreferences } from "@/lib/use-preferences";
@@ -1085,35 +1086,15 @@ export function SettingsPanel() {
             </span>
           }
         />
-        {/* AI usage allowance (chat + tools) */}
+        {/* Included usage — Cursor-style Total % + breakdown */}
         {chatUsage && sub.is_active_pro && (chatUsage.spend_cap_usd ?? 0) > 0 && (
-          <div className="px-3 py-3 border-b border-white/5 space-y-2">
-            <div className="flex justify-between text-xs text-white/45">
-              <span>AI allowance this month</span>
-              <span>
-                ${(chatUsage.spend_usd ?? 0).toFixed(2)} / ${(chatUsage.spend_cap_usd ?? 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  chatUsage.at_limit ? "bg-amber-500" : "bg-white/30"
-                }`}
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.round(
-                      ((chatUsage.spend_usd ?? 0) / (chatUsage.spend_cap_usd ?? 1)) * 100,
-                    ),
-                  )}%`,
-                }}
-              />
-            </div>
+          <div className="px-3 py-3 border-b border-white/5">
+            <AiAllowanceMeter usage={chatUsage} plan={sub.plan} />
             {(chatUsage.at_limit || chatUsage.near_limit) && chatUsage.upgrade_plan && (
-              <p className="text-xs text-amber-200/80">
+              <p className="text-xs text-amber-200/80 mt-2">
                 {chatUsage.at_limit
-                  ? "Allowance reached — upgrade for more headroom."
-                  : "Running low — upgrade for a higher monthly allowance."}
+                  ? "Limit reached — upgrade for more included usage."
+                  : "Running low — upgrade for a higher included limit."}
               </p>
             )}
           </div>
