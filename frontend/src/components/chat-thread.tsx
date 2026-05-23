@@ -13,7 +13,8 @@ import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
 import { OrryonAvatar } from "@/components/orryon-avatar";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 
-const CHAT_AVATAR_SIZE = 44; // 25% larger than 35px (originally 28px)
+/** Chat reply portrait — was 28px; object-cover fills the circle (PNG has side margins). */
+const CHAT_AVATAR_SIZE = 40;
 
 export interface ChatThreadMessage {
   role: "user" | "assistant";

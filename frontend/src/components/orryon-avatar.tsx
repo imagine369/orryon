@@ -25,7 +25,7 @@ export function OrryonAvatar({
       decoding="async"
       loading={priority ? "eager" : "lazy"}
       draggable={false}
-      className={cn("aspect-square shrink-0 rounded-full object-contain", className)}
+      className={cn("aspect-square shrink-0 rounded-full object-cover", className)}
       style={{ width: size, height: size }}
     />
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { motion, type TargetAndTransition } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
@@ -77,14 +76,17 @@ export function OrryonAliveAvatar({
           ease: "easeInOut",
         }}
       />
-      <Image
+      {/* Plain img + explicit px sizing — Next/Image did not honor size in chat layout */}
+      <img
         src="/avatar.png"
         alt="Orryon"
         width={size}
         height={size}
-        priority={priority}
+        decoding="async"
+        loading={priority ? "eager" : "lazy"}
         draggable={false}
-        className="relative rounded-full object-contain ring-1 ring-white/[0.08] select-none"
+        className="relative rounded-full object-cover ring-1 ring-white/[0.08] select-none"
+        style={{ width: size, height: size }}
       />
     </motion.div>
   );
