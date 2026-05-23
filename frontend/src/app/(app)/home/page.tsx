@@ -39,7 +39,7 @@ import {
   DeleteConfirmModal,
   type PendingDestructiveAction,
 } from "@/components/delete-confirm-modal";
-import { HEALTH_DISCLAIMER_SHORT, LIFE_OS_CHAT_EMPTY, PRO_TEXT_ONLY_HINT } from "@/lib/life-os-copy";
+import { HEALTH_DISCLAIMER_SHORT, PRO_TEXT_ONLY_HINT } from "@/lib/life-os-copy";
 import {
   POST_CHECKOUT_SESSION_KEY,
   readCheckoutIntent,
@@ -754,11 +754,8 @@ export default function HomePage() {
 
             {/* Greeting — centered in the remaining space */}
             <div className="flex flex-1 flex-col items-center justify-center">
-              <p className="mb-2 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
+              <p className="mb-4 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
                 {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
-              </p>
-              <p className="mb-4 max-w-[280px] text-center text-[12px] leading-snug text-white/35">
-                {LIFE_OS_CHAT_EMPTY}
               </p>
               <ChatStarterPrompts onPick={handleSend} disabled={streaming} />
 

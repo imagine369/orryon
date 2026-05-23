@@ -456,8 +456,8 @@ export function ChatInput({
   return (
     <div
       className={cn(
-        "flex w-full items-end gap-2 border bg-[#141414] px-4 py-2.5 transition-colors duration-150",
-        isMultiline ? "rounded-2xl" : "rounded-full",
+        "flex w-full gap-2 border bg-[#141414] px-4 transition-colors duration-150",
+        isMultiline ? "items-end py-2.5 rounded-2xl" : "items-center py-2.5 rounded-full",
         isRecording
           ? "border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
           : "border-white/[0.09] hover:border-white/[0.14] focus-within:border-white/[0.18]"
@@ -480,7 +480,8 @@ export function ChatInput({
         disabled={disabled}
         rows={1}
         className={cn(
-          "flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 outline-none py-1 leading-relaxed overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
+          "flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 outline-none overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
+          isMultiline ? "py-1 leading-relaxed" : "h-11 py-0 leading-[44px]",
           isRecording ? "placeholder:text-white/60" : "placeholder:text-white/30"
         )}
         style={{ maxHeight: "200px", scrollbarWidth: "none" }}

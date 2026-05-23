@@ -6,10 +6,6 @@ export const LIFE_OS_TAGLINE =
 export const LIFE_OS_SHORT =
   "Ask almost anything. Your money, schedule, and notes actually update when you ask.";
 
-/** Shown on chat empty state — keep in sync with docs/CAPABILITIES.md */
-export const LIFE_OS_CHAT_EMPTY =
-  "Ask almost anything — spending, calendar, writing, how-tos, or just thinking out loud.";
-
 /** Shown on Pro tier — upgrade path to Premium voice */
 export const PRO_TEXT_ONLY_HINT =
   "Pro is text chat. Upgrade to Premium to speak to Orryon, or Premium Plus to hear replies aloud.";
