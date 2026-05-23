@@ -8,6 +8,7 @@ import {
 } from "@/lib/pricing-tiers";
 import type { TierId } from "@/lib/tier-checkout";
 import type { Subscription } from "@/lib/use-subscription";
+import { formatUsageResetLabel } from "@/lib/format-usage-reset";
 import { cn } from "@/lib/utils";
 
 const TIER_BY_PLAN: Record<string, TierId | "trial" | "free" | null> = {
@@ -103,12 +104,22 @@ export function PlanUsageCards({
       sub.plan === "premium_plus" ||
       sub.plan === "past_due");
 
+  const billingReset =
+    sub.reset_date && !sub.is_trial_period
+      ? formatUsageResetLabel(sub.reset_date)
+      : null;
+
   const resetSublabel =
-    sub.plan === "trial"
-      ? trialResetLabel(sub)
-      : sub.plan === "free" || sub.plan === "past_due"
-        ? "Subscribe to unlock Orryon"
-        : usageResetsLabel || "Usage resets on your billing date";
+    sub.plan === "free" || sub.plan === "past_due"
+      ? "Subscribe to unlock Orryon"
+      : billingReset ||
+        usageResetsLabel ||
+        (sub.plan === "trial"
+          ? trialResetLabel(sub)
+          : sub.reset_date
+            ? formatUsageResetLabel(sub.reset_date, sub.is_trial_period)
+            : sub.usage_resets_label) ||
+        "Usage resets on your billing date";
 
   return (
     <div className="px-3 pt-4 pb-3 border-b border-white/5 space-y-3">

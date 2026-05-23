@@ -529,10 +529,16 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(requir
 
 def _subscription_payload(user_row: dict) -> dict:
     """API shape for /api/subscription — includes Stripe linkage for post-checkout polling."""
+    from core.usage_period import refresh_billing_period_from_stripe, resolve_usage_period
+
     payload = resolve_plan(user_row)
     payload["has_stripe_subscription"] = bool(
         (user_row.get("stripe_subscription_id") or "").strip()
     )
+    period = resolve_usage_period(user_row)
+    payload["usage_resets_label"] = period.reset_label
+    payload["reset_date"] = period.reset_at.isoformat()
+    payload["is_trial_period"] = period.is_trial_period
     return payload
 
 
@@ -780,8 +786,11 @@ async def get_subscription(user: dict = Depends(get_current_user)):
         raise HTTPException(404, "User not found")
     row = dict(row)
     resolved = resolve_plan(row)
-    needs_reconcile = resolved["plan"] in ("free", "trial")
-    if needs_reconcile:
+    has_stripe = bool((row.get("stripe_subscription_id") or "").strip())
+    needs_reconcile = resolved["plan"] in ("free", "trial") or (
+        has_stripe and not (row.get("billing_period_start") or "").strip()
+    )
+    if needs_reconcile and has_stripe:
         from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
 
         if STRIPE_ENABLED:
@@ -792,6 +801,10 @@ async def get_subscription(user: dict = Depends(get_current_user)):
                 return _sync_user_plan_from_stripe(stripe_lib, row)
             except Exception as e:
                 logger.warning("subscription reconcile on GET failed for %s: %s", row.get("id"), e)
+    elif has_stripe:
+        from core.usage_period import refresh_billing_period_from_stripe
+
+        row = refresh_billing_period_from_stripe(row)
     return _subscription_payload(row)
 
 
@@ -1515,4 +1528,5 @@ async def chat_usage(user: dict = Depends(get_current_user)):
         "near_limit": near_spend_limit and not at_spend_limit,
         "reset_date": period.reset_at.isoformat(),
         "usage_resets_label": period.reset_label,
+        "is_trial_period": period.is_trial_period,
     }

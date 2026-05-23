@@ -22,6 +22,7 @@ class UsagePeriod:
     key: str
     reset_at: datetime
     reset_label: str
+    is_trial_period: bool = False
 
 
 def _add_months(dt: datetime, months: int) -> datetime:
@@ -44,24 +45,103 @@ def _parse_iso(value: str) -> datetime | None:
         return None
 
 
+def _stripe_field(obj: object, key: str):
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def stripe_subscription_period_bounds(sub_obj: object) -> tuple[str, str]:
+    """Extract billing_period_start/end ISO strings from a Stripe subscription object."""
+    try:
+        cps = _stripe_field(sub_obj, "current_period_start")
+        cpe = _stripe_field(sub_obj, "current_period_end")
+        if cps is None or cpe is None:
+            return "", ""
+        start = datetime.fromtimestamp(int(cps), tz=timezone.utc).isoformat()
+        end = datetime.fromtimestamp(int(cpe), tz=timezone.utc).isoformat()
+        return start, end
+    except Exception as exc:
+        logger.warning("stripe_subscription_period_bounds: %s", exc)
+        return "", ""
+
+
+def refresh_billing_period_from_stripe(user_row: dict) -> dict:
+    """Pull current_period_start/end from Stripe so usage resets match the real bill date."""
+    sub_id = (user_row.get("stripe_subscription_id") or "").strip()
+    if not sub_id:
+        return user_row
+    from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
+
+    if not STRIPE_ENABLED:
+        return user_row
+    try:
+        import stripe as stripe_lib
+        from db import get_connection
+
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+        sub_obj = stripe_lib.Subscription.retrieve(sub_id)
+        bps, bpe = stripe_subscription_period_bounds(sub_obj)
+        if not bps or not bpe:
+            logger.warning(
+                "refresh_billing_period: no period on sub=%s user=%s",
+                sub_id,
+                user_row.get("id"),
+            )
+            return user_row
+        uid = user_row["id"]
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE users SET billing_period_start=?, billing_period_end=? WHERE id=?",
+                (bps, bpe, uid),
+            )
+            conn.commit()
+        updated = dict(user_row)
+        updated["billing_period_start"] = bps
+        updated["billing_period_end"] = bpe
+        return updated
+    except Exception as exc:
+        logger.warning(
+            "refresh_billing_period: user=%s sub=%s failed: %s",
+            user_row.get("id"),
+            sub_id,
+            exc,
+        )
+        return user_row
+
+
 def _calendar_month_period(now: datetime) -> UsagePeriod:
     start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     end = _add_months(start, 1)
     return _period_from_bounds(start, end)
 
 
-def _period_from_bounds(start: datetime, end: datetime) -> UsagePeriod:
+def _period_from_bounds(
+    start: datetime,
+    end: datetime,
+    *,
+    prefix: str = "Resets",
+) -> UsagePeriod:
     key = start.strftime("%Y-%m-%d")
     now = datetime.now(timezone.utc)
     days = max(0, int((end - now).total_seconds() // 86400))
-    reset_label = f"{end.strftime('%b')} {end.day}"
+    date_label = f"{end.strftime('%b')} {end.day}"
     if days > 0:
-        reset_label += f" ({days} day{'s' if days != 1 else ''})"
-    return UsagePeriod(key=key, reset_at=end, reset_label=f"Resets {reset_label}")
+        date_label += f" ({days} day{'s' if days != 1 else ''})"
+    return UsagePeriod(
+        key=key,
+        reset_at=end,
+        reset_label=f"{prefix} {date_label}",
+        is_trial_period=prefix == "Trial ends",
+    )
 
 
 def _rolling_monthly_period(anchor: datetime, period_end: datetime | None, now: datetime) -> UsagePeriod:
-    """Advance 1-month windows from anchor until *now* is inside [start, end)."""
+    """Use Stripe period end when valid; otherwise advance monthly from anchor."""
+    if period_end and now < period_end:
+        return _period_from_bounds(anchor, period_end)
     start = anchor
     end = period_end or _add_months(start, 1)
     while now >= end:
@@ -70,22 +150,26 @@ def _rolling_monthly_period(anchor: datetime, period_end: datetime | None, now: 
     return _period_from_bounds(start, end)
 
 
-def resolve_usage_period(user_row: dict) -> UsagePeriod:
+def resolve_usage_period(user_row: dict, *, refresh_stripe: bool = True) -> UsagePeriod:
     """
     Return the usage bucket for *user_row*.
 
-    Paid Stripe subscribers: anchor on billing_period_start (from Stripe period).
-    Trial: anchor on trial start (trial end minus trial length, or account created_at).
-    Free / past_due: calendar month.
+    Stripe billing period wins when present (paid subscribers).
+    Trial-only users without Stripe billing see trial end date.
     """
+    if refresh_stripe and (user_row.get("stripe_subscription_id") or "").strip():
+        user_row = refresh_billing_period_from_stripe(user_row)
+
     now = datetime.now(timezone.utc)
     plan = (user_row.get("plan") or "free").strip()
 
     period_start = _parse_iso(user_row.get("billing_period_start") or "")
     period_end = _parse_iso(user_row.get("billing_period_end") or "")
 
-    if period_start and plan in ("pro", "premium", "premium_plus", "past_due"):
-        return _rolling_monthly_period(period_start, period_end, now)
+    # Paid billing cycle from Stripe — applies even during trial if checkout linked a sub
+    if period_start and period_end:
+        period = _rolling_monthly_period(period_start, period_end, now)
+        return period
 
     if plan == "trial":
         trial_end = _parse_iso(user_row.get("trial_ends_at") or "")
@@ -94,7 +178,7 @@ def resolve_usage_period(user_row: dict) -> UsagePeriod:
             start = trial_end - timedelta(days=TRIAL_DAYS)
             if created and created > start:
                 start = created
-            return _period_from_bounds(start, trial_end)
+            return _period_from_bounds(start, trial_end, prefix="Trial ends")
         if created:
             return _rolling_monthly_period(created, _add_months(created, 1), now)
 
@@ -107,18 +191,3 @@ def resolve_usage_period(user_row: dict) -> UsagePeriod:
 
 def resolve_usage_period_key(user_row: dict) -> str:
     return resolve_usage_period(user_row).key
-
-
-def stripe_subscription_period_bounds(sub_obj: dict) -> tuple[str, str]:
-    """Extract billing_period_start/end ISO strings from a Stripe subscription object."""
-    try:
-        cps = sub_obj.get("current_period_start")
-        cpe = sub_obj.get("current_period_end")
-        if not cps or not cpe:
-            return "", ""
-        start = datetime.fromtimestamp(int(cps), tz=timezone.utc).isoformat()
-        end = datetime.fromtimestamp(int(cpe), tz=timezone.utc).isoformat()
-        return start, end
-    except Exception as exc:
-        logger.warning("stripe_subscription_period_bounds: %s", exc)
-        return "", ""

@@ -436,11 +436,12 @@ export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [view, setView] = useState<View>(null);
 
-  // Refresh included usage when opening Plan & Usuage.
+  // Refresh plan + usage when opening Plan & Usuage (pulls billing period from Stripe).
   useEffect(() => {
     if (view !== "subscription") return;
+    refreshSub();
     reloadChatUsage();
-  }, [view, reloadChatUsage]);
+  }, [view, reloadChatUsage, refreshSub]);
 
   // If Stripe charged but webhook missed, reconcile when opening Subscription settings.
   useEffect(() => {
@@ -1402,7 +1403,7 @@ export function SettingsPanel() {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
         <PlanUsageCards
           sub={sub}
-          usageResetsLabel={chatUsage?.usage_resets_label}
+          usageResetsLabel={chatUsage?.usage_resets_label ?? sub.usage_resets_label}
           manageLoading={billingLoading}
           onManageBilling={openBillingPortal}
         />

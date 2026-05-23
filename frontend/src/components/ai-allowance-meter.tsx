@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { formatUsageResetLabel } from "@/lib/format-usage-reset";
 import type { ChatUsage } from "@/lib/use-chat-usage";
 
 const PLAN_DISPLAY: Record<string, string> = {
@@ -33,6 +34,9 @@ export function AiAllowanceMeter({ usage, plan, embedded, className }: AiAllowan
   const totalPct = pctUsed(spent, spendCap) ?? 0;
   const planName = PLAN_DISPLAY[plan ?? usage.plan ?? ""] ?? "your plan";
   const isAtLimit = usage.at_limit || totalPct >= 100;
+  const resetLabel = usage.reset_date
+    ? formatUsageResetLabel(usage.reset_date, usage.is_trial_period)
+    : usage.usage_resets_label;
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -70,8 +74,8 @@ export function AiAllowanceMeter({ usage, plan, embedded, className }: AiAllowan
           />
         </div>
 
-        {usage.usage_resets_label && (
-          <p className="text-xs text-white/35">{usage.usage_resets_label}</p>
+        {resetLabel && (
+          <p className="text-xs text-white/35">{resetLabel}</p>
         )}
       </div>
     </div>

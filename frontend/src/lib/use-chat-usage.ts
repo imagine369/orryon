@@ -17,6 +17,7 @@ export interface ChatUsage {
   near_limit?: boolean;
   reset_date?: string;
   usage_resets_label?: string;
+  is_trial_period?: boolean;
 }
 
 export function useChatUsage() {

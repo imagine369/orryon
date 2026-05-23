@@ -12,6 +12,9 @@ export interface Subscription {
   is_free_tier: boolean;
   /** True once Stripe subscription id is stored (post-checkout or billing portal). */
   has_stripe_subscription: boolean;
+  usage_resets_label?: string;
+  reset_date?: string;
+  is_trial_period?: boolean;
 }
 
 export function useSubscription() {

@@ -28,7 +28,9 @@ export function PlanUsageSection({ plan, chatUsage }: PlanUsageSectionProps) {
         <p className="text-sm font-medium text-white/85">What keeps Orryon working</p>
         <p className="text-[11px] text-white/35 mt-1.5 leading-relaxed">
           One pool for typed chat, voice messages (after transcription), replies, search, and tools.
-          It resets on your billing date, not the 1st of the calendar month.
+          {chatUsage.is_trial_period
+            ? "On a free trial, usage follows your trial end date until you subscribe."
+            : "Resets on your billing date (from Stripe), not the 1st of the calendar month."}
         </p>
       </div>
 
