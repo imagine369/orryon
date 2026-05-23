@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  Check,
   ChevronRight,
   ArrowLeft,
   Download,
@@ -32,6 +31,7 @@ import {
   Plus,
   Volume2,
   VolumeX,
+  User,
 } from "lucide-react";
 import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -49,6 +49,12 @@ import { useChatUsage } from "@/lib/use-chat-usage";
 interface Settings {
   display_name: string;
   email: string;
+  created_at?: string;
+  phone?: string;
+  country?: string;
+  language?: string;
+  birth_date?: string;
+  gender?: string;
   currency: string;
   budget_cycle_start: number;
   spending_alert_pct: number;
@@ -82,6 +88,7 @@ type View =
   | "notifications"
   | "financial"
   | "subscription"
+  | "account"
   | "app"
   | "memory"
   | "health"
@@ -142,9 +149,96 @@ const BILL_ALERT_DAYS = [
   { label: "1 week before", value: 7 },
 ];
 
+const COUNTRIES = [
+  { label: "—", value: "" },
+  { label: "United States", value: "US" },
+  { label: "Canada", value: "CA" },
+  { label: "United Kingdom", value: "GB" },
+  { label: "Australia", value: "AU" },
+  { label: "Germany", value: "DE" },
+  { label: "France", value: "FR" },
+  { label: "Spain", value: "ES" },
+  { label: "Italy", value: "IT" },
+  { label: "Netherlands", value: "NL" },
+  { label: "Sweden", value: "SE" },
+  { label: "Norway", value: "NO" },
+  { label: "Denmark", value: "DK" },
+  { label: "Switzerland", value: "CH" },
+  { label: "Ireland", value: "IE" },
+  { label: "India", value: "IN" },
+  { label: "Japan", value: "JP" },
+  { label: "South Korea", value: "KR" },
+  { label: "China", value: "CN" },
+  { label: "Singapore", value: "SG" },
+  { label: "Hong Kong", value: "HK" },
+  { label: "Brazil", value: "BR" },
+  { label: "Mexico", value: "MX" },
+  { label: "New Zealand", value: "NZ" },
+  { label: "South Africa", value: "ZA" },
+  { label: "United Arab Emirates", value: "AE" },
+  { label: "Israel", value: "IL" },
+  { label: "Philippines", value: "PH" },
+  { label: "Indonesia", value: "ID" },
+  { label: "Malaysia", value: "MY" },
+  { label: "Thailand", value: "TH" },
+  { label: "Vietnam", value: "VN" },
+  { label: "Poland", value: "PL" },
+  { label: "Portugal", value: "PT" },
+  { label: "Belgium", value: "BE" },
+  { label: "Austria", value: "AT" },
+  { label: "Argentina", value: "AR" },
+  { label: "Colombia", value: "CO" },
+  { label: "Chile", value: "CL" },
+  { label: "Turkey", value: "TR" },
+  { label: "Saudi Arabia", value: "SA" },
+  { label: "Egypt", value: "EG" },
+  { label: "Nigeria", value: "NG" },
+  { label: "Kenya", value: "KE" },
+];
+
+const LANGUAGES = [
+  { label: "English", value: "en" },
+  { label: "Spanish", value: "es" },
+  { label: "French", value: "fr" },
+  { label: "German", value: "de" },
+  { label: "Portuguese", value: "pt" },
+  { label: "Italian", value: "it" },
+  { label: "Dutch", value: "nl" },
+  { label: "Japanese", value: "ja" },
+  { label: "Korean", value: "ko" },
+  { label: "Chinese (Simplified)", value: "zh" },
+  { label: "Hindi", value: "hi" },
+  { label: "Arabic", value: "ar" },
+  { label: "Russian", value: "ru" },
+  { label: "Polish", value: "pl" },
+  { label: "Turkish", value: "tr" },
+  { label: "Vietnamese", value: "vi" },
+  { label: "Thai", value: "th" },
+  { label: "Indonesian", value: "id" },
+  { label: "Swedish", value: "sv" },
+  { label: "Norwegian", value: "no" },
+  { label: "Danish", value: "da" },
+  { label: "Finnish", value: "fi" },
+  { label: "Hebrew", value: "he" },
+];
+
+const GENDER_OPTIONS = [
+  { label: "Prefer not to say", value: "" },
+  { label: "Woman", value: "woman" },
+  { label: "Man", value: "man" },
+  { label: "Non-binary", value: "nonbinary" },
+  { label: "Other", value: "other" },
+];
+
 const DEMO_SETTINGS: Settings = {
   display_name: "Alex",
   email: "demo@orryon.app",
+  created_at: "2025-01-15T12:00:00Z",
+  phone: "+1 555 0100",
+  country: "US",
+  language: "en",
+  birth_date: "1990-06-15",
+  gender: "",
   currency: "USD",
   budget_cycle_start: 1,
   spending_alert_pct: 80,
@@ -159,6 +253,7 @@ const DEMO_SETTINGS: Settings = {
 };
 
 const VIEW_TITLES: Record<string, string> = {
+  account: "Account information",
   "security-access": "Security & Account Access",
   security: "Security",
   sessions: "Sessions",
@@ -167,7 +262,7 @@ const VIEW_TITLES: Record<string, string> = {
   data: "Data",
   notifications: "Notifications",
   financial: "Financial Preferences",
-  subscription: "Plan + usage",
+  subscription: "Plan + Usage",
   app: "App",
   memory: "Memory",
   health: "Health",
@@ -181,6 +276,29 @@ function parentOf(view: View): View {
     return "security-access";
   if (view === "data") return "privacy-safety";
   return null;
+}
+
+function formatAccountDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function ageFromBirthDate(iso: string): number | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const birth = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDelta = today.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age >= 0 && age < 150 ? age : null;
 }
 
 // ── Small shared components ──────────────────────────────────────────────────
@@ -211,6 +329,33 @@ function Row({ label, sublabel, right }: { label: string; sublabel?: string; rig
       </div>
       <div className="shrink-0">{right}</div>
     </div>
+  );
+}
+
+function TextField({
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+  type = "text",
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  type?: string;
+  className?: string;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      className={`w-40 max-w-[50vw] bg-[#111] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/20 placeholder:text-white/25 text-right ${className}`}
+    />
   );
 }
 
@@ -300,9 +445,14 @@ export function SettingsPanel() {
     api.post("/api/subscription/sync").then(() => refreshSub()).catch(() => {});
   }, [view, sub?.plan, sub?.has_stripe_subscription, refreshSub]);
 
-  // display name editing
-  const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState("");
+  const [accountDraft, setAccountDraft] = useState({
+    display_name: "",
+    phone: "",
+    country: "",
+    language: "en",
+    birth_date: "",
+    gender: "",
+  });
 
   // email change flow
   type EmailStep = "idle" | "input" | "code";
@@ -335,6 +485,10 @@ export function SettingsPanel() {
   useEffect(() => {
     if (!isOpen) return;
     setView(null);
+    setEmailStep("idle");
+    setNewEmail("");
+    setEmailCode("");
+    setEmailError("");
     if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
     api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
     api.get<{ connected: boolean; synced_count: number }>("/api/calendar/google/status")
@@ -344,14 +498,34 @@ export function SettingsPanel() {
   }, [isOpen]);
 
   const patch = async (updates: Record<string, unknown>) => {
+    if (isDemo()) {
+      setSettings((prev) => prev ? { ...prev, ...updates } as Settings : prev);
+      return;
+    }
     await api.patch("/api/settings", updates);
     setSettings((prev) => prev ? { ...prev, ...updates } as Settings : prev);
   };
 
-  const saveName = async () => {
-    if (!nameInput.trim()) return;
-    await patch({ display_name: nameInput.trim() });
-    setEditingName(false);
+  useEffect(() => {
+    if (!settings || view !== "account") return;
+    setAccountDraft({
+      display_name: settings.display_name || "",
+      phone: settings.phone || "",
+      country: settings.country || "",
+      language: settings.language || "en",
+      birth_date: settings.birth_date || "",
+      gender: settings.gender || "",
+    });
+  }, [settings, view]);
+
+  const saveProfileField = async (
+    key: "display_name" | "phone" | "country" | "language" | "birth_date" | "gender",
+    value: string,
+  ) => {
+    const trimmed = key === "display_name" ? value.trim() : value;
+    const current = settings?.[key] ?? (key === "language" ? "en" : "");
+    if (trimmed === current) return;
+    await patch({ [key]: trimmed });
   };
 
   const sendEmailCode = async () => {
@@ -416,52 +590,34 @@ export function SettingsPanel() {
 
   const renderMainMenu = () => (
     <>
-      {/* Profile card */}
-      <div className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
+      {/* Profile summary */}
+      <button
+        type="button"
+        onClick={() => setView("account")}
+        className="w-full flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6 hover:bg-white/[0.05] transition text-left"
+      >
         <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-base font-bold text-white shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          {editingName ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
-                className="flex-1 bg-white/5 border border-white/20 rounded-lg px-2.5 py-1.5 text-sm text-white outline-none"
-                placeholder="Display name"
-              />
-              <button onClick={saveName} className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition">
-                <Check className="h-3.5 w-3.5 text-green-400" strokeWidth={2} />
-              </button>
-              <button onClick={() => setEditingName(false)} className="w-11 h-11 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition">
-                <X className="h-3.5 w-3.5 text-white/40" strokeWidth={2} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="font-semibold text-sm truncate">{settings!.display_name || "Set a name"}</p>
-                <p className="text-xs text-white/30 mt-0.5 break-all">{settings!.email}</p>
-              </div>
-              <button
-                onClick={() => { setNameInput(settings!.display_name || ""); setEditingName(true); }}
-                className="text-xs text-white/40 hover:text-white/70 transition px-2 py-1 rounded-lg hover:bg-white/5"
-              >
-                Edit
-              </button>
-            </div>
-          )}
+          <p className="font-semibold text-sm truncate">{settings!.display_name || "Set a name"}</p>
+          <p className="text-xs text-white/30 mt-0.5 break-all">{settings!.email}</p>
         </div>
-      </div>
+        <ChevronRight className="h-4 w-4 text-white/20 shrink-0" strokeWidth={1.5} />
+      </button>
 
       {/* Navigation items */}
       <div>
+        <NavItem
+          icon={<User className="h-5 w-5" strokeWidth={1.5} />}
+          title="Account information"
+          description="Name, contact details, and profile"
+          onClick={() => setView("account")}
+        />
         {sub && (
           <NavItem
             icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
-            title="Plan + usage"
+            title="Plan + Usage"
             description={
               sub.plan === "trial"
                 ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
@@ -600,6 +756,198 @@ export function SettingsPanel() {
       </div>
     </>
   );
+
+  const renderAccountInformation = () => {
+    const age = ageFromBirthDate(accountDraft.birth_date);
+    const createdLabel = settings?.created_at
+      ? formatAccountDate(settings.created_at)
+      : "—";
+
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-white/30 leading-relaxed">
+          Personal details for your Orryon account. Changes save when you leave a field or pick a new option.
+        </p>
+
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
+          <Row
+            label="Name"
+            right={
+              <TextField
+                value={accountDraft.display_name}
+                onChange={(v) => setAccountDraft((d) => ({ ...d, display_name: v }))}
+                onBlur={() => saveProfileField("display_name", accountDraft.display_name)}
+                placeholder="Your name"
+              />
+            }
+          />
+          <Row
+            label="Phone"
+            right={
+              <TextField
+                type="tel"
+                value={accountDraft.phone}
+                onChange={(v) => setAccountDraft((d) => ({ ...d, phone: v }))}
+                onBlur={() => saveProfileField("phone", accountDraft.phone)}
+                placeholder="+1 555 0000"
+              />
+            }
+          />
+          <Row
+            label="Email"
+            sublabel="Sign-in address"
+            right={
+              <span className="text-xs text-white/50 max-w-[50vw] truncate block text-right">
+                {settings!.email}
+              </span>
+            }
+          />
+          <Row
+            label="Account created"
+            right={<span className="text-xs text-white/50">{createdLabel}</span>}
+          />
+          <Row
+            label="Country"
+            right={
+              <SelectField
+                value={accountDraft.country}
+                onChange={(v) => {
+                  setAccountDraft((d) => ({ ...d, country: v }));
+                  void saveProfileField("country", v);
+                }}
+                options={COUNTRIES}
+              />
+            }
+          />
+          <Row
+            label="Language"
+            right={
+              <SelectField
+                value={accountDraft.language}
+                onChange={(v) => {
+                  setAccountDraft((d) => ({ ...d, language: v }));
+                  void saveProfileField("language", v);
+                }}
+                options={LANGUAGES}
+              />
+            }
+          />
+          <Row
+            label="Birth date"
+            right={
+              <TextField
+                type="date"
+                value={accountDraft.birth_date}
+                onChange={(v) => setAccountDraft((d) => ({ ...d, birth_date: v }))}
+                onBlur={() => saveProfileField("birth_date", accountDraft.birth_date)}
+                className="w-36"
+              />
+            }
+          />
+          <Row
+            label="Gender"
+            right={
+              <SelectField
+                value={accountDraft.gender}
+                onChange={(v) => {
+                  setAccountDraft((d) => ({ ...d, gender: v }));
+                  void saveProfileField("gender", v);
+                }}
+                options={GENDER_OPTIONS}
+              />
+            }
+          />
+          <Row
+            label="Age"
+            sublabel="Calculated from birth date"
+            right={
+              <span className="text-xs text-white/50">
+                {age !== null ? `${age} years` : "—"}
+              </span>
+            }
+          />
+        </div>
+
+        <div>
+          <p className="text-xs text-white/40 mb-2 uppercase tracking-wide">Email</p>
+          {emailStep === "idle" && (
+            <button
+              onClick={() => { setEmailStep("input"); setEmailError(""); }}
+              className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.06] transition text-sm text-white/70 hover:text-white"
+            >
+              <span>Change login email</span>
+              <ChevronRight className="h-4 w-4 text-white/30" strokeWidth={1.5} />
+            </button>
+          )}
+          {emailStep === "input" && (
+            <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
+              <p className="text-xs text-white/40">
+                Enter your new email address. We&apos;ll send a verification code to confirm.
+              </p>
+              <input
+                autoFocus
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="new@email.com"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20"
+              />
+              {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setEmailStep("idle"); setNewEmail(""); setEmailError(""); }}
+                  className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendEmailCode}
+                  disabled={emailLoading || !newEmail.includes("@")}
+                  className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+                >
+                  {emailLoading ? "Sending…" : "Send code"}
+                </button>
+              </div>
+            </div>
+          )}
+          {emailStep === "code" && (
+            <div className="p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl space-y-3">
+              <p className="text-xs text-white/40">
+                Enter the 6-digit code sent to <span className="text-white/70">{newEmail}</span>
+              </p>
+              {emailDevCode && (
+                <p className="text-xs text-yellow-400 bg-yellow-400/10 rounded-lg px-3 py-2">
+                  Dev mode — code: <span className="font-mono font-bold">{emailDevCode}</span>
+                </p>
+              )}
+              <input
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white tracking-[0.3em] text-center font-mono outline-none focus:border-white/20"
+              />
+              {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setEmailStep("input"); setEmailCode(""); setEmailError(""); }}
+                  className="flex-1 py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={verifyEmailCode}
+                  disabled={emailLoading || emailCode.length < 6}
+                  className="flex-1 py-2 bg-white text-black text-xs font-semibold rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+                >
+                  {emailLoading ? "Verifying…" : "Confirm"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderSecurityAccess = () => (
     <div>
@@ -1190,6 +1538,7 @@ export function SettingsPanel() {
       case "notifications": return renderNotifications();
       case "financial": return renderFinancial();
       case "subscription": return renderSubscription();
+      case "account": return renderAccountInformation();
       case "app": return renderApp();
       case "memory": return renderMemory();
       case "health": return renderHealth();

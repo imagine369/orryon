@@ -188,6 +188,7 @@ def _build_checkout_session_params(
 
 _SETTINGS_READ_FIELDS = {
     "id", "email", "display_name", "created_at", "plan", "trial_ends_at",
+    "phone", "country", "language", "birth_date", "gender",
     "currency", "budget_cycle_start", "spending_alert_pct",
     "default_reminder_minutes", "daily_digest_enabled", "daily_digest_time",
     "weekly_report_enabled", "bill_due_alert_days",
@@ -212,6 +213,11 @@ async def get_settings(user: dict = Depends(get_current_user)):
 # the users table (e.g. stripe_customer_id, trial_ends_at) from being writable.
 _SETTINGS_ALLOWED_FIELDS: set[str] = {
     "display_name",
+    "phone",
+    "country",
+    "language",
+    "birth_date",
+    "gender",
     "default_reminder_minutes",
     "daily_digest_enabled",
     "daily_digest_time",

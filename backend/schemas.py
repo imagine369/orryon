@@ -170,6 +170,11 @@ class BillReq(BaseModel):
 
 class SettingsUpdate(BaseModel):
     display_name: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    language: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
     default_reminder_minutes: Optional[int] = None
     daily_digest_enabled: Optional[int] = None
     daily_digest_time: Optional[str] = None

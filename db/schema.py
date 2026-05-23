@@ -552,6 +552,11 @@ _USERS_EXTRA_COLS = {
     "stripe_subscription_id": "TEXT DEFAULT ''",
     "segment": "TEXT DEFAULT ''",
     "billing_interval": "TEXT DEFAULT ''",
+    "phone": "TEXT DEFAULT ''",
+    "country": "TEXT DEFAULT ''",
+    "language": "TEXT DEFAULT 'en'",
+    "birth_date": "TEXT DEFAULT ''",
+    "gender": "TEXT DEFAULT ''",
 }
 
 _TRANSACTIONS_EXTRA_COLS = {
