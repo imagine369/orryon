@@ -99,6 +99,7 @@ _TOOL_MAP = {
     "add_health_appointment": h._add_health_appointment,
     "get_health_appointments": h._get_health_appointments,
     "get_weather": h._get_weather,
+    "search_web": h._search_web,
 }
 
 def _log_destructive_action(

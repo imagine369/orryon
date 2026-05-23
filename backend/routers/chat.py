@@ -136,6 +136,7 @@ async def chat_stream(
                 session_id=session_id,
                 tier=ctx["plan"],
                 mode="golden" if ctx["golden_mode"] else "adult",
+                live_orryon=ctx["live_orryon"],
             ):
                 if event["type"] == "token":
                     full_text += event["content"]
@@ -286,6 +287,7 @@ async def chat_ws(ws: WebSocket):
                     session_id=session_id,
                     tier=ctx["plan"],
                     mode="golden" if ctx["golden_mode"] else "adult",
+                    live_orryon=ctx["live_orryon"],
                 ):
                     if event["type"] == "token":
                         full_text += event["content"]

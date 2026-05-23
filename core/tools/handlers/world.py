@@ -1,10 +1,14 @@
-"""Live world context tools (weather via Open-Meteo — no API key)."""
+"""Live world context tools (weather via Open-Meteo, news via Google News RSS)."""
 from __future__ import annotations
 
 import json
 import logging
+import re
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from html import unescape
 from typing import Any
 
 from db import get_user_places
@@ -43,13 +47,17 @@ def _wmo_label(code: Any) -> str:
         return "Variable conditions"
 
 
-def _http_json(url: str, timeout: int = 12) -> dict:
+def _http_get(url: str, timeout: int = 12) -> bytes:
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "orryon/1.0 (+https://orryon.com)"},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+        return resp.read()
+
+
+def _http_json(url: str, timeout: int = 12) -> dict:
+    return json.loads(_http_get(url, timeout=timeout).decode())
 
 
 def _default_location(user_id: str) -> str:
@@ -162,3 +170,68 @@ def _get_weather(args: dict, user_id: str) -> dict:
     except Exception as exc:
         logger.warning("get_weather failed for %r user=%s: %s", location, user_id, exc)
         return {"error": f"Weather lookup failed: {exc}"}
+
+
+_GOOGLE_NEWS_LOCALE = {
+    "US": ("en-US", "US", "US:en"),
+    "GB": ("en-GB", "GB", "GB:en"),
+    "CA": ("en-CA", "CA", "CA:en"),
+    "AU": ("en-AU", "AU", "AU:en"),
+}
+
+
+def _news_rss_url(query: str, country_code: str) -> str:
+    hl, gl, ceid = _GOOGLE_NEWS_LOCALE.get(country_code.upper(), ("en-US", "US", "US:en"))
+    if query:
+        q = urllib.parse.quote(query.strip())
+        return f"https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={ceid}"
+    return f"https://news.google.com/rss?hl={hl}&gl={gl}&ceid={ceid}"
+
+
+def _strip_html(text: str) -> str:
+    return unescape(re.sub(r"<[^>]+>", "", text or "")).strip()
+
+
+def _parse_news_rss(xml_text: str, limit: int = 8) -> list[dict]:
+    root = ET.fromstring(xml_text)
+    items: list[dict] = []
+    for item in root.findall(".//item")[:limit]:
+        title = _strip_html(item.findtext("title") or "")
+        link = (item.findtext("link") or "").strip()
+        published = (item.findtext("pubDate") or "").strip()
+        source_el = item.find("source")
+        source = (source_el.text or "").strip() if source_el is not None else ""
+        if title:
+            items.append({
+                "title": title,
+                "source": source,
+                "link": link,
+                "published": published,
+            })
+    return items
+
+
+def _search_web(args: dict, user_id: str) -> dict:
+    """Fetch recent headlines from Google News public RSS (no API key)."""
+    query = (args.get("query") or "").strip()
+    locale = get_user_locale(user_id)
+    cc = (locale.country_code or "US").upper()
+    limit = min(max(int(args.get("limit") or 8), 1), 12)
+
+    try:
+        url = _news_rss_url(query, cc)
+        headlines = _parse_news_rss(_http_get(url).decode("utf-8", errors="replace"), limit=limit)
+        if not headlines:
+            return {"error": "No headlines found for that search."}
+
+        return {
+            "query": query or None,
+            "region": cc,
+            "headlines": headlines,
+            "count": len(headlines),
+            "source": "Google News (public RSS)",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.warning("search_web failed query=%r user=%s: %s", query, user_id, exc)
+        return {"error": f"News lookup failed: {exc}"}

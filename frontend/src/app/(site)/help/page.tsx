@@ -55,7 +55,7 @@ const FAQ: FAQCategory[] = [
       },
       {
         q: "What can Orryon help with in chat?",
-        a: "Broad chat: explanations, writing and tone checks, planning, study help (non-code), health education (not a doctor), sewing, cooking, opinions, and most everyday questions. When you ask about your Orryon data (\u201cwhat did I spend?\u201d, \u201cadd a task\u201d), it uses tools so numbers stay accurate. It cannot book rides, order food, or read your live bank balance yet.",
+        a: "Broad chat: explanations, writing and tone checks, planning, study help (non-code), health education (not a doctor), sewing, cooking, opinions, and most everyday questions. For today\u2019s news and current events, Orryon uses Grok-style live web and X search with citations (when Live Orryon is on in Settings). When you ask about your Orryon data (\u201cwhat did I spend?\u201d, \u201cadd a task\u201d), it uses tools so numbers stay accurate. It cannot book rides, order food, or read your live bank balance yet.",
       },
       {
         q: "What is Orryon not built for?",

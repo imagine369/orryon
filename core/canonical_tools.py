@@ -44,6 +44,7 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "add_health_appointment", "get_health_appointments",
     # World / live context
     "get_weather",
+    "search_web",
 )
 
 # Legacy names kept in _TOOL_MAP only (old chat tool_calls / aliases) — not sent to Grok.
@@ -56,9 +57,15 @@ LEGACY_TOOL_ALIASES: frozenset[str] = frozenset({
 })
 
 
-def filter_schemas_for_grok(all_schemas: list[dict]) -> list[dict]:
-    """Return only canonical tool schemas for the xAI API (smaller payload, fewer hallucinations)."""
+def filter_schemas_for_grok(
+    all_schemas: list[dict],
+    *,
+    live_orryon: bool = True,
+) -> list[dict]:
+    """Return canonical tool schemas for the xAI API (smaller payload, fewer hallucinations)."""
     allowed = frozenset(CANONICAL_TOOL_NAMES)
+    if not live_orryon:
+        allowed = allowed - {"search_web"}
     return [s for s in all_schemas if s.get("function", {}).get("name") in allowed]
 
 
@@ -86,7 +93,7 @@ _REPROMPT_SECTIONS = (
     "get_spending_summary, get_spending_recap, get_spending_patterns",
     "HEALTH: log_health_vital, get_health_vitals, log_medication, get_medications, "
     "add_health_appointment, get_health_appointments; "
-    "WORLD: get_weather",
+    "WORLD: get_weather, search_web",
 )
 
 

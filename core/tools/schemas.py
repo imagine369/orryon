@@ -1359,4 +1359,33 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_web",
+            "description": (
+                "Search live news and current events on the web. Use when the user asks "
+                "what is in the news today, top headlines, breaking news, what is "
+                "happening in the world, or recent developments on a topic. Returns "
+                "headline titles, sources, and links. Omit query for general top "
+                "headlines; include query for a specific topic."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Optional search topic, e.g. 'US politics', 'AI', or "
+                            "'Ukraine'. Omit for general top headlines."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max headlines to return (default 8, max 12).",
+                    },
+                },
+            },
+        },
+    },
 ]

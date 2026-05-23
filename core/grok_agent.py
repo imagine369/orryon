@@ -36,7 +36,8 @@ from core.context_cache import (
     schedule_context_refresh,
 )
 from core.tool_labels import get_tool_label
-from core.tools import GROK_TOOL_SCHEMAS, execute_tool
+from core.canonical_tools import filter_schemas_for_grok
+from core.tools import GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
 from db import fetch_rows
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,8 @@ _ACTION_VERB_RE = re.compile(
     r"complete|completed|finish|finished|mark|marked|check|checked|"
     r"pin|unpin|"
     r"show|pull|list|find|search|"
+    r"news|headlines|headline|breaking|happening|current events|"
+    r"in the news|what'?s new|"
     r"how\s+much|how\s+many|what'?s\s+my|what\s+are\s+my|"
     r"forecast|insights?|yearly|summary|afford|trend|pattern|analyze|analyse"
     r")\b",
@@ -211,6 +214,7 @@ async def run_orryon_stream(
     session_id: str = "",
     tier: str = "pro",
     mode: str = "adult",
+    live_orryon: bool = True,
 ) -> AsyncGenerator[dict, None]:
     """
     Async streaming generator that yields events as orryon processes a message.
@@ -239,8 +243,11 @@ async def run_orryon_stream(
         user_name=user_name,
         tier=tier,
         mode=mode,
+        live_orryon=live_orryon,
         locale_block=locale.prompt_block() + brand_hint,
     )
+    grok_tools = filter_schemas_for_grok(TOOL_SCHEMAS, live_orryon=live_orryon)
+    use_agent_tools = live_orryon
     memories = _get_user_memories(user_id)
     context_snip = await get_context_snapshot_text(
         user_id, lambda: _compute_context_snapshot(user_id),
@@ -256,11 +263,39 @@ async def run_orryon_stream(
     reprompted_once = False
 
     try:
+        if use_agent_tools:
+            from core.xai_responses import (
+                AgentToolsUnavailable,
+                chat_schemas_to_responses_tools,
+                run_orryon_stream_agent,
+            )
+
+            try:
+                async for event in run_orryon_stream_agent(
+                    user_message=user_message,
+                    user_id=user_id,
+                    messages=messages,
+                    responses_tools=chat_schemas_to_responses_tools(grok_tools),
+                    session_id=session_id,
+                    api_key=_next_api_key(),
+                    reprompt_note=_REPROMPT_SYSTEM_NOTE,
+                    max_rounds=MAX_TOOL_ROUNDS,
+                ):
+                    yield event
+                return
+            except AgentToolsUnavailable:
+                logger.warning(
+                    "Agent Tools unavailable for user_id=%s — using chat completions + RSS news",
+                    user_id,
+                )
+
         for _round in range(MAX_TOOL_ROUNDS):
             content_parts: list[str] = []
             tool_calls_buf: list[dict] = []
 
-            async for chunk in _call_grok_stream(messages, session_id=session_id):
+            async for chunk in _call_grok_stream(
+                messages, session_id=session_id, tools=grok_tools,
+            ):
                 if chunk.get("usage"):
                     u = chunk["usage"]
                     accumulated_usage["prompt_tokens"] += u.get("prompt_tokens", 0)
@@ -399,6 +434,7 @@ async def run_orryon_stream(
 async def _call_grok_stream(
     messages: list[dict],
     session_id: str = "",
+    tools: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Async SSE streaming call to xAI Grok API. Yields parsed JSON chunks.
 
@@ -420,7 +456,7 @@ async def _call_grok_stream(
         "messages": messages,
         "temperature": CHAT_TEMPERATURE,
         "max_tokens": CHAT_MAX_TOKENS,
-        "tools": GROK_TOOL_SCHEMAS,
+        "tools": tools if tools is not None else GROK_TOOL_SCHEMAS,
         "tool_choice": "auto",
         "stream": True,
         "stream_options": {"include_usage": True},

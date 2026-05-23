@@ -83,7 +83,7 @@ from core.tools.handlers.health import (
     _add_health_appointment,
     _get_health_appointments,
 )
-from core.tools.handlers.world import _get_weather
+from core.tools.handlers.world import _get_weather, _search_web
 
 __all__ = [
     "_add_expense",
@@ -153,4 +153,5 @@ __all__ = [
     "_add_health_appointment",
     "_get_health_appointments",
     "_get_weather",
+    "_search_web",
 ]

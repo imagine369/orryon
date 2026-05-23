@@ -9,7 +9,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | Layer | What it means |
 |-------|----------------|
 | **Chat** | Broad assistant for explanations, writing, planning, how-tos, health education, opinions, tutoring (non-code), and more |
-| **Tools** | Their Orryon data + live weather — log, read, update; never guess amounts or IDs |
+| **Tools** | Their Orryon data + live weather & news — log, read, update; never guess amounts or IDs |
 | **Not offered** | Porn / explicit sexual content · substantial **code** (IDE/homework) · **images** (generate/edit/analyze as a product) |
 
 ---
@@ -45,6 +45,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Lists** | Grocery and custom lists |
 | **Health logs** | Vitals, medications, appointments (stored in Orryon) |
 | **Weather** | `get_weather` — live conditions for a city/place |
+| **News & web** | xAI `web_search` + `x_search` (Grok-style, when Live Orryon is on); RSS `search_web` fallback |
 | **Search** | Cross-feature search across their data |
 
 Morning **briefing**: Dashboard in the app (chat can suggest opening it).
@@ -81,8 +82,6 @@ Everyday **writing** (emails, tone) is not code. **Sewing/cooking** how-tos are 
 - Read **live** bank balance from a linked bank (use manual balance, expenses, CSV import)
 - Send email on the user's behalf
 - Shop on external sites
-- Live web/X search (unless added later)
-
 **Alternatives:** calendar, tasks, reminders, `get_weather`, log expenses, link to official site.
 
 ---
