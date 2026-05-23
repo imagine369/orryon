@@ -1,27 +1,32 @@
-"""HTTP tests for Phase 2c account router extraction (no live xAI receipt calls)."""
+"""HTTP tests for Phase 2c account router extraction."""
 from __future__ import annotations
 
 import io
+import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from backend.auth import create_token
-from backend.deps import resolve_plan_for_user
+from backend.deps import IS_LOCAL_DEV, resolve_plan_for_user
 from backend.main import app
-from db import get_or_create_user_by_email
+from db import get_connection, get_or_create_user_by_email
 
 _DEV_ORIGIN = "http://localhost:3000"
 
 
-@pytest.fixture
-def auth_headers():
-    user = get_or_create_user_by_email("pytest-account@orryon.app")
+def _headers_for_email(email: str) -> dict[str, str]:
+    user = get_or_create_user_by_email(email)
     token = create_token(user["id"], user["email"], device_name="pytest", ip_address="127.0.0.1")
     return {
         "Authorization": f"Bearer {token}",
         "Origin": _DEV_ORIGIN,
     }
+
+
+@pytest.fixture
+def auth_headers():
+    return _headers_for_email("pytest-account@orryon.app")
 
 
 @pytest.mark.asyncio
@@ -121,6 +126,126 @@ async def test_receipt_scan_empty_upload(auth_headers):
             files=files,
         )
     assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_email_change_send_and_verify(monkeypatch):
+    """Full send-code → verify flow using dev_code (no real email)."""
+    assert IS_LOCAL_DEV is True
+    email = f"pytest-email-flow-{uuid.uuid4().hex[:8]}@orryon.app"
+    new_email = f"pytest-email-flow-new-{uuid.uuid4().hex[:8]}@orryon.app"
+    headers = _headers_for_email(email)
+
+    def _noop_send(_to: str, _code: str) -> dict:
+        return {"sent": False, "detail": "pytest — email not sent"}
+
+    monkeypatch.setattr(
+        "backend.routers.account_settings.send_verification_code",
+        _noop_send,
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        send_res = await client.post(
+            "/api/settings/email-change/send-code",
+            headers=headers,
+            json={"new_email": new_email},
+        )
+        assert send_res.status_code == 200
+        send_body = send_res.json()
+        code = send_body.get("dev_code", "")
+        assert len(code) == 6, f"expected dev_code in local dev, got {send_body!r}"
+
+        verify_res = await client.post(
+            "/api/settings/email-change/verify",
+            headers=headers,
+            json={"new_email": new_email, "code": code},
+        )
+        assert verify_res.status_code == 200
+        verify_body = verify_res.json()
+        assert verify_body["email"] == new_email
+        assert verify_body.get("token")
+
+        new_headers = {
+            **headers,
+            "Authorization": f"Bearer {verify_body['token']}",
+        }
+        settings_res = await client.get("/api/settings", headers=new_headers)
+        assert settings_res.status_code == 200
+        assert settings_res.json()["email"] == new_email
+
+
+@pytest.mark.asyncio
+async def test_delete_account_removes_user():
+    """Destructive — uses a dedicated user so other tests are unaffected."""
+    email = f"pytest-delete-{uuid.uuid4().hex[:12]}@orryon.app"
+    headers = _headers_for_email(email)
+    uid = get_or_create_user_by_email(email)["id"]
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        del_res = await client.delete("/api/account", headers=headers)
+        assert del_res.status_code == 200
+        assert del_res.json().get("deleted") is True
+
+        settings_res = await client.get("/api/settings", headers=headers)
+        assert settings_res.status_code == 404
+
+    with get_connection() as conn:
+        row = conn.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone()
+    assert row is None
+
+
+@pytest.mark.asyncio
+async def test_receipt_scan_mocked_xai_response(monkeypatch):
+    """End-to-end handler path with mocked xAI (no network)."""
+    headers = _headers_for_email(f"pytest-receipt-{uuid.uuid4().hex[:8]}@orryon.app")
+
+    receipt_json = (
+        '{"merchant": "Test Mart", "amount": 19.99, "date": "2026-05-01", '
+        '"category": "Groceries", "items": ["milk"]}'
+    )
+
+    class _MockResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {
+                "choices": [{"message": {"content": receipt_json}}],
+                "usage": {"prompt_tokens": 50, "completion_tokens": 30},
+            }
+
+    class _MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, **kwargs):
+            assert "api.x.ai" in url
+            assert kwargs.get("json", {}).get("model")
+            return _MockResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient", _MockAsyncClient)
+
+    files = {"file": ("receipt.jpg", io.BytesIO(b"\xff\xd8\xff fake jpeg"), "image/jpeg")}
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.post(
+            "/api/receipts/scan",
+            headers=headers,
+            files=files,
+        )
+    assert res.status_code == 200
+    body = res.json()
+    assert body.get("merchant") == "Test Mart"
+    assert body.get("amount") == 19.99
+    assert body.get("category") == "Groceries"
 
 
 @pytest.mark.asyncio
