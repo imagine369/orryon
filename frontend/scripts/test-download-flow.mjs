@@ -87,9 +87,13 @@ describe("HTTP routes (requires dev server)", () => {
       method: "HEAD",
     });
     const ct = headers.get("content-type") || "";
-    // static file if present, or 404 from Next static - but NOT text/html not-found page
     if (status === 404) {
       assert.ok(!ct.includes("text/html"), "avoid marketing 404 page");
+    } else {
+      assert.ok(
+        status === 308 || status === 307 || status === 302 || status === 200,
+        `legacy path should redirect or serve file, got ${status}`,
+      );
     }
   });
 
@@ -99,6 +103,11 @@ describe("HTTP routes (requires dev server)", () => {
     const m = await res.json();
     assert.equal(m.display, "standalone");
     assert.ok(m.icons?.length >= 1, "has icons");
-    assert.ok(m.icons.some((i) => i.src.includes("avatar")), "uses avatar icon");
+    assert.ok(m.icons.some((i) => /icon-192\.png/.test(i.src)), "has 192px icon");
+    assert.ok(m.icons.some((i) => /icon-512\.png/.test(i.src)), "has 512px icon");
+    for (const icon of m.icons) {
+      const { status: iconStatus } = await fetchCheck(icon.src);
+      assert.equal(iconStatus, 200, `icon ${icon.src} should be reachable`);
+    }
   });
 });
