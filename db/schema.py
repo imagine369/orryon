@@ -579,6 +579,11 @@ _WAITLIST_EXTRA_COLS = {
     "approve_token": "TEXT DEFAULT ''",
 }
 
+_USER_PREFERENCES_EXTRA_COLS = {
+    "life_priorities": "TEXT DEFAULT ''",
+    "life_priorities_set": "INTEGER DEFAULT 0",
+}
+
 
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call multiple times."""
@@ -605,6 +610,7 @@ def _init_db_pg() -> None:
         _migrate_extra_cols_pg(cur, "transactions", _TRANSACTIONS_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "notes", _NOTES_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "waitlist", _WAITLIST_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "user_preferences", _USER_PREFERENCES_EXTRA_COLS)
         conn.commit()
         logger.info("Postgres schema initialised")
     except Exception as exc:
@@ -639,6 +645,7 @@ def _init_db_sqlite() -> None:
     _migrate_sqlite_cols(conn, "transactions", _TRANSACTIONS_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "notes", _NOTES_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "waitlist", _WAITLIST_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "user_preferences", _USER_PREFERENCES_EXTRA_COLS)
     conn.commit()
     conn.close()
     logger.info("SQLite database initialised at: %s", DB_PATH)

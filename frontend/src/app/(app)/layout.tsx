@@ -13,6 +13,7 @@ import { JournalPanel } from "@/components/journal-panel";
 import { ResetAnchorPanel } from "@/components/reset-anchor-panel";
 import { TrialBanner } from "@/components/trial-banner";
 import { InstallPrompt } from "@/components/install-prompt";
+import { LifeInterestsOnboarding } from "@/components/life-interests-onboarding";
 import { useSubscription } from "@/lib/use-subscription";
 import { SubscriptionProvider } from "@/lib/subscription-service";
 import { usePreferences } from "@/lib/use-preferences";
@@ -94,6 +95,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <JournalPanel />
       <ResetAnchorPanel />
       <InstallPrompt />
+      <LifeInterestsOnboarding />
     </div>
   );
 }

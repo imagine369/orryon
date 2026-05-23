@@ -34,6 +34,7 @@ from backend.deps import (
 from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_current_user
 from backend.signing import require_signed_request
 from backend.schemas import ChatReq
+from db.preferences import parse_life_priorities
 from db import (
     create_chat_session,
     delete_chat_session,
@@ -77,9 +78,17 @@ def _get_user_context(uid: str) -> dict:
     user_row = conn.execute("SELECT plan, segment, display_name FROM users WHERE id=?", (uid,)).fetchone()
     conn.close()
     prefs = get_user_preferences(uid)
+    life_priorities = parse_life_priorities(prefs.get("life_priorities", ""))
     if not user_row:
-        return {"plan": "free", "segment": "", "display_name": "there",
-                "voice_overlay": False, "golden_mode": False}
+        return {
+            "plan": "free",
+            "segment": "",
+            "display_name": "there",
+            "voice_overlay": False,
+            "golden_mode": False,
+            "live_orryon": True,
+            "life_priorities": life_priorities,
+        }
     return {
         "plan": user_row["plan"] or "free",
         "segment": user_row["segment"] or "",
@@ -87,6 +96,7 @@ def _get_user_context(uid: str) -> dict:
         "voice_overlay": bool(prefs.get("voice_overlay_enabled", 0)),
         "golden_mode": bool(prefs.get("golden_mode_enabled", 0)),
         "live_orryon": bool(prefs.get("live_orryon_enabled", 1)),
+        "life_priorities": life_priorities,
     }
 
 
@@ -139,6 +149,7 @@ async def chat_stream(
                 tier=ctx["plan"],
                 mode="golden" if ctx["golden_mode"] else "adult",
                 live_orryon=ctx["live_orryon"],
+                life_priorities=ctx.get("life_priorities") or [],
             ):
                 if event["type"] == "token":
                     full_text += event["content"]
@@ -290,6 +301,7 @@ async def chat_ws(ws: WebSocket):
                     tier=ctx["plan"],
                     mode="golden" if ctx["golden_mode"] else "adult",
                     live_orryon=ctx["live_orryon"],
+                    life_priorities=ctx.get("life_priorities") or [],
                 ):
                     if event["type"] == "token":
                         full_text += event["content"]

@@ -229,6 +229,7 @@ async def run_orryon_stream(
     tier: str = "pro",
     mode: str = "adult",
     live_orryon: bool = True,
+    life_priorities: list[str] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Async streaming generator that yields events as orryon processes a message.
@@ -267,7 +268,13 @@ async def run_orryon_stream(
         user_id, lambda: _compute_context_snapshot(user_id),
     )
     messages = _build_messages(
-        system_prompt, chat_history or [], user_message, user_id, memories, context_snip,
+        system_prompt,
+        chat_history or [],
+        user_message,
+        user_id,
+        memories,
+        context_snip,
+        life_priorities=life_priorities or [],
     )
 
     actions_taken: list[dict] = []
@@ -514,6 +521,28 @@ async def _call_grok_async(messages: list[dict]) -> dict:
 # MESSAGE BUILDING
 # ─────────────────────────────────────────────────────────────────────────────
 
+_LIFE_PRIORITY_LABELS = {
+    "health": "Health & medications",
+    "calendar": "Schedule",
+    "communication": "Family & messages",
+    "finance": "Money & bills",
+    "tasks": "Tasks & reminders",
+    "notes": "Notes & remembering",
+}
+
+
+def _life_priorities_block(ids: list[str]) -> str:
+    if not ids:
+        return ""
+    labels = [_LIFE_PRIORITY_LABELS.get(i, i) for i in ids]
+    return (
+        "\n\n## USER FOCUS AREAS\n"
+        f"The user asked Orryon to prioritize: {', '.join(labels)}. "
+        "Weight practical help toward these when relevant. "
+        "Their chat habits may shift emphasis over time.\n"
+    )
+
+
 def _build_messages(
     system_prompt: str,
     chat_history: list[dict],
@@ -521,6 +550,7 @@ def _build_messages(
     user_id: str,
     memories: list[str] | None = None,
     context_snip: str = "(context unavailable)",
+    life_priorities: list[str] | None = None,
 ) -> list[dict]:
     memory_block = ""
     if memories:
@@ -537,6 +567,7 @@ def _build_messages(
             "content": (
                 system_prompt
                 + f"\n\n## CURRENT USER CONTEXT\n{context_snip}"
+                + _life_priorities_block(life_priorities or [])
                 + memory_block
             ),
         }

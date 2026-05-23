@@ -9,6 +9,25 @@ from db.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
+LIFE_PRIORITY_IDS = frozenset({
+    "health", "calendar", "communication", "finance", "tasks", "notes",
+})
+
+
+def parse_life_priorities(raw: str) -> list[str]:
+    out: list[str] = []
+    for part in (raw or "").split(","):
+        pid = part.strip()
+        if pid in LIFE_PRIORITY_IDS and pid not in out:
+            out.append(pid)
+        if len(out) >= 3:
+            break
+    return out
+
+
+def normalize_life_priorities(raw: str | None) -> str:
+    return ",".join(parse_life_priorities(raw or ""))
+
 
 def get_user_preferences(user_id: str) -> dict:
     try:
@@ -25,6 +44,8 @@ def get_user_preferences(user_id: str) -> dict:
             "briefing_time": "07:00",
             "briefing_includes": "finance,health,calendar,goals",
             "onboarding_complete": 0,
+            "life_priorities": "",
+            "life_priorities_set": 0,
         }
     except Exception as exc:
         logger.error("get_user_preferences error: %s", exc)

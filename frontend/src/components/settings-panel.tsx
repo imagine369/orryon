@@ -42,6 +42,7 @@ import { InstallButton } from "@/components/install-prompt";
 import { usePreferences } from "@/lib/use-preferences";
 import { useChatUsage } from "@/lib/use-chat-usage";
 import { formatDisplayName } from "@/lib/format-display-name";
+import { LifePrioritiesPicker } from "@/components/life-priorities-picker";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1841,9 +1842,44 @@ function AccessibilityView({ prefs, onUpdate, sub }: {
 }) {
   const plan = sub?.plan;
   const isPlus = plan === "premium_plus";
+  const [focusPicks, setFocusPicks] = useState(prefs.life_priorities);
+  const [focusSaved, setFocusSaved] = useState(false);
+
+  useEffect(() => {
+    setFocusPicks(prefs.life_priorities);
+  }, [prefs.life_priorities]);
+
+  async function saveFocusAreas() {
+    await onUpdate({
+      life_priorities: focusPicks,
+      life_priorities_set: true,
+    });
+    setFocusSaved(true);
+    setTimeout(() => setFocusSaved(false), 2000);
+  }
 
   return (
     <div className="space-y-4">
+      <div className="py-3 border-b border-white/[0.04]">
+        <p className="text-sm text-white/80 font-medium mb-1">What matters most</p>
+        <p className="text-xs text-white/35 mb-4 leading-relaxed">
+          Up to three focus areas for home shortcuts. Orryon still learns from what
+          you chat about most over time.
+        </p>
+        <LifePrioritiesPicker
+          selected={focusPicks}
+          onChange={setFocusPicks}
+          gentle={prefs.golden_mode_enabled}
+        />
+        <button
+          type="button"
+          onClick={saveFocusAreas}
+          className="mt-4 w-full rounded-full border border-white/[0.12] bg-white/[0.06] py-2.5 text-sm text-white/70 hover:bg-white/[0.1] hover:text-white/90"
+        >
+          {focusSaved ? "Saved" : "Save focus areas"}
+        </button>
+      </div>
+
       {/* Golden Mode */}
       <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.04]">
         <div>

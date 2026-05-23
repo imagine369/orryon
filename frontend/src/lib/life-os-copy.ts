@@ -13,9 +13,5 @@ export const PRO_TEXT_ONLY_HINT =
 export const HEALTH_DISCLAIMER_SHORT =
   "Health answers are informational only — not medical advice. Consult a healthcare professional for medical decisions.";
 
-export const CHAT_STARTER_PROMPTS: { label: string; message: string }[] = [
-  { label: "Log lunch", message: "I had lunch for $14 at a cafe" },
-  { label: "This week", message: "What's on my calendar this week?" },
-  { label: "Sound okay?", message: "Does this message sound polite? I'll paste it next." },
-  { label: "Plan Saturday", message: "Help me plan a calm Saturday" },
-];
+/** Default empty-state chips (personalized per user when history exists). */
+export { DEFAULT_STARTER_PROMPTS as CHAT_STARTER_PROMPTS } from "@/lib/personalized-starter-prompts";

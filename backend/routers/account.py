@@ -40,6 +40,7 @@ from backend.schemas import (
 )
 from config import APP_URL, GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from core.display_name import normalize_display_name
+from db.preferences import normalize_life_priorities, parse_life_priorities
 from db import (
     create_verification_code,
     get_connection,
@@ -1461,6 +1462,8 @@ class PrefsReq(BaseModel):
     briefing_time: str | None = None
     briefing_includes: str | None = None
     onboarding_complete: int | None = None
+    life_priorities: str | None = None
+    life_priorities_set: int | None = None
 
 
 @router.get("/api/preferences")
@@ -1473,12 +1476,16 @@ async def get_prefs(user: dict = Depends(get_current_user)):
         "briefing_time": prefs.get("briefing_time", "07:00"),
         "briefing_includes": prefs.get("briefing_includes", "finance,health,calendar,goals"),
         "onboarding_complete": bool(prefs.get("onboarding_complete", 0)),
+        "life_priorities": parse_life_priorities(prefs.get("life_priorities", "")),
+        "life_priorities_set": bool(prefs.get("life_priorities_set", 0)),
     }
 
 
 @router.patch("/api/preferences")
 async def update_prefs(body: PrefsReq, user: dict = Depends(get_current_user)):
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "life_priorities" in updates:
+        updates["life_priorities"] = normalize_life_priorities(updates["life_priorities"])
     if updates:
         upsert_user_preferences(user["user_id"], updates)
     return {"updated": True}
