@@ -16,6 +16,8 @@ os.environ.setdefault("NODE_ENV", "development")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-pytest-only-32b")
 os.environ.setdefault("REQUEST_SIGNING_MODE", "off")
 os.environ.setdefault("ENABLE_DEMO", "1")
+# Avoid slow/blocked Redis connect during background startup in API tests.
+os.environ["REDIS_URL"] = ""
 
 
 @pytest.fixture(scope="session", autouse=True)

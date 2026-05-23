@@ -10,6 +10,12 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from core.stripe_sync import (
+    _all_stripe_customer_ids,
+    _find_paid_subscription,
+    _persist_paid_plan,
+)
+
 logger = logging.getLogger(__name__)
 
 TRIAL_DAYS = 14
@@ -112,12 +118,6 @@ def sync_user_billing_row(user_row: dict) -> dict:
     try:
         import stripe as stripe_lib
         from db import get_connection
-
-        from backend.routers.account import (
-            _all_stripe_customer_ids,
-            _find_paid_subscription,
-            _persist_paid_plan,
-        )
 
         stripe_lib.api_key = STRIPE_SECRET_KEY
         customer_ids, user_row = _all_stripe_customer_ids(stripe_lib, user_row)

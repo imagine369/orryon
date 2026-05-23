@@ -11,6 +11,8 @@ import logging
 import time
 from typing import Any
 
+from core.cache import cache_delete, cache_get, cache_set
+
 logger = logging.getLogger(__name__)
 
 _CONTEXT_TTL_FRESH = 300
@@ -27,7 +29,6 @@ def _cache_key(user_id: str) -> str:
 
 async def _redis_get(user_id: str) -> tuple[float, str] | None:
     try:
-        from backend.cache import cache_get
         raw = await cache_get(_cache_key(user_id))
     except Exception:
         return None
@@ -42,7 +43,6 @@ async def _redis_get(user_id: str) -> tuple[float, str] | None:
 
 async def _redis_set(user_id: str, text: str) -> None:
     try:
-        from backend.cache import cache_set
         await cache_set(
             _cache_key(user_id),
             {"ts": time.time(), "text": text},
@@ -129,7 +129,6 @@ def invalidate_context_cache(user_id: str) -> None:
 
 async def _redis_delete(user_id: str) -> None:
     try:
-        from backend.cache import cache_delete
         await cache_delete(_cache_key(user_id))
     except Exception:
         pass

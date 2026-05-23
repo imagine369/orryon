@@ -1,8 +1,6 @@
 """API smoke — liveness and app import."""
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -20,12 +18,23 @@ async def test_api_health_ok():
 
 @pytest.mark.asyncio
 async def test_api_ready_after_startup():
+    """
+    Readiness is set by background startup in production; httpx ASGITransport does
+    not schedule that task, so we run startup explicitly then assert /api/ready.
+    """
+    import backend.main as m
+
+    m._startup_ready = False
+    m._startup_error = None
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        for _ in range(100):
-            res = await client.get("/api/ready")
-            if res.status_code == 200:
-                assert res.json() == {"status": "ok"}
-                return
-            await asyncio.sleep(0.05)
-    pytest.fail("background startup did not become ready in time")
+        starting = await client.get("/api/ready")
+        assert starting.status_code == 503
+        assert starting.json()["status"] == "starting"
+
+        await m._run_startup()
+
+        ready = await client.get("/api/ready")
+        assert ready.status_code == 200
+        assert ready.json() == {"status": "ok"}

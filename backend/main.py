@@ -130,6 +130,11 @@ async def _run_startup() -> None:
         logger.info("Request signing mode: %s", get_signing_mode())
         _log_email_config_status()
 
+        # Mark ready before optional xAI prewarm so /api/ready and pytest are not
+        # blocked on external network (Railway healthchecks, CI).
+        _startup_ready = True
+        _startup_error = None
+
         if XAI_API_KEY:
             try:
                 from core.grok_agent import get_http_client
@@ -138,9 +143,6 @@ async def _run_startup() -> None:
                 logger.info("xAI connection prewarmed")
             except Exception:
                 pass
-
-        _startup_ready = True
-        _startup_error = None
     except Exception as exc:
         _startup_error = str(exc)
         logger.critical(

@@ -336,7 +336,7 @@ def _parse_event_datetime(event_date: str) -> datetime | None:
 def run_daily_backup() -> None:
     """Take a daily SQLite backup (runs at 3 AM UTC via scheduler)."""
     try:
-        from backend.backup import backup_database
+        from core.backup import backup_database
         result = backup_database()
         if result:
             logger.info("Daily backup completed: %s", result)

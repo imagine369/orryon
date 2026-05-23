@@ -21,6 +21,9 @@ _FAHRENHEIT_COUNTRIES = frozenset({
 # Road-distance conventions (weather wind stays mph for UK even though °C).
 _MILES_COUNTRIES = frozenset({"US", "GB", "LR", "MM"})
 
+# open-meteo wind_speed_unit: mph for US/imperial and UK (Met Office-style forecasts).
+_MPH_WIND_COUNTRIES = _FAHRENHEIT_COUNTRIES | frozenset({"GB"})
+
 # When Home isn't geocoded, infer country from the currency they chose in Settings.
 _CURRENCY_DEFAULT_COUNTRY: dict[str, str] = {
     "USD": "US",
@@ -150,9 +153,11 @@ def _units_for_country(country_code: str | None) -> tuple[str, str, str, str, st
     cc = (country_code or "").upper()
     if cc in _FAHRENHEIT_COUNTRIES:
         temp_unit, temp_display = "fahrenheit", "°F"
-        wind_unit, wind_display = "mph", "mph"
     else:
         temp_unit, temp_display = "celsius", "°C"
+    if cc in _MPH_WIND_COUNTRIES:
+        wind_unit, wind_display = "mph", "mph"
+    else:
         wind_unit, wind_display = "kmh", "km/h"
     distance = "miles" if cc in _MILES_COUNTRIES else "km"
     return temp_unit, temp_display, wind_unit, wind_display, distance

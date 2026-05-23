@@ -685,10 +685,17 @@ async def _extract_memories_async(
     user_message: str, assistant_response: str, user_id: str,
 ) -> None:
     try:
-        from backend.deps import get_monthly_spend_cap, get_monthly_token_cap, resolve_plan_for_user
+        from core.plans import (
+            get_monthly_spend_cap,
+            get_monthly_token_cap,
+            resolve_plan_for_user_id,
+        )
         from db import get_monthly_spend, get_monthly_token_usage, record_token_spend, save_user_memory
 
-        plan = resolve_plan_for_user(user_id)["plan"]
+        plan_info = resolve_plan_for_user_id(user_id)
+        if not plan_info:
+            return
+        plan = plan_info["plan"]
         if get_monthly_spend(user_id) >= get_monthly_spend_cap(plan):
             return
         token_usage = get_monthly_token_usage(user_id)
