@@ -241,9 +241,10 @@ async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_curr
     except ImportError:
         raise HTTPException(503, "stripe package not installed")
 
-    from backend.routers.account import _validate_stripe_return_url
-    success_url = _validate_stripe_return_url(body.success_url, "success_url")
-    cancel_url = _validate_stripe_return_url(body.cancel_url, "cancel_url")
+    from backend.billing.stripe_urls import validate_stripe_return_url
+
+    success_url = validate_stripe_return_url(body.success_url, "success_url")
+    cancel_url = validate_stripe_return_url(body.cancel_url, "cancel_url")
 
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["user_id"],)).fetchone()
