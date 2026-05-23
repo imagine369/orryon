@@ -167,7 +167,7 @@ export function PlanUsageCards({
         </div>
 
         {/* Upgrade */}
-        {upgradeTier && (
+        {upgradeId && upgradeTier && (
           <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-4 flex flex-col min-h-[140px]">
             <p className="text-[10px] font-medium tracking-wider text-white/35 uppercase">
               Upgrade available
@@ -179,7 +179,7 @@ export function PlanUsageCards({
               </span>
             </p>
             <p className="mt-1.5 text-xs text-white/40 flex-1 leading-relaxed">
-              {UPGRADE_TAGLINE[upgradeTier.id]}
+              {UPGRADE_TAGLINE[upgradeId]}
             </p>
             <Link
               href={UPGRADE_PATH}
