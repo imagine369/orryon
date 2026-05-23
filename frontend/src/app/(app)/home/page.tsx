@@ -32,7 +32,6 @@ import { useSubscriptionService } from "@/lib/subscription-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
-import { DailyBriefingCard } from "@/components/daily-briefing-card";
 import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
 import {
@@ -49,6 +48,7 @@ import {
   storeCheckoutIntent,
 } from "@/lib/post-checkout";
 import type { Subscription } from "@/lib/use-subscription";
+import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -402,8 +402,14 @@ export default function HomePage() {
             return updated;
           });
         } else if (event.type === "tool") {
-          setThinking(false);
-          setToolLabel(event.label || event.name || "Working…");
+          const toolName = event.name || "";
+          if (shouldShowToolCaption(toolName)) {
+            setThinking(false);
+            setToolLabel(event.label || toolName.replace(/_/g, " ") || "Working…");
+          } else {
+            setThinking(true);
+            setToolLabel("");
+          }
         } else if (event.type === "confirm_required") {
           setThinking(false);
           setToolLabel("");
@@ -731,12 +737,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Daily briefing card */}
-          {sub?.is_active_pro && (
-            <div className={`${CONTAINER} mb-2`}>
-              <DailyBriefingCard />
-            </div>
-          )}
 
           {/* Upgrade success banner */}
           {upgradeBanner && (

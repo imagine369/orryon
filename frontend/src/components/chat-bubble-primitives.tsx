@@ -55,7 +55,7 @@ export function ThinkingIndicator() {
     >
       <div className="flex items-center gap-2">
         <span className="text-[13px] font-medium tracking-wide text-white/35">
-          Thinking
+          Thinking…
         </span>
         <span className="inline-flex items-center gap-[5px]" aria-hidden>
           {[0, 1, 2].map((i) => (

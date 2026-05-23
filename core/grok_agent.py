@@ -25,7 +25,10 @@ import httpx
 from config import XAI_API_KEY, XAI_API_KEYS, GROK_MODEL
 from core.canonical_tools import build_reprompt_note
 from core.system_prompt import get_system_prompt
-from core.user_locale import get_user_locale
+from core.orryon_brand import (
+    normalize_orryon_in_assistant_reply,
+    user_likely_addressing_orryon,
+)
 from core.context_cache import (
     get_context_snapshot_text,
     invalidate_context_cache,
@@ -225,11 +228,17 @@ async def run_orryon_stream(
         return
 
     locale = get_user_locale(user_id)
+    brand_hint = ""
+    if user_likely_addressing_orryon(user_message):
+        brand_hint = (
+            "\nNOTE: The user may have said Oriana, Orion, or Orryon (e.g. voice transcription). "
+            "They mean you — orryon. Reply using orryon; do not mirror the misspelling.\n"
+        )
     system_prompt = get_system_prompt(
         user_name=user_name,
         tier=tier,
         mode=mode,
-        locale_block=locale.prompt_block(),
+        locale_block=locale.prompt_block() + brand_hint,
     )
     memories = _get_user_memories(user_id)
     context_snip = await get_context_snapshot_text(
@@ -281,7 +290,9 @@ async def run_orryon_stream(
                         if fn.get("arguments"):
                             tool_calls_buf[idx]["function"]["arguments"] += fn["arguments"]
 
-            full_content = "".join(content_parts)
+            full_content = normalize_orryon_in_assistant_reply(
+                "".join(content_parts), user_message,
+            )
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": full_content or None}
             if tool_calls_buf:
                 assistant_msg["tool_calls"] = tool_calls_buf
