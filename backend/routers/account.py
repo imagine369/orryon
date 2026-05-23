@@ -787,8 +787,10 @@ async def get_subscription(user: dict = Depends(get_current_user)):
     row = dict(row)
     resolved = resolve_plan(row)
     has_stripe = bool((row.get("stripe_subscription_id") or "").strip())
+    has_customer = bool((row.get("stripe_customer_id") or "").strip())
     needs_reconcile = resolved["plan"] in ("free", "trial") or (
-        has_stripe and not (row.get("billing_period_start") or "").strip()
+        (has_stripe or has_customer)
+        and not (row.get("billing_period_end") or "").strip()
     )
     if needs_reconcile and has_stripe:
         from config import STRIPE_ENABLED, STRIPE_SECRET_KEY
