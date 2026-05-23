@@ -29,6 +29,7 @@ from core.orryon_brand import (
     normalize_orryon_in_assistant_reply,
     user_likely_addressing_orryon,
 )
+from core.user_locale import get_user_locale
 from core.context_cache import (
     get_context_snapshot_text,
     invalidate_context_cache,
