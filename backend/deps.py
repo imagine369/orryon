@@ -149,8 +149,8 @@ def check_monthly_api_quota(user_id: str, plan: str) -> None:
                 "plan": plan,
                 "upgrade_plan": get_suggested_upgrade_plan(plan),
                 "message": (
-                    "You've reached your monthly AI usage allowance for your plan. "
-                    "Upgrade for a higher limit — it resets on the 1st if you stay on this tier."
+                    "You've reached your included AI usage for this billing period. "
+                    "Upgrade for a higher limit — it resets on your next billing date."
                 ),
             },
         )
@@ -172,8 +172,8 @@ def check_monthly_api_quota(user_id: str, plan: str) -> None:
                 "plan": plan,
                 "upgrade_plan": get_suggested_upgrade_plan(plan),
                 "message": (
-                    "You've reached your monthly token allowance for your plan. "
-                    "Upgrade for a higher limit — it resets on the 1st if you stay on this tier."
+                    "You've reached your included token allowance for this billing period. "
+                    "Upgrade for a higher limit — it resets on your next billing date."
                 ),
             },
         )

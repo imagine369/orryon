@@ -15,6 +15,8 @@ export interface ChatUsage {
   upgrade_plan?: string | null;
   at_limit?: boolean;
   near_limit?: boolean;
+  reset_date?: string;
+  usage_resets_label?: string;
 }
 
 export function useChatUsage() {

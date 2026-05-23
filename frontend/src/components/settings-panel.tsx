@@ -586,34 +586,10 @@ export function SettingsPanel() {
 
   const goBack = () => setView(parentOf(view));
 
-  const initials = (settings?.display_name || settings?.email || "?")
-    .split(/[\s@]/)[0]
-    .slice(0, 2)
-    .toUpperCase();
-
   // ── View renderers ─────────────────────────────────────────────────────────
 
   const renderMainMenu = () => (
     <>
-      {/* Profile summary */}
-      <button
-        type="button"
-        onClick={() => setView("account")}
-        className="w-full flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6 hover:bg-white/[0.05] transition text-left"
-      >
-        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-base font-bold text-white shrink-0">
-          {initials}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">
-            {settings!.display_name ? formatDisplayName(settings!.display_name) : "Set a name"}
-          </p>
-          <p className="text-xs text-white/30 mt-0.5 break-all">{settings!.email}</p>
-        </div>
-        <ChevronRight className="h-4 w-4 text-white/20 shrink-0" strokeWidth={1.5} />
-      </button>
-
-      {/* Navigation items */}
       <div>
         <NavItem
           icon={<User className="h-5 w-5" strokeWidth={1.5} />}
@@ -1426,6 +1402,7 @@ export function SettingsPanel() {
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl divide-y divide-white/5">
         <PlanUsageCards
           sub={sub}
+          usageResetsLabel={chatUsage?.usage_resets_label}
           manageLoading={billingLoading}
           onManageBilling={openBillingPortal}
         />

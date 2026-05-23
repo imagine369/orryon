@@ -706,12 +706,20 @@ def _find_paid_subscription(stripe_lib: Any, customer_ids: list[str], user_id: s
     return best
 
 
-def _persist_paid_plan(user_id: str, customer_id: str, sub_id: str, plan: str) -> None:
+def _persist_paid_plan(
+    user_id: str,
+    customer_id: str,
+    sub_id: str,
+    plan: str,
+    *,
+    billing_period_start: str = "",
+    billing_period_end: str = "",
+) -> None:
     with get_connection() as conn:
         conn.execute(
             "UPDATE users SET plan=?, stripe_customer_id=?, stripe_subscription_id=?, "
-            "trial_ends_at='', segment='' WHERE id=?",
-            (plan, customer_id, sub_id, user_id),
+            "trial_ends_at='', segment='', billing_period_start=?, billing_period_end=? WHERE id=?",
+            (plan, customer_id, sub_id, billing_period_start, billing_period_end, user_id),
         )
         conn.commit()
 
@@ -735,7 +743,15 @@ def _sync_user_plan_from_stripe(stripe_lib: Any, user_row: dict) -> dict:
         return out
 
     customer_id, sub_id, new_plan, price_id = found
-    _persist_paid_plan(user_id, customer_id, sub_id, new_plan)
+    bps, bpe = "", ""
+    try:
+        sub_obj = stripe_lib.Subscription.retrieve(str(sub_id))
+        from core.usage_period import stripe_subscription_period_bounds
+
+        bps, bpe = stripe_subscription_period_bounds(sub_obj)
+    except Exception as exc:
+        logger.warning("subscription sync: could not read period for %s: %s", sub_id, exc)
+    _persist_paid_plan(user_id, customer_id, sub_id, new_plan, billing_period_start=bps, billing_period_end=bpe)
 
     updated = dict(user_row)
     updated["plan"] = new_plan
@@ -1288,11 +1304,20 @@ async def stripe_webhook(request: Request):
                     _cfg.STRIPE_PRICE_PREMIUM_ANNUAL,
                     _cfg.STRIPE_PRICE_PREMIUM_PLUS_ANNUAL,
                 ) else "monthly"
+                bps, bpe = "", ""
+                try:
+                    from core.usage_period import stripe_subscription_period_bounds
+
+                    sub_obj = stripe_lib.Subscription.retrieve(str(sub_id))
+                    bps, bpe = stripe_subscription_period_bounds(sub_obj)
+                except Exception as exc:
+                    logger.warning("checkout.session.completed: period for %s: %s", sub_id, exc)
                 user_email = ""
                 with get_connection() as conn:
                     conn.execute(
-                        "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='' WHERE id=?",
-                        (new_plan, sub_id, user_id),
+                        "UPDATE users SET plan=?, stripe_subscription_id=?, trial_ends_at='', segment='', "
+                        "billing_period_start=?, billing_period_end=? WHERE id=?",
+                        (new_plan, sub_id, bps, bpe, user_id),
                     )
                     conn.commit()
                     row = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()
@@ -1331,11 +1356,25 @@ async def stripe_webhook(request: Request):
                 new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
             else:
                 new_plan = "free"
+            bps, bpe = "", ""
+            try:
+                from core.usage_period import stripe_subscription_period_bounds
+
+                bps, bpe = stripe_subscription_period_bounds(sub)
+            except Exception:
+                pass
             with get_connection() as conn:
-                conn.execute(
-                    "UPDATE users SET plan=? WHERE stripe_subscription_id=?",
-                    (new_plan, sub_id),
-                )
+                if status in ("active", "trialing", "past_due") and bps:
+                    conn.execute(
+                        "UPDATE users SET plan=?, billing_period_start=?, billing_period_end=? "
+                        "WHERE stripe_subscription_id=?",
+                        (new_plan, bps, bpe, sub_id),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE users SET plan=? WHERE stripe_subscription_id=?",
+                        (new_plan, sub_id),
+                    )
                 conn.commit()
 
     elif event["type"] == "invoice.payment_failed":
@@ -1372,11 +1411,26 @@ async def stripe_webhook(request: Request):
             except Exception:
                 price_id = ""
             new_plan = PRICE_ID_TO_PLAN.get(price_id, "pro")
+            bps, bpe = "", ""
+            try:
+                from core.usage_period import stripe_subscription_period_bounds
+
+                sub_obj = stripe_lib.Subscription.retrieve(str(sub_id))
+                bps, bpe = stripe_subscription_period_bounds(sub_obj)
+            except Exception as exc:
+                logger.warning("invoice.payment_succeeded: period for %s: %s", sub_id, exc)
             with get_connection() as conn:
-                conn.execute(
-                    "UPDATE users SET plan=? WHERE stripe_customer_id=? AND stripe_subscription_id=?",
-                    (new_plan, customer_id, sub_id),
-                )
+                if bps:
+                    conn.execute(
+                        "UPDATE users SET plan=?, billing_period_start=?, billing_period_end=? "
+                        "WHERE stripe_customer_id=? AND stripe_subscription_id=?",
+                        (new_plan, bps, bpe, customer_id, sub_id),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE users SET plan=? WHERE stripe_customer_id=? AND stripe_subscription_id=?",
+                        (new_plan, customer_id, sub_id),
+                    )
                 conn.commit()
             logger.info("Renewal confirmed: customer=%s sub=%s plan=%s", customer_id, sub_id, new_plan)
 
@@ -1424,14 +1478,21 @@ async def chat_usage(user: dict = Depends(get_current_user)):
         get_chat_limit,
         get_suggested_upgrade_plan,
     )
+    from core.usage_period import resolve_usage_period
     from db import get_monthly_token_usage
 
     uid = user["user_id"]
-    plan_info = resolve_plan_for_user(uid)
+    with get_connection() as conn:
+        user_row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not user_row:
+        raise HTTPException(404, "User not found")
+    user_row = dict(user_row)
+    period = resolve_usage_period(user_row)
+    plan_info = resolve_plan(user_row)
     plan = plan_info["plan"]
-    count = get_chat_message_count(uid)
+    count = get_chat_message_count(uid, period.key)
     limit = get_chat_limit(plan)
-    token_usage = get_monthly_token_usage(uid)
+    token_usage = get_monthly_token_usage(uid, period.key)
     spend_cap = get_monthly_spend_cap(plan)
     token_cap = get_monthly_token_cap(plan)
     spend_usd = round(token_usage["cost_usd"], 4)
@@ -1452,4 +1513,6 @@ async def chat_usage(user: dict = Depends(get_current_user)):
         "upgrade_plan": get_suggested_upgrade_plan(plan),
         "at_limit": at_message_limit or at_spend_limit,
         "near_limit": near_spend_limit and not at_spend_limit,
+        "reset_date": period.reset_at.isoformat(),
+        "usage_resets_label": period.reset_label,
     }

@@ -41,14 +41,6 @@ function tierForId(id: TierId): TierDefinition {
   return t;
 }
 
-function usageResetLabel(): { label: string; days?: number } {
-  const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const days = Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  const label = next.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return { label, days };
-}
-
 function trialResetLabel(sub: Subscription): string {
   if (!sub.trial_ends_at) {
     return `${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left on trial`;
@@ -91,18 +83,19 @@ function currentPriceLabel(sub: Subscription): string {
 
 interface PlanUsageCardsProps {
   sub: Subscription;
+  usageResetsLabel?: string;
   manageLoading?: boolean;
   onManageBilling?: () => void;
 }
 
 export function PlanUsageCards({
   sub,
+  usageResetsLabel,
   manageLoading,
   onManageBilling,
 }: PlanUsageCardsProps) {
   const upgradeId = UPGRADE_TARGET[sub.plan];
   const upgradeTier = upgradeId ? tierForId(upgradeId) : null;
-  const usageReset = usageResetLabel();
   const showManage =
     sub.has_stripe_subscription &&
     (sub.plan === "pro" ||
@@ -115,7 +108,7 @@ export function PlanUsageCards({
       ? trialResetLabel(sub)
       : sub.plan === "free" || sub.plan === "past_due"
         ? "Subscribe to unlock Orryon"
-        : `Usage resets ${usageReset.label} (${usageReset.days} day${usageReset.days !== 1 ? "s" : ""})`;
+        : usageResetsLabel || "Usage resets on your billing date";
 
   return (
     <div className="px-3 pt-4 pb-3 border-b border-white/5 space-y-3">

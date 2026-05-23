@@ -27,8 +27,8 @@ export function PlanUsageSection({ plan, chatUsage }: PlanUsageSectionProps) {
       <div>
         <p className="text-sm font-medium text-white/85">What keeps Orryon working</p>
         <p className="text-[11px] text-white/35 mt-1.5 leading-relaxed">
-          One monthly pool for typed chat, voice messages (after transcription), replies, search, and
-          tools. When it runs out, Orryon pauses until it resets or you upgrade.
+          One pool for typed chat, voice messages (after transcription), replies, search, and tools.
+          It resets on your billing date, not the 1st of the calendar month.
         </p>
       </div>
 

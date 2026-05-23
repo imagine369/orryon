@@ -557,6 +557,8 @@ _USERS_EXTRA_COLS = {
     "language": "TEXT DEFAULT 'en'",
     "birth_date": "TEXT DEFAULT ''",
     "gender": "TEXT DEFAULT ''",
+    "billing_period_start": "TEXT DEFAULT ''",
+    "billing_period_end": "TEXT DEFAULT ''",
 }
 
 _TRANSACTIONS_EXTRA_COLS = {
