@@ -33,6 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { usePreferences } from "@/lib/use-preferences";
 import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
+import { formatDisplayName } from "@/lib/format-display-name";
 import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
 import {
@@ -764,7 +765,7 @@ export default function HomePage() {
                 />
               </div>
               <p className="mb-4 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
-                {getGreeting()}{user?.display_name ? `, ${user.display_name}` : ""}.
+                {getGreeting()}{user?.display_name ? `, ${formatDisplayName(user.display_name)}` : ""}.
               </p>
               <ChatStarterPrompts onPick={handleSend} disabled={streaming} />
 

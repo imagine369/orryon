@@ -22,6 +22,7 @@ from backend.cache import cache_set
 from backend.deps import ENABLE_DEMO, IS_LOCAL_DEV, IS_PRODUCTION, check_otp_rate_limit
 from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
 from config import CONTACT_EMAIL, SMTP_FROM, SMTP_USER
+from core.display_name import normalize_display_name
 from db import (
     create_verification_code,
     fetch_rows,
@@ -120,7 +121,10 @@ _PUBLIC_USER_FIELDS = {
 
 def _safe_user(user: dict) -> dict:
     """Strip sensitive fields before sending user data to the client."""
-    return {k: v for k, v in user.items() if k in _PUBLIC_USER_FIELDS}
+    out = {k: v for k, v in user.items() if k in _PUBLIC_USER_FIELDS}
+    if out.get("display_name"):
+        out["display_name"] = normalize_display_name(out["display_name"])
+    return out
 
 
 @router.get("/api/auth/email-status")
@@ -200,7 +204,7 @@ async def auth_verify(body: VerifyReq, request: Request):
         raise HTTPException(429, "Too many attempts. Please wait 15 minutes then request a new code.")
     if not verify_code(email, body.code.strip()):
         raise HTTPException(401, "Invalid or expired code")
-    display_name = (body.display_name or "").strip()
+    display_name = normalize_display_name((body.display_name or "").strip())
     segment = "free_breathe" if body.free_breathing_signup else ""
     is_new_user = False
     with get_connection() as conn:

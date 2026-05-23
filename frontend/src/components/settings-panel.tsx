@@ -21,7 +21,6 @@ import {
   ExternalLink,
   FileText,
   Heart,
-  Mic,
   Brain,
   Activity,
   MapPin,
@@ -37,12 +36,11 @@ import { api, getApiBase } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
-import { useVoiceUsage, startVoiceTopup } from "@/lib/use-voice-usage";
-import { AiAllowanceMeter } from "@/components/ai-allowance-meter";
-import { VoiceUsageMeter } from "@/components/voice-usage-meter";
+import { PlanUsageSection } from "@/components/plan-usage-section";
 import { InstallButton } from "@/components/install-prompt";
 import { usePreferences } from "@/lib/use-preferences";
 import { useChatUsage } from "@/lib/use-chat-usage";
+import { formatDisplayName } from "@/lib/format-display-name";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -430,13 +428,18 @@ export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const { logout, login } = useAuth();
   const { sub, refresh: refreshSub } = useSubscription();
-  const { usage: voiceUsage, isAtLimit: voiceAtLimit } = useVoiceUsage();
   const { prefs, update: updatePrefs } = usePreferences();
-  const { usage: chatUsage } = useChatUsage();
+  const { usage: chatUsage, reload: reloadChatUsage } = useChatUsage();
   const isOpen = openPanel === "settings";
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [view, setView] = useState<View>(null);
+
+  // Refresh included usage when opening Plan & Usuage.
+  useEffect(() => {
+    if (view !== "subscription") return;
+    reloadChatUsage();
+  }, [view, reloadChatUsage]);
 
   // If Stripe charged but webhook missed, reconcile when opening Subscription settings.
   useEffect(() => {
@@ -522,7 +525,8 @@ export function SettingsPanel() {
     key: "display_name" | "phone" | "country" | "language" | "birth_date" | "gender",
     value: string,
   ) => {
-    const trimmed = key === "display_name" ? value.trim() : value;
+    const trimmed =
+      key === "display_name" ? formatDisplayName(value) : value;
     const current = settings?.[key] ?? (key === "language" ? "en" : "");
     if (trimmed === current) return;
     await patch({ [key]: trimmed });
@@ -600,7 +604,9 @@ export function SettingsPanel() {
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate">{settings!.display_name || "Set a name"}</p>
+          <p className="font-semibold text-sm truncate">
+            {settings!.display_name ? formatDisplayName(settings!.display_name) : "Set a name"}
+          </p>
           <p className="text-xs text-white/30 mt-0.5 break-all">{settings!.email}</p>
         </div>
         <ChevronRight className="h-4 w-4 text-white/20 shrink-0" strokeWidth={1.5} />
@@ -1414,44 +1420,38 @@ export function SettingsPanel() {
               ? `Pro trial · ${sub.trial_days_remaining} day${sub.trial_days_remaining !== 1 ? "s" : ""} left`
               : sub.plan === "pro"
               ? "Pro"
+              : sub.plan === "premium"
+              ? "Premium"
+              : sub.plan === "premium_plus"
+              ? "Premium Plus"
+              : sub.plan === "past_due"
+              ? "Payment issue — update billing"
               : "Free — trial ended"
           }
           right={
             <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60 uppercase tracking-wider">
-              {sub.plan === "trial" ? "Trial" : sub.plan === "pro" ? "Active" : "Expired"}
+              {sub.plan === "trial"
+                ? "Trial"
+                : sub.plan === "free"
+                ? "Expired"
+                : sub.plan === "past_due"
+                ? "Past due"
+                : "Active"}
             </span>
           }
         />
-        {/* Included usage — Cursor-style Total % + breakdown */}
-        {chatUsage && sub.is_active_pro && (chatUsage.spend_cap_usd ?? 0) > 0 && (
-          <div className="px-3 py-3 border-b border-white/5">
-            <AiAllowanceMeter usage={chatUsage} plan={sub.plan} />
-            {(chatUsage.at_limit || chatUsage.near_limit) && chatUsage.upgrade_plan && (
-              <p className="text-xs text-amber-200/80 mt-2">
-                {chatUsage.at_limit
-                  ? "Limit reached — upgrade for more included usage."
-                  : "Running low — upgrade for a higher included limit."}
-              </p>
-            )}
-          </div>
+        {sub.is_active_pro && (
+          <PlanUsageSection plan={sub.plan} chatUsage={chatUsage} />
         )}
-
-        {/* Voice minute usage meter */}
-        {voiceUsage && (sub.plan === "premium" || sub.plan === "premium_plus") && (
-          <div className="px-3 py-3 border-b border-white/5">
-            <VoiceUsageMeter usage={voiceUsage} variant="full" />
-            {voiceAtLimit && (
-              <button
-                onClick={async () => {
-                  try { await startVoiceTopup(); } catch { /* handled inside */ }
-                }}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 text-sm text-white/80
-                  border border-white/10 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] transition"
-              >
-                <Mic className="h-4 w-4" strokeWidth={1.5} />
-                Add 60 minutes · $6.00
-              </button>
-            )}
+        {chatUsage &&
+          (chatUsage.at_limit || chatUsage.near_limit) &&
+          chatUsage.upgrade_plan && (
+          <div className="px-3 pb-3 border-b border-white/5">
+            <p className="text-xs text-amber-200/80">
+              {chatUsage.at_limit
+                ? "Chat limit reached — upgrade for more included usage."
+                : "Chat allowance running low — upgrade for a higher limit."}
+            </p>
           </div>
         )}
 

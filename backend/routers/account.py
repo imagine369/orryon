@@ -39,6 +39,7 @@ from backend.schemas import (
     SettingsUpdate,
 )
 from config import APP_URL, GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
+from core.display_name import normalize_display_name
 from db import (
     create_verification_code,
     get_connection,
@@ -203,6 +204,8 @@ async def get_settings(user: dict = Depends(get_current_user)):
     if not row:
         raise HTTPException(404, "User not found")
     d = {k: v for k, v in dict(row).items() if k in _SETTINGS_READ_FIELDS}
+    if d.get("display_name"):
+        d["display_name"] = normalize_display_name(d["display_name"])
     d["smtp_enabled"] = SMTP_ENABLED
     d["ai_connected"] = bool(XAI_API_KEY)
     d["grok_model"] = GROK_MODEL
@@ -236,6 +239,10 @@ async def update_settings(body: SettingsUpdate, user: dict = Depends(get_current
     updates = {k: v for k, v in raw.items() if k in _SETTINGS_ALLOWED_FIELDS}
     if not updates:
         raise HTTPException(400, "No fields to update")
+    if "display_name" in updates and isinstance(updates["display_name"], str):
+        updates["display_name"] = normalize_display_name(updates["display_name"])
+        if not updates["display_name"]:
+            raise HTTPException(400, "Display name cannot be empty")
     update_row("users", updates, {"id": uid})
     return {"updated": True}
 

@@ -18,6 +18,8 @@ interface AiAllowanceMeterProps {
   usage: ChatUsage;
   /** Plan id for the "Included in …" heading */
   plan?: string;
+  /** Inside PlanUsageSection — hide outer plan heading */
+  embedded?: boolean;
   className?: string;
 }
 
@@ -27,7 +29,7 @@ function pctUsed(used: number, cap: number): number | null {
 }
 
 /** Cursor-style included usage: Total %, green bar, optional breakdown. */
-export function AiAllowanceMeter({ usage, plan, className }: AiAllowanceMeterProps) {
+export function AiAllowanceMeter({ usage, plan, embedded, className }: AiAllowanceMeterProps) {
   const [expanded, setExpanded] = useState(false);
 
   const spendCap = usage.spend_cap_usd ?? 0;
@@ -47,23 +49,31 @@ export function AiAllowanceMeter({ usage, plan, className }: AiAllowanceMeterPro
   const planName = PLAN_DISPLAY[plan ?? usage.plan ?? ""] ?? "your plan";
   const isAtLimit = usage.at_limit || totalPct >= 100;
 
-  const breakdownParts: string[] = [];
-  if (messagePct !== null) breakdownParts.push(`${messagePct}% messages`);
-  if (tokenPct !== null) breakdownParts.push(`${tokenPct}% tokens`);
-  const breakdownSummary =
-    breakdownParts.length > 0
-      ? `${breakdownParts.join(" and ")} used`
-      : "Chat and tools share this monthly pool";
+  const spendLabel =
+    spendCap > 0
+      ? `$${spent.toFixed(2)} of $${spendCap.toFixed(2)} this month`
+      : null;
 
-  const hasDetails = messagePct !== null || tokenPct !== null;
+  const breakdownSummary = spendLabel ?? "View breakdown";
+  const hasDetails =
+    spendLabel !== null || messagePct !== null || tokenPct !== null;
 
   return (
     <div className={cn("space-y-2", className)}>
-      <p className="text-xs text-white/40">Included in {planName}</p>
+      {!embedded && (
+        <p className="text-xs text-white/40">Included AI usage · {planName}</p>
+      )}
 
-      <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3.5 space-y-3">
+      <div
+        className={cn(
+          "rounded-xl border border-white/[0.08] bg-white/[0.04] p-3.5 space-y-3",
+          embedded && "border-0 bg-transparent p-0",
+        )}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-white/90">Total</span>
+          <span className="text-sm font-medium text-white/90">
+            {embedded ? "Monthly pool" : "Monthly allowance"}
+          </span>
           <span
             className={cn(
               "text-sm font-medium tabular-nums",
@@ -117,15 +127,23 @@ export function AiAllowanceMeter({ usage, plan, className }: AiAllowanceMeterPro
               </div>
             )}
             {tokenPct !== null && (
-              <div className="flex justify-between">
-                <span>AI tokens</span>
-                <span className="tabular-nums text-white/70">
+              <div className="flex justify-between gap-3">
+                <span>Token estimate</span>
+                <span className="tabular-nums text-white/70 text-right">
                   {(usage.tokens_used ?? 0).toLocaleString()} /{" "}
                   {(usage.token_cap ?? 0).toLocaleString()}
+                  <span className="text-white/40"> ({tokenPct}%)</span>
                 </span>
               </div>
             )}
-            <p className="text-white/30 pt-1">Resets on the 1st of each month</p>
+            {tokenPct !== null && totalPct !== tokenPct && (
+              <p className="text-white/35 text-[10px] leading-relaxed">
+                Total {totalPct}% is based on estimated cost; token % can differ when replies are long or tools run extra steps.
+              </p>
+            )}
+            <p className="text-white/30 pt-1 leading-relaxed">
+              Resets on the 1st of each month.
+            </p>
           </div>
         )}
       </div>

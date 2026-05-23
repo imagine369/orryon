@@ -47,6 +47,7 @@ from db import (
     save_chat_message,
     update_chat_session_title,
 )
+from core.display_name import normalize_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,8 @@ def _resolve_session(uid: str, session_id: str) -> tuple[str, bool]:
 def _get_display_name(uid: str) -> str:
     with get_connection() as conn:
         row = conn.execute("SELECT display_name FROM users WHERE id=?", (uid,)).fetchone()
-    return row["display_name"] if row else "there"
+    raw = row["display_name"] if row else None
+    return normalize_display_name(raw) or "there"
 
 
 def _get_user_context(uid: str) -> dict:
@@ -81,7 +83,7 @@ def _get_user_context(uid: str) -> dict:
     return {
         "plan": user_row["plan"] or "free",
         "segment": user_row["segment"] or "",
-        "display_name": user_row["display_name"] or "there",
+        "display_name": normalize_display_name(user_row["display_name"]) or "there",
         "voice_overlay": bool(prefs.get("voice_overlay_enabled", 0)),
         "golden_mode": bool(prefs.get("golden_mode_enabled", 0)),
         "live_orryon": bool(prefs.get("live_orryon_enabled", 1)),

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
 import { migrateHabitsToServer } from "./migrate-habits";
 import { invalidateSigningKey, prefetchSigningKey } from "./signing";
+import { formatDisplayName } from "./format-display-name";
 
 interface User {
   id: string;
@@ -49,7 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get<User>("/api/auth/me")
       .then((u) => {
-        setUser(u);
+        setUser(
+          u.display_name
+            ? { ...u, display_name: formatDisplayName(u.display_name) }
+            : u,
+        );
         prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
       })
@@ -73,7 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback((u: User) => {
     // Cookies were set by /api/auth/login (or /api/auth/demo-login); we just
     // need to remember the user object in React state.
-    setUser(u);
+    setUser(
+      u.display_name
+        ? { ...u, display_name: formatDisplayName(u.display_name) }
+        : u,
+    );
     prefetchSigningKey().catch(() => {});
   }, []);
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ArrowUpRight, Loader2, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
+import { formatDisplayName } from "@/lib/format-display-name";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
   }, [user?.display_name]);
 
   const saveName = async () => {
-    const trimmed = nameInput.trim();
+    const trimmed = formatDisplayName(nameInput);
     if (!trimmed || trimmed === user?.display_name) { setEditingName(false); return; }
     setNameSaving(true);
     try {
@@ -162,7 +163,9 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-white/85 truncate">
-                            {user?.display_name || "Set a name"}
+                            {user?.display_name
+                              ? formatDisplayName(user.display_name)
+                              : "Set a name"}
                           </p>
                           <p className="text-xs text-white/30 mt-0.5 truncate">{user?.email}</p>
                         </div>

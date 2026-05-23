@@ -35,6 +35,9 @@ export function VoiceUsageMeter({
   const isNearLimit = pct >= 80;
   const isAtLimit = remaining_minutes <= 0;
 
+  const formatMinutes = (n: number) =>
+    n < 10 && n % 1 !== 0 ? n.toFixed(1) : String(Math.round(n));
+
   const resetLabel = (() => {
     const d = new Date(reset_date);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -50,7 +53,7 @@ export function VoiceUsageMeter({
               <span className="text-white/60">No minutes left</span>
             ) : (
               <span>
-                {Math.round(minutes_used)}&thinsp;/&thinsp;{total_available_minutes} min
+                {formatMinutes(minutes_used)}&thinsp;/&thinsp;{total_available_minutes} min
               </span>
             )}
           </span>
@@ -81,7 +84,7 @@ export function VoiceUsageMeter({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Mic className="w-4 h-4 text-white/50" strokeWidth={1.5} />
-          <span className="text-sm text-white/70">Voice minutes</span>
+          <span className="text-sm text-white/70">Recording time</span>
         </div>
         <span
           className={cn(
@@ -113,7 +116,7 @@ export function VoiceUsageMeter({
         <span>
           {isAtLimit
             ? "All included minutes used"
-            : `${Math.round(remaining_minutes)} min remaining`}
+            : `${formatMinutes(remaining_minutes)} min remaining`}
         </span>
         <span>Resets {resetLabel}</span>
       </div>

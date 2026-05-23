@@ -5,6 +5,7 @@ import { useSearchParams as useNextSearchParams } from "next/navigation";
 import { X, Check, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { formatDisplayName } from "@/lib/format-display-name";
 import { useAuth } from "@/lib/auth-context";
 import {
   startTierCheckout,
@@ -158,7 +159,7 @@ function LoginPageInner() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           code: code.trim(),
-          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+          ...(displayName.trim() ? { display_name: formatDisplayName(displayName) } : {}),
           ...(breatheFlow ? { free_breathing_signup: true } : {}),
         }),
       });
@@ -250,7 +251,7 @@ function LoginPageInner() {
   // At this point the user is already authenticated and subscribed — we just
   // save the display name and send them into the app.
   const handleSaveName = async () => {
-    const name = displayName.trim();
+    const name = formatDisplayName(displayName);
     if (!name) {
       setError("Please enter your name.");
       return;
