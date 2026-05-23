@@ -75,6 +75,18 @@ _ACTION_VERB_RE = re.compile(
 
 _TRAILING_QUESTION_RE = re.compile(r"\?\s*$")
 
+# News/current-events questions are answered via server-side web_search/x_search —
+# no Orryon client tool is required, so never soft-re-prompt into Life OS tools.
+_LIVE_NEWS_QUERY_RE = re.compile(
+    r"\b("
+    r"news|headlines|headline|breaking(?:\s+news)?|current events|"
+    r"in the news|what'?s new|what(?:'s| is) (?:in )?the news|"
+    r"what happened today|happening (?:in the world|today)|"
+    r"tell me.*\bnews\b"
+    r")\b",
+    re.IGNORECASE,
+)
+
 _REPROMPT_SYSTEM_NOTE = build_reprompt_note()
 
 
@@ -87,6 +99,8 @@ def _needs_tool_reprompt(
     if tool_calls:
         return False
     if not user_msg or not _ACTION_VERB_RE.search(user_msg):
+        return False
+    if _LIVE_NEWS_QUERY_RE.search(user_msg):
         return False
     text = (assistant_text or "").strip()
     if not text:

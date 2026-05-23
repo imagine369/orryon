@@ -4,6 +4,9 @@
  */
 export function shouldShowToolCaption(toolName: string): boolean {
   if (!toolName) return false;
+  if (toolName === "web_search" || toolName === "x_search" || toolName === "search_web") {
+    return true;
+  }
   if (toolName.startsWith("get_")) return false;
   if (toolName.startsWith("search_")) return false;
   if (toolName.startsWith("generate_")) return false;

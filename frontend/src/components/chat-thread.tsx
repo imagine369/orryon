@@ -53,6 +53,40 @@ const BUDGET_PHRASES = [
   "Mapping your cash flow",
 ];
 
+/** Shimmer while a specific tool is running (e.g. web search) — no finance copy. */
+function ToolWorkingIndicator() {
+  return (
+    <div
+      className="flex flex-col gap-2.5 py-0.5"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="flex items-center gap-2" aria-hidden>
+        <span className="inline-flex shrink-0 items-center gap-[5px]">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="chat-thinking-dot inline-block h-[5px] w-[5px] rounded-full bg-white/30"
+              style={{ animationDelay: `${i * 0.14}s` }}
+            />
+          ))}
+        </span>
+      </div>
+      <div className="flex flex-col gap-[7px]" aria-hidden>
+        <div className="h-[3px] w-[160px] overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="chat-thinking-shimmer h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        </div>
+        <div className="h-[3px] w-[100px] overflow-hidden rounded-full bg-white/[0.04]">
+          <div
+            className="chat-thinking-shimmer h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-white/15 to-transparent"
+            style={{ animationDelay: "0.45s" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StreamingBudgetIndicator() {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
@@ -199,9 +233,11 @@ export function ChatThread({
 
         // ── Assistant message ───────────────────────────────────────────────
         const showThinking = isLast && thinking && !msg.content;
-        // showStreamingEmpty: streaming started, no token yet, not thinking
+        const showToolWorking =
+          isLast && streaming && !thinking && !msg.content && !!toolLabel;
+        // Finance-themed rotator only when idle-waiting, not during an active tool label
         const showStreamingEmpty =
-          isLast && streaming && !thinking && !msg.content;
+          isLast && streaming && !thinking && !msg.content && !toolLabel;
 
         return (
           <div key={i} className="group flex w-full min-w-0 items-start gap-3.5">
@@ -230,8 +266,9 @@ export function ChatThread({
               <div className={assistantBubbleClass(!!msg.isError)}>
                 {showThinking ? (
                   <ThinkingIndicator />
+                ) : showToolWorking ? (
+                  <ToolWorkingIndicator />
                 ) : showStreamingEmpty ? (
-                  // Dynamic, alive indicator while waiting for first token
                   <StreamingBudgetIndicator />
                 ) : msg.content ? (
                   <>
