@@ -29,10 +29,21 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 
 from backend.auth import get_current_user
+from config import (
+    APP_URL as CONFIG_APP_URL,
+    GOOGLE_CALENDAR_OAUTH_ENABLED,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+)
 from db import get_connection, insert_row
 
 router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)
+
+
+def _require_google_oauth() -> None:
+    if not GOOGLE_CALENDAR_OAUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 # ── Signed OAuth state (CSRF defense) ─────────────────────────────────────────
@@ -95,13 +106,9 @@ def _verify_oauth_state(state: str) -> str:
     return uid
 
 # ── Google OAuth config ───────────────────────────────────────────────────────
-GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-APP_URL              = os.getenv("APP_URL", "http://localhost:3000")
-GOOGLE_REDIRECT_URI  = f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
-GOOGLE_SCOPES        = ["https://www.googleapis.com/auth/calendar.readonly"]
-
-GOOGLE_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+APP_URL = CONFIG_APP_URL or os.getenv("APP_URL", "http://localhost:3000")
+GOOGLE_REDIRECT_URI = f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
+GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -317,11 +324,7 @@ async def google_auth(request: Request, token: str = ""):
     Accepts the JWT as a ?token= query param because this is a browser redirect
     (cannot send Authorization headers from a link click).
     """
-    if not GOOGLE_ENABLED:
-        raise HTTPException(
-            status_code=503,
-            detail="Google Calendar integration is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your .env.",
-        )
+    _require_google_oauth()
 
     # Validate the JWT and extract user_id
     import jwt as pyjwt
@@ -365,8 +368,7 @@ async def google_auth(request: Request, token: str = ""):
 @router.get("/api/calendar/google/callback")
 async def google_callback(code: str, state: str, request: Request):
     """Handle Google's OAuth callback, store tokens, and sync events."""
-    if not GOOGLE_ENABLED:
-        raise HTTPException(status_code=503, detail="Google Calendar not configured.")
+    _require_google_oauth()
 
     try:
         from google_auth_oauthlib.flow import Flow
@@ -412,8 +414,7 @@ async def google_callback(code: str, state: str, request: Request):
 @router.post("/api/calendar/google/sync")
 async def google_sync(user: dict = Depends(get_current_user)):
     """Re-fetch events from Google Calendar and upsert into the DB."""
-    if not GOOGLE_ENABLED:
-        raise HTTPException(status_code=503, detail="Google Calendar not configured.")
+    _require_google_oauth()
 
     uid    = user["user_id"]
     tokens = _get_google_tokens(uid)
@@ -433,6 +434,7 @@ async def google_sync(user: dict = Depends(get_current_user)):
 @router.delete("/api/calendar/google/disconnect")
 async def google_disconnect(user: dict = Depends(get_current_user)):
     """Remove stored Google tokens for this user."""
+    _require_google_oauth()
     uid  = user["user_id"]
     with get_connection() as conn:
         conn.execute("DELETE FROM user_calendar_tokens WHERE user_id=?", (uid,))
@@ -442,17 +444,22 @@ async def google_disconnect(user: dict = Depends(get_current_user)):
 
 @router.get("/api/calendar/google/status")
 async def google_status(user: dict = Depends(get_current_user)):
-    """Check if Google Calendar is connected for this user."""
-    uid     = user["user_id"]
-    tokens  = _get_google_tokens(uid)
-    conn    = get_connection()
-    row     = conn.execute(
+    """Check if Google Calendar OAuth is active for this user."""
+    uid = user["user_id"]
+    tokens = _get_google_tokens(uid)
+    conn = get_connection()
+    row = conn.execute(
         "SELECT COUNT(*) FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
     ).fetchone()
+    imported_count = row[0] if row else 0
+    oauth_on = GOOGLE_CALENDAR_OAUTH_ENABLED
+    has_tokens = tokens is not None
+    # connected only when the user can actually sync/disconnect in the UI.
     return {
-        "connected":     tokens is not None,
-        "google_enabled": GOOGLE_ENABLED,
-        "synced_count":  row[0] if row else 0,
+        "oauth_available": oauth_on,
+        "connected": oauth_on and has_tokens,
+        "sync_paused": not oauth_on and has_tokens,
+        "synced_count": imported_count,
     }
 
 

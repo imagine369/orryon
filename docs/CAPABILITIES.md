@@ -45,7 +45,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Lists** | Grocery and custom lists |
 | **Health logs** | Vitals, medications, appointments (stored in Orryon) |
 | **Weather** | `get_weather` — live conditions for a city/place |
-| **News & web** | xAI `web_search` + `x_search` (Grok-style, when Live Orryon is on); RSS `search_web` fallback |
+| **News & web** | xAI `web_search` + `x_search` (Grok-style); RSS `search_web` fallback if Agent Tools unavailable |
 | **Search** | Cross-feature search across their data |
 
 Morning **briefing**: Dashboard in the app (chat can suggest opening it).

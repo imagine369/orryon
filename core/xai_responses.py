@@ -1,7 +1,7 @@
 """
 core/xai_responses.py — xAI Responses API with Agent Tools (web_search, x_search).
 
-Used when Live Orryon is enabled: server-side browsing/search like the Grok app,
+Server-side browsing/search (web_search, x_search) like the Grok app,
 mixed with Orryon's client-side Life OS function tools.
 """
 
@@ -14,9 +14,16 @@ from typing import Any, AsyncGenerator
 import httpx
 
 from config import GROK_MODEL
+from core.agent_shared import needs_tool_reprompt
+from core.agent_tool_round import (
+    AgentTurnState,
+    finalize_max_rounds,
+    finalize_turn,
+    merge_usage,
+    parse_tool_args,
+    process_client_tool,
+)
 from core.orryon_brand import normalize_orryon_in_assistant_reply
-from core.tool_labels import get_tool_label
-from core.tools import execute_tool
 
 logger = logging.getLogger(__name__)
 
@@ -253,19 +260,8 @@ async def run_orryon_stream_agent(
     Agentic Responses API loop (web_search + x_search + Orryon function tools).
     Yields the same event types as run_orryon_stream in grok_agent.py.
     """
-    from core.context_cache import invalidate_context_cache, schedule_context_refresh
-    from core.grok_agent import (
-        _UNDO_TABLE_MAP,
-        _compute_context_snapshot,
-        _needs_tool_reprompt,
-        _schedule_memory_extraction,
-    )
-
     instructions, base_input = split_instructions_and_input(messages)
-    actions_taken: list[dict] = []
-    all_tabs: set[str] = set()
-    last_undo_info: dict | None = None
-    accumulated_usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0}
+    state = AgentTurnState()
     reprompted_once = False
 
     previous_response_id: str | None = None
@@ -301,9 +297,7 @@ async def run_orryon_stream_agent(
                 return
 
             previous_response_id = completed.get("id") or previous_response_id
-            usage = _usage_from_response(completed)
-            accumulated_usage["prompt_tokens"] += usage["prompt_tokens"]
-            accumulated_usage["completion_tokens"] += usage["completion_tokens"]
+            merge_usage(state, _usage_from_response(completed))
 
             output = completed.get("output") or []
             function_calls = _extract_function_calls(output)
@@ -318,7 +312,7 @@ async def run_orryon_stream_agent(
             )
 
             if not function_calls:
-                if (not reprompted_once) and _needs_tool_reprompt(
+                if (not reprompted_once) and needs_tool_reprompt(
                     user_message, [], full_content,
                 ):
                     reprompted_once = True
@@ -329,69 +323,25 @@ async def run_orryon_stream_agent(
                     }]
                     continue
 
-                _schedule_memory_extraction(user_message, full_content, user_id)
-                schedule_context_refresh(
-                    user_id, lambda: _compute_context_snapshot(user_id),
+                yield finalize_turn(
+                    user_message, full_content, user_id, state, citations=citations,
                 )
-                yield {
-                    "type": "done",
-                    "message": full_content,
-                    "actions": actions_taken,
-                    "tabs": list(all_tabs),
-                    "undo_info": last_undo_info,
-                    "usage": accumulated_usage,
-                    "citations": citations,
-                }
                 return
 
             follow_up_input = []
             for fc in function_calls:
                 fn_name = fc["name"]
-                label = get_tool_label(fn_name)
-                yield {"type": "tool", "name": fn_name, "label": label}
-
-                try:
-                    tool_args = json.loads(fc["arguments"])
-                except json.JSONDecodeError:
-                    tool_args = {}
-
-                result, tabs = execute_tool(fn_name, tool_args, user_id)
-                all_tabs.update(tabs)
-                if tabs:
-                    invalidate_context_cache(user_id)
-                actions_taken.append({"tool": fn_name, "args": tool_args, "result": result})
-
-                if result.get("needs_confirmation"):
-                    yield {
-                        "type": "confirm_required",
-                        "action": fn_name,
-                        "message": result.get("message", "Confirmation required."),
-                        "args": tool_args,
-                    }
-
-                if result.get("id") and fn_name in _UNDO_TABLE_MAP:
-                    last_undo_info = {
-                        "table": _UNDO_TABLE_MAP[fn_name],
-                        "id": result["id"],
-                        "tool": fn_name,
-                        "label": label,
-                    }
-
+                tool_args = parse_tool_args(fc["arguments"])
+                result, events = process_client_tool(fn_name, tool_args, user_id, state)
+                for ev in events:
+                    yield ev
                 follow_up_input.append({
                     "type": "function_call_output",
                     "call_id": fc["call_id"],
                     "output": json.dumps(result),
                 })
 
-        schedule_context_refresh(user_id, lambda: _compute_context_snapshot(user_id))
-        yield {
-            "type": "done",
-            "message": "Done! Let me know if you need anything else.",
-            "actions": actions_taken,
-            "tabs": list(all_tabs),
-            "undo_info": last_undo_info,
-            "usage": accumulated_usage,
-        }
+        yield finalize_max_rounds(user_id, state)
 
     except httpx.TimeoutException:
         logger.error("xAI Responses API timeout")

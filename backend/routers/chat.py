@@ -86,7 +86,6 @@ def _get_user_context(uid: str) -> dict:
             "display_name": "there",
             "voice_overlay": False,
             "golden_mode": False,
-            "live_orryon": True,
             "life_priorities": life_priorities,
         }
     return {
@@ -95,7 +94,6 @@ def _get_user_context(uid: str) -> dict:
         "display_name": normalize_display_name(user_row["display_name"]) or "there",
         "voice_overlay": bool(prefs.get("voice_overlay_enabled", 0)),
         "golden_mode": bool(prefs.get("golden_mode_enabled", 0)),
-        "live_orryon": bool(prefs.get("live_orryon_enabled", 1)),
         "life_priorities": life_priorities,
     }
 
@@ -148,7 +146,6 @@ async def chat_stream(
                 session_id=session_id,
                 tier=ctx["plan"],
                 mode="golden" if ctx["golden_mode"] else "adult",
-                live_orryon=ctx["live_orryon"],
                 life_priorities=ctx.get("life_priorities") or [],
             ):
                 if event["type"] == "token":
@@ -300,7 +297,6 @@ async def chat_ws(ws: WebSocket):
                     session_id=session_id,
                     tier=ctx["plan"],
                     mode="golden" if ctx["golden_mode"] else "adult",
-                    live_orryon=ctx["live_orryon"],
                     life_priorities=ctx.get("life_priorities") or [],
                 ):
                     if event["type"] == "token":

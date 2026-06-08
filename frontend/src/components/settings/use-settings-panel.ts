@@ -64,6 +64,8 @@ export function useSettingsPanel() {
     // export
     const [exportLoading, setExportLoading] = useState(false);
     const [calConnected, setCalConnected] = useState(false);
+    const [calOAuthAvailable, setCalOAuthAvailable] = useState(false);
+    const [calSyncPaused, setCalSyncPaused] = useState(false);
     const [calSynced, setCalSynced] = useState(0);
     const [calLoading, setCalLoading] = useState(false);
     const [calMsg, setCalMsg] = useState("");
@@ -82,8 +84,18 @@ export function useSettingsPanel() {
       setEmailError("");
       if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
       api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
-      api.get<{ connected: boolean; synced_count: number }>("/api/calendar/google/status")
-        .then((d) => { setCalConnected(d.connected); setCalSynced(d.synced_count); })
+      api.get<{
+        connected: boolean;
+        oauth_available: boolean;
+        sync_paused: boolean;
+        synced_count: number;
+      }>("/api/calendar/google/status")
+        .then((d) => {
+          setCalConnected(d.connected);
+          setCalOAuthAvailable(d.oauth_available);
+          setCalSyncPaused(d.sync_paused);
+          setCalSynced(d.synced_count);
+        })
         .catch(() => {});
       api.get<AuthSession[]>("/api/sessions").then(setSessions).catch(() => {});
     }, [isOpen]);
@@ -180,7 +192,9 @@ export function useSettingsPanel() {
     emailStep, setEmailStep, newEmail, setNewEmail, emailCode, setEmailCode, emailLoading, emailError, setEmailError, emailDevCode, setEmailDevCode,
     deleteConfirm, setDeleteConfirm, deleteLoading, setDeleteLoading,
     billingLoading, setBillingLoading, exportLoading, setExportLoading,
-    calConnected, setCalConnected, calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
+    calConnected, setCalConnected, calOAuthAvailable, setCalOAuthAvailable,
+    calSyncPaused, setCalSyncPaused,
+    calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
     sessions, setSessions, revokeAllLoading, setRevokeAllLoading, revokeAllDone, setRevokeAllDone,
     patch, saveProfileField, sendEmailCode, verifyEmailCode, handleDeleteAccount, goBack,
   };

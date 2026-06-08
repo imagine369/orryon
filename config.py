@@ -48,6 +48,24 @@ PLAID_SECRET: str = os.getenv("PLAID_SECRET", "")
 PLAID_ENV: str = os.getenv("PLAID_ENV", "sandbox")
 PLAID_ACCESS_TOKEN: str = os.getenv("PLAID_ACCESS_TOKEN", "")
 PLAID_ENABLED: bool = bool(PLAID_CLIENT_ID and PLAID_SECRET)
+# Bank link API is hidden until the full Plaid flow ships (CSV import stays live).
+PLAID_LINK_ENABLED: bool = (
+    os.getenv("PLAID_LINK_ENABLED", "").lower() in ("1", "true", "yes")
+    and PLAID_ENABLED
+)
+
+# Google Calendar OAuth sync (ICS file import works without this).
+GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_CALENDAR_OAUTH_ENABLED: bool = (
+    os.getenv("GOOGLE_CALENDAR_OAUTH_ENABLED", "").lower() in ("1", "true", "yes")
+    and bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+)
+
+# Human-in-the-loop approve/reject queue (agent audit history stays on).
+APPROVALS_HITL_ENABLED: bool = os.getenv(
+    "APPROVALS_HITL_ENABLED", ""
+).lower() in ("1", "true", "yes")
 
 # ── Market Data ───────────────────────────────────────────────────────────────
 POLYGON_API_KEY: str = os.getenv("POLYGON_API_KEY", "")

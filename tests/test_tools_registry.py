@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import pytest
 
+from core.canonical_tools import LEGACY_TOOL_ALIASES, resolve_tool_name
 from core.tools import CANONICAL_TOOL_NAMES, GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
-from core.tools.registry import _TOOL_MAP
+from core.tools.registry import TOOLS, _TOOL_MAP
 from db import get_health_vitals, get_medications, get_or_create_user_by_email
 
 
@@ -12,6 +13,39 @@ from db import get_health_vitals, get_medications, get_or_create_user_by_email
 def user_id():
     user = get_or_create_user_by_email("pytest-tools@orryon.app")
     return user["id"]
+
+
+def test_tools_registry_covers_canonical_names():
+    missing = [n for n in CANONICAL_TOOL_NAMES if n not in TOOLS]
+    assert not missing, f"missing from TOOLS: {missing}"
+
+
+def test_legacy_aliases_not_in_tools_map():
+    for legacy in LEGACY_TOOL_ALIASES:
+        assert legacy not in _TOOL_MAP
+        assert resolve_tool_name(legacy) in TOOLS
+
+
+def test_legacy_alias_dispatches_like_canonical(user_id):
+    from db import insert_row
+    from core.tools.shared import _uid
+
+    tid = _uid()
+    insert_row(
+        "transactions",
+        {
+            "id": tid,
+            "user_id": user_id,
+            "amount": 12.0,
+            "merchant": "legacy-alias",
+            "description": "pytest",
+            "category": "Other",
+            "date": "2026-05-01",
+        },
+    )
+    result, tabs = execute_tool("add_expense", {"amount": 3.5, "merchant": "alias"}, user_id)
+    assert "error" not in result or not result["error"]
+    assert "dashboard" in tabs or "budget" in tabs
 
 
 def test_canonical_tools_have_schemas():

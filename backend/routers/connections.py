@@ -16,16 +16,13 @@ maximum privacy to maximum convenience:
              Forward transaction alert emails to a dedicated address.
              Requires SMTP config. Parsed in the background.
 
-    Tier 4 — Plaid bank link (planned, stubs below)
-             Real-time account sync via Plaid. Config keys are already
-             in config.py (PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV).
+    Tier 4 — Plaid bank link (planned; gated by PLAID_LINK_ENABLED in config.py)
 
 Endpoints:
     GET  /api/connections              — list connected services
     POST /api/import/csv               — upload CSV, get parsed preview
     POST /api/import/csv/confirm       — commit previewed transactions
-    POST /api/connections/plaid/link   — create Plaid Link token (stub)
-    POST /api/connections/plaid/exchange — exchange public_token (stub)
+    POST /api/import/csv/mapped        — CSV with explicit column mapping
 """
 
 from __future__ import annotations
@@ -40,7 +37,7 @@ from backend.auth import get_current_user
 from backend.cache import cache_get, cache_set
 from backend.deps import require_active_plan
 from backend.schemas import CSVColumnMapping, CSVImportConfirmReq
-from config import PLAID_CLIENT_ID, PLAID_ENABLED, PLAID_SECRET
+from config import PLAID_LINK_ENABLED
 from db import adjust_balance, get_connection, insert_row
 
 logger = logging.getLogger(__name__)
@@ -79,19 +76,15 @@ async def list_connections(user: dict = Depends(get_current_user)):
 
     Returns which import tiers are available based on current config.
     """
-    available = ["csv_import"]
-    if PLAID_ENABLED:
-        available.append("plaid")
-
     return {
         "connections": [],
-        "available": available,
+        "available": ["csv_import"],
         "tiers": {
             "manual": {"status": "active", "description": "Add transactions via AI chat"},
             "csv": {"status": "active", "description": "Upload bank CSV files"},
             "email": {"status": "planned", "description": "Forward transaction alert emails"},
             "plaid": {
-                "status": "active" if PLAID_ENABLED else "not_configured",
+                "status": "active" if PLAID_LINK_ENABLED else "planned",
                 "description": "Real-time bank account sync via Plaid",
             },
         },
@@ -265,57 +258,3 @@ async def upload_csv_with_mapping(
         ],
     }
 
-
-# ── Plaid Bank Link (stubs — requires PLAID_CLIENT_ID and PLAID_SECRET) ──────
-
-@router.post("/api/connections/plaid/link")
-async def create_plaid_link_token(user: dict = Depends(get_current_user)):
-    """
-    Create a Plaid Link token to initialize the bank connection flow.
-
-    The frontend opens the Plaid Link modal with this token. After the
-    user connects their bank, Plaid returns a public_token which is
-    exchanged via POST /api/connections/plaid/exchange.
-
-    Requires PLAID_CLIENT_ID and PLAID_SECRET in .env.
-    """
-    if not PLAID_ENABLED:
-        raise HTTPException(
-            503,
-            "Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET in .env to enable bank linking.",
-        )
-
-    # Implementation will go here once plaid-python is installed:
-    #
-    # from plaid.api import plaid_api
-    # from plaid.model.link_token_create_request import LinkTokenCreateRequest
-    # from plaid.model.products import Products
-    #
-    # request = LinkTokenCreateRequest(
-    #     user={"client_user_id": user["user_id"]},
-    #     client_name="orryon",
-    #     products=[Products("transactions")],
-    #     country_codes=["US"],
-    #     language="en",
-    # )
-    # response = client.link_token_create(request)
-    # return {"link_token": response.link_token}
-
-    raise HTTPException(501, "Plaid integration is not yet implemented. Use CSV import for now.")
-
-
-@router.post("/api/connections/plaid/exchange")
-async def exchange_plaid_token(user: dict = Depends(get_current_user)):
-    """
-    Exchange a Plaid public_token for a persistent access_token.
-
-    Called after the user completes the Plaid Link flow in the frontend.
-    The access_token is stored securely and used for transaction sync.
-    """
-    if not PLAID_ENABLED:
-        raise HTTPException(503, "Plaid is not configured.")
-
-    # Implementation will exchange public_token -> access_token and
-    # store it in the users table (encrypted if ENCRYPTION_KEY is set).
-
-    raise HTTPException(501, "Plaid token exchange is not yet implemented.")

@@ -2,105 +2,115 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Callable
 
-import core.tools.helpers as h
+import core.tools.handlers as h
+from core.canonical_tools import CANONICAL_TOOL_NAMES, resolve_tool_name
 from core.tool_labels import get_tool_label, is_destructive_tool
 from core.tools.normalize import normalize_args
 
 logger = logging.getLogger(__name__)
 
-_TOOL_MAP = {
+Handler = Callable[[dict, str], dict]
+
+
+def _tool(handler: Handler, tabs: list[str] | None = None) -> dict[str, Any]:
+    return {"handler": handler, "tabs": tabs or []}
+
+
+# Single registry: handler + dashboard tabs to refresh after execution.
+TOOLS: dict[str, dict[str, Any]] = {
     # Bills
-    "log_bill": h._add_recurring_bill,
-    "get_bills": h._get_bills,
+    "log_bill": _tool(h._add_recurring_bill, ["schedule", "forecast"]),
+    "get_bills": _tool(h._get_bills),
+    "edit_bill": _tool(h._edit_bill, ["schedule", "forecast"]),
+    "delete_bill": _tool(h._delete_bill, ["schedule", "forecast"]),
     # Expenses
-    "log_expense": h._add_expense,
-    "get_expenses": h._get_expenses,
+    "log_expense": _tool(h._add_expense, ["dashboard", "budget"]),
+    "get_expenses": _tool(h._get_expenses),
+    "edit_expense": _tool(h._edit_expense, ["dashboard", "budget"]),
+    "delete_expense": _tool(h._delete_expense, ["dashboard", "budget"]),
+    "split_expense": _tool(h._split_expense, ["dashboard", "budget"]),
     # Calendar
-    "add_calendar_event": h._add_calendar_event,
-    "get_calendar": h._get_upcoming_schedule,
+    "add_calendar_event": _tool(h._add_calendar_event, ["dashboard", "schedule"]),
+    "get_calendar": _tool(h._get_upcoming_schedule),
+    "edit_event": _tool(h._edit_event, ["dashboard", "schedule"]),
+    "delete_event": _tool(h._delete_event, ["dashboard", "schedule"]),
     # Notes
-    "add_note": h._add_note,
-    "get_notes": h._get_notes,
+    "add_note": _tool(h._add_note, ["notes"]),
+    "get_notes": _tool(h._get_notes),
+    "search_notes": _tool(h._search_notes),
+    "edit_note": _tool(h._edit_note, ["notes"]),
+    "pin_note": _tool(h._pin_note, ["notes"]),
+    "delete_note": _tool(h._delete_note, ["notes"]),
     # Journal
-    "log_journal_entry": h._log_journal_entry,
-    "get_journal": h._get_journal,
+    "log_journal_entry": _tool(h._log_journal_entry, ["notes", "journal"]),
+    "get_journal": _tool(h._get_journal),
+    "edit_journal_entry": _tool(h._edit_journal_entry, ["notes", "journal"]),
+    "delete_journal_entry": _tool(h._delete_journal_entry, ["notes", "journal"]),
     # Goals
-    "create_goal": h._add_goal,
-    "update_goal": h._update_goal_progress,
-    "get_goals": h._get_goals,
+    "create_goal": _tool(h._add_goal, ["dashboard", "goals"]),
+    "update_goal": _tool(h._update_goal_progress, ["dashboard", "goals"]),
+    "get_goals": _tool(h._get_goals),
+    "delete_goal": _tool(h._delete_goal, ["dashboard", "goals"]),
+    # Tasks
+    "add_task": _tool(h._add_task, ["schedule"]),
+    "edit_task": _tool(h._edit_task, ["schedule"]),
+    "complete_task": _tool(h._complete_task, ["schedule"]),
+    "delete_task": _tool(h._delete_task, ["schedule"]),
+    # Lists & grocery
+    "create_list": _tool(h._create_list, ["lists"]),
+    "get_user_lists": _tool(h._get_user_lists),
+    "add_list_items": _tool(h._add_list_items, ["lists"]),
+    "delete_list": _tool(h._delete_list, ["lists"]),
+    "add_grocery_items": _tool(h._add_grocery_items, ["lists", "dashboard"]),
+    "check_grocery_item": _tool(h._check_grocery_item, ["lists"]),
+    "get_grocery_list": _tool(h._get_grocery_list),
     # Analysis
-    "generate_insights": h._generate_insights,
-    "generate_forecast": h._generate_forecast,
-    "generate_yearly_summary": h._generate_yearly_summary,
-
-    # Full-CRUD additions (v3.1)
-    "edit_bill": h._edit_bill,
-    "delete_goal": h._delete_goal,
-    "edit_journal_entry": h._edit_journal_entry,
-    "delete_journal_entry": h._delete_journal_entry,
-    "delete_list": h._delete_list,
-
-    # Legacy aliases (kept for back-compat with historical tool calls)
-    "add_expense": h._add_expense,
-    "add_recurring_bill": h._add_recurring_bill,
-    "add_goal": h._add_goal,
-    "update_goal_progress": h._update_goal_progress,
-    "get_upcoming_schedule": h._get_upcoming_schedule,
-
-    # Orphan tools — still registered, still dispatchable
-    "set_balance": h._set_balance,
-    "add_money": h._add_money,
-    "get_balance": h._get_balance,
-    "add_grocery_items": h._add_grocery_items,
-    "add_task": h._add_task,
-    "search_notes": h._search_notes,
-    "edit_note": h._edit_note,
-    "pin_note": h._pin_note,
-    "set_budget": h._set_budget,
-    "check_grocery_item": h._check_grocery_item,
-    "get_grocery_list": h._get_grocery_list,
-    "complete_task": h._complete_task,
-    "get_spending_summary": h._get_spending_summary,
-    "get_net_worth": h._get_net_worth,
-    "get_budget_status": h._get_budget_status,
-    "get_spending_recap": h._get_spending_recap,
-    "add_custom_category": h._add_custom_category,
-    "get_money_left_after_goals": h._get_money_left_after_goals,
-    "set_notification_preferences": h._set_notification_preferences,
-    "delete_expense": h._delete_expense,
-    "delete_event": h._delete_event,
-    "delete_task": h._delete_task,
-    "edit_expense": h._edit_expense,
-    "add_recurring_income": h._add_recurring_income,
-    "edit_event": h._edit_event,
-    "edit_task": h._edit_task,
-    "delete_note": h._delete_note,
-    "delete_bill": h._delete_bill,
-    "split_expense": h._split_expense,
-    "get_spending_patterns": h._get_spending_patterns,
-    "search_transactions": h._search_transactions,
-    "get_subscription_health": h._get_subscription_health,
-    "get_mood_spending_report": h._get_mood_spending_report,
-    "create_list": h._create_list,
-    "add_list_items": h._add_list_items,
-    "get_user_lists": h._get_user_lists,
-
-    # Historical lookup + cross-feature tools
-    "get_wellness_history": h._get_wellness_history,
-    "compare_periods": h._compare_periods,
-    "cross_feature_search": h._cross_feature_search,
-
-    # Health tracking
-    "log_health_vital": h._log_health_vital,
-    "get_health_vitals": h._get_health_vitals,
-    "log_medication": h._log_medication,
-    "get_medications": h._get_medications,
-    "add_health_appointment": h._add_health_appointment,
-    "get_health_appointments": h._get_health_appointments,
-    "get_weather": h._get_weather,
-    "search_web": h._search_web,
+    "generate_insights": _tool(h._generate_insights, ["insights"]),
+    "generate_forecast": _tool(h._generate_forecast, ["forecast"]),
+    "generate_yearly_summary": _tool(h._generate_yearly_summary, ["yearly"]),
+    # Balance & budget
+    "set_balance": _tool(h._set_balance, ["dashboard", "forecast"]),
+    "add_money": _tool(h._add_money, ["dashboard", "budget", "forecast"]),
+    "get_balance": _tool(h._get_balance),
+    "set_budget": _tool(h._set_budget, ["dashboard", "budget"]),
+    "get_budget_status": _tool(h._get_budget_status),
+    "get_spending_summary": _tool(h._get_spending_summary),
+    "get_spending_recap": _tool(h._get_spending_recap),
+    "get_spending_patterns": _tool(h._get_spending_patterns),
+    "get_money_left_after_goals": _tool(h._get_money_left_after_goals),
+    "add_custom_category": _tool(h._add_custom_category, ["budget"]),
+    "set_notification_preferences": _tool(h._set_notification_preferences),
+    "add_recurring_income": _tool(h._add_recurring_income, ["dashboard", "budget", "forecast"]),
+    "get_net_worth": _tool(h._get_net_worth),
+    "get_subscription_health": _tool(h._get_subscription_health),
+    "get_mood_spending_report": _tool(h._get_mood_spending_report),
+    "search_transactions": _tool(h._search_transactions),
+    # Cross-feature
+    "get_wellness_history": _tool(h._get_wellness_history),
+    "compare_periods": _tool(h._compare_periods),
+    "cross_feature_search": _tool(h._cross_feature_search),
+    # Health
+    "log_health_vital": _tool(h._log_health_vital),
+    "get_health_vitals": _tool(h._get_health_vitals),
+    "log_medication": _tool(h._log_medication),
+    "get_medications": _tool(h._get_medications),
+    "add_health_appointment": _tool(h._add_health_appointment),
+    "get_health_appointments": _tool(h._get_health_appointments),
+    # World / live context
+    "get_weather": _tool(h._get_weather),
+    "search_web": _tool(h._search_web),
 }
+
+_missing = [n for n in CANONICAL_TOOL_NAMES if n not in TOOLS]
+if _missing:
+    raise RuntimeError(f"TOOLS registry missing canonical tools: {_missing}")
+
+# Backward-compatible exports for callers that import the flat maps.
+_TOOL_MAP: dict[str, Handler] = {k: v["handler"] for k, v in TOOLS.items()}
+_TAB_REFRESH_MAP: dict[str, list[str]] = {k: v["tabs"] for k, v in TOOLS.items()}
+
 
 def _log_destructive_action(
     user_id: str, tool_name: str, args: dict, result: dict,
@@ -120,90 +130,6 @@ def _log_destructive_action(
         logger.warning("Destructive action audit log failed: %s", exc)
 
 
-_TAB_REFRESH_MAP = {
-    "log_bill": ["schedule", "forecast"],
-    "get_bills": [],
-    "log_expense": ["dashboard", "budget"],
-    "get_expenses": [],
-    "add_calendar_event": ["dashboard", "schedule"],
-    "get_calendar": [],
-    "add_note": ["notes"],
-    "get_notes": [],
-    "log_journal_entry": ["notes", "journal"],
-    "get_journal": [],
-    "create_goal": ["dashboard", "goals"],
-    "update_goal": ["dashboard", "goals"],
-    "get_goals": [],
-    "generate_insights": ["insights"],
-    "generate_forecast": ["forecast"],
-    "generate_yearly_summary": ["yearly"],
-
-    # Full-CRUD additions
-    "edit_bill": ["schedule", "forecast"],
-    "delete_goal": ["dashboard", "goals"],
-    "edit_journal_entry": ["notes", "journal"],
-    "delete_journal_entry": ["notes", "journal"],
-    "delete_list": ["lists"],
-
-    # Legacy aliases
-    "add_expense": ["dashboard", "budget"],
-    "add_recurring_bill": ["schedule", "forecast"],
-    "add_goal": ["dashboard", "goals"],
-    "update_goal_progress": ["dashboard", "goals"],
-    "get_upcoming_schedule": [],
-
-    # Orphan tools
-    "set_balance": ["dashboard", "forecast"],
-    "add_money": ["dashboard", "budget", "forecast"],
-    "get_balance": [],
-    "set_budget": ["dashboard", "budget"],
-    "add_grocery_items": ["lists", "dashboard"],
-    "check_grocery_item": ["lists"],
-    "get_grocery_list": [],
-    "add_task": ["schedule"],
-    "complete_task": ["schedule"],
-    "search_notes": [],
-    "edit_note": ["notes"],
-    "pin_note": ["notes"],
-    "get_spending_summary": [],
-    "get_net_worth": [],
-    "get_budget_status": [],
-    "get_spending_recap": [],
-    "add_custom_category": ["budget"],
-    "get_money_left_after_goals": [],
-    "set_notification_preferences": [],
-    "delete_expense": ["dashboard", "budget"],
-    "delete_event": ["dashboard", "schedule"],
-    "delete_task": ["schedule"],
-    "edit_expense": ["dashboard", "budget"],
-    "add_recurring_income": ["dashboard", "budget", "forecast"],
-    "edit_event": ["dashboard", "schedule"],
-    "edit_task": ["schedule"],
-    "delete_note": ["notes"],
-    "delete_bill": ["schedule", "forecast"],
-    "split_expense": ["dashboard", "budget"],
-    "get_spending_patterns": [],
-    "search_transactions": [],
-    "get_subscription_health": [],
-    "get_mood_spending_report": [],
-    "create_list": ["lists"],
-    "add_list_items": ["lists"],
-    "get_user_lists": [],
-
-    # Historical lookup + cross-feature tools
-    "get_wellness_history": [],
-    "compare_periods": [],
-    "cross_feature_search": [],
-    "log_health_vital": [],
-    "get_health_vitals": [],
-    "log_medication": [],
-    "get_medications": [],
-    "add_health_appointment": [],
-    "get_health_appointments": [],
-}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[str]]:
     """
     Execute a tool by name with the given args for user_id.
@@ -211,9 +137,11 @@ def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[s
     category / mood / frequency snapped to canonical taxonomy) before dispatch.
     Returns (result_dict, tabs_to_refresh).
     """
-    fn = _TOOL_MAP.get(tool_name)
-    if fn is None:
+    tool_name = resolve_tool_name(tool_name)
+    entry = TOOLS.get(tool_name)
+    if entry is None:
         return {"error": f"Unknown tool: {tool_name}"}, []
+    fn = entry["handler"]
     try:
         args = dict(args or {})
         args = normalize_args(tool_name, args)
@@ -229,7 +157,7 @@ def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[s
                 "action": tool_name,
             }, []
         result = fn(args, user_id)
-        tabs = _TAB_REFRESH_MAP.get(tool_name, [])
+        tabs = entry["tabs"]
         logger.info("Tool %s executed: %s", tool_name, result)
         if is_destructive_tool(tool_name) and not result.get("error"):
             _log_destructive_action(user_id, tool_name, args, result)
@@ -237,6 +165,3 @@ def execute_tool(tool_name: str, args: dict, user_id: str) -> tuple[dict, list[s
     except Exception as exc:
         logger.error("Tool %s error: %s", tool_name, exc)
         return {"error": str(exc)}, []
-
-
-# ─────────────────────────────────────────────────────────────────────────────

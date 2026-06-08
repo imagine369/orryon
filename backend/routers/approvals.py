@@ -16,13 +16,20 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
+from config import APPROVALS_HITL_ENABLED
 from db import get_approval_requests, resolve_approval_request
 
 router = APIRouter(tags=["approvals"], dependencies=[Depends(require_active_plan)])
 
 
+def _require_hitl() -> None:
+    if not APPROVALS_HITL_ENABLED:
+        raise HTTPException(404, "Not found")
+
+
 @router.get("/api/approvals")
 async def list_pending(user: dict = Depends(get_current_user)):
+    _require_hitl()
     items = get_approval_requests(user["user_id"], status="pending")
     return {"approvals": items, "count": len(items)}
 
@@ -35,6 +42,7 @@ async def approval_history(user: dict = Depends(get_current_user)):
 
 @router.post("/api/approvals/{approval_id}/approve")
 async def approve_action(approval_id: str, user: dict = Depends(get_current_user)):
+    _require_hitl()
     ok = resolve_approval_request(user["user_id"], approval_id, "approved")
     if not ok:
         raise HTTPException(404, "Approval request not found or already resolved")
@@ -43,6 +51,7 @@ async def approve_action(approval_id: str, user: dict = Depends(get_current_user
 
 @router.post("/api/approvals/{approval_id}/reject")
 async def reject_action(approval_id: str, user: dict = Depends(get_current_user)):
+    _require_hitl()
     ok = resolve_approval_request(user["user_id"], approval_id, "rejected")
     if not ok:
         raise HTTPException(404, "Approval request not found or already resolved")

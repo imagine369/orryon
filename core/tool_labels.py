@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.canonical_tools import resolve_tool_name
+
 # Overrides only — unknown tools get a title-cased name from the tool id.
 _TOOL_LABELS: dict[str, str] = {
     "log_bill": "Logging bill",
@@ -25,11 +27,6 @@ _TOOL_LABELS: dict[str, str] = {
     "edit_journal_entry": "Updating journal entry",
     "delete_journal_entry": "Removing journal entry",
     "delete_list": "Deleting list",
-    "add_expense": "Logging expense",
-    "add_recurring_bill": "Logging bill",
-    "add_goal": "Creating goal",
-    "update_goal_progress": "Updating goal",
-    "get_upcoming_schedule": "Loading calendar",
     "set_balance": "Setting balance",
     "add_money": "Adding to balance",
     "get_balance": "Checking balance",
@@ -79,8 +76,9 @@ _TOOL_LABELS: dict[str, str] = {
 }
 
 def get_tool_label(tool_name: str) -> str:
-    return _TOOL_LABELS.get(tool_name, tool_name.replace("_", " ").title())
+    canonical = resolve_tool_name(tool_name)
+    return _TOOL_LABELS.get(canonical, canonical.replace("_", " ").title())
 
 
 def is_destructive_tool(tool_name: str) -> bool:
-    return tool_name.startswith("delete_")
+    return resolve_tool_name(tool_name).startswith("delete_")

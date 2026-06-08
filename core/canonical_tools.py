@@ -47,25 +47,24 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "search_web",
 )
 
-# Legacy names kept in _TOOL_MAP only (old chat tool_calls / aliases) — not sent to Grok.
-LEGACY_TOOL_ALIASES: frozenset[str] = frozenset({
-    "add_expense",
-    "add_recurring_bill",
-    "add_goal",
-    "update_goal_progress",
-    "get_upcoming_schedule",
-})
+# Legacy names from old chat sessions — resolved at dispatch, not advertised to Grok.
+LEGACY_TOOL_ALIASES: dict[str, str] = {
+    "add_expense": "log_expense",
+    "add_recurring_bill": "log_bill",
+    "add_goal": "create_goal",
+    "update_goal_progress": "update_goal",
+    "get_upcoming_schedule": "get_calendar",
+}
 
 
-def filter_schemas_for_grok(
-    all_schemas: list[dict],
-    *,
-    live_orryon: bool = True,
-) -> list[dict]:
+def resolve_tool_name(name: str) -> str:
+    """Map legacy tool-call IDs to canonical registry names."""
+    return LEGACY_TOOL_ALIASES.get(name, name)
+
+
+def filter_schemas_for_grok(all_schemas: list[dict]) -> list[dict]:
     """Return canonical tool schemas for the xAI API (smaller payload, fewer hallucinations)."""
     allowed = frozenset(CANONICAL_TOOL_NAMES)
-    if not live_orryon:
-        allowed = allowed - {"search_web"}
     return [s for s in all_schemas if s.get("function", {}).get("name") in allowed]
 
 

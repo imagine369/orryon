@@ -15,7 +15,7 @@ export function SecurityAccessView({ panel }: { panel: SettingsPanel }) {
     emailLoading, emailError, setEmailError, emailDevCode,
     deleteConfirm, setDeleteConfirm, deleteLoading, setDeleteLoading,
     billingLoading, setBillingLoading, exportLoading, setExportLoading,
-    calConnected, setCalConnected, calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
+    calConnected, calOAuthAvailable, calSyncPaused, calSynced,
     sessions, setSessions, revokeAllLoading, setRevokeAllLoading, revokeAllDone, setRevokeAllDone,
     patch, saveProfileField, sendEmailCode, verifyEmailCode, handleDeleteAccount,
   } = panel;
@@ -44,7 +44,17 @@ export function SecurityAccessView({ panel }: { panel: SettingsPanel }) {
     <NavItem
       icon={<CalendarDays className="h-5 w-5" strokeWidth={1.5} />}
       title="Connected Accounts"
-      description={calConnected ? "Google Calendar connected" : "Connect Google Calendar and more"}
+      description={
+        calOAuthAvailable
+          ? calConnected
+            ? "Google Calendar connected"
+            : "Connect Google Calendar and more"
+          : calSyncPaused
+            ? "Google sync paused — imported events remain"
+            : calSynced > 0
+              ? `${calSynced} calendar event${calSynced !== 1 ? "s" : ""} in Orryon`
+              : "Import calendar files from the dashboard"
+      }
       onClick={() => setView("connected")}
     />
   </div>

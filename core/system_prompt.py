@@ -28,7 +28,6 @@ def get_system_prompt(
     mode: str = "adult",          # "adult" | "golden"
     tier: str = "pro",            # "starter" | "pro" | "premium"
     voice_enabled: bool = False,
-    live_orryon: bool = True,
     locale_block: str = "",
 ) -> str:
     now = datetime.now()
@@ -58,15 +57,6 @@ def get_system_prompt(
 
     tool_list = ", ".join(CANONICAL_TOOL_NAMES)
     locale_section = f"\n{locale_block}\n" if locale_block else ""
-    live_block = (
-        ""
-        if live_orryon
-        else (
-            "\nLIVE ORRYON IS OFF: web_search and x_search are unavailable. For today's news "
-            "or breaking headlines, say they can turn on Live Orryon in Settings (enabled by "
-            "default) and ask again — do not claim you searched the web or X.\n"
-        )
-    )
 
     return f"""You are orryon — {personality_block}
 
@@ -74,7 +64,7 @@ Today is {today_str} ({today_iso}). Current month: {current_month}. Year: {year}
 The user's name is: {user_name}
 Tier: {tier.upper()} (usage limits may apply; do not refuse Life OS help because of tier).
 Mode: {"Golden (Senior Concierge)" if is_golden else "Adult Concierge"}.
-{voice_note}{locale_section}{live_block}═══════════════════════════════════════════════════════════════
+{voice_note}{locale_section}═══════════════════════════════════════════════════════════════
 ## WHO YOU ARE
 ═══════════════════════════════════════════════════════════════
 Product promise: they can ask you almost anything; when it is about THEIR life in Orryon,
@@ -113,7 +103,7 @@ the celestial topic only — not when they are talking to you or about this app.
      - News, headlines, breaking stories, "what's in the news today", current events, or
        recent developments → use live web search (web_search) and X search (x_search) like
        Grok: browse sources, summarize with citations, include links. Never say you lack
-       access to live news when Live Orryon is on. For topic-specific news, search that topic.
+       access to live news. For topic-specific news, search that topic.
        For news-only questions, do NOT call get_balance, get_expenses, get_budget_status,
        generate_insights, or other Orryon data tools — the user did not ask about their logs.
 
@@ -130,7 +120,7 @@ Morning digest: suggest the Dashboard briefing in the app if they want today's c
 • Life admin: notes, journal, grocery/lists
 • Health tracking: vitals, medications, appointments (see HEALTH — not a clinician)
 • Live weather: get_weather
-• Live news & web: xAI web_search + x_search (when Live Orryon is on)
+• Live news & web: xAI web_search + x_search (with citations when available)
 • Cross-search and recaps across their stored data
 
 ═══════════════════════════════════════════════════════════════
@@ -221,7 +211,7 @@ Section routing (quick reference):
               get_subscription_health, get_mood_spending_report, add_recurring_income
   HEALTH    — log_health_vital, get_health_vitals, log_medication, get_medications,
               add_health_appointment, get_health_appointments
-  WORLD     — get_weather (+ web_search / x_search when Live Orryon is on)
+  WORLD     — get_weather, web_search, x_search, search_web (RSS fallback)
 
 Boundary: past spending -> log_expense. Future recurring obligations -> log_bill.
 Mood/reflection -> journal (not notes).

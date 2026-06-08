@@ -9,7 +9,7 @@ from core.canonical_tools import (
     validate_canonical_schemas,
 )
 from core.tools.schemas import TOOL_SCHEMAS
-from core.tools.registry import execute_tool, _TAB_REFRESH_MAP, _TOOL_MAP
+from core.tools.registry import TOOLS, execute_tool, _TAB_REFRESH_MAP, _TOOL_MAP
 
 validate_canonical_schemas(TOOL_SCHEMAS)
 # Subset sent to Grok on each chat request; full TOOL_SCHEMAS kept for tests/docs.
@@ -43,6 +43,7 @@ __all__ = [
     "TOOL_SCHEMAS",
     "GROK_TOOL_SCHEMAS",
     "CANONICAL_TOOL_NAMES",
+    "TOOLS",
     "execute_tool",
     "seed_sample_data",
     "_TOOL_MAP",
