@@ -48,7 +48,7 @@ const FINANCE_CARDS: FeatureCardData[] = [
   { tag: "BUDGET",   Icon: SlidersHorizontal, highlighted: "Always know",        rest: "where your money goes.",      from: "#060e1f", to: "#0d1f40", glow: "rgba(96,165,250,0.12)", photo: "/budget-card.jpg" },
   { tag: "GOALS",    Icon: Target,            highlighted: "Save any amount.",    rest: "Meet your goals.",     from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"  },
   { tag: "BILLS",    Icon: Receipt,           highlighted: "Stay on top",         rest: "of your expenses.",            from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"  },
-  { tag: "INSIGHTS", Icon: BarChart2,         highlighted: "Spot patterns,",      rest: "spend smarter.",              from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
+  { tag: "INSIGHTS", Icon: BarChart2,         highlighted: "Master your calendar", rest: "without the chaos.",          from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
   { tag: "FORECAST", Icon: TrendingUp,        highlighted: "See where",           rest: "your money is headed.",       from: "#031a1a", to: "#063030", glow: "rgba(45,212,191,0.12)", photo: "/forecast-card.jpg"  },
   { tag: "YEARLY",   Icon: Activity,          highlighted: "Your entire year,",   rest: "in one clear view.",          from: "#08081e", to: "#14143c", glow: "rgba(129,140,248,0.12)", photo: "/yearly-card.jpg" },
 ];
