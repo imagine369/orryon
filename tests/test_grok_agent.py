@@ -4,12 +4,13 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from core.agent_messages import build_messages
 from core.agent_memory import extract_memories_async
 from core.agent_shared import needs_tool_reprompt
-from core.xai_responses import run_orryon_stream_agent, split_instructions_and_input
+from core.xai_responses import AgentToolsUnavailable, run_orryon_stream_agent, split_instructions_and_input
 from db.auth import get_or_create_user_by_email
 
 
@@ -108,7 +109,7 @@ async def test_run_orryon_stream_agent_reprompt_then_done():
 
     messages = build_messages("sys", [], "log my coffee $5", user["id"])
     events = []
-    with patch("core.xai_responses._stream_responses", side_effect=fake_stream):
+    with patch("core.xai_responses.agent.stream_responses", side_effect=fake_stream):
         async for ev in run_orryon_stream_agent(
             user_message="log my coffee $5",
             user_id=user["id"],
@@ -164,7 +165,7 @@ async def test_run_orryon_stream_agent_tool_round_mock_xai():
 
     messages = build_messages("sys", [], "log coffee $5.50", user["id"])
     events = []
-    with patch("core.xai_responses._stream_responses", side_effect=fake_stream):
+    with patch("core.xai_responses.agent.stream_responses", side_effect=fake_stream):
         async for ev in run_orryon_stream_agent(
             user_message="log coffee $5.50",
             user_id=user["id"],
@@ -182,6 +183,30 @@ async def test_run_orryon_stream_agent_tool_round_mock_xai():
     done = next(e for e in events if e["type"] == "done")
     assert done["message"]
     assert any(a.get("tool") == "log_expense" for a in done.get("actions") or [])
+
+
+@pytest.mark.asyncio
+async def test_run_orryon_stream_agent_raises_on_agent_tools_http_403():
+    """HTTP 403 from Responses API must raise AgentToolsUnavailable for degraded retry."""
+
+    async def stream_http_403(**_kwargs):
+        req = httpx.Request("POST", "https://api.x.ai/v1/responses")
+        resp = httpx.Response(403, request=req, text="agent tools disabled")
+        raise httpx.HTTPStatusError("403", request=req, response=resp)
+        yield {"kind": "token", "content": ""}  # pragma: no cover
+
+    messages = build_messages("sys", [], "what is trending?", "user-1")
+    with patch("core.xai_responses.agent.stream_responses", side_effect=stream_http_403):
+        with pytest.raises(AgentToolsUnavailable):
+            async for _ in run_orryon_stream_agent(
+                user_message="what is trending?",
+                user_id="user-1",
+                messages=messages,
+                responses_tools=[{"type": "web_search"}],
+                api_key="test-key",
+                reprompt_note="nudge",
+            ):
+                pass
 
 
 @pytest.mark.asyncio
