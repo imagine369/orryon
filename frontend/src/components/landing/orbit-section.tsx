@@ -17,7 +17,7 @@ const ORBIT_ITEMS = [
   { label: "Tasks",     sub: "To-dos, lists & errands",  Icon: Check,     color: "#4ade80", glow: "rgba(74,222,128,0.20)"  },
   { label: "Calendar",  sub: "Events & reminders",       Icon: Calendar,  color: "#fb923c", glow: "rgba(251,146,60,0.20)"  },
   { label: "Plans",     sub: "Trips, dinners & pickups", Icon: Map,       color: "#fbbf24", glow: "rgba(251,191,36,0.20)"  },
-  { label: "Journal",   sub: "Thoughts & entries",       Icon: BookOpen,  color: "#c084fc", glow: "rgba(192,132,252,0.20)" },
+  { label: "Journal",   sub: "Reflection & capture",     Icon: BookOpen,  color: "#c084fc", glow: "rgba(192,132,252,0.20)" },
   { label: "Wellbeing", sub: "Breathing & clarity",      Icon: Wind,      color: "#2dd4bf", glow: "rgba(45,212,191,0.20)"  },
 ];
 
