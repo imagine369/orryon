@@ -26,6 +26,7 @@ from config import GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from core.display_name import normalize_display_name
 from db.preferences import (
     clamp_ambient_sensitivity,
+    normalize_ambient_mode_enabled,
     normalize_ambient_sound_style,
     normalize_life_priorities,
     parse_life_priorities,
@@ -215,6 +216,10 @@ async def update_prefs(body: PrefsReq, user: dict = Depends(get_current_user)):
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if "life_priorities" in updates:
         updates["life_priorities"] = normalize_life_priorities(updates["life_priorities"])
+    if "ambient_mode_enabled" in updates:
+        updates["ambient_mode_enabled"] = normalize_ambient_mode_enabled(
+            updates["ambient_mode_enabled"],
+        )
     if "ambient_sensitivity" in updates:
         updates["ambient_sensitivity"] = clamp_ambient_sensitivity(
             updates["ambient_sensitivity"],

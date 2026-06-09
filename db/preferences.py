@@ -61,6 +61,10 @@ def normalize_ambient_sound_style(raw: str | None) -> str:
     return style if style in AMBIENT_SOUND_STYLES else "soft_glow_rise"
 
 
+def normalize_ambient_mode_enabled(value: int | float | bool | None) -> int:
+    return 1 if value else 0
+
+
 def get_user_preferences(user_id: str) -> dict:
     try:
         conn = get_connection()
