@@ -29,6 +29,7 @@ export function sampleThrottleMsForAmbientState(state: AmbientAvatarState): numb
   if (state === "miniOrb") return SAMPLE_THROTTLE_MINIORB_MS;
   return SAMPLE_THROTTLE_AWAKE_MS;
 }
+
 export const PUT_DOWN_SUSTAIN_MS = 400;
 export const MOTION_RESUMED_DEBOUNCE_MS = 500;
 export const TOUCH_DECAY_MS = 2_000;
