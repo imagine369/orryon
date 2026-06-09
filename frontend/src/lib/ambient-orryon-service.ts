@@ -13,10 +13,7 @@ import {
   canTransitionAmbientState,
   type AmbientAvatarState,
 } from "@/lib/ambient-avatar-state";
-import {
-  clampAmbientSensitivity,
-  type AmbientSoundStyle,
-} from "@/lib/ambient-plan";
+import { clampAmbientSensitivity } from "@/lib/ambient-plan";
 
 export const PICKUP_CONFIDENCE_BASE = 0.75;
 export const AMBIENT_INACTIVITY_MS = 75_000;
@@ -27,8 +24,6 @@ export const AMBIENT_PICKUP_DEBOUNCE_MS = 300;
 export interface AmbientOrryonConfig {
   enabled: boolean;
   sensitivity: number;
-  soundStyle: AmbientSoundStyle;
-  premiumGreeting: boolean;
   premiumVoiceHold: boolean;
 }
 

@@ -69,8 +69,6 @@ export function useAmbientOrryon({
       {
         enabled: prefs.ambient_mode_enabled,
         sensitivity: prefs.ambient_sensitivity,
-        soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
-        premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
         premiumVoiceHold: planAllowsAmbientVoiceHold(plan),
       },
       {
@@ -102,16 +100,9 @@ export function useAmbientOrryon({
     serviceRef.current?.updateConfig({
       enabled: prefs.ambient_mode_enabled,
       sensitivity: prefs.ambient_sensitivity,
-      soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
-      premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
       premiumVoiceHold: planAllowsAmbientVoiceHold(plan),
     });
-  }, [
-    prefs.ambient_mode_enabled,
-    prefs.ambient_sensitivity,
-    prefs.ambient_sound_style,
-    plan,
-  ]);
+  }, [prefs.ambient_mode_enabled, prefs.ambient_sensitivity, plan]);
 
   useEffect(() => {
     const active =
