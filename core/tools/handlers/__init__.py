@@ -84,6 +84,7 @@ from core.tools.handlers.health import (
     _get_health_appointments,
 )
 from core.tools.handlers.world import _get_weather, _search_web
+from core.tools.handlers.fulfillment import _create_fulfillment_handoff
 
 __all__ = [
     "_add_expense",
@@ -154,4 +155,5 @@ __all__ = [
     "_get_health_appointments",
     "_get_weather",
     "_search_web",
+    "_create_fulfillment_handoff",
 ]

@@ -6,6 +6,7 @@ import {
   hasAuthSignal,
   isDemoMode,
 } from "@/lib/api-auth";
+import { isLocalHostClient } from "@/lib/demo-mode";
 
 export {
   clearToken,
@@ -51,12 +52,18 @@ export function parseApiDetail(body: unknown, fallback: string): string {
   return fallback;
 }
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 function networkErrorMessage(): string {
-  const isBrowser = typeof window !== "undefined";
-  const onLocalhost =
-    isBrowser &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  if (isBrowser && onLocalhost) {
+  if (typeof window !== "undefined" && isLocalHostClient()) {
     return "Can't reach the API. Start the backend (e.g. uvicorn on port 8000) and make sure BACKEND_URL is set.";
   }
   return "Can't reach the API. The backend proxy at /api/* may be misconfigured — check that BACKEND_URL is set on Vercel to your Railway URL.";
@@ -103,7 +110,7 @@ async function request<T = unknown>(path: string, opts: RequestInit = {}): Promi
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(parseApiDetail(body, `Request failed: ${res.status}`));
+    throw new ApiError(parseApiDetail(body, `Request failed: ${res.status}`), res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -150,7 +157,7 @@ async function uploadFile<T = unknown>(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `Upload failed: ${res.status}`);
+    throw new ApiError(parseApiDetail(body, `Upload failed: ${res.status}`), res.status);
   }
   return res.json() as Promise<T>;
 }

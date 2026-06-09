@@ -15,6 +15,7 @@ from db.schema.schema_approvals import TABLES as APPROVALS_TABLES
 from db.schema.schema_auth import TABLES as AUTH_TABLES
 from db.schema.schema_briefings import TABLES as BRIEFINGS_TABLES
 from db.schema.schema_calendar import TABLES as CALENDAR_TABLES
+from db.schema.schema_fulfillment import TABLES as FULFILLMENT_TABLES
 from db.schema.schema_chat import TABLES as CHAT_TABLES
 from db.schema.schema_finance import TABLES as FINANCE_TABLES
 from db.schema.schema_habits import TABLES as HABITS_TABLES
@@ -46,6 +47,7 @@ _ALL_TABLES = "\n\n".join(
         APPROVALS_TABLES,
         USAGE_TABLES,
         CALENDAR_TABLES,
+        FULFILLMENT_TABLES,
     )
 )
 

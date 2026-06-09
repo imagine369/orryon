@@ -24,14 +24,7 @@ export function hasAuthSignal(): boolean {
   return /(?:^|;\s*)orryon_auth=1/.test(document.cookie);
 }
 
-export function isDemoMode(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem("orryon_demo") === "true";
-  } catch {
-    return false;
-  }
-}
+export { isDemoMode } from "./demo-mode";
 
 export function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;

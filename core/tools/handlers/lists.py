@@ -19,6 +19,7 @@ from db.finance import (
     get_or_create_balance_account,
     update_balance,
 )
+from core.grocery_list import get_unchecked_grocery_item_names
 from core.tools.shared import (
     _now_iso,
     _uid
@@ -181,28 +182,7 @@ def _check_grocery_item(args: dict, user_id: str) -> dict:
 def _get_grocery_list(args: dict, user_id: str) -> dict:
     """Return the unchecked grocery items as the user sees them in the Lists
     tab. Prefers the "Grocery" user_list; falls back to the legacy table."""
-    conn = get_connection()
-    try:
-        glist = conn.execute(
-            "SELECT id FROM user_lists WHERE user_id=? AND LOWER(name)='grocery' "
-            "ORDER BY created_at ASC LIMIT 1",
-            (user_id,),
-        ).fetchone()
-        if glist:
-            list_id = glist["id"] if isinstance(glist, dict) else glist[0]
-            rows = conn.execute(
-                "SELECT name FROM list_items "
-                "WHERE list_id=? AND user_id=? AND is_checked=0 "
-                "ORDER BY sort_order ASC",
-                (list_id, user_id),
-            ).fetchall()
-            names = [r["name"] if isinstance(r, dict) else r[0] for r in rows]
-            if names:
-                return {"status": "ok", "items": names, "count": len(names)}
-    finally:
-        conn.close()
-    items = fetch_rows("grocery_items", {"user_id": user_id, "is_checked": 0})
-    names = [i["name"] for i in items]
+    names = get_unchecked_grocery_item_names(user_id)
     return {"status": "ok", "items": names, "count": len(names)}
 def _create_list(args: dict, user_id: str) -> dict:
     name = args["name"]

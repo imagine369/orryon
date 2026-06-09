@@ -30,6 +30,4 @@ export function ageFromBirthDate(iso: string): number | null {
   return age >= 0 && age < 150 ? age : null;
 }
 
-export function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
+export { isDemoMode as isDemo } from "@/lib/demo-mode";

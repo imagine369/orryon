@@ -20,9 +20,7 @@ export const PRIORITY_ORDER: Record<string, number> = {
   none: 3,
 };
 
-export function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
+export { isDemoMode as isDemo } from "@/lib/demo-mode";
 
 export const TODAY = new Date().toISOString().split("T")[0];
 
@@ -70,4 +68,4 @@ export const DEMO_BILLS: Bill[] = [
   { id: "db2", name: "Spotify", amount: 9.99, frequency: "monthly", next_due: TODAY },
 ];
 
-export type Tab = "today" | "calendar" | "lists";
+export type Tab = "today" | "calendar" | "lists" | "errands";

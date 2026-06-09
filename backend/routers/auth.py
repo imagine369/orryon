@@ -301,8 +301,9 @@ async def auth_demo(request: Request):
     """Issue a demo JWT for local development.
 
     Disabled unless ENABLE_DEMO=1 AND we're running in a local-dev environment.
+    Never available in production.
     """
-    if not ENABLE_DEMO:
+    if IS_PRODUCTION or not ENABLE_DEMO:
         raise HTTPException(403, "Demo mode is disabled")
     email = "demo@orryon.app"
     user = get_or_create_user_by_email(email)
@@ -310,6 +311,9 @@ async def auth_demo(request: Request):
     if not existing_txns:
         from core.tools import seed_sample_data
         seed_sample_data(user["id"])
+    if FULFILLMENT_ENABLED:
+        from core.integrations.fulfillment.demo_seed import seed_marketing_handoffs
+        seed_marketing_handoffs(user["id"])
     ua = request.headers.get("user-agent", "")
     ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
     if ip and "," in ip:

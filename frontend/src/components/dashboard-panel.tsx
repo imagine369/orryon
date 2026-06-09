@@ -5,6 +5,7 @@ import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { api } from "@/lib/api";
+import { isDemo } from "@/components/dashboard/demo-data";
 import { usePanels } from "@/lib/panel-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,10 +61,6 @@ const DEMO_DATA: DashboardData = {
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
 }
 
 export function DashboardPanel() {

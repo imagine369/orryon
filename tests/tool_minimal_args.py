@@ -203,6 +203,9 @@ def minimal_args_for_tool(name: str, seeded: SeededToolIds) -> dict[str, Any]:
         "get_health_appointments": {},
         "get_weather": {"location": "London"},
         "search_web": {"query": "technology", "limit": 3},
+        "create_fulfillment_handoff": {
+            "handoffs": [{"type": "grocery", "title": "Grocery run"}],
+        },
     }
     if name not in mapping:
         raise KeyError(f"No minimal args for {name}")

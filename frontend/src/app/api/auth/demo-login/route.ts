@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isDemoRouteAllowed } from "@/lib/demo-mode-server";
 import { makeCsrf, setAuthCookies } from "@/lib/server/auth-cookies";
 import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
 
@@ -14,6 +15,10 @@ function backendBase(): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isDemoRouteAllowed(req)) {
+    return NextResponse.json({ detail: "Not found" }, { status: 404 });
+  }
+
   // 5 demo logins per IP per minute — demo mode is gated to NODE_ENV=local on
   // the backend anyway, but we still want to cap edge-level abuse.
   const rl = await checkRateLimit(req, { tier: "demo-login", limit: 5, windowSeconds: 60 });

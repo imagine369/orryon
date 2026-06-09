@@ -5,6 +5,7 @@ import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
 import { migrateHabitsToServer } from "./migrate-habits";
 import { invalidateSigningKey, prefetchSigningKey } from "./signing";
+import { clearDemoFlagIfRemote, isDemoMode } from "./demo-mode";
 import { formatDisplayName } from "./format-display-name";
 
 interface User {
@@ -36,7 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useQueuedEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true") {
+    clearDemoFlagIfRemote();
+    if (isDemoMode()) {
       setUser(DEMO_USER);
       setLoading(false);
       return;

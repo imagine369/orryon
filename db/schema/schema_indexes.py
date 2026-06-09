@@ -33,5 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_commute_user ON commute_patterns(user_id);
 CREATE INDEX IF NOT EXISTS idx_briefings_user_date ON briefings(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_approvals_user ON approval_requests(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_chat_counts_user_month ON chat_message_counts(user_id, month);
+CREATE INDEX IF NOT EXISTS idx_fulfillment_handoffs_user ON fulfillment_handoffs(user_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_fulfillment_cache_user ON fulfillment_url_cache(user_id, cache_key);
 
 """

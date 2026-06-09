@@ -12,6 +12,8 @@ import {
 import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
 import { OrryonAvatar } from "@/components/orryon-avatar";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
+import { FulfillmentCardList } from "@/components/fulfillment/fulfillment-card";
+import type { FulfillmentHandoff } from "@/lib/fulfillment-types";
 
 /** Chat reply portrait — was 28px; object-cover fills the circle (PNG has side margins). */
 const CHAT_AVATAR_SIZE = 40;
@@ -20,6 +22,7 @@ export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
   isError?: boolean;
+  fulfillmentHandoffs?: FulfillmentHandoff[];
 }
 
 interface ChatThreadProps {
@@ -294,6 +297,10 @@ export function ChatThread({
                   <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-white/22" />
                 )}
               </div>
+
+              {!streaming && msg.fulfillmentHandoffs && msg.fulfillmentHandoffs.length > 0 ? (
+                <FulfillmentCardList handoffs={msg.fulfillmentHandoffs} />
+              ) : null}
 
               {/* Action row — copy / retry (visible on hover) */}
               <div className="mt-2 flex items-center gap-3.5 opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-hover:opacity-100">

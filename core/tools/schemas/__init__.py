@@ -11,6 +11,7 @@ from core.tools.schemas.balance import SCHEMAS as BALANCE_SCHEMAS
 from core.tools.schemas.analysis import SCHEMAS as ANALYSIS_SCHEMAS
 from core.tools.schemas.health import SCHEMAS as HEALTH_SCHEMAS
 from core.tools.schemas.world import SCHEMAS as WORLD_SCHEMAS
+from core.tools.schemas.fulfillment import SCHEMAS as FULFILLMENT_SCHEMAS
 
 _ALL = (
     EXPENSES_SCHEMAS
@@ -23,6 +24,7 @@ _ALL = (
     + ANALYSIS_SCHEMAS
     + HEALTH_SCHEMAS
     + WORLD_SCHEMAS
+    + FULFILLMENT_SCHEMAS
 )
 
 # Preserve legacy monolith order for stable diffs and any order-sensitive tests.
@@ -95,6 +97,7 @@ _LEGACY_ORDER = (
     "get_health_appointments",
     "get_weather",
     "search_web",
+    "create_fulfillment_handoff",
 )
 
 _by_name = {s["function"]["name"]: s for s in _ALL}

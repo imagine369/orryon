@@ -45,6 +45,8 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     # World / live context
     "get_weather",
     "search_web",
+    # Instant fulfillment (deeplink handoffs)
+    "create_fulfillment_handoff",
 )
 
 # Legacy names from old chat sessions — resolved at dispatch, not advertised to Grok.
@@ -96,6 +98,7 @@ _REPROMPT_SECTIONS = (
     "search_transactions",
     "HEALTH: log_health_vital, get_health_vitals, log_medication, get_medications, "
     "add_health_appointment, get_health_appointments",
+    "FULFILLMENT: create_fulfillment_handoff (Uber, DoorDash, Instacart, OpenTable, pharmacy deeplinks)",
     "WORLD: get_weather, search_web",
 )
 

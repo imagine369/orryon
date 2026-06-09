@@ -47,6 +47,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Weather** | `get_weather` — live conditions for a city/place |
 | **News & web** | xAI `web_search` + `x_search` (Grok-style); RSS `search_web` fallback if Agent Tools unavailable |
 | **Search** | Cross-feature search across their data |
+| **Errands** | `create_fulfillment_handoff` — deeplink to Uber, DoorDash, Instacart, OpenTable, pharmacy (user completes in partner app) |
 
 Morning **briefing**: Dashboard in the app (chat can suggest opening it).
 
@@ -77,12 +78,13 @@ Everyday **writing** (emails, tone) is not code. **Sewing/cooking** how-tos are 
 
 ## Not yet (do not claim done)
 
-- Book Uber/Lyft or food delivery
+- Complete checkout or payment in external apps on the user's behalf
 - Auto-pay bills or transfer money
 - Read **live** bank balance from a linked bank (use manual balance, expenses, CSV import)
 - Send email on the user's behalf
-- Shop on external sites
-**Alternatives:** calendar, tasks, reminders, `get_weather`, log expenses, link to official site.
+- Shop on external sites (Instacart/DoorDash deeplink handoffs are OK — user pays in partner app)
+
+**Alternatives:** calendar, tasks, reminders, `get_weather`, log expenses, `create_fulfillment_handoff`, link to official site.
 
 ---
 
@@ -110,7 +112,7 @@ Subscription tier affects **usage limits** (messages, voice, etc.), not whether 
 
 ## Registered agent tools
 
-Orryon exposes **68 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
+Orryon exposes **69 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
 
 | Domain | Tools (summary) |
 |--------|-----------------|
@@ -122,6 +124,7 @@ Orryon exposes **68 canonical function tools** (`core/canonical_tools.CANONICAL_
 | Lists & grocery | lists, grocery items |
 | Money & budget | balance, budget, spending summaries, forecasts, insights |
 | Health | vitals, medications, appointments |
+| Errands | `create_fulfillment_handoff` (deeplink handoffs) |
 | Search & analysis | cross-feature search, compare periods, wellness history |
 | World | `get_weather`, live web/X search |
 

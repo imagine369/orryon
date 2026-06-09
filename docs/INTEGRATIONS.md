@@ -62,3 +62,25 @@ No Plaid HTTP routes. `GET /api/connections` lists Plaid as `planned` only.
 | Docs | `DEPLOY.md` | — |
 
 Implementation: `core/email/` (`otp.py`, `digest.py`, `contact.py`, `providers.py`).
+
+## Instant fulfillment (deeplink handoffs) — **Live when `FULFILLMENT_ENABLED=1`**
+
+| Stage | Status | Location |
+|-------|--------|----------|
+| Config | `FULFILLMENT_ENABLED`, optional `UBER_CLIENT_ID` | `config.py` |
+| Connect | N/A — deeplinks only (no OAuth in v1) | — |
+| Sync job | N/A | — |
+| UI | Chat cards + Quick Access → Errands | `fulfillment-card.tsx`, `errands-tab.tsx` |
+| Tests | `test_fulfillment_deeplinks.py`, `test_fulfillment_handoff.py`, `test_fulfillment_cache.py`, `test_fulfillment_demo_seed.py`, `test_fulfillment_api.py`; `extract-fulfillment-handoffs.test.mjs`, `demo-mode.test.mjs`, `demo-mode-server.test.mjs` | `tests/`, `frontend/src/lib/` |
+| Docs | This file | — |
+
+Implementation: `core/integrations/fulfillment/` (deeplinks built locally — zero partner API calls).
+Agent tool: `create_fulfillment_handoff`. Partners: Uber, DoorDash, Instacart, OpenTable, pharmacy (Maps).
+
+**Phase 1 scope:** Pharmacy handoffs use Maps deeplinks from a destination address/place only. Migration `003_fulfillment.*.sql` adds
+`medications.pharmacy_name`, `pharmacy_address`, `refill_due_date`, and `pickup_status` as schema scaffolding for a future
+medication–pharmacy sync phase — those columns are not read or written in v1.
+
+**Marketing demo (localhost only):** `POST /api/fulfillment/demo/seed` (requires `ENABLE_DEMO=1` local dev) or Preview App mode
+(`localStorage orryon_demo` on `localhost`) shows client-side sample cards in Errands tab. Demo login auto-seeds DB rows.
+Never enabled on the live production site.

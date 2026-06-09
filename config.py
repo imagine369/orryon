@@ -62,6 +62,14 @@ GOOGLE_CALENDAR_OAUTH_ENABLED: bool = (
     and bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 )
 
+# ── Instant fulfillment (deeplink handoffs — zero partner API cost in v1) ─────
+# Uber client_id is optional; used for affiliate attribution on ride deeplinks.
+# Register at https://developer.uber.com — no API calls required for deeplinks.
+UBER_CLIENT_ID: str = os.getenv("UBER_CLIENT_ID", "")
+FULFILLMENT_ENABLED: bool = os.getenv(
+    "FULFILLMENT_ENABLED", "1"
+).lower() in ("1", "true", "yes")
+
 # Human-in-the-loop approve/reject queue (agent audit history stays on).
 APPROVALS_HITL_ENABLED: bool = os.getenv(
     "APPROVALS_HITL_ENABLED", ""

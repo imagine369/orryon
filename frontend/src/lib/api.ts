@@ -11,6 +11,7 @@ export {
   getCsrfToken,
   clientHeaders,
   parseApiDetail,
+  ApiError,
   api,
 } from "@/lib/api-client";
 

@@ -2,12 +2,10 @@
  * Centralized demo data for the Orryon dashboard.
  *
  * When isDemo() is true, components show this sample data instead of
- * fetching from the API — used for the "Preview the app" mode.
+ * fetching from the API — used for the "Preview the app" mode (localhost only).
  */
 
-export function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
-}
+export { isDemoMode as isDemo } from "@/lib/demo-mode";
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 

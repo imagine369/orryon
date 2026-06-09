@@ -24,6 +24,7 @@ _ALLOWED_TABLES: frozenset[str] = frozenset({
     "health_vitals", "medications", "health_appointments",
     "user_places", "commute_patterns", "briefings", "approval_requests",
     "chat_message_counts", "user_api_spend",
+    "fulfillment_handoffs", "fulfillment_url_cache",
 })
 
 # Tables with a user_id column — purged on DELETE /api/account (users row removed last).

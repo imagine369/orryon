@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
+import { isDemo } from "@/components/dashboard/demo-data";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface Transaction {
@@ -45,10 +46,6 @@ function formatMonthLabel(m: string) {
 function formatDate(d: string) {
   const date = new Date(d + "T00:00:00");
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function isDemo() {
-  return typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true";
 }
 
 export function BankTab() {

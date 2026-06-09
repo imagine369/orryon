@@ -83,6 +83,7 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     "get_health_appointments": {"impl": h._get_health_appointments, "tabs": []},
     "get_weather": {"impl": h._get_weather, "tabs": []},
     "search_web": {"impl": h._search_web, "tabs": []},
+    "create_fulfillment_handoff": {"impl": h._create_fulfillment_handoff, "tabs": ["errands"]},
 }
 TOOLS: dict[str, BoundHandler] = {
     name: bind_handler(spec["impl"], spec.get("tabs") or [])

@@ -8,6 +8,7 @@ import { useDestructiveConfirm } from "@/lib/use-destructive-confirm";
 import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
+import { extractFulfillmentHandoffs } from "@/lib/extract-fulfillment-handoffs";
 import type { ChatMessage, ChatSession } from "@/lib/chat-types";
 import {
   chatHistoryPath,
@@ -98,9 +99,14 @@ export function useHomeChat({
             });
           } else if (event.type === "done") {
             const final = event.message || aiText;
+            const handoffs = extractFulfillmentHandoffs(event.actions);
             setMessages((prev) => {
               const updated = [...prev];
-              updated[updated.length - 1] = { role: "assistant", content: final };
+              updated[updated.length - 1] = {
+                role: "assistant",
+                content: final,
+                ...(handoffs.length > 0 ? { fulfillmentHandoffs: handoffs } : {}),
+              };
               return updated;
             });
             setToolLabel("");

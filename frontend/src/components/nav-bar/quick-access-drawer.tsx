@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { motion } from "framer-motion";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
+import { ErrandsTab } from "@/components/nav-bar/errands-tab";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TodayTab } from "@/components/nav-bar/today-tab";
 import type { Tab } from "@/components/nav-bar/types";
@@ -11,6 +12,7 @@ import type { useNavBarToday } from "@/components/nav-bar/use-nav-bar-today";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Today" },
+  { key: "errands", label: "Errands" },
   { key: "calendar", label: "Calendar" },
   { key: "lists", label: "Lists" },
 ];
@@ -109,6 +111,7 @@ export function QuickAccessDrawer({
               }
             >
               {activeTab === "today" && <TodayTab today={today} />}
+              {activeTab === "errands" && <ErrandsTab />}
               {activeTab === "calendar" && <CalendarTab />}
               {activeTab === "lists" && <ListsTab />}
             </ErrorBoundary>

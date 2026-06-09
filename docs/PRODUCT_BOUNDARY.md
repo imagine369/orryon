@@ -16,7 +16,8 @@ That is **not** open-ended automation (booking rides, paying bills, sending emai
 |-------|------------|----------|---------|
 | **General chat** (“everything” within limits) | Broad assistant: explain, draft, plan, tutor (non-code), life skills | “How does inflation work?”, “Proofread this email”, “Steps to hem pants” | xAI Responses API, **no** Orryon tool required |
 | **Life OS tools** | Read/write the user’s stored data + bounded live context | Log expense, calendar, notes, health vitals, `get_weather`, news search | Responses API + `core/tools/` (`execute_tool`) |
-| **Out of scope** | Automation we do not implement | Book Uber, auto-pay, shop checkout, send email as user, arbitrary multi-step web agents | Not in roadmap — document under “Not yet” in `docs/CAPABILITIES.md` |
+| **Out of scope** | Automation we do not implement | Auto-pay, shop checkout, send email as user, checkout in partner apps on user's behalf | Document under “Not yet” in `docs/CAPABILITIES.md` |
+| **Reviewed handoffs** | Deeplink orchestration after user intent | Uber, DoorDash, Instacart, OpenTable, pharmacy via `create_fulfillment_handoff` | `core/integrations/fulfillment/`, `docs/INTEGRATIONS.md` |
 
 ### General chat — in
 
