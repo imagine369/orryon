@@ -32,8 +32,9 @@ Single checklist for a new Orryon Life OS tool. Do every step — import-time va
 8. **Argument normalization** (only if needed) — `core/tools/normalize.py`
    - Add tool-specific coercion in `normalize_args` or shared field maps — never duplicate in handlers.
 
-9. **Tests** — `tests/test_tools_registry.py` or domain-specific tests
+9. **Tests** — `tests/test_tools_registry.py`, `tests/tool_minimal_args.py`, or domain-specific tests
    - Cover happy path and destructive `user_confirmed` if applicable.
+   - Run `pytest tests/test_capabilities_sync.py` — every canonical name must appear in `get_system_prompt()`.
 
 ## Validation (automatic)
 

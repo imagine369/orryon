@@ -20,10 +20,10 @@ Orryon runs as a **Next.js frontend + FastAPI backend**.
                                  ┌──────────────────┼───────────────┐
                                  │                  │               │
                             core/grok_agent.py   db/           core/scheduler.py
-                            (xAI SSE)          (SQLite/PG)    (APScheduler)
+                            (xAI Responses)    (SQLite/PG)    (APScheduler)
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and migration roadmap.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and migration roadmap. Contributors: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

@@ -108,11 +108,38 @@ Subscription tier affects **usage limits** (messages, voice, etc.), not whether 
 
 ---
 
+## Registered agent tools
+
+Orryon exposes **68 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
+
+| Domain | Tools (summary) |
+|--------|-----------------|
+| Bills | log/get/edit/delete bill |
+| Expenses | log/get/edit/delete/split expense |
+| Calendar & tasks | events + tasks CRUD |
+| Notes & journal | notes CRUD, search, pin; journal CRUD |
+| Goals | create/get/update/delete |
+| Lists & grocery | lists, grocery items |
+| Money & budget | balance, budget, spending summaries, forecasts, insights |
+| Health | vitals, medications, appointments |
+| Search & analysis | cross-feature search, compare periods, wellness history |
+| World | `get_weather`, live web/X search |
+
+`core/system_prompt.py` injects every canonical name into `## TOOL SURFACE` at runtime via `CANONICAL_TOOL_NAMES`. Section routing in the prompt must stay aligned with `_REPROMPT_SECTIONS` in `canonical_tools.py`.
+
+Enforced by tests:
+
+```bash
+pytest tests/test_capabilities_sync.py tests/test_tools_registry.py -q
+```
+
+---
+
 ## When adding a feature
 
 Update **all** of:
 
-1. This file  
+1. This file (if user-visible or policy-relevant)  
 2. Follow `docs/ADDING_A_TOOL.md` (schema → handler → `TOOL_SPECS` → canonical → reprompt)  
-3. `core/system_prompt.py` tool list / CAPABILITIES TODAY section  
+3. Confirm `pytest tests/test_capabilities_sync.py` passes (`system_prompt` lists every canonical tool)  
 4. Help FAQ if user-facing  

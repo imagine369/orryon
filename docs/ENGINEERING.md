@@ -10,23 +10,22 @@ Do not add new logic to these shells — extract into hooks, components, or `cor
 
 ## File size cap
 
-**No new file over 400 lines** without explicit justification documented here.
+CI enforces via `scripts/check_file_length.sh`:
+
+| Threshold | Effect |
+|-----------|--------|
+| **> 400 lines** | Warning |
+| **> 500 lines** | Fail (unless on `scripts/file-length-allowlist.txt`) |
 
 Run locally:
 
 ```bash
-bash scripts/check_file_length.sh
+./scripts/check_file_length.sh
 ```
 
-Override for a one-off audit: `ORRYON_MAX_FILE_LINES=600 bash scripts/check_file_length.sh`
+Grandfathered paths: `scripts/file-length-allowlist.txt` — do not grow those files; split when touched.
 
-Known exceptions (legacy; split when touched):
-
-| File | Lines | Notes |
-|------|-------|-------|
-| `frontend/src/components/landing/feature-section.tsx` | ~580 | Marketing landing only |
-| `frontend/src/app/(site)/help/page.tsx` | ~650 | Help content |
-| `frontend/src/app/(site)/login/page.tsx` | ~495 | Auth flows |
+Override for a one-off audit: `ORRYON_MAX_FILE_LINES=600 ./scripts/check_file_length.sh`
 
 ## Agent runtime
 
@@ -77,3 +76,11 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **Dispatch:** `core/tools/registry.py` — `TOOL_SPECS` holds `impl` + `tabs`; `bind_handler` returns `{result, tabs}`.
 - **Legacy aliases:** `core/canonical_tools.resolve_tool_name()` at dispatch only.
 - **Args:** normalize in `core/tools/normalize.py` only — not in handlers.
+
+## Documentation & process (Phase 11)
+
+- **Architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md) — one diagram + unified chat flow (Responses API only).
+- **Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md) — layering, file caps, tool checklist.
+- **PR template:** `.github/pull_request_template.md` — god file, single registry, tool tests.
+- **Capabilities sync:** `docs/CAPABILITIES.md` + `tests/test_capabilities_sync.py` vs `CANONICAL_TOOL_NAMES` / `system_prompt.py`.
+- **ORM:** SQLAlchemy/Alembic **cancelled** — see [MIGRATION_ROADMAP.md](../MIGRATION_ROADMAP.md) Phase B.1.

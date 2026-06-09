@@ -7,20 +7,32 @@ This document describes the system architecture, folder responsibilities, data f
 ## System Overview
 
 ```
-┌──────────────┐    REST + SSE/WS    ┌────────────────────────────┐
-│  Next.js 16  │ ◄─────────────────► │  FastAPI                   │
-│  React 19    │  :3000 ↔ :8000      │  backend/main.py           │
-│  Tailwind 4  │                     │  + routers/                │
-│  PWA         │                     └─────────┬──────────────────┘
-└──────────────┘                               │
-                    ┌──────────────────────────┼──────────────────┐
-                    │                          │                  │
-               core/grok_agent.py          db/               scheduler
-               (xAI SSE)              (SQLite/PG)       (APScheduler)
-                    │                          │                  │
-               core/tools/               config.py        email_sender
-               core/system_prompt.py
+┌─────────────────┐   REST + SSE/WS    ┌──────────────────────────┐
+│  Next.js 16     │ ◄───────────────► │  FastAPI (backend/)      │
+│  React 19 PWA   │   :3000 ↔ :8000   │  routers/ + auth/deps    │
+│  frontend/      │                   └────────────┬─────────────┘
+└─────────────────┘                                │
+                                                   ▼
+                                    ┌──────────────────────────────┐
+                                    │  core/grok_agent.py          │
+                                    │  orchestration + messages    │
+                                    └──────────────┬───────────────┘
+                                                   │
+                                                   ▼
+                                    ┌──────────────────────────────┐
+                                    │  core/xai_responses.py       │
+                                    │  xAI Responses API agent loop│
+                                    │  (Grok + web_search/x_search │
+                                    │   + Orryon function tools)   │
+                                    └──────────────┬───────────────┘
+                     ┌─────────────────────────────┼─────────────────────────┐
+                     ▼                             ▼                         ▼
+              core/tools/                    db/ (SQLite/PG)          core/scheduler.py
+              registry + handlers            raw SQL + migrations     APScheduler jobs
+              core/system_prompt.py          Redis (context cache)    core/email/
 ```
+
+**Agent unification:** All chat turns use the **xAI Responses API** (`core/xai_responses.py`). `core/grok_agent.py` builds context and delegates to `run_orryon_stream_agent()`. If Agent Tools (`web_search` / `x_search`) are unavailable, the same loop retries in **degraded mode** with function tools + RSS `search_web` only — there is no separate Chat Completions chat path.
 
 ---
 
@@ -62,12 +74,14 @@ The "brain" of orryon — used by the FastAPI backend:
 
 | File | Purpose |
 |------|---------|
-| `grok_agent.py` | Streaming AI agent with tool calling, memory extraction |
+| `grok_agent.py` | Chat orchestration: messages, context, delegates to `xai_responses` |
+| `xai_responses.py` | xAI Responses API agent loop (stream, tools, soft re-prompt) |
+| `agent_messages.py` | System prompt + memory + history assembly |
+| `agent_tool_round.py` | Client-side tool execution shared by the Responses loop |
 | `context_cache.py` | Redis-backed agent context snapshot (shared across workers) |
 | `tools/handlers/` | Domain tool handlers (expenses, bills, calendar, …) |
 | `tools/shared.py` | Shared handler utilities (cycles, budgets, dates) |
-| `tools/` | Tool schemas (`schemas.py`), registry (`registry.py`), shim (`helpers.py`) |
-| `db/` | Database package (connection, schema, crud, domain modules) |
+| `tools/` | Schemas (`schemas/`), registry (`registry.py`), handlers (`handlers/`) |
 | `canonical_tools.py` | Single source of truth for advertised tool names |
 | `system_prompt.py` | Life OS system prompt (v10; broad chat + tools; three limits: porn/code/images; see `docs/CAPABILITIES.md`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
@@ -87,21 +101,25 @@ The "brain" of orryon — used by the FastAPI backend:
 
 ## Data Flow: AI Chat
 
-The most complex flow is the streaming chat, which connects the frontend to the AI agent:
+Single path for SSE (`POST /api/chat`) and WebSocket (`/ws/chat`) — same event types, same agent loop:
 
 ```
-1. User types message in frontend chat
-2. frontend/src/lib/api.ts → streamChat() sends POST /api/chat
-3. backend/routers/chat.py validates auth, checks rate limit & spend cap
-4. Calls core/grok_agent.py → run_orryon_stream()
-5. grok_agent builds messages array (system prompt + context + history + user msg)
-6. Streams SSE from the AI provider API
-7. For each chunk:
-   - Text tokens → yield {"type": "token", "content": "..."} → SSE to frontend
-   - Tool calls → execute via core/tools/ → append result → loop back to step 6
-8. Final message → yield {"type": "done", ...} → SSE to frontend
-9. Save to chat_messages table, extract memories in background thread
+1. User sends message (frontend: streamChatMessage in lib/chat-transport.ts)
+2. backend/routers/chat.py — auth, content policy, rate limit, spend cap, session
+3. core/grok_agent.run_orryon_stream()
+     a. get_system_prompt() + user locale / life priorities
+     b. build_messages() — context snapshot, memories, session summary, history
+     c. run_orryon_stream_agent() in core/xai_responses.py
+4. xAI Responses API stream (one round at a time, up to MAX_TOOL_ROUNDS):
+     • token deltas → {"type":"token","content":"..."}
+     • server tools (web_search/x_search) → {"type":"tool",...}
+     • function_call → process_client_tool() → execute_tool() → function_call_output → next round
+     • no tool + action intent → one soft re-prompt → {"type":"retry"} → corrective user note
+     • turn complete → finalize_turn() → {"type":"done",...}
+5. chat router persists messages; finalize_turn schedules memory extraction + session summary
 ```
+
+On `AgentToolsUnavailable`, step 4 retries with `include_agent_tools=False` (RSS `search_web` instead of xAI search tools).
 
 ### SSE Event Format
 
@@ -118,11 +136,7 @@ data: [DONE]
 
 ### Canonical Tool Surface
 
-The model is taught the names in `core/canonical_tools.py` (also listed in
-`core/system_prompt.py` v6). Only those names are sent in `GROK_TOOL_SCHEMAS`
-(each chat request). Legacy aliases remain in `_TOOL_MAP` so old tool-call IDs
-still execute, but are not sent to the API. Memory is injected by
-`grok_agent.py` (background extraction) — not via `save_memory` tools.
+`CANONICAL_TOOL_NAMES` in `core/canonical_tools.py` is the single source of advertised tool names. `get_system_prompt()` injects the full list at runtime. Only those names are sent in `GROK_TOOL_SCHEMAS` each request. Legacy aliases resolve at dispatch via `resolve_tool_name()` but are not sent to xAI. Memory is injected by `grok_agent` / `agent_memory` (background extraction) — there are no `save_memory` tools. Policy: `docs/CAPABILITIES.md`.
 
 ### Usage limits by plan (`backend/deps.py`)
 
@@ -156,11 +170,7 @@ Two server-side safety nets wrap the dispatcher:
    (`YYYY-MM-DD` for date-only fields, `YYYY-MM-DDTHH:MM:SS` for `start`/`end`),
    snaps categories/moods/frequencies to canonical values via fuzzy match,
    and forces amounts to positive floats. Runs on every `execute_tool` call.
-2. **`_needs_tool_reprompt`** (`core/grok_agent.py`) — if the model produces
-   neither a tool call nor a clarifying question on a turn whose user
-   message contained an action verb, a one-shot system correction is
-   appended and the call is retried. Capped at one retry per turn; emits
-   a `{"type":"retry"}` SSE event so the UI can show a micro indicator.
+2. **`needs_tool_reprompt`** (`core/agent_shared.py`, locale-aware via `core/intent_classifier.py`) — if the Responses loop finishes with neither a function call nor a clarifying question on an action-intent turn, one corrective user note is sent and the round retries once. Emits `{"type":"retry"}` for the UI.
 
 ---
 
@@ -170,7 +180,7 @@ Single SQLite file (`finance.db` by default, configurable via `DB_PATH`).
 
 Key tables: `users`, `transactions`, `events`, `goals`, `notes`, `action_items`, `grocery_items`, `subscriptions`, `budget_categories`, `chat_messages`, `user_memory`, `recurring_income`, `net_worth_snapshots`, `user_lists`, `list_items`, `share_tokens`.
 
-The `db/` package uses raw SQL (no ORM). Schema DDL lives in `db/schema/schema_*.py`; `init_db()` creates tables and applies numbered migrations from `db/migrations/`. SQLite auto-inits on import in local dev; Postgres uses `DATABASE_URL` + connection pool.
+The `db/` package uses **raw SQL only** (no ORM — SQLAlchemy was considered and declined; see `MIGRATION_ROADMAP.md`). Schema DDL lives in `db/schema/schema_*.py`; `init_db()` creates tables and applies numbered migrations from `db/migrations/`. SQLite for local dev; Postgres via `DATABASE_URL` + connection pool (CI tests both).
 
 ---
 
@@ -252,14 +262,13 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 
 ### Medium-Term
 
-4. **PostgreSQL Migration** — Replace `db.py` with SQLAlchemy + Alembic. The schema is already well-structured.
-5. **Background Job Queue** — Replace APScheduler with Celery + Redis for distributed deployments.
-6. **Vector Memory** — Replace key-value `user_memory` with pgvector embeddings for semantic recall.
+4. **Background Job Queue** — Replace APScheduler with Celery + Redis for distributed deployments.
+5. **Vector Memory** — Replace key-value `user_memory` with pgvector embeddings for semantic recall.
 
 ### Long-Term
 
-7. **Multi-Device Sync** — WebSocket layer for real-time updates across devices (chat WebSocket exists; broaden to dashboard).
-8. **Mobile App** — Capacitor PWA / native shells (see `frontend/` and `desktop/`).
+6. **Multi-Device Sync** — WebSocket layer for real-time updates across devices (chat WebSocket exists; broaden to dashboard).
+7. **Mobile App** — Capacitor PWA / native shells (see `frontend/` and `desktop/`).
 
 ---
 
@@ -271,6 +280,6 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 | Raw SQL over ORM | Performance, transparency, fewer abstraction layers |
 | Single AI provider | Policy decision; single-provider simplicity, tool calling support |
 | JWT over sessions | Stateless auth fits the decoupled frontend/backend architecture |
-| SSE over WebSocket | Simpler for one-directional streaming; sufficient for chat |
+| SSE + WebSocket | WebSocket preferred for chat latency; SSE universal fallback; same events |
 | APScheduler over Celery | No Redis/broker dependency; fits single-process deployment |
 | Shared `core/` | Single agent + tools layer behind all API routes |

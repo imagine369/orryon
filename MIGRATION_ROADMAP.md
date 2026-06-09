@@ -10,7 +10,7 @@ The primary stack is **Next.js 16 + FastAPI**.
       ├── core/grok_agent.py   → xAI Grok API (streaming + tool calling)
       ├── core/tools/          → AI tool schemas, registry, handlers
       ├── core/scheduler.py    → APScheduler (background jobs)
-      ├── db.py                → SQLite or Postgres
+      ├── db/                  → SQLite or Postgres (raw SQL)
       └── core/email/          → OTP, digests, contact, providers
 ```
 
@@ -29,6 +29,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram.
 | Subscription Billing | **Done** | Stripe integration with trial support |
 | Receipt Scanning | **Done** | Grok Vision-based receipt OCR |
 | Documentation | **Done** | README, ARCHITECTURE.md, this roadmap |
+| Backend router split | **Done** | Phase 7 — per-domain routers |
+| Data layer (raw SQL) | **Done** | Phase 8 — `db/schema/`, `db/migrations/`, Postgres CI |
+| Integrations & email | **Done** | Phase 9 — `core/email/`, Google Calendar |
+| Testing & CI guards | **Done** | Phase 10 — agent/chat tests, file-length CI |
 
 ---
 
@@ -48,13 +52,13 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 
 ### A.2 — CSV/OFX Import
 
-`core/csv_importer.py` already has `parse_csv()`. Wire into the connections router.
+**API done** — `POST /api/import/csv` + confirm via `backend/routers/connections.py` and `core/csv_importer.py`.
 
-| Step | Action |
+| Step | Status |
 |------|--------|
-| 1 | `POST /api/import/csv` (upload + preview) |
-| 2 | `POST /api/import/csv/confirm` (commit parsed rows) |
-| 3 | Frontend upload component in the Budget tab |
+| 1 | **Done** — upload + preview |
+| 2 | **Done** — confirm commits rows |
+| 3 | Optional — richer frontend upload UI in Budget tab |
 
 ### A.3 — Google Calendar Sync
 
@@ -64,9 +68,11 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 
 ## Phase B: Data Layer Evolution
 
-### B.1 — Database Migration
+### B.1 — Database layer
 
-**Chosen (Phase 8):** stay on raw SQL + numbered migrations in `db/migrations/` — not SQLAlchemy + Alembic + raw SQL in parallel.
+**Decided (Phase 8):** raw SQL + numbered migrations in `db/migrations/`.
+
+**Cancelled:** SQLAlchemy + Alembic ORM layer — not pursued; would duplicate the existing schema/migration path without benefit for this codebase.
 
 | Step | Status | Notes |
 |------|--------|-------|
@@ -130,14 +136,15 @@ Business logic consolidated in `core/`:
 
 ## File Reference
 
-| File | Purpose | Migration Impact |
-|------|---------|-----------------|
-| `db.py` | All data access | Replace with SQLAlchemy (Phase B) |
-| `core/grok_agent.py` | AI agent | Stable — no change needed |
-| `core/tools/` | Tool implementations | Stable — schemas + helpers + registry |
-| `core/scheduler.py` | Background jobs | Replace with Celery (Phase B) |
-| `core/integrations/google_calendar.py` | GCal sync | Done when OAuth enabled (Phase 9) |
-| `core/csv_importer.py` | CSV parsing | Wire into connections router (Phase A) |
-| `config.py` | All env vars | Add `DATABASE_URL` (Phase B) |
+| File | Purpose | Notes |
+|------|---------|-------|
+| `db/` | Connection, schema, migrations, domain CRUD | Raw SQL; Postgres + SQLite |
+| `core/grok_agent.py` | Chat orchestration | Delegates to `xai_responses` |
+| `core/xai_responses.py` | xAI Responses agent loop | Single chat runtime |
+| `core/tools/` | Tool schemas, registry, handlers | Add tools via `docs/ADDING_A_TOOL.md` |
+| `core/scheduler.py` | Background jobs | Future: Celery (Phase B.2) |
+| `core/integrations/google_calendar.py` | GCal sync | Live when OAuth enabled |
+| `core/csv_importer.py` | CSV parsing | Live via connections router |
+| `config.py` | Env vars | `DATABASE_URL` for Postgres |
 | `backend/` | FastAPI app | Primary — actively developed |
 | `frontend/` | Next.js app | Primary — actively developed |
