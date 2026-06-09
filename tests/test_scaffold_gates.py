@@ -20,9 +20,7 @@ def test_connections_never_advertises_plaid_without_link_flag():
         import asyncio
         from backend.routers.connections import list_connections
 
-        result = asyncio.get_event_loop().run_until_complete(
-            list_connections(user={"user_id": "u1"}),
-        )
+        result = asyncio.run(list_connections(user={"user_id": "u1"}))
     assert "plaid" not in result["available"]
     assert result["tiers"]["plaid"]["status"] == "planned"
 

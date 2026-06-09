@@ -35,10 +35,16 @@ def _load_verify_prod():
     return mod
 
 
-def _prime_prod_module(vp) -> None:
+def _prime_prod_module(vp, env: dict | None = None) -> None:
     """config.py is imported once per session in pytest — set attrs the script reads."""
-    vp.DATABASE_URL = _PROD_BASE_ENV["DATABASE_URL"]
-    vp.REDIS_URL = _PROD_BASE_ENV["REDIS_URL"]
+    env = env or _PROD_BASE_ENV
+    vp.DATABASE_URL = env.get("DATABASE_URL", "")
+    vp.REDIS_URL = env.get("REDIS_URL", "")
+    vp.XAI_API_KEY = env.get("XAI_API_KEY", "")
+    vp.RESEND_ENABLED = bool(env.get("RESEND_API_KEY"))
+    vp.SMTP_ENABLED = bool(
+        env.get("SMTP_HOST") and env.get("SMTP_USER") and env.get("SMTP_PASS")
+    )
 
 
 def test_collect_production_cors_origins_dedupes():
@@ -55,16 +61,14 @@ def test_collect_production_cors_origins_dedupes():
 
 
 def test_dev_mode_skips_strict_prod_checks():
-    with patch.dict(
-        os.environ,
-        {
-            "NODE_ENV": "development",
-            "JWT_SECRET": "x" * 64,
-            "XAI_API_KEY": "test-xai-key",
-        },
-        clear=False,
-    ):
+    env = {
+        "NODE_ENV": "development",
+        "JWT_SECRET": "x" * 64,
+        "XAI_API_KEY": "test-xai-key",
+    }
+    with patch.dict(os.environ, env, clear=False):
         vp = _load_verify_prod()
+        _prime_prod_module(vp, env)
         assert vp.main() == 0
 
 

@@ -7,6 +7,7 @@ frontend/src/components/landing/feature-section.tsx
 frontend/src/components/reset-anchor-panel.tsx
 frontend/src/components/dashboard/lists-tab.tsx
 frontend/src/lib/breathing-sounds.ts
+frontend/src/lib/sensor-fusion.ts
 frontend/src/lib/reset-scripts.ts
 core/tools/handlers/balance.py
 backend/routers/auth.py
