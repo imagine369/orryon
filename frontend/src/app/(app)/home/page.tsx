@@ -13,6 +13,7 @@ import {
 import { AmbientOverlay } from "@/components/ambient/ambient-overlay";
 import { resolveAmbientAliveState } from "@/lib/ambient-alive-state";
 import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
+import { AMBIENT_INACTIVITY_MS } from "@/lib/ambient-orryon-service";
 import { useAmbientOrryon } from "@/lib/use-ambient-orryon";
 import { ChatSessionSidebar } from "@/components/chat-session-sidebar";
 import { ChatActivationScreen } from "@/components/home/chat-activation-screen";
@@ -99,6 +100,15 @@ export default function HomePage() {
     },
     [ambient.touchActivity, voice.setStatus],
   );
+
+  useEffect(() => {
+    if (!chat.streaming && !chat.thinking) return;
+
+    ambient.touchActivity();
+    const intervalMs = Math.max(30_000, AMBIENT_INACTIVITY_MS - 15_000);
+    const intervalId = setInterval(() => ambient.touchActivity(), intervalMs);
+    return () => clearInterval(intervalId);
+  }, [chat.streaming, chat.thinking, ambient.touchActivity]);
 
   const wakePrimedRef = useRef(false);
   useEffect(() => {
