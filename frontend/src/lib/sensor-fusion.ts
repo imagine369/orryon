@@ -21,6 +21,14 @@ export const PUT_DOWN_CONFIDENCE_THRESHOLD = 0.75;
 export const MOTION_RESUMED_THRESHOLD = 0.45;
 export const SAMPLE_THROTTLE_SLEEPING_MS = 100;
 export const SAMPLE_THROTTLE_AWAKE_MS = 150;
+export const SAMPLE_THROTTLE_MINIORB_MS = 300;
+
+/** Sample interval by ambient avatar state (battery vs responsiveness). */
+export function sampleThrottleMsForAmbientState(state: AmbientAvatarState): number {
+  if (state === "sleeping") return SAMPLE_THROTTLE_SLEEPING_MS;
+  if (state === "miniOrb") return SAMPLE_THROTTLE_MINIORB_MS;
+  return SAMPLE_THROTTLE_AWAKE_MS;
+}
 export const PUT_DOWN_SUSTAIN_MS = 400;
 export const MOTION_RESUMED_DEBOUNCE_MS = 500;
 export const TOUCH_DECAY_MS = 2_000;
@@ -385,9 +393,7 @@ export class SensorFusionController {
     if (!this.enabled || document.hidden) return;
 
     const now = Date.now();
-    const throttleMs = this.ambientState === "sleeping"
-      ? SAMPLE_THROTTLE_SLEEPING_MS
-      : SAMPLE_THROTTLE_AWAKE_MS;
+    const throttleMs = sampleThrottleMsForAmbientState(this.ambientState);
     if (now - this.lastSampleAt < throttleMs) return;
     this.lastSampleAt = now;
 

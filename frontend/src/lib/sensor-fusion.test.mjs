@@ -103,3 +103,28 @@ describe("scoreProximityHeuristic", () => {
     assert.ok(upright > flat);
   });
 });
+
+const SAMPLE_THROTTLE_SLEEPING_MS = 100;
+const SAMPLE_THROTTLE_AWAKE_MS = 150;
+const SAMPLE_THROTTLE_MINIORB_MS = 300;
+
+function sampleThrottleMsForAmbientState(state) {
+  if (state === "sleeping") return SAMPLE_THROTTLE_SLEEPING_MS;
+  if (state === "miniOrb") return SAMPLE_THROTTLE_MINIORB_MS;
+  return SAMPLE_THROTTLE_AWAKE_MS;
+}
+
+describe("sampleThrottleMsForAmbientState", () => {
+  it("uses the slowest interval in miniOrb for battery savings", () => {
+    assert.equal(sampleThrottleMsForAmbientState("miniOrb"), 300);
+    assert.ok(
+      sampleThrottleMsForAmbientState("miniOrb") >
+        sampleThrottleMsForAmbientState("active"),
+    );
+  });
+
+  it("keeps pickup responsiveness while sleeping", () => {
+    assert.equal(sampleThrottleMsForAmbientState("sleeping"), 100);
+    assert.equal(sampleThrottleMsForAmbientState("awakening"), 150);
+  });
+});

@@ -141,10 +141,21 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
           ? "Premium: spoken greeting on pickup and mini-orb voice hold when you set your phone down during a conversation."
           : "Free: non-verbal wake sound on pickup. Upgrade to Premium for a spoken greeting and voice hold in mini-orb."}
       </p>
-      <p className="text-xs text-white/20 leading-relaxed">
-        Uses motion sensors while enabled. Sensor data stays on your device and is
-        not sent to Orryon servers.
-      </p>
+
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
+        <p className="text-xs text-white/30 leading-relaxed">
+          <span className="font-medium text-white/45">Privacy.</span> Motion and
+          proximity signals are processed on your device only. Nothing is recorded
+          or sent to Orryon servers.
+        </p>
+        {enabled && (
+          <p className="text-xs text-white/30 leading-relaxed">
+            <span className="font-medium text-white/45">Battery.</span> Sensors
+            run while Ambient Pickup is on and pause when the app is in the
+            background. Mini-orb mode samples at a lower rate to save power.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

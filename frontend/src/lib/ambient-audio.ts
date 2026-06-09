@@ -8,8 +8,19 @@ import type { AmbientSoundStyle } from "@/lib/ambient-plan";
 let _ctx: AudioContext | null = null;
 let _wakeStop: (() => void) | null = null;
 let _settleStop: (() => void) | null = null;
+let _wakeMaster: GainNode | null = null;
+let _settleMaster: GainNode | null = null;
 let _wakeStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let _settleStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function disconnectGain(node: GainNode | null): void {
+  if (!node) return;
+  try {
+    node.disconnect();
+  } catch {
+    // already disconnected
+  }
+}
 
 function clearWakeStopTimeout(): void {
   if (_wakeStopTimeoutId !== null) {
@@ -55,6 +66,8 @@ function stopWakeSound(): void {
     // ignore
   }
   _wakeStop = null;
+  disconnectGain(_wakeMaster);
+  _wakeMaster = null;
 }
 
 function stopSettleSound(): void {
@@ -65,6 +78,8 @@ function stopSettleSound(): void {
     // ignore
   }
   _settleStop = null;
+  disconnectGain(_settleMaster);
+  _settleMaster = null;
 }
 
 /** Rising warm tone — ~2s “Soft Glow Rise”. */
@@ -192,11 +207,17 @@ export function playAmbientWakeSound(style: AmbientSoundStyle): void {
     const master = ctx.createGain();
     master.gain.value = 0.85;
     master.connect(ctx.destination);
+    _wakeMaster = master;
 
-    _wakeStop =
+    const stopSynth =
       style === "crystal_bloom"
         ? synthCrystalBloom(ctx, master)
         : synthSoftGlowRise(ctx, master);
+    _wakeStop = () => {
+      stopSynth();
+      disconnectGain(master);
+      if (_wakeMaster === master) _wakeMaster = null;
+    };
 
     _wakeStopTimeoutId = setTimeout(() => {
       _wakeStopTimeoutId = null;
@@ -218,7 +239,14 @@ export function playAmbientSettleSound(): void {
     const master = ctx.createGain();
     master.gain.value = 0.7;
     master.connect(ctx.destination);
-    _settleStop = synthSettlingChime(ctx, master);
+    _settleMaster = master;
+
+    const stopSynth = synthSettlingChime(ctx, master);
+    _settleStop = () => {
+      stopSynth();
+      disconnectGain(master);
+      if (_settleMaster === master) _settleMaster = null;
+    };
     _settleStopTimeoutId = setTimeout(() => {
       _settleStopTimeoutId = null;
       stopSettleSound();

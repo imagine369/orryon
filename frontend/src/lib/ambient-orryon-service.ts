@@ -87,7 +87,7 @@ export class AmbientOrryonService {
   updateConfig(patch: Partial<AmbientOrryonConfig>): void {
     this.config = { ...this.config, ...patch };
     if (!this.config.enabled && this.state !== "sleeping") {
-      this.transitionTo("sleeping", { sleepCallback: true });
+      this.transitionTo("sleeping", { sleepCallback: false });
     }
   }
 
