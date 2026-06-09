@@ -49,6 +49,7 @@ from db import (
     update_chat_session_title,
 )
 from core.agent_shared import USER_FACING_CHAT_ERROR
+from core.content_policy import evaluate_content_policy
 from core.display_name import normalize_display_name
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,15 @@ async def chat_stream(
 
     check_chat_quota(uid, ctx["plan"])
     check_monthly_api_quota(uid, ctx["plan"])
+
+    policy_refusal = evaluate_content_policy(message)
+    if policy_refusal:
+
+        async def policy_blocked():
+            yield f"data: {json.dumps({'type': 'error', 'message': policy_refusal})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(policy_blocked(), media_type="text/event-stream")
 
     session_id, auto_created = _resolve_session(uid, body.session_id or "")
 
@@ -244,6 +254,11 @@ async def chat_ws(ws: WebSocket):
             message = (data.get("message") or "").strip()
             if not message:
                 await ws.send_json({"type": "error", "message": "Empty message"})
+                continue
+
+            policy_refusal = evaluate_content_policy(message)
+            if policy_refusal:
+                await ws.send_json({"type": "error", "message": policy_refusal})
                 continue
 
             ctx = _get_user_context(uid)

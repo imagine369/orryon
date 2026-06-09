@@ -49,6 +49,13 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **Event contract:** `core/chat_events.py` + `tests/fixtures/chat_event_contract.json` — SSE and WS must validate.
 - **Errors:** never expose raw exceptions to clients; use `USER_FACING_CHAT_ERROR` in `grok_agent` and chat routers.
 
+## Safety & guardrails (Phase 6)
+
+- **Destructive tools:** in-chat confirmation (`confirm_required` + `user_confirmed`); audit log at `GET /api/audit/history`. `/api/approvals/history` is a deprecated alias.
+- **HITL queue:** `APPROVALS_HITL_ENABLED` gates `/api/approvals` pending approve/reject — not wired to delete tools.
+- **Content policy:** `core/content_policy.py` enforces the three chat limits server-side before the LLM runs.
+- **Signing:** production must set `REQUEST_SIGNING_MODE=enforce` on chat + voice. Verify with `backend/scripts/verify_signing.py`. See [DEPLOY.md](./DEPLOY.md).
+
 ## Tool registry
 
 - **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).

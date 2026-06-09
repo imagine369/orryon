@@ -47,6 +47,7 @@ from backend.routers import (
     location,
     briefings,
     approvals,
+    audit,
     waitlist,
 )
 from config import XAI_API_KEY
@@ -277,6 +278,7 @@ app.include_router(memory.router)
 app.include_router(health.router)
 app.include_router(location.router)
 app.include_router(briefings.router)
+app.include_router(audit.router)
 app.include_router(approvals.router)
 app.include_router(waitlist.router)
 

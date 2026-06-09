@@ -3,7 +3,10 @@
 import { useCallback, useState } from "react";
 import type { PendingDestructiveAction } from "@/components/delete-confirm-modal";
 
-/** Destructive tool confirmation flow for chat (confirm_required SSE events). */
+/**
+ * Destructive tool confirmation for chat (confirm_required SSE/WS events).
+ * Backend blocks delete_* until user_confirmed=true; successful deletes are audit-logged.
+ */
 export function useDestructiveConfirm(
   runAI: (text: string) => void,
   onUserMessage?: (text: string) => void,

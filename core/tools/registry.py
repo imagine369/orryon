@@ -119,7 +119,7 @@ validate_tool_registry()
 def _log_destructive_action(
     user_id: str, tool_name: str, args: dict, result: dict,
 ) -> None:
-    """Audit trail for agent-driven deletes (visible under GET /api/approvals/history)."""
+    """Audit trail for agent-driven deletes (visible under GET /api/audit/history)."""
     try:
         from db import create_approval_request
         create_approval_request(

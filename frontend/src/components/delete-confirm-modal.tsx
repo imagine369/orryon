@@ -50,7 +50,10 @@ export function DeleteConfirmModal({
               {pending.message ||
                 `Permanently remove this ${actionLabel(pending.action)}?`}
             </p>
-            <p className="text-xs text-white/35 mb-5">This cannot be undone.</p>
+            <p className="text-xs text-white/35 mb-5">
+              This cannot be undone. Orryon confirms deletes here in chat — not via a
+              separate approvals queue.
+            </p>
             <div className="flex gap-2">
               <button
                 type="button"

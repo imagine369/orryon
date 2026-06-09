@@ -1,13 +1,16 @@
 """
-backend/routers/approvals.py — Approval requests and agent action audit trail.
+backend/routers/approvals.py — Reserved HITL approval queue (feature-flagged).
 
-Agent delete tools log completed actions as status=approved (see registry.execute_tool).
-Human-in-the-loop approve/reject is reserved for future UI.
+Agent delete tools today use in-chat confirmation (confirm_required + user_confirmed),
+not this queue. Completed deletes are logged to GET /api/audit/history.
 
-GET  /api/approvals              — list pending approval requests
-POST /api/approvals/{id}/approve — approve an action
-POST /api/approvals/{id}/reject  — reject an action
-GET  /api/approvals/history      — resolved + agent audit entries
+When APPROVALS_HITL_ENABLED=1:
+  GET  /api/approvals              — pending approval requests
+  POST /api/approvals/{id}/approve
+  POST /api/approvals/{id}/reject
+
+Legacy alias (same data as audit log):
+  GET  /api/approvals/history
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
+from backend.routers.audit import _audit_entries
 from config import APPROVALS_HITL_ENABLED
 from db import get_approval_requests, resolve_approval_request
 
@@ -36,8 +40,13 @@ async def list_pending(user: dict = Depends(get_current_user)):
 
 @router.get("/api/approvals/history")
 async def approval_history(user: dict = Depends(get_current_user)):
-    items = get_approval_requests(user["user_id"], status=None)
-    return {"approvals": [a for a in items if a["status"] != "pending"]}
+    """Deprecated alias for /api/audit/history — same completed audit entries."""
+    entries = _audit_entries(user["user_id"])
+    return {
+        "approvals": entries,
+        "count": len(entries),
+        "deprecated": "Use GET /api/audit/history",
+    }
 
 
 @router.post("/api/approvals/{approval_id}/approve")
