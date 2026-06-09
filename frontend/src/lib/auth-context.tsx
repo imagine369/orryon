@@ -7,6 +7,12 @@ import { migrateHabitsToServer } from "./migrate-habits";
 import { invalidateSigningKey, prefetchSigningKey } from "./signing";
 import { clearDemoFlagIfRemote, isDemoMode } from "./demo-mode";
 import { formatDisplayName } from "./format-display-name";
+import {
+  clearLoginMarkers,
+  isFreshLogin,
+  takeBootstrapUser,
+  type BootstrapUser,
+} from "./auth-session";
 
 interface User {
   id: string;
@@ -32,6 +38,38 @@ const AuthContext = createContext<AuthState>({
 
 const DEMO_USER: User = { id: "demo", email: "demo@orryon.app", display_name: "Alex" };
 
+function formatUser(u: BootstrapUser): User {
+  return u.display_name
+    ? { ...u, display_name: formatDisplayName(u.display_name) }
+    : u;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchMeWithRetry(): Promise<User> {
+  const attempts = isFreshLogin() ? 4 : 2;
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await api.get<User>("/api/auth/me");
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await sleep(300 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+async function clearServerSession(): Promise<void> {
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  } catch {
+    /* ignore */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,61 +81,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    // Fast path: no auth signal cookie AND no legacy token → unauthenticated.
-    // Skip the /auth/me round-trip; avoids an annoying 401 log on every cold
-    // start for logged-out visitors.
-    if (!hasAuthSignal() && !hasToken()) {
-      setLoading(false);
-      return;
-    }
-    api
-      .get<User>("/api/auth/me")
-      .then((u) => {
-        setUser(
-          u.display_name
-            ? { ...u, display_name: formatDisplayName(u.display_name) }
-            : u,
-        );
+
+    void (async () => {
+      const bootstrap = takeBootstrapUser();
+      if (bootstrap) {
+        setUser(formatUser(bootstrap));
+      }
+
+      if (!bootstrap && !hasAuthSignal() && !hasToken()) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const u = await fetchMeWithRetry();
+        clearLoginMarkers();
+        setUser(formatUser(u));
         prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
-      })
-      .catch((err) => {
-        // Don't fire /api/auth/logout here. That used to be "best-effort
-        // cookie clear" but in practice it created a self-inflicted bounce:
-        // a single transient 401 (e.g. backend cold-start race against the
-        // cookie) wiped the freshly-issued session and forced the user back
-        // to /login forever. Just clear local React state — if the cookie
-        // really is invalid, the very next request will 401 again and the
-        // user can manually re-auth.
+      } catch (err) {
+        clearLoginMarkers();
+        // Drop stale cookies so we don't loop: orryon_auth=1 with a dead session
+        // made every /home visit bounce straight back to /login.
+        if (hasAuthSignal() || bootstrap) {
+          await clearServerSession();
+        }
+        clearToken();
+        setUser(null);
         if (process.env.NODE_ENV !== "production") {
           // eslint-disable-next-line no-console
           console.warn("[auth] /api/auth/me failed:", (err as Error)?.message);
         }
-        clearToken();
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const login = useCallback((u: User) => {
     // Cookies were set by /api/auth/login (or /api/auth/demo-login); we just
     // need to remember the user object in React state.
-    setUser(
-      u.display_name
-        ? { ...u, display_name: formatDisplayName(u.display_name) }
-        : u,
-    );
+    setUser(formatUser(u));
     prefetchSigningKey().catch(() => {});
   }, []);
 
   const logout = useCallback(async () => {
+    clearLoginMarkers();
     clearToken();
     invalidateSigningKey();
     if (typeof window !== "undefined") localStorage.removeItem("orryon_demo");
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
-    } catch {
-      /* ignore — we still want to clear local state */
-    }
+    await clearServerSession();
     setUser(null);
   }, []);
 

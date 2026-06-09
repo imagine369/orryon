@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { clearAuthCookies, getSessionToken } from "@/lib/server/auth-cookies";
 
 /** POST /api/auth/logout — revokes the server session, then clears cookies. */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const jwt = getSessionToken(req);
 
   // Best-effort: tell the backend to revoke this session server-side
@@ -23,6 +23,6 @@ export async function POST(req: Request) {
   }
 
   const res = NextResponse.json({ ok: true });
-  clearAuthCookies(res);
+  clearAuthCookies(res, req.headers.get("host") ?? undefined);
   return res;
 }

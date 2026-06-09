@@ -70,6 +70,6 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ user: data.user });
-  setAuthCookies(res, data.token, makeCsrf());
+  setAuthCookies(res, data.token, makeCsrf(), req.headers.get("host") ?? undefined);
   return res;
 }

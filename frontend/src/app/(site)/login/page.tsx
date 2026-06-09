@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PillButton } from "@/components/pill-cta";
 import { GetAppNavLink, SiteNav } from "@/components/site-nav";
+import { stashBootstrapUser } from "@/lib/auth-session";
 
 type Tier = TierId;
 
@@ -239,6 +240,7 @@ function LoginPageInner() {
 
       setAuthUser(payload.user);
       setDisplayName(payload.user.display_name || "");
+      stashBootstrapUser(payload.user);
       login(payload.user);
 
       // New sign-up from /pricing → Stripe after OTP (unless no-card trial beta)
