@@ -11,7 +11,7 @@ The primary stack is **Next.js 16 + FastAPI**.
       ├── core/tools/          → AI tool schemas, registry, handlers
       ├── core/scheduler.py    → APScheduler (background jobs)
       ├── db.py                → SQLite or Postgres
-      └── email_sender.py      → SMTP (OTP, digests)
+      └── core/email/          → OTP, digests, contact, providers
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram.
@@ -58,13 +58,7 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 
 ### A.3 — Google Calendar Sync
 
-`core/google_calendar.py` has the OAuth scaffold. Needs a UI trigger and bidirectional sync.
-
-| Step | Action |
-|------|--------|
-| 1 | OAuth consent flow in Settings |
-| 2 | Push orryon events → Google Calendar |
-| 3 | Pull Google Calendar → orryon events |
+**Done (Phase 9)** when `GOOGLE_CALENDAR_OAUTH_ENABLED=1`: OAuth in Settings, pull + push via `core/integrations/google_calendar.py`, scheduler every 6h. ICS import works without OAuth.
 
 ---
 
@@ -142,7 +136,7 @@ Business logic consolidated in `core/`:
 | `core/grok_agent.py` | AI agent | Stable — no change needed |
 | `core/tools/` | Tool implementations | Stable — schemas + helpers + registry |
 | `core/scheduler.py` | Background jobs | Replace with Celery (Phase B) |
-| `core/google_calendar.py` | GCal sync | Expand from scaffold (Phase A) |
+| `core/integrations/google_calendar.py` | GCal sync | Done when OAuth enabled (Phase 9) |
 | `core/csv_importer.py` | CSV parsing | Wire into connections router (Phase A) |
 | `config.py` | All env vars | Add `DATABASE_URL` (Phase B) |
 | `backend/` | FastAPI app | Primary — actively developed |

@@ -72,7 +72,8 @@ The "brain" of orryon — used by the FastAPI backend:
 | `system_prompt.py` | Life OS system prompt (v10; broad chat + tools; three limits: porn/code/images; see `docs/CAPABILITIES.md`) |
 | `scheduler.py` | APScheduler jobs (net worth snapshots, bill reminders, digests) |
 | `csv_importer.py` | Bank CSV parsing (for future import feature) |
-| `google_calendar.py` | Google Calendar OAuth scaffold |
+| `integrations/google_calendar.py` | Google Calendar OAuth pull/push (gated) |
+| `email/` | OTP, digests, contact, Resend/SMTP providers |
 
 ### Root-Level Modules
 
@@ -80,7 +81,7 @@ The "brain" of orryon — used by the FastAPI backend:
 |------|---------|
 | `db/` | Database package: schema, connection pool, domain CRUD (`from db import …`) |
 | `config.py` | Environment variable loading from `.env` |
-| `email_sender.py` | SMTP email sending (OTP codes, digests) |
+| `core/email/` | OTP, digests, contact form, Resend/SMTP providers |
 
 ---
 
@@ -246,8 +247,8 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 ### Near-Term
 
 1. **CSV Import** — Live. `POST /api/import/csv` accepts bank CSVs, auto-detects format, returns a preview. `POST /api/import/csv/confirm` commits selected transactions. Frontend upload UI is the remaining piece.
-2. **Bank Import (Plaid)** — Stubs exist in `backend/routers/connections.py`. Config keys are in `config.py`. Needs `pip install plaid-python` and the Link token flow.
-3. **Google Calendar Sync** — `core/google_calendar.py` has the OAuth scaffold. Add a UI trigger and bidirectional sync.
+2. **Bank Import (Plaid)** — Not implemented. Config keys reserved; see `docs/INTEGRATIONS.md` and roadmap Phase A.1.
+3. **Google Calendar Sync** — Live when `GOOGLE_CALENDAR_OAUTH_ENABLED=1` (`core/integrations/google_calendar.py`). ICS import always available.
 
 ### Medium-Term
 

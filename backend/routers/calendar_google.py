@@ -1,4 +1,4 @@
-"""Google Calendar OAuth and pull-sync (gated by GOOGLE_CALENDAR_OAUTH_ENABLED)."""
+"""Google Calendar OAuth and bidirectional sync (gated by GOOGLE_CALENDAR_OAUTH_ENABLED)."""
 
 from __future__ import annotations
 
@@ -10,33 +10,28 @@ import logging
 import os
 import secrets as _secrets
 import time
-import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from backend.auth import get_current_user
-from backend.routers.calendar_tokens import get_google_tokens, store_google_tokens
 from config import (
     APP_URL as CONFIG_APP_URL,
     GOOGLE_CALENDAR_OAUTH_ENABLED,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
 )
-from db import (
-    get_connection,
-    insert_row,
-)
+from core.integrations.google_calendar import GOOGLE_SCOPES, pull_google_events
+from core.integrations.google_tokens import get_google_tokens, store_google_tokens
+from db import get_connection
 
 router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)
 
 APP_URL = CONFIG_APP_URL or os.getenv("APP_URL", "http://localhost:3000")
 GOOGLE_REDIRECT_URI = f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
-GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
-
 _OAUTH_STATE_TTL = 600
+_OAUTH_IN_SCHEMA = GOOGLE_CALENDAR_OAUTH_ENABLED
 
 
 def _require_google_oauth() -> None:
@@ -94,9 +89,8 @@ def _verify_oauth_state(state: str) -> str:
     return uid
 
 
-@router.get("/api/calendar/google/auth")
+@router.get("/api/calendar/google/auth", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_auth(request: Request, token: str = ""):
-    """Redirect the user to Google's OAuth 2.0 consent screen."""
     _require_google_oauth()
 
     import jwt as pyjwt
@@ -137,9 +131,8 @@ async def google_auth(request: Request, token: str = ""):
     return RedirectResponse(auth_url)
 
 
-@router.get("/api/calendar/google/callback")
+@router.get("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_callback(code: str, state: str, request: Request):
-    """Handle Google's OAuth callback, store tokens, and sync events."""
     _require_google_oauth()
 
     try:
@@ -165,44 +158,36 @@ async def google_callback(code: str, state: str, request: Request):
     )
     flow.fetch_token(code=code)
     creds = flow.credentials
-    tokens = {
+    store_google_tokens(uid, {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
         "token_uri": creds.token_uri,
         "client_id": creds.client_id,
         "client_secret": creds.client_secret,
         "scopes": list(creds.scopes or GOOGLE_SCOPES),
-    }
-    store_google_tokens(uid, tokens)
-    _sync_google_events(uid, creds)
+    })
+    pull_google_events(uid)
 
     frontend = os.getenv("FRONTEND_URL", APP_URL).rstrip("/")
     return RedirectResponse(f"{frontend}/home?calendar_connected=1")
 
 
-@router.post("/api/calendar/google/sync")
+@router.post("/api/calendar/google/sync", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_sync(user: dict = Depends(get_current_user)):
-    """Re-fetch events from Google Calendar and upsert into the DB."""
     _require_google_oauth()
-
     uid = user["user_id"]
-    tokens = get_google_tokens(uid)
-    if not tokens:
+    if not get_google_tokens(uid):
         raise HTTPException(status_code=400, detail="Google Calendar not connected.")
-
     try:
-        from google.oauth2.credentials import Credentials
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Google auth library not available.")
-
-    creds = Credentials(**tokens)
-    count = _sync_google_events(uid, creds)
+        count = pull_google_events(uid)
+    except Exception as exc:
+        logger.error("Google Calendar sync failed for user %s: %s", uid, exc)
+        raise HTTPException(status_code=500, detail=f"Google Calendar sync failed: {exc}")
     return {"synced": count, "message": f"Synced {count} event{'s' if count != 1 else ''} from Google Calendar."}
 
 
-@router.delete("/api/calendar/google/disconnect")
+@router.delete("/api/calendar/google/disconnect", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_disconnect(user: dict = Depends(get_current_user)):
-    """Remove stored Google tokens for this user."""
     _require_google_oauth()
     uid = user["user_id"]
     with get_connection() as conn:
@@ -213,7 +198,7 @@ async def google_disconnect(user: dict = Depends(get_current_user)):
 
 @router.get("/api/calendar/google/status")
 async def google_status(user: dict = Depends(get_current_user)):
-    """Check if Google Calendar OAuth is active for this user."""
+    """Always available so the settings UI can show ICS-only vs OAuth state."""
     uid = user["user_id"]
     tokens = get_google_tokens(uid)
     conn = get_connection()
@@ -228,92 +213,5 @@ async def google_status(user: dict = Depends(get_current_user)):
         "connected": oauth_on and has_tokens,
         "sync_paused": not oauth_on and has_tokens,
         "synced_count": imported_count,
+        "bidirectional": oauth_on,
     }
-
-
-def _sync_google_events(uid: str, creds) -> int:
-    """Fetch upcoming events from Google Calendar and upsert into the DB."""
-    try:
-        from googleapiclient.discovery import build
-        import google.auth.transport.requests
-
-        if hasattr(creds, "expired") and creds.expired and creds.refresh_token:
-            creds.refresh(google.auth.transport.requests.Request())
-            tokens = {
-                "token": creds.token,
-                "refresh_token": creds.refresh_token,
-                "token_uri": creds.token_uri,
-                "client_id": creds.client_id,
-                "client_secret": creds.client_secret,
-                "scopes": list(creds.scopes or GOOGLE_SCOPES),
-            }
-            store_google_tokens(uid, tokens)
-
-        service = build("calendar", "v3", credentials=creds)
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        result = service.events().list(
-            calendarId="primary",
-            timeMin=now_iso,
-            maxResults=250,
-            singleEvents=True,
-            orderBy="startTime",
-        ).execute()
-
-        items = result.get("items", [])
-        conn = get_connection()
-        existing_ids = {
-            row[0]
-            for row in conn.execute(
-                "SELECT external_uid FROM events WHERE user_id=? AND external_uid IS NOT NULL", (uid,)
-            ).fetchall()
-        }
-
-        count = 0
-        for item in items:
-            ext_id = item.get("id", "")
-            if ext_id in existing_ids:
-                continue
-
-            start = item.get("start", {})
-            dtstart = start.get("dateTime", start.get("date", ""))
-            if not dtstart:
-                continue
-
-            if "T" in dtstart:
-                try:
-                    dt = datetime.fromisoformat(dtstart.replace("Z", "+00:00"))
-                    dtstart = dt.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    pass
-
-            title = item.get("summary", "Untitled event")[:200]
-            description = item.get("description", "")[:500]
-            location = item.get("location", "")
-            if location:
-                description = (f"{description}\n📍 {location}" if description else f"📍 {location}")
-
-            insert_row("events", {
-                "id": str(uuid.uuid4()),
-                "user_id": uid,
-                "title": title,
-                "description": description,
-                "event_date": dtstart[:16],
-                "event_type": "event",
-                "amount": 0,
-                "is_recurring": 0,
-                "recurrence": "",
-                "is_synced_to_google": 1,
-                "reminder_minutes": 30,
-                "reminder_sent": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "external_uid": ext_id,
-            })
-            existing_ids.add(ext_id)
-            count += 1
-
-        logger.info("Google Calendar sync for user %s: %d new events", uid, count)
-        return count
-    except Exception as exc:
-        logger.error("Google Calendar sync failed for user %s: %s", uid, exc)
-        raise HTTPException(status_code=500, detail=f"Google Calendar sync failed: {exc}")

@@ -63,6 +63,14 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **Imports:** barrel `db` exports connection + CRUD + `init_db` only. Domain helpers: `from db.auth import ...`, `from db.chat import ...`, etc.
 - **Dialects:** SQLite (local/pytest default); Postgres when `DATABASE_URL` is set. CI runs full pytest on both (`backend` + `backend-postgres` jobs).
 
+## Integrations & extensibility (Phase 9)
+
+- **Checklist:** `docs/INTEGRATIONS.md` — config → connect → sync job → UI → tests → docs before exposing an integration.
+- **Email:** `core/email/` (`otp.py`, `digest.py`, `contact.py`, `providers.py`); `email_sender.py` is a compat shim.
+- **Google Calendar:** `core/integrations/google_calendar.py` — bidirectional when OAuth enabled; no OpenAPI for OAuth routes when flag is off.
+- **Plaid:** not live — no HTTP routes; do not document as available in README/API.
+- **Extensibility:** `docs/EXTENSIBILITY.md` — prefer handler **or** route; optional future MCP/plugin boundary.
+
 ## Tool registry
 
 - **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).

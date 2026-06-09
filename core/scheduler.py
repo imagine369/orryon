@@ -45,6 +45,11 @@ def start_scheduler() -> None:
     _scheduler.add_job(advance_bill_dates, "interval", seconds=60, id="advance_bills")
     _scheduler.add_job(run_daily_backup, "cron", hour=3, minute=0, id="daily_backup")
 
+    from config import GOOGLE_CALENDAR_OAUTH_ENABLED
+    if GOOGLE_CALENDAR_OAUTH_ENABLED:
+        from core.integrations.google_calendar import sync_all_google_calendars
+        _scheduler.add_job(sync_all_google_calendars, "interval", hours=6, id="google_calendar_sync")
+
     # Email jobs (only if SMTP is configured)
     if SMTP_ENABLED:
         _scheduler.add_job(check_reminders, "interval", seconds=60, id="check_reminders")
@@ -172,7 +177,7 @@ def check_reminders() -> None:
                 date_str = event_dt.strftime("%A, %B %-d, %Y")
                 time_str = event_dt.strftime("%-I:%M %p") if len(e["event_date"] or "") > 10 else ""
 
-                from email_sender import send_event_reminder
+                from core.email import send_event_reminder
                 sent = send_event_reminder(
                     to_email=e["email"],
                     event_title=e["title"],
@@ -241,7 +246,7 @@ def check_daily_digest() -> None:
                 update_row("users", {"last_digest_sent": today}, {"id": user["id"]})
                 continue
 
-            from email_sender import send_daily_digest
+            from core.email import send_daily_digest
             sent = send_daily_digest(
                 to_email=user["email"],
                 user_name=user["display_name"] or user["email"].split("@")[0],
@@ -301,7 +306,7 @@ def send_weekly_reports() -> None:
                 (user["id"],),
             ).fetchall()
 
-            from email_sender import send_weekly_report
+            from core.email import send_weekly_report
             sent = send_weekly_report(
                 to_email=user["email"],
                 user_name=user["display_name"] or user["email"].split("@")[0],

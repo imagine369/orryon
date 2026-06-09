@@ -66,6 +66,8 @@ def _add_calendar_event(args: dict, user_id: str) -> dict:
         "created_at": _now_iso(),
     }
     insert_row("events", row)
+    from core.integrations.google_calendar import push_event_to_google
+    push_event_to_google(user_id, row)
 
     reminder_label = _reminder_label(reminder)
     return {

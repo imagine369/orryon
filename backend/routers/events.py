@@ -47,14 +47,17 @@ async def create_event(body: EventReq, user: dict = Depends(get_current_user)):
     event_date = body.date
     if body.time:
         event_date = f"{body.date} {body.time}"
-    insert_row("events", {
+    row = {
         "id": evt_id, "user_id": uid, "title": body.title,
         "description": body.description, "event_date": event_date,
         "event_type": body.event_type, "amount": 0, "is_recurring": 0,
         "recurrence": "", "is_synced_to_google": 0,
         "reminder_minutes": body.reminder_minutes, "reminder_sent": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    insert_row("events", row)
+    from core.integrations.google_calendar import push_event_to_google
+    push_event_to_google(uid, row)
     return {"id": evt_id}
 
 

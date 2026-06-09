@@ -16,7 +16,7 @@ maximum privacy to maximum convenience:
              Forward transaction alert emails to a dedicated address.
              Requires SMTP config. Parsed in the background.
 
-    Tier 4 — Plaid bank link (planned; gated by PLAID_LINK_ENABLED in config.py)
+    Tier 4 — Plaid bank link (not implemented; see docs/INTEGRATIONS.md)
 
 Endpoints:
     GET  /api/connections              — list connected services

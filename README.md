@@ -108,7 +108,7 @@ Orryon takes a **tiered approach to transaction import**, progressing from maxim
 | 3 | **Email forwarding** — auto-parse transaction alert emails | Requires SMTP config | Planned |
 | 4 | **Plaid bank link** — real-time account sync | Third-party connection | Planned |
 
-**CSV import** is live in the Budget tab — click "Import CSV", select a bank statement (Chase, Amex, or generic), review the preview table, select/deselect rows, and confirm. Plaid integration config keys (`PLAID_CLIENT_ID`, `PLAID_SECRET`) are already in `.env.example` — implementation is next on the roadmap. See `backend/routers/connections.py` for the full plan.
+**CSV import** is live in the Budget tab — click "Import CSV", select a bank statement (Chase, Amex, or generic), review the preview table, select/deselect rows, and confirm. Plaid is not implemented yet; see `docs/INTEGRATIONS.md` and `MIGRATION_ROADMAP.md` Phase A.1.
 
 ---
 
@@ -150,8 +150,8 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 | `APP_URL` | No | Public URL (default: `http://localhost:3000`) |
 | `FRONTEND_URL` | No | Frontend origin for CORS (default: `http://localhost:3000`) |
 | `DB_PATH` | No | SQLite file path (default: `finance.db`) |
-| `PLAID_CLIENT_ID` | No | Plaid API credentials for bank sync (upcoming) |
-| `PLAID_SECRET` | No | Plaid API secret |
+| `PLAID_CLIENT_ID` | No | Reserved for future Plaid integration (not active) |
+| `PLAID_SECRET` | No | Reserved for future Plaid integration (not active) |
 | `STRIPE_SECRET_KEY` | No | Stripe API key for billing |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
 | `SENTRY_DSN` | No | Backend error tracking (Railway) |
@@ -253,11 +253,12 @@ orryon/
 │   ├── system_prompt.py        #   System prompt construction
 │   ├── scheduler.py            #   APScheduler background jobs
 │   ├── csv_importer.py         #   Bank CSV parsing (Chase, Amex, generic)
-│   └── google_calendar.py      #   Google Calendar sync (scaffold)
+│   ├── integrations/           #   Google Calendar sync (OAuth)
+│   └── email/                  #   OTP, digests, contact, providers
 │
 ├── db/                         # Database package (SQLite / Postgres)
 ├── config.py                   # Environment variable loading
-├── email_sender.py             # SMTP email sending
+├── email_sender.py             # Re-exports core.email (compat)
 │
 ├── ARCHITECTURE.md             # Detailed architecture documentation
 ├── MIGRATION_ROADMAP.md        # Future migration plans
