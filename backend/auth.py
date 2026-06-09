@@ -196,45 +196,23 @@ async def get_current_user(
 # logs, proxies, or browser history. Instead we mint a 30-second, single-use
 # ticket tied to the user, validate it once on upgrade, and discard.
 #
-# In-memory store is fine for a single-process deployment. For multi-worker
-# Railway setups we'd move this to Redis, but the ticket lifetime is short
-# enough that a single dyno handles all websocket traffic today.
-
-import threading
-import time
+# Stored in Redis when REDIS_URL is set (multi-worker safe); in-memory fallback
+# for single-process local dev. See core/cache.py store_ws_ticket_async.
 
 _WS_TICKET_TTL_SECONDS = 30
 
-# ticket_id -> (user_id, email, expires_at_epoch)
-_ws_tickets: dict[str, tuple[str, str, float]] = {}
-_ws_tickets_lock = threading.Lock()
 
-
-def _ws_gc_locked() -> None:
-    now = time.time()
-    expired = [t for t, (_, _, exp) in _ws_tickets.items() if exp < now]
-    for t in expired:
-        _ws_tickets.pop(t, None)
-
-
-def create_ws_ticket(user_id: str, email: str) -> str:
+async def create_ws_ticket(user_id: str, email: str) -> str:
     """Issue a one-time ticket valid for 30 seconds."""
+    from backend.cache import store_ws_ticket_async
+
     ticket = secrets.token_urlsafe(32)
-    expires = time.time() + _WS_TICKET_TTL_SECONDS
-    with _ws_tickets_lock:
-        _ws_gc_locked()
-        _ws_tickets[ticket] = (user_id, email, expires)
+    await store_ws_ticket_async(ticket, user_id, email, _WS_TICKET_TTL_SECONDS)
     return ticket
 
 
-def consume_ws_ticket(ticket: str) -> Optional[dict[str, str]]:
+async def consume_ws_ticket(ticket: str) -> Optional[dict[str, str]]:
     """Atomically pop a ticket and return its user payload, or None if invalid/expired."""
-    with _ws_tickets_lock:
-        _ws_gc_locked()
-        entry = _ws_tickets.pop(ticket, None)
-    if entry is None:
-        return None
-    user_id, email, expires = entry
-    if expires < time.time():
-        return None
-    return {"user_id": user_id, "email": email}
+    from backend.cache import consume_ws_ticket_async
+
+    return await consume_ws_ticket_async(ticket)

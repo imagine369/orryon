@@ -67,9 +67,10 @@ async def test_sse_payloads_validate_against_contract():
         assert not errors, f"{payload.get('type')}: {errors}"
 
 
-def test_ws_payloads_validate_against_contract():
+@pytest.mark.asyncio
+async def test_ws_payloads_validate_against_contract():
     user = get_or_create_user_by_email("pytest-contract-ws@orryon.app")
-    ticket = create_ws_ticket(user["id"], user["email"])
+    ticket = await create_ws_ticket(user["id"], user["email"])
 
     async def fake_stream(*_args, **_kwargs):
         async for ev in _mock_stream():

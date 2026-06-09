@@ -157,3 +157,60 @@ def _consume_nonce_mem(nonce: str, ttl_seconds: int) -> bool:
         return False
     _mem_nonces[nonce] = now + ttl_seconds
     return True
+
+
+# ── WebSocket auth tickets ────────────────────────────────────────────────────
+# Single-use, short-lived tickets for /ws/chat (see backend/auth.py). Redis when
+# available so mint/consume works across workers; in-memory fallback for dev.
+
+_mem_ws_tickets: dict[str, tuple[float, dict[str, str]]] = {}
+
+
+def _prune_mem_ws_tickets(now: float) -> None:
+    if len(_mem_ws_tickets) <= 4096:
+        return
+    for ticket, (expires, _) in list(_mem_ws_tickets.items()):
+        if expires < now:
+            _mem_ws_tickets.pop(ticket, None)
+
+
+async def store_ws_ticket_async(
+    ticket: str,
+    user_id: str,
+    email: str,
+    ttl_seconds: int = 30,
+) -> None:
+    """Store a one-time WebSocket auth ticket."""
+    payload = {"user_id": user_id, "email": email}
+    if _USE_REDIS and _redis:
+        await _redis.set(f"ws_ticket:{ticket}", json.dumps(payload), ex=ttl_seconds)
+        return
+    now = time.time()
+    _prune_mem_ws_tickets(now)
+    _mem_ws_tickets[ticket] = (now + ttl_seconds, payload)
+
+
+async def consume_ws_ticket_async(ticket: str) -> dict[str, str] | None:
+    """Atomically consume a ticket. Returns user payload or None if invalid/expired."""
+    if not ticket:
+        return None
+    if _USE_REDIS and _redis:
+        val = await _redis.getdel(f"ws_ticket:{ticket}")
+        if not val:
+            return None
+        data = json.loads(val)
+        if not isinstance(data, dict):
+            return None
+        user_id = data.get("user_id")
+        email = data.get("email")
+        if not user_id or not email:
+            return None
+        return {"user_id": user_id, "email": email}
+    now = time.time()
+    entry = _mem_ws_tickets.pop(ticket, None)
+    if entry is None:
+        return None
+    expires, payload = entry
+    if expires < now:
+        return None
+    return payload

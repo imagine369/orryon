@@ -211,7 +211,7 @@ async def chat_ws(ws: WebSocket):
 
     ticket_str = ws.query_params.get("ticket", "")
     if ticket_str:
-        payload = consume_ws_ticket(ticket_str)
+        payload = await consume_ws_ticket(ticket_str)
         if payload:
             uid = payload["user_id"]
 
@@ -353,7 +353,7 @@ async def chat_ws_ticket(user: dict = Depends(get_current_user)):
     to /ws/chat. The browser uses this instead of the long-lived JWT so the
     raw token never appears in the WS URL (and therefore never in logs).
     """
-    ticket = create_ws_ticket(user["user_id"], user["email"])
+    ticket = await create_ws_ticket(user["user_id"], user["email"])
     return {"ticket": ticket, "expires_in": 30}
 
 

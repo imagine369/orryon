@@ -11,7 +11,9 @@ from core.cache import (
     check_rate_limit_async,
     close_redis,
     consume_nonce_async,
+    consume_ws_ticket_async,
     init_redis,
+    store_ws_ticket_async,
 )
 
 __all__ = [
@@ -22,4 +24,6 @@ __all__ = [
     "cache_set",
     "cache_delete",
     "consume_nonce_async",
+    "store_ws_ticket_async",
+    "consume_ws_ticket_async",
 ]
