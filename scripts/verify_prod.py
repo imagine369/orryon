@@ -36,6 +36,17 @@ from config import (
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 
 
+def _collect_production_cors_origins() -> list[str]:
+    """Mirror backend/main.py production CORS origin assembly (no localhost dev ports)."""
+    origins: list[str] = []
+    for key in ("FRONTEND_URL", "APP_URL"):
+        for part in os.getenv(key, "").split(","):
+            origin = part.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+    return origins
+
+
 def _ok(msg: str) -> None:
     print(f"  ✓ {msg}")
 
@@ -51,7 +62,21 @@ def main() -> int:
     print("Orryon production verification\n")
 
     print("Environment")
-    if JWT_SECRET and len(JWT_SECRET) >= 32:
+
+    if is_prod:
+        from backend.middleware import validate_origin_config
+        from backend.signing import get_signing_mode, validate_signing_config
+
+        try:
+            validate_signing_config()
+            if len(os.getenv("JWT_SECRET", "").strip()) < 32:
+                raise RuntimeError("JWT_SECRET missing or too short (need 32+ chars)")
+            _ok("JWT_SECRET is set")
+            _ok(f"Request signing mode: {get_signing_mode()}")
+        except RuntimeError as exc:
+            _fail(str(exc))
+            errors += 1
+    elif JWT_SECRET and len(JWT_SECRET) >= 32:
         _ok("JWT_SECRET is set")
     else:
         _fail("JWT_SECRET missing or too short (need 32+ chars)")
@@ -76,11 +101,12 @@ def main() -> int:
             _fail("No email provider — OTP sign-in will fail")
             errors += 1
 
-        mode = os.getenv("REQUEST_SIGNING_MODE", "enforce").lower()
-        if mode == "enforce":
-            _ok("REQUEST_SIGNING_MODE=enforce")
-        else:
-            _fail(f"REQUEST_SIGNING_MODE should be enforce (got {mode})")
+        try:
+            origins = _collect_production_cors_origins()
+            validate_origin_config(origins)
+            _ok(f"Origin allowlist configured ({', '.join(origins)})")
+        except RuntimeError as exc:
+            _fail(str(exc))
             errors += 1
 
         if DATABASE_URL:
@@ -93,20 +119,6 @@ def main() -> int:
             _ok("REDIS_URL set")
         else:
             _fail("REDIS_URL not set — rate limits/cache may differ per worker")
-            errors += 1
-
-        frontend_url = os.getenv("FRONTEND_URL", "").strip()
-        app_url = os.getenv("APP_URL", "").strip()
-        if frontend_url or app_url:
-            _ok(
-                "FRONTEND_URL/APP_URL set "
-                f"({frontend_url or app_url})"
-            )
-        else:
-            _fail(
-                "FRONTEND_URL and APP_URL are both unset — "
-                "origin enforcement requires at least one in production"
-            )
             errors += 1
     else:
         print("  (NODE_ENV is not production — skipping strict prod-only checks)")
