@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessageSource } from "@/components/chat-input";
-import { streamChatAuto, api, PlanLimitError, type PlanLimitDetail } from "@/lib/api";
+import { api, PlanLimitError, type PlanLimitDetail } from "@/lib/api";
+import { streamChatMessage } from "@/lib/chat-transport";
 import { useDestructiveConfirm } from "@/lib/use-destructive-confirm";
 import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
@@ -62,7 +63,7 @@ export function useHomeChat({
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       try {
-        for await (const event of streamChatAuto(text, sessionId, controller.signal)) {
+        for await (const event of streamChatMessage(text, sessionId, controller.signal)) {
           if (event.type === "session") {
             setSessionId(event.session_id || "");
           } else if (event.type === "token") {

@@ -163,6 +163,19 @@ def _units_for_country(country_code: str | None) -> tuple[str, str, str, str, st
     return temp_unit, temp_display, wind_unit, wind_display, distance
 
 
+def get_user_language(user_id: str) -> str:
+    """User's preferred UI language (ISO 639-1), from account settings."""
+    try:
+        conn = get_connection()
+        row = conn.execute("SELECT language FROM users WHERE id=?", (user_id,)).fetchone()
+        conn.close()
+        if row and row["language"]:
+            return str(row["language"]).strip().lower().split("-")[0] or "en"
+    except Exception as exc:
+        logger.debug("user language lookup failed for %s: %s", user_id, exc)
+    return "en"
+
+
 def get_user_locale(user_id: str) -> UserLocale:
     currency = _user_currency(user_id)
     home = _home_address(user_id)

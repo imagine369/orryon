@@ -20,7 +20,10 @@ export {
   PlanLimitError,
   warmConnection,
   streamChat,
+  streamChatSse,
   connectChatWs,
   disconnectChatWs,
+  isChatWsConnected,
+  streamChatMessage,
   streamChatAuto,
 } from "@/lib/api-chat";

@@ -46,6 +46,8 @@ _LIVE_NEWS_QUERY_RE = re.compile(
 
 REPROMPT_SYSTEM_NOTE = build_reprompt_note()
 
+USER_FACING_CHAT_ERROR = "Something went wrong. Please try again."
+
 UNDO_TABLE_MAP = {
     "log_expense": "transactions",
     "log_bill": "subscriptions",
@@ -64,13 +66,17 @@ def needs_tool_reprompt(
     user_msg: str,
     tool_calls: list,
     assistant_text: str,
+    *,
+    language: str = "en",
 ) -> bool:
     """True iff the first pass should be retried with a corrective nudge."""
+    from core.intent_classifier import message_is_live_news_query, message_suggests_tool_action
+
     if tool_calls:
         return False
-    if not user_msg or not _ACTION_VERB_RE.search(user_msg):
+    if not user_msg or not message_suggests_tool_action(user_msg, language):
         return False
-    if _LIVE_NEWS_QUERY_RE.search(user_msg):
+    if message_is_live_news_query(user_msg, language):
         return False
     text = (assistant_text or "").strip()
     if not text:

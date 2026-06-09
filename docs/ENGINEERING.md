@@ -42,6 +42,13 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **Context cache:** `core/context_cache.py` — financial snapshot only; do not extend for chat/memory.
 - **Embeddings:** not implemented; add only if keyword + fuzzy memory proves insufficient.
 
+## Conversation & intent (Phase 5)
+
+- **Locale-aware re-prompt:** `core/intent_classifier.py` + `get_user_language()`; `needs_tool_reprompt(..., language=)` in the Responses loop.
+- **Chat transport:** WebSocket preferred (`frontend/src/lib/chat-transport.ts` → `streamChatMessage`); SSE fallback only.
+- **Event contract:** `core/chat_events.py` + `tests/fixtures/chat_event_contract.json` — SSE and WS must validate.
+- **Errors:** never expose raw exceptions to clients; use `USER_FACING_CHAT_ERROR` in `grok_agent` and chat routers.
+
 ## Tool registry
 
 - **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).

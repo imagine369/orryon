@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from backend.auth import create_token
 from backend.main import app
+from core.chat_events import validate_chat_event
 from db import get_or_create_user_by_email
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "chat_event_contract.json"
 
 _DEV_ORIGIN = "http://localhost:3000"
 
@@ -81,3 +85,15 @@ async def test_chat_sse_event_shapes():
     done = next(p for p in payloads if p["type"] == "done")
     assert done["message"] == "Hi there"
     assert "tabs" in done
+
+    for payload in payloads:
+        errors = validate_chat_event(payload)
+        assert not errors, f"{payload.get('type')}: {errors}"
+
+
+def test_fixture_contract_snapshot():
+    """Frozen reference shapes — update alongside core/chat_events.py."""
+    events = json.loads(_FIXTURE.read_text())
+    for event in events:
+        errors = validate_chat_event(event)
+        assert not errors, f"{event['type']}: {errors}"

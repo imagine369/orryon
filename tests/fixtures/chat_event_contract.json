@@ -1,0 +1,21 @@
+[
+  {"type": "session", "session_id": "sess-uuid"},
+  {"type": "token", "content": "partial "},
+  {"type": "tool", "name": "log_expense", "label": "Logging expense"},
+  {"type": "retry", "reason": "no_tool_called"},
+  {
+    "type": "confirm_required",
+    "action": "delete_expense",
+    "message": "Delete this expense?",
+    "args": {"expense_id": "tx-1"}
+  },
+  {
+    "type": "done",
+    "message": "Logged your coffee.",
+    "actions": [{"tool": "log_expense", "args": {}, "result": {}}],
+    "tabs": ["dashboard", "budget"],
+    "undo_info": null,
+    "usage": {"prompt_tokens": 10, "completion_tokens": 5}
+  },
+  {"type": "error", "message": "Orryon's AI hit a snag. Try again shortly."}
+]

@@ -48,6 +48,7 @@ from db import (
     save_chat_message,
     update_chat_session_title,
 )
+from core.agent_shared import USER_FACING_CHAT_ERROR
 from core.display_name import normalize_display_name
 
 logger = logging.getLogger(__name__)
@@ -175,9 +176,9 @@ async def chat_stream(
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "error":
                     yield f"data: {json.dumps(event)}\n\n"
-        except Exception as exc:
-            logger.error("Chat stream error: %s", exc, exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        except Exception:
+            logger.exception("Chat stream error")
+            yield f"data: {json.dumps({'type': 'error', 'message': USER_FACING_CHAT_ERROR})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
@@ -316,9 +317,9 @@ async def chat_ws(ws: WebSocket):
                             ctx["plan"] == "premium_plus" and ctx["voice_overlay"]
                         )
                     await ws.send_json(event)
-            except Exception as exc:
-                logger.error("WS chat error: %s", exc, exc_info=True)
-                await ws.send_json({"type": "error", "message": str(exc)})
+            except Exception:
+                logger.exception("WS chat error")
+                await ws.send_json({"type": "error", "message": USER_FACING_CHAT_ERROR})
 
     except WebSocketDisconnect:
         pass

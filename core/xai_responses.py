@@ -15,6 +15,7 @@ import httpx
 
 from config import GROK_MODEL
 from core.agent_shared import needs_tool_reprompt
+from core.user_locale import get_user_language
 from core.agent_tool_round import (
     AgentTurnState,
     finalize_max_rounds,
@@ -322,7 +323,10 @@ async def run_orryon_stream_agent(
 
             if not function_calls:
                 if (not reprompted_once) and needs_tool_reprompt(
-                    user_message, [], full_content,
+                    user_message,
+                    [],
+                    full_content,
+                    language=get_user_language(user_id),
                 ):
                     reprompted_once = True
                     yield {"type": "retry", "reason": "no_tool_called"}

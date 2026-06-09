@@ -14,7 +14,7 @@ import httpx
 
 from core.agent_context import compute_context_snapshot
 from core.agent_messages import build_messages, get_user_memories
-from core.agent_shared import MAX_TOOL_ROUNDS, REPROMPT_SYSTEM_NOTE
+from core.agent_shared import MAX_TOOL_ROUNDS, REPROMPT_SYSTEM_NOTE, USER_FACING_CHAT_ERROR
 from core.canonical_tools import filter_schemas_for_grok
 from core.context_cache import get_context_snapshot_text
 from core.orryon_brand import user_likely_addressing_orryon
@@ -192,5 +192,5 @@ async def run_orryon_stream(
         logger.error("Grok HTTP error %s: %s", status, exc)
         yield {"type": "error", "message": msg}
     except Exception as exc:
-        logger.error("run_orryon_stream error: %s", exc)
-        yield {"type": "error", "message": f"Something went wrong: {exc}"}
+        logger.exception("run_orryon_stream error")
+        yield {"type": "error", "message": USER_FACING_CHAT_ERROR}
