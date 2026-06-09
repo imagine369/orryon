@@ -1,7 +1,7 @@
 """Tests for fulfillment handoff place resolution."""
 from __future__ import annotations
 
-from core.integrations.fulfillment.handoff import resolve_user_place
+from core.integrations.fulfillment.handoff import create_handoffs, resolve_user_place
 from core.tools import execute_tool
 from db.auth import get_or_create_user_by_email
 from db.location import add_user_place
@@ -65,3 +65,36 @@ def test_pharmacy_handoff_uses_address_when_place_not_geocoded():
     url = result["handoffs"][0]["action_url"]
     assert "94105" in url or "Market" in url
     assert "0%2C0" not in url
+
+
+def test_delivery_cache_distinguishes_restaurant_names():
+    user = get_or_create_user_by_email("pytest-fulfillment-cache-names@orryon.app")
+    uid = user["id"]
+    shared_url = "https://www.doordash.com/"
+    batch_a = create_handoffs(
+        uid,
+        [
+            {
+                "type": "delivery",
+                "title": "Thai Basil",
+                "restaurant_name": "Thai Basil",
+                "partner_url": shared_url,
+            },
+        ],
+    )
+    batch_b = create_handoffs(
+        uid,
+        [
+            {
+                "type": "delivery",
+                "title": "Pizza Hut",
+                "restaurant_name": "Pizza Hut",
+                "partner_url": shared_url,
+            },
+        ],
+    )
+    url_a = batch_a["handoffs"][0]["action_url"]
+    url_b = batch_b["handoffs"][0]["action_url"]
+    assert url_a != url_b
+    assert "Thai" in url_a or "Basil" in url_a
+    assert "Pizza" in url_b

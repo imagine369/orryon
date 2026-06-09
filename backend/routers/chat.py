@@ -69,6 +69,19 @@ def _resolve_session(uid: str, session_id: str) -> tuple[str, bool]:
     return session["id"], True
 
 
+def _assistant_message_for_save(final_text: str, event: dict) -> dict:
+    """Build the assistant row persisted after a completed chat turn."""
+    msg = {
+        "role": "assistant",
+        "content": final_text,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    actions = event.get("actions")
+    if actions:
+        msg["tool_actions"] = actions
+    return msg
+
+
 def _get_display_name(uid: str) -> str:
     with get_connection() as conn:
         row = conn.execute("SELECT display_name FROM users WHERE id=?", (uid,)).fetchone()
@@ -168,11 +181,7 @@ async def chat_stream(
                     yield f"data: {json.dumps(event)}\n\n"
                 elif event["type"] == "done":
                     final_text = event.get("message", full_text)
-                    ai_msg = {
-                        "role": "assistant",
-                        "content": final_text,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                    }
+                    ai_msg = _assistant_message_for_save(final_text, event)
                     save_chat_message(uid, ai_msg, session_id=session_id)
                     usage = event.get("usage") or {}
                     if usage.get("prompt_tokens") or usage.get("completion_tokens"):
@@ -321,11 +330,7 @@ async def chat_ws(ws: WebSocket):
                         full_text += event["content"]
                     elif event["type"] == "done":
                         final_text = event.get("message", full_text)
-                        ai_msg = {
-                            "role": "assistant",
-                            "content": final_text,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                        }
+                        ai_msg = _assistant_message_for_save(final_text, event)
                         save_chat_message(uid, ai_msg, session_id=session_id)
                         usage = event.get("usage") or {}
                         if usage.get("prompt_tokens") or usage.get("completion_tokens"):

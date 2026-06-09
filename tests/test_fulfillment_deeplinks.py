@@ -80,6 +80,33 @@ def test_pharmacy_includes_zero_coords():
     assert "0%2C0" in url or "0,0" in url
 
 
+def test_doordash_homepage_with_restaurant_name_uses_search():
+    url = build_doordash_link(
+        partner_url="https://www.doordash.com/",
+        restaurant_name="Thai Basil",
+    )
+    assert "/search/store/" in url
+    assert "Thai" in url
+
+
+def test_opentable_homepage_with_query_uses_search():
+    url = build_opentable_link(
+        partner_url="https://www.opentable.com/",
+        query="Italian",
+        lat=37.77,
+        lng=-122.41,
+    )
+    assert "/s?" in url
+    assert "Italian" in url or "italian" in url.lower()
+
+
+def test_opentable_partner_restaurant_passthrough():
+    url = build_opentable_link(
+        partner_url="https://www.opentable.com/r/the-french-laundry-yountville",
+    )
+    assert url == "https://www.opentable.com/r/the-french-laundry-yountville"
+
+
 def test_build_action_url_delivery():
     url = build_action_url("delivery", {"restaurant_name": "Thai Basil"})
     assert "doordash.com" in url

@@ -3,6 +3,7 @@ db.chat — Chat messages and sessions.
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -12,9 +13,38 @@ from db.crud import insert_row
 
 logger = logging.getLogger(__name__)
 
+_TOOL_ACTIONS_EVIDENCE_KEY = "tool_actions"
+
+
+def encode_tool_actions(actions: list | None) -> str:
+    """Serialize tool actions into the chat_messages.evidence column."""
+    if not actions:
+        return ""
+    return json.dumps({_TOOL_ACTIONS_EVIDENCE_KEY: actions}, separators=(",", ":"))
+
+
+def decode_tool_actions(evidence: str | None) -> list:
+    """Restore tool actions persisted on an assistant message."""
+    if not evidence:
+        return []
+    try:
+        parsed = json.loads(evidence)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    actions = parsed.get(_TOOL_ACTIONS_EVIDENCE_KEY)
+    return actions if isinstance(actions, list) else []
+
 
 def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
     now = datetime.now(timezone.utc).isoformat()
+    tool_actions = msg.get("tool_actions")
+    if tool_actions is None:
+        tool_actions = msg.get("actions")
+    evidence = msg.get("evidence", "")
+    if tool_actions:
+        evidence = encode_tool_actions(tool_actions)
     row = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -25,7 +55,7 @@ def save_chat_message(user_id: str, msg: dict, session_id: str = "") -> bool:
         "status": msg.get("status", ""),
         "summary": msg.get("summary", ""),
         "confidence": msg.get("confidence", 0),
-        "evidence": msg.get("evidence", ""),
+        "evidence": evidence,
         "next_steps": msg.get("next_steps_or_question", ""),
         "created_at": now,
     }
@@ -67,6 +97,9 @@ def load_chat_history(user_id: str, limit: int = 100, session_id: str = "") -> l
         for r in rows:
             d = dict(r)
             d["next_steps_or_question"] = d.pop("next_steps", "")
+            actions = decode_tool_actions(d.get("evidence"))
+            if actions:
+                d["actions"] = actions
             msgs.append(d)
         return msgs
     except Exception as exc:

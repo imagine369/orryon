@@ -9,6 +9,7 @@ import { formatDisplayName } from "@/lib/format-display-name";
 import { useAuth } from "@/lib/auth-context";
 import {
   startTierCheckout,
+  claimNoCardTier,
   type BillingPlan,
   type TierId,
 } from "@/lib/tier-checkout";
@@ -20,8 +21,8 @@ type Tier = TierId;
 
 type Step = "breathe" | "email" | "code" | "name";
 
-// Beta flag — set NEXT_PUBLIC_NO_CARD_TRIAL=true to skip Stripe at signup
-const NO_CARD_TRIAL: boolean =
+// Build-time opt-in — must match backend NO_CARD_TRIAL=1 (verified via /api/auth/email-status).
+const NO_CARD_TRIAL_BUILD: boolean =
   (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
 
 function LoginPageInner() {
@@ -50,6 +51,9 @@ function LoginPageInner() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [noCardTrialServer, setNoCardTrialServer] = useState(false);
+  const [authConfigLoaded, setAuthConfigLoaded] = useState(false);
+  const noCardTrialActive = NO_CARD_TRIAL_BUILD && noCardTrialServer;
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -62,22 +66,33 @@ function LoginPageInner() {
 
   useEffect(() => {
     api
-      .get<{ configured: boolean }>("/api/auth/email-status")
+      .get<{ configured: boolean; no_card_trial_enabled?: boolean }>("/api/auth/email-status")
       .then((s) => {
+        setNoCardTrialServer(s.no_card_trial_enabled === true);
+        setAuthConfigLoaded(true);
         if (!s.configured) {
           setError(
             "Sign-in email is not configured on the server. Contact support@orryon.com for help signing in.",
           );
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setAuthConfigLoaded(true);
+      });
   }, []);
 
   // Signed-in user from /pricing → Stripe (skip email OTP)
   useEffect(() => {
-    if (authLoading || !authedUser || !hasTierParam || breatheFlow) return;
-    if (NO_CARD_TRIAL) {
-      window.location.assign(nextParam);
+    if (authLoading || !authedUser || !hasTierParam || breatheFlow || !authConfigLoaded) return;
+    if (noCardTrialActive) {
+      void claimNoCardTier(selectedTier)
+        .then(() => {
+          window.location.assign(nextParam);
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "Could not activate trial plan");
+          setLoading(false);
+        });
       return;
     }
     let cancelled = false;
@@ -97,7 +112,7 @@ function LoginPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authedUser, hasTierParam, selectedTier, selectedPlan, breatheFlow, nextParam]);
+  }, [authLoading, authedUser, hasTierParam, selectedTier, selectedPlan, breatheFlow, nextParam, authConfigLoaded, noCardTrialActive]);
 
   const [authUser, setAuthUser] = useState<{ id: string; email: string; display_name: string } | null>(null);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
@@ -227,7 +242,15 @@ function LoginPageInner() {
       login(payload.user);
 
       // New sign-up from /pricing → Stripe after OTP (unless no-card trial beta)
-      if (hasTierParam && selectedTier && !NO_CARD_TRIAL) {
+      if (hasTierParam && selectedTier && noCardTrialActive) {
+        try {
+          await claimNoCardTier(selectedTier);
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : "Could not activate trial plan");
+          setLoading(false);
+          return;
+        }
+      } else if (hasTierParam && selectedTier && !noCardTrialActive) {
         try {
           await startTierCheckout(selectedTier, selectedPlan, {
             successUrl: `${window.location.origin}/login?step=name`,

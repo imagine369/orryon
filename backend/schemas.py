@@ -31,6 +31,9 @@ class SignupCheckoutReq(BaseModel):
     success_url: str
     cancel_url: str
 
+class NoCardTierReq(BaseModel):
+    tier: str
+
 class AuthRes(BaseModel):
     token: str
     user: dict

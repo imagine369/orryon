@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.auth import _parse_device_name, create_token, get_current_user
 from backend.cache import cache_set
 from backend.deps import ENABLE_DEMO, IS_LOCAL_DEV, IS_PRODUCTION, check_otp_rate_limit
-from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
+from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq, NoCardTierReq
 from config import CONTACT_EMAIL, SMTP_FROM, SMTP_USER
 from core.display_name import normalize_display_name
 from db import (
@@ -132,7 +132,7 @@ def _safe_user(user: dict) -> dict:
 @router.get("/api/auth/email-status")
 async def auth_email_status():
     """Public check: is outbound email configured? (no send, no secrets.)"""
-    from config import RESEND_ENABLED, SMTP_ENABLED
+    from config import RESEND_ENABLED, SMTP_ENABLED, no_card_trial_enabled
 
     if RESEND_ENABLED:
         provider = "resend"
@@ -140,7 +140,11 @@ async def auth_email_status():
         provider = "smtp"
     else:
         provider = "none"
-    return {"configured": provider != "none", "provider": provider}
+    return {
+        "configured": provider != "none",
+        "provider": provider,
+        "no_card_trial_enabled": no_card_trial_enabled(is_production=IS_PRODUCTION),
+    }
 
 
 @router.post("/api/auth/send-code")
@@ -229,6 +233,38 @@ async def auth_verify(body: VerifyReq, request: Request):
     return {"token": token, "user": _safe_user(user)}
 
 
+@router.post("/api/auth/no-card-tier")
+async def claim_no_card_tier(body: NoCardTierReq, user: dict = Depends(get_current_user)):
+    """Grant a paid tier without Stripe when NO_CARD_TRIAL beta is enabled."""
+    from config import TRIAL_DAYS, no_card_trial_enabled
+    from datetime import datetime, timedelta, timezone
+
+    if not no_card_trial_enabled(is_production=IS_PRODUCTION):
+        raise HTTPException(status_code=404, detail="No-card trial not enabled")
+
+    tier = (body.tier or "").strip().lower()
+    if tier not in ("pro", "premium", "premium_plus"):
+        raise HTTPException(status_code=400, detail="Invalid tier")
+
+    uid = user["user_id"]
+    with get_connection() as conn:
+        row = conn.execute("SELECT plan, stripe_subscription_id FROM users WHERE id=?", (uid,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    row = dict(row)
+    if row.get("stripe_subscription_id"):
+        raise HTTPException(status_code=400, detail="Already subscribed via Stripe")
+
+    trial_ends_at = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
+    update_row(
+        "users",
+        {"plan": tier, "trial_ends_at": trial_ends_at, "segment": ""},
+        {"id": uid},
+    )
+    logger.info("No-card tier granted: user=%s tier=%s until %s", uid, tier, trial_ends_at)
+    return {"status": "ok", "plan": tier, "trial_ends_at": trial_ends_at}
+
+
 @router.post("/api/auth/signup-checkout")
 async def signup_checkout(body: SignupCheckoutReq, user: dict = Depends(get_current_user)):
     """Create a Stripe Checkout session with a trial as part of signup flow."""
@@ -311,6 +347,7 @@ async def auth_demo(request: Request):
     if not existing_txns:
         from core.tools import seed_sample_data
         seed_sample_data(user["id"])
+    from config import FULFILLMENT_ENABLED
     if FULFILLMENT_ENABLED:
         from core.integrations.fulfillment.demo_seed import seed_marketing_handoffs
         seed_marketing_handoffs(user["id"])

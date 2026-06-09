@@ -15,6 +15,15 @@ def test_marketing_specs_count():
     assert len(MARKETING_HANDOFF_SPECS) >= 4
 
 
+def test_clear_marketing_demo_handoffs_returns_deleted_count():
+    user = get_or_create_user_by_email("pytest-fulfillment-clear-count@orryon.app")
+    uid = user["id"]
+    seed_marketing_handoffs(uid, force=True)
+    deleted = clear_marketing_demo_handoffs(uid)
+    assert deleted == len(MARKETING_HANDOFF_SPECS)
+    assert clear_marketing_demo_handoffs(uid) == 0
+
+
 def test_seed_marketing_handoffs_idempotent():
     user = get_or_create_user_by_email("pytest-fulfillment-demo@orryon.app")
     uid = user["id"]

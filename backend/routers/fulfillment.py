@@ -5,6 +5,8 @@ Privacy: returns user-owned handoff rows only. External checkout happens in part
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.deps import ENABLE_DEMO, IS_PRODUCTION, require_active_plan
@@ -14,6 +16,7 @@ from core.integrations.fulfillment.demo_seed import seed_marketing_handoffs
 from core.integrations.fulfillment.handoff import dismiss_handoff, get_pending_handoffs
 
 router = APIRouter(tags=["fulfillment"], dependencies=[Depends(require_active_plan)])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/fulfillment/handoffs")
@@ -21,7 +24,12 @@ async def list_handoffs(user: dict = Depends(get_current_user)):
     if not FULFILLMENT_ENABLED:
         return {"enabled": False, "handoffs": []}
     uid = user["user_id"]
-    return {"enabled": True, "handoffs": get_pending_handoffs(uid)}
+    try:
+        handoffs = get_pending_handoffs(uid)
+    except Exception:
+        logger.exception("list_handoffs failed for user %s", uid)
+        raise HTTPException(status_code=500, detail="Could not load handoffs")
+    return {"enabled": True, "handoffs": handoffs}
 
 
 @router.post("/api/fulfillment/demo/seed")

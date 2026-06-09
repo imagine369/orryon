@@ -254,16 +254,21 @@ export function useChatSessions(
   const loadSessionMessages = useCallback(
     (sid: string, setMessages: (msgs: ChatMessage[]) => void) => {
       api
-        .get<{ role: string; content: string }[]>(chatHistoryPath(sid))
+        .get<{ role: string; content: string; actions?: unknown[] }[]>(chatHistoryPath(sid))
         .then((history) => {
           if (history?.length) {
             setMessages(
               history
                 .filter((m) => m.role === "user" || m.role === "assistant")
-                .map((m) => ({
-                  role: m.role as "user" | "assistant",
-                  content: m.content || "",
-                })),
+                .map((m) => {
+                  const handoffs =
+                    m.role === "assistant" ? extractFulfillmentHandoffs(m.actions) : [];
+                  return {
+                    role: m.role as "user" | "assistant",
+                    content: m.content || "",
+                    ...(handoffs.length > 0 ? { fulfillmentHandoffs: handoffs } : {}),
+                  };
+                }),
             );
           } else {
             setMessages([]);

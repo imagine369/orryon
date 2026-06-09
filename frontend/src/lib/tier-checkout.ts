@@ -118,3 +118,8 @@ export async function startTierCheckout(
   storeCheckoutIntent(tier);
   window.location.href = res.checkout_url;
 }
+
+/** Grant selected tier without Stripe when NO_CARD_TRIAL beta is on (backend must match). */
+export async function claimNoCardTier(tier: TierId): Promise<void> {
+  await api.post<{ status: string; plan: string }>("/api/auth/no-card-tier", { tier });
+}

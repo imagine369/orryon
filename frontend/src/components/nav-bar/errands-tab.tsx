@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
+import { useAuth } from "@/lib/auth-context";
 import { isDemo } from "@/components/dashboard/demo-data";
 import { isLocalHostClient } from "@/lib/demo-mode";
 import { api, ApiError } from "@/lib/api";
@@ -13,6 +14,7 @@ import { FulfillmentCardList } from "@/components/fulfillment/fulfillment-card";
 import type { FulfillmentHandoff } from "@/lib/fulfillment-types";
 
 export function ErrandsTab() {
+  const { user } = useAuth();
   const [handoffs, setHandoffs] = useState<FulfillmentHandoff[]>([]);
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(true);
@@ -21,7 +23,7 @@ export function ErrandsTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
-    if (isDemo()) {
+    if (isDemo() && !user) {
       setDemoPreview(true);
       setEnabled(true);
       setUpgradeRequired(false);
@@ -58,7 +60,7 @@ export function ErrandsTab() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   useQueuedEffect(() => reload(), [reload]);
 

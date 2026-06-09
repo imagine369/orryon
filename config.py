@@ -70,6 +70,22 @@ FULFILLMENT_ENABLED: bool = os.getenv(
     "FULFILLMENT_ENABLED", "1"
 ).lower() in ("1", "true", "yes")
 
+# Beta: grant selected tier at signup without Stripe (requires matching frontend flag).
+NO_CARD_TRIAL: bool = os.getenv("NO_CARD_TRIAL", "0").lower() in ("1", "true", "yes")
+# Explicit opt-in to allow NO_CARD_TRIAL in production (default off).
+NO_CARD_TRIAL_ALLOW_PRODUCTION: bool = os.getenv(
+    "NO_CARD_TRIAL_ALLOW_PRODUCTION", "0"
+).lower() in ("1", "true", "yes")
+
+
+def no_card_trial_enabled(*, is_production: bool) -> bool:
+    """True when no-card trial is configured and allowed for the current environment."""
+    if not NO_CARD_TRIAL:
+        return False
+    if is_production and not NO_CARD_TRIAL_ALLOW_PRODUCTION:
+        return False
+    return True
+
 # Human-in-the-loop approve/reject queue (agent audit history stays on).
 APPROVALS_HITL_ENABLED: bool = os.getenv(
     "APPROVALS_HITL_ENABLED", ""

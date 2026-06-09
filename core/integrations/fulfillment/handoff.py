@@ -17,7 +17,7 @@ from core.grocery_list import get_unchecked_grocery_item_names
 from core.integrations.fulfillment.cache import get_cached_url, set_cached_url
 from core.integrations.fulfillment.deeplinks import action_label_for_type, build_action_url
 from db.connection import get_connection
-from db.crud import fetch_rows, insert_row, update_row
+from db.crud import insert_row
 from db.location import get_user_places
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,23 @@ def _grocery_items_for_user(user_id: str, explicit: list[str] | None) -> list[st
         return []
 
 
+def _fulfillment_url_cache_key(
+    handoff_type: str,
+    partner_url: str,
+    *,
+    restaurant_name: str,
+    near_address: str,
+    lat: float | None,
+    lng: float | None,
+) -> str:
+    """Stable cache key — includes deeplink context, not partner_url alone."""
+    normalized_url = partner_url.rstrip("/")[:120]
+    name = restaurant_name.strip().lower()[:80]
+    addr = near_address.strip().lower()[:80]
+    coords = f"{lat},{lng}" if lat is not None and lng is not None else ""
+    return f"{handoff_type}:{normalized_url}|{name}|{addr}|{coords}"[:200]
+
+
 def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
     handoff_type = str(spec.get("type") or "").strip().lower()
     if handoff_type not in VALID_TYPES:
@@ -103,13 +120,24 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
 
     near_address = destination.get("address") or pickup.get("address") or ""
     partner_url = str(spec.get("partner_url") or "").strip()
+    restaurant_name = str(spec.get("restaurant_name") or title)
+    lat = _first_present_coord(destination.get("lat"), pickup.get("lat"))
+    lng = _first_present_coord(destination.get("lng"), pickup.get("lng"))
 
     cache_key = ""
+    action_url = ""
     if partner_url and handoff_type in ("delivery", "reservation"):
-        cache_key = f"{handoff_type}:{partner_url[:180]}"
+        cache_key = _fulfillment_url_cache_key(
+            handoff_type,
+            partner_url,
+            restaurant_name=restaurant_name,
+            near_address=near_address,
+            lat=lat,
+            lng=lng,
+        )
         cached = get_cached_url(user_id, cache_key)
         if cached:
-            partner_url = cached
+            action_url = cached
 
     grocery_items = _grocery_items_for_user(
         user_id,
@@ -120,20 +148,21 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         "pickup": pickup,
         "dropoff": destination,
         "partner_url": partner_url,
-        "restaurant_name": str(spec.get("restaurant_name") or title),
+        "restaurant_name": restaurant_name,
         "grocery_items": grocery_items,
         "items": grocery_items,
         "near_address": near_address,
         "pharmacy_brand": str(spec.get("pharmacy_brand") or "cvs").lower(),
         "medication_name": str(spec.get("medication_name") or ""),
-        "lat": _first_present_coord(destination.get("lat"), pickup.get("lat")),
-        "lng": _first_present_coord(destination.get("lng"), pickup.get("lng")),
+        "lat": lat,
+        "lng": lng,
         "title": title,
     }
 
-    action_url = build_action_url(handoff_type, payload, uber_client_id=UBER_CLIENT_ID)
-    if cache_key and partner_url:
-        set_cached_url(user_id, cache_key, action_url)
+    if not action_url:
+        action_url = build_action_url(handoff_type, payload, uber_client_id=UBER_CLIENT_ID)
+        if cache_key:
+            set_cached_url(user_id, cache_key, action_url)
 
     subtitle = str(spec.get("subtitle") or "").strip()
     if not subtitle:
@@ -217,30 +246,27 @@ def create_handoffs(user_id: str, specs: list[dict[str, Any]]) -> dict[str, Any]
 
 
 def get_pending_handoffs(user_id: str, limit: int = 20) -> list[dict]:
-    try:
-        with get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM fulfillment_handoffs WHERE user_id=? AND status='pending' "
-                "ORDER BY created_at DESC LIMIT ?",
-                (user_id, limit),
-            ).fetchall()
-        return [_public_handoff(dict(r)) for r in rows]
-    except Exception as exc:
-        logger.error("get_pending_handoffs error: %s", exc)
-        return []
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM fulfillment_handoffs WHERE user_id=? AND status='pending' "
+            "ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+    return [_public_handoff(dict(r)) for r in rows]
 
 
 def dismiss_handoff(user_id: str, handoff_id: str) -> bool:
     """Mark a pending handoff dismissed. Returns False if not found or not pending."""
-    pending = fetch_rows(
-        "fulfillment_handoffs",
-        {"id": handoff_id, "user_id": user_id, "status": "pending"},
-        limit=1,
-    )
-    if not pending:
+    try:
+        with get_connection() as conn:
+            cur = conn.execute(
+                "UPDATE fulfillment_handoffs SET status=? "
+                "WHERE id=? AND user_id=? AND status='pending'",
+                ("dismissed", handoff_id, user_id),
+            )
+            conn.commit()
+            rc = getattr(cur, "rowcount", None)
+            return (rc or 0) > 0
+    except Exception as exc:
+        logger.error("dismiss_handoff error: %s", exc)
         return False
-    return update_row(
-        "fulfillment_handoffs",
-        {"status": "dismissed"},
-        {"id": handoff_id, "user_id": user_id, "status": "pending"},
-    )

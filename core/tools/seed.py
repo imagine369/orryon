@@ -20,6 +20,7 @@ from db import (
     insert_row,
     update_row,
 )
+from core.tools.shared import _now_iso, _uid
 from db.finance import (
     adjust_balance,
     get_balance,

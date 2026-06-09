@@ -42,13 +42,25 @@ def build_uber_ride_link(
     return "https://m.uber.com/ul/?" + urllib.parse.urlencode(params)
 
 
+def _doordash_store_url(partner_url: str) -> bool:
+    """True when partner_url is a store-specific DoorDash link, not the site homepage."""
+    if not partner_url.startswith("http"):
+        return False
+    normalized = partner_url.rstrip("/").lower()
+    if normalized in ("https://www.doordash.com", "http://www.doordash.com"):
+        return False
+    return "/store/" in normalized or "/merchant/" in normalized
+
+
 def build_doordash_link(*, partner_url: str = "", restaurant_name: str = "") -> str:
     """DoorDash store URL or search fallback."""
-    if partner_url and partner_url.startswith("http"):
+    if partner_url and _doordash_store_url(partner_url):
         return partner_url
     if restaurant_name:
         q = urllib.parse.quote_plus(restaurant_name.strip())
         return f"https://www.doordash.com/search/store/{q}"
+    if partner_url and partner_url.startswith("http"):
+        return partner_url
     return "https://www.doordash.com/"
 
 
@@ -67,6 +79,21 @@ def build_instacart_grocery_link(
     return "https://www.instacart.com/store/"
 
 
+def _opentable_restaurant_url(partner_url: str) -> bool:
+    """True when partner_url is a restaurant page, not the OpenTable homepage."""
+    if not partner_url.startswith("http"):
+        return False
+    normalized = partner_url.rstrip("/").lower()
+    if normalized in (
+        "https://www.opentable.com",
+        "http://www.opentable.com",
+        "https://opentable.com",
+        "http://opentable.com",
+    ):
+        return False
+    return "/r/" in normalized or "/restaurant/" in normalized
+
+
 def build_opentable_link(
     *,
     partner_url: str = "",
@@ -75,7 +102,7 @@ def build_opentable_link(
     lng: float | None = None,
 ) -> str:
     """OpenTable restaurant page or nearby search."""
-    if partner_url and partner_url.startswith("http"):
+    if partner_url and _opentable_restaurant_url(partner_url):
         return partner_url
     params: dict[str, str] = {}
     if query:
@@ -85,6 +112,8 @@ def build_opentable_link(
         params["longitude"] = str(lng)
     if params:
         return "https://www.opentable.com/s?" + urllib.parse.urlencode(params)
+    if partner_url and partner_url.startswith("http"):
+        return partner_url
     return "https://www.opentable.com/"
 
 

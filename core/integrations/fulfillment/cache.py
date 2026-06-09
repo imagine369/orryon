@@ -5,7 +5,8 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from db.connection import _USE_PG, get_connection
+import db.connection as db_connection
+from db.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def set_cached_url(user_id: str, cache_key: str, url: str) -> None:
     row_id = str(uuid.uuid4())
     try:
         with get_connection() as conn:
-            if _USE_PG:
+            if db_connection._USE_PG:
                 conn.execute(
                     "INSERT INTO fulfillment_url_cache (id, user_id, cache_key, url, created_at) "
                     "VALUES (%s, %s, %s, %s, %s) ON CONFLICT(user_id, cache_key) DO UPDATE SET "
