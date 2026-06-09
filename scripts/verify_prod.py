@@ -94,6 +94,20 @@ def main() -> int:
         else:
             _fail("REDIS_URL not set — rate limits/cache may differ per worker")
             errors += 1
+
+        frontend_url = os.getenv("FRONTEND_URL", "").strip()
+        app_url = os.getenv("APP_URL", "").strip()
+        if frontend_url or app_url:
+            _ok(
+                "FRONTEND_URL/APP_URL set "
+                f"({frontend_url or app_url})"
+            )
+        else:
+            _fail(
+                "FRONTEND_URL and APP_URL are both unset — "
+                "origin enforcement requires at least one in production"
+            )
+            errors += 1
     else:
         print("  (NODE_ENV is not production — skipping strict prod-only checks)")
 
