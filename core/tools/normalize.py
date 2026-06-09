@@ -1,4 +1,8 @@
-"""Argument normalisation before dispatch."""
+"""Argument normalisation before dispatch.
+
+All tool argument coercion (dates, amounts, categories, moods, frequencies) belongs
+here — not in individual handlers. See docs/ADDING_A_TOOL.md step 8.
+"""
 from __future__ import annotations
 
 import json

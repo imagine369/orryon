@@ -113,6 +113,6 @@ Subscription tier affects **usage limits** (messages, voice, etc.), not whether 
 Update **all** of:
 
 1. This file  
-2. `core/canonical_tools.py` + `core/tools/schemas.py` + handler + registry  
+2. Follow `docs/ADDING_A_TOOL.md` (schema → handler → `TOOL_SPECS` → canonical → reprompt)  
 3. `core/system_prompt.py` tool list / CAPABILITIES TODAY section  
 4. Help FAQ if user-facing  

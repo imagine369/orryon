@@ -6,7 +6,7 @@
  *
  * When Orryon finishes a tool call, the home page dispatches a
  * `orryon:data-changed` CustomEvent carrying the list of affected tab keys
- * (from the backend's _TAB_REFRESH_MAP). Any tab that cares about one of
+ * (from the chat SSE `done` event / tool handler contract). Any tab that cares about one of
  * those keys calls `useDataRefresh([...keys], reloadFn)` and the tab will
  * re-fetch itself automatically — no manual refresh, no close-and-reopen.
  *

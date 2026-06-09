@@ -36,4 +36,7 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 
 ## Tool registry
 
-Single source: `core/tools/registry.py` → `TOOLS` dict. Legacy tool names resolve via `core/canonical_tools.resolve_tool_name()`.
+- **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).
+- **Dispatch:** `core/tools/registry.py` — `TOOL_SPECS` holds `impl` + `tabs`; `bind_handler` returns `{result, tabs}`.
+- **Legacy aliases:** `core/canonical_tools.resolve_tool_name()` at dispatch only.
+- **Args:** normalize in `core/tools/normalize.py` only — not in handlers.

@@ -1,7 +1,7 @@
 """
 core/system_prompt.py — Master system prompt for Orryon AI (v10, Life OS).
 
-Every tool name in this prompt MUST exist in core.tools.registry._TOOL_MAP.
+Every tool name in this prompt MUST exist in core.tools.registry.TOOL_SPECS / CANONICAL_TOOL_NAMES.
 Memory is injected automatically (see grok_agent) — there are no save_memory tools.
 Capability policy: docs/CAPABILITIES.md
 """

@@ -89,9 +89,13 @@ _REPROMPT_SECTIONS = (
     "add_grocery_items, check_grocery_item, get_grocery_list",
     "ANALYSIS: generate_insights, generate_forecast, generate_yearly_summary",
     "BALANCE/BUDGET: set_balance, add_money, get_balance, set_budget, get_budget_status, "
-    "get_spending_summary, get_spending_recap, get_spending_patterns",
+    "get_spending_summary, get_spending_recap, get_spending_patterns, "
+    "get_money_left_after_goals, add_custom_category, set_notification_preferences, "
+    "add_recurring_income, get_net_worth, get_subscription_health, get_mood_spending_report",
+    "SEARCH/INSIGHTS: get_wellness_history, compare_periods, cross_feature_search, "
+    "search_transactions",
     "HEALTH: log_health_vital, get_health_vitals, log_medication, get_medications, "
-    "add_health_appointment, get_health_appointments; "
+    "add_health_appointment, get_health_appointments",
     "WORLD: get_weather, search_web",
 )
 

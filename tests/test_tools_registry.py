@@ -1,11 +1,19 @@
 """Tool registry — destructive confirmation and health handlers."""
 from __future__ import annotations
 
+import re
+
 import pytest
 
-from core.canonical_tools import LEGACY_TOOL_ALIASES, resolve_tool_name
-from core.tools import CANONICAL_TOOL_NAMES, GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
-from core.tools.registry import TOOLS, _TOOL_MAP
+from core.canonical_tools import (
+    CANONICAL_TOOL_NAMES,
+    LEGACY_TOOL_ALIASES,
+    _REPROMPT_SECTIONS,
+    resolve_tool_name,
+)
+from core.tools import GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
+from core.tools.handler_contract import parse_handler_outcome
+from core.tools.registry import TOOL_SPECS, TOOLS, _TOOL_MAP, validate_tool_registry
 from db import get_health_vitals, get_medications, get_or_create_user_by_email
 
 
@@ -15,9 +23,33 @@ def user_id():
     return user["id"]
 
 
+def test_validate_tool_registry_passes():
+    validate_tool_registry()
+
+
 def test_tools_registry_covers_canonical_names():
-    missing = [n for n in CANONICAL_TOOL_NAMES if n not in TOOLS]
-    assert not missing, f"missing from TOOLS: {missing}"
+    missing = [n for n in CANONICAL_TOOL_NAMES if n not in TOOL_SPECS]
+    assert not missing, f"missing from TOOL_SPECS: {missing}"
+    assert set(TOOLS) == set(TOOL_SPECS)
+
+
+def test_every_canonical_tool_has_handler_and_tab_metadata():
+    for name in CANONICAL_TOOL_NAMES:
+        spec = TOOL_SPECS[name]
+        assert callable(spec["impl"]), f"{name} missing impl"
+        assert isinstance(spec["tabs"], list), f"{name} tabs must be a list"
+
+
+def test_parse_handler_outcome_contract():
+    result, tabs = parse_handler_outcome({"result": {"status": "ok"}, "tabs": ["budget"]})
+    assert result == {"status": "ok"}
+    assert tabs == ["budget"]
+
+
+def test_bound_handler_returns_contract_via_execute(user_id):
+    result, tabs = execute_tool("get_balance", {}, user_id)
+    assert isinstance(result, dict)
+    assert isinstance(tabs, list)
 
 
 def test_legacy_aliases_not_in_tools_map():
@@ -46,6 +78,16 @@ def test_legacy_alias_dispatches_like_canonical(user_id):
     result, tabs = execute_tool("add_expense", {"amount": 3.5, "merchant": "alias"}, user_id)
     assert "error" not in result or not result["error"]
     assert "dashboard" in tabs or "budget" in tabs
+
+
+def test_reprompt_sections_list_every_canonical_tool():
+    listed = set()
+    for section in _REPROMPT_SECTIONS:
+        for name in re.findall(r"[a-z][a-z0-9_]*", section):
+            if name in CANONICAL_TOOL_NAMES:
+                listed.add(name)
+    missing = sorted(set(CANONICAL_TOOL_NAMES) - listed)
+    assert not missing, f"missing from _REPROMPT_SECTIONS: {missing}"
 
 
 def test_canonical_tools_have_schemas():
