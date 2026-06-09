@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities -- legal copy with many quoted terms */
 import { SiteNav, NavBackLink } from "@/components/site-nav";
 
 export default function PrivacyPage() {

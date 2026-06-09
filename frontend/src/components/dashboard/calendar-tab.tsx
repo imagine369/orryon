@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 interface CalEvent {
   id: string;
@@ -81,7 +82,7 @@ export function CalendarTab() {
     ]).then(([e, t]) => { setEvents(e); setTasks(t); }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useQueuedEffect(() => reload(), [reload]);
   useDataRefresh(["calendar", "schedule", "dashboard"], reload);
 
   const handleIcsUpload = async (file: File) => {

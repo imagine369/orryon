@@ -16,7 +16,7 @@ export function AccessibilityView({ prefs, onUpdate, sub }: {
   const [focusSaved, setFocusSaved] = useState(false);
 
   useEffect(() => {
-    setFocusPicks(prefs.life_priorities);
+    queueMicrotask(() => setFocusPicks(prefs.life_priorities));
   }, [prefs.life_priorities]);
 
   async function saveFocusAreas() {

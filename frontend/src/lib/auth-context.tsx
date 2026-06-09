@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
 import { migrateHabitsToServer } from "./migrate-habits";
 import { invalidateSigningKey, prefetchSigningKey } from "./signing";
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("orryon_demo") === "true") {
       setUser(DEMO_USER);
       setLoading(false);

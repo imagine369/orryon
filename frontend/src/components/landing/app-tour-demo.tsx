@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { ArrowUp, Bell, LayoutGrid, Mic, Search, Settings } from "lucide-react";
 import {
   CHAT_ASSISTANT_BUBBLE_CLASS,
@@ -47,7 +48,7 @@ export function AppTourDemo() {
 
   const go = (next: TourPhase, delay: number) => { tmr.current = setTimeout(() => setPhase(next), delay); };
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (tmr.current) clearTimeout(tmr.current);
 
     const chat = TOUR_CHATS[chatIdx];

@@ -12,12 +12,14 @@ export function IntegrityGate({ children }: { children: React.ReactNode }) {
   const [blocked, setBlocked] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      assertTrustedHost();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "untrusted-host";
-      setBlocked(msg.replace("untrusted-host:", ""));
-    }
+    queueMicrotask(() => {
+      try {
+        assertTrustedHost();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "untrusted-host";
+        setBlocked(msg.replace("untrusted-host:", ""));
+      }
+    });
   }, []);
 
   if (blocked) {

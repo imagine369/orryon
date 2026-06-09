@@ -52,10 +52,12 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (flow === "breathe") {
-      setBreatheFlow(true);
-      setStep((s) => (s === "email" ? "breathe" : s));
-    }
+    queueMicrotask(() => {
+      if (flow === "breathe") {
+        setBreatheFlow(true);
+        setStep((s) => (s === "email" ? "breathe" : s));
+      }
+    });
   }, [flow]);
 
   useEffect(() => {
@@ -75,15 +77,18 @@ function LoginPageInner() {
   useEffect(() => {
     if (authLoading || !authedUser || !hasTierParam || breatheFlow) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
-    startTierCheckout(selectedTier, selectedPlan, {
-      successUrl: `${window.location.origin}/home?upgraded=1&plan=${encodeURIComponent(selectedTier)}`,
-      cancelUrl: `${window.location.origin}/pricing`,
-    }).catch((e: unknown) => {
+    queueMicrotask(() => {
       if (cancelled) return;
-      setError(e instanceof Error ? e.message : "Could not open checkout");
-      setLoading(false);
+      setLoading(true);
+      setError("");
+      startTierCheckout(selectedTier, selectedPlan, {
+        successUrl: `${window.location.origin}/home?upgraded=1&plan=${encodeURIComponent(selectedTier)}`,
+        cancelUrl: `${window.location.origin}/pricing`,
+      }).catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Could not open checkout");
+        setLoading(false);
+      });
     });
     return () => {
       cancelled = true;

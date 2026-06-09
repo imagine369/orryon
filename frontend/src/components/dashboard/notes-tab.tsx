@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { Plus, Search, X } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -75,7 +76,7 @@ export function NotesTab() {
     api.get<Note[]>("/api/notes").then(setNotes).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadNotes(); }, []);
+  useQueuedEffect(loadNotes, []);
   useDataRefresh(["notes", "journal"], loadNotes);
 
   const addNote = () => {

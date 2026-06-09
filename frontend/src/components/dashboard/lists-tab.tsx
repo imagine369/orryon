@@ -8,6 +8,7 @@ import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { isDemo, DEMO_LISTS, DEMO_ITEMS } from "./demo-data";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ function ListsOverview({
     api.get<UserList[]>("/api/lists").then(setLists).catch(() => {});
   };
 
-  useEffect(() => { load(); }, []);
+  useQueuedEffect(load, []);
   useDataRefresh(["lists"], load);
 
   const createList = () => {
@@ -226,7 +227,7 @@ function ListDetail({
     api.get<ListItem[]>(`/api/lists/${list.id}/items`).then(setItems).catch(() => {});
   }, [list.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useQueuedEffect(load, [load]);
   useDataRefresh(["lists"], load);
 
   useEffect(() => {

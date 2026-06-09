@@ -56,7 +56,7 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) {
-      setResults({ transactions: [], notes: [], tasks: [] });
+      queueMicrotask(() => setResults({ transactions: [], notes: [], tasks: [] }));
       return;
     }
     debounceRef.current = setTimeout(async () => {
@@ -127,7 +127,9 @@ export function SearchPanel({ onClose }: SearchPanelProps) {
           )}
 
           {!loading && hasQuery && total === 0 && (
-            <p className="text-white/30 text-sm text-center py-10">No results for "{query}"</p>
+            <p className="text-white/30 text-sm text-center py-10">
+              No results for &ldquo;{query}&rdquo;
+            </p>
           )}
 
           {/* Transactions */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
@@ -42,7 +43,7 @@ export function ResetAnchorSession({
   const [markedStreak,    setMarkedStreak]    = useState(false);
   const [container,       setContainer]       = useState<HTMLElement | null>(null);
 
-  useEffect(() => { setContainer(document.body); }, []);
+  useQueuedEffect(() => { setContainer(document.body); }, []);
 
   // Ensure any prior session ambience is stopped when the overlay closes.
   useEffect(() => () => stopBackgroundSound(), []);

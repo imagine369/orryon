@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
@@ -64,7 +65,7 @@ export function BudgetTab() {
     api.get<{ month: string; categories: BudgetCategory[] }>(`/api/budget?month=${selectedMonth}`).then(setData).catch(() => {});
   };
 
-  useEffect(() => { load(); }, [selectedMonth]);
+  useQueuedEffect(load, [selectedMonth]);
   useDataRefresh(["budget", "dashboard"], load);
 
   const addExpense = () => {

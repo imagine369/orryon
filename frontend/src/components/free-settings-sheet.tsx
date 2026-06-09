@@ -46,7 +46,7 @@ export function FreeSettingsSheet({ open, onClose, onUpgrade }: FreeSettingsShee
   }, [open]);
 
   useEffect(() => {
-    setNameInput(user?.display_name || "");
+    queueMicrotask(() => setNameInput(user?.display_name || ""));
   }, [user?.display_name]);
 
   const saveName = async () => {

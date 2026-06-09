@@ -15,7 +15,7 @@ export default function LandingPage() {
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
-    setLoggedIn(hasToken());
+    queueMicrotask(() => setLoggedIn(hasToken()));
   }, []);
 
   const navActions = loggedIn ? (

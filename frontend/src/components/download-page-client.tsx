@@ -75,10 +75,12 @@ export function DownloadPageClient() {
   const { isInstallable, install } = usePwaInstall();
 
   useEffect(() => {
-    const p = detectPlatform();
-    setDetected(p);
-    setSelected(defaultDownloadTab(p));
-    setMounted(true);
+    queueMicrotask(() => {
+      const p = detectPlatform();
+      setDetected(p);
+      setSelected(defaultDownloadTab(p));
+      setMounted(true);
+    });
   }, []);
 
   useEffect(() => {

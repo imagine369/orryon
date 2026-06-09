@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -76,7 +77,7 @@ export function DashboardPanel() {
     api.get<DashboardData>("/api/dashboard/stats").then(setData).catch(() => {});
   }, [isOpen]);
 
-  useEffect(() => { load(); }, [load]);
+  useQueuedEffect(load, [load]);
 
   return (
     <AnimatePresence>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useDataRefresh } from "@/lib/use-data-refresh";
@@ -100,9 +101,7 @@ export function BankTab() {
       .finally(() => setLoading(false));
   }, [selectedMonth, isCurrentMonth]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  useQueuedEffect(() => reload(), [reload]);
   useDataRefresh(["dashboard", "budget", "forecast"], reload);
 
   const totalDeposited = deposits.reduce((s, t) => s + Math.abs(t.amount), 0);

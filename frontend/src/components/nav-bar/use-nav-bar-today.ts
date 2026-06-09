@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import {
   PRIORITY_CONFIG,
   PRIORITY_ORDER,
@@ -70,7 +71,7 @@ export function useNavBarToday(notifOpen: boolean) {
     }).catch(() => {});
   }, [today]);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (notifOpen) loadToday();
   }, [notifOpen, loadToday]);
 

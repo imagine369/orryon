@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,7 +92,7 @@ export function GoalsTab() {
       .then(setGoals).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadGoals(); }, []);
+  useQueuedEffect(loadGoals, []);
   useDataRefresh(["goals", "dashboard"], loadGoals);
 
   const addGoal = () => {

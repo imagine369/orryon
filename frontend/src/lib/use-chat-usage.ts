@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 
 export interface ChatUsage {
@@ -30,7 +31,7 @@ export function useChatUsage() {
     } catch { /* non-fatal */ }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useQueuedEffect(() => { void load(); }, [load]);
 
   return { usage, reload: load };
 }

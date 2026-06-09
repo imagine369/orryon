@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { motion, AnimatePresence } from "framer-motion";
 import { LifePrioritiesPicker } from "@/components/life-priorities-picker";
 import type { LifePriorityId } from "@/lib/life-priorities";
@@ -16,7 +17,7 @@ export function LifeInterestsOnboarding() {
   const [selected, setSelected] = useState<LifePriorityId[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (!loading && !prefs.life_priorities_set) {
       setOpen(true);
     }

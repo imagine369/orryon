@@ -292,12 +292,14 @@ export function useVoiceRecording({
   };
 
   useEffect(() => {
-    if (externalStatus === "listening" && voiceStatus !== "listening" && !disabled) {
-      void startRecording();
-    }
-    if (externalStatus === "idle" && voiceStatus === "listening") {
-      stopRecording();
-    }
+    queueMicrotask(() => {
+      if (externalStatus === "listening" && voiceStatus !== "listening" && !disabled) {
+        void startRecording();
+      }
+      if (externalStatus === "idle" && voiceStatus === "listening") {
+        stopRecording();
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalStatus, disabled]);
 

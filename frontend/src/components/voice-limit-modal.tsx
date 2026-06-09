@@ -84,7 +84,7 @@ export function VoiceLimitModal({
               All voice minutes used
             </h2>
             <p className="text-sm text-white/45 leading-relaxed mb-6">
-              You've used all your included voice minutes this month. Orryon has
+              You&apos;ve used all your included voice minutes this month. Orryon has
               been talking with you a lot!
               {minutesUsed !== undefined && limitMinutes !== undefined && (
                 <span className="block mt-1 text-white/30 text-xs tabular-nums">

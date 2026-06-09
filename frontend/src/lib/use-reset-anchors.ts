@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api, isDemoMode } from "@/lib/api";
 import { useStreaks, calculateStreak } from "@/lib/use-streaks";
 
@@ -88,7 +89,7 @@ export function useResetAnchors() {
   const fetchedRef = useRef(false);
 
   // Hydrate: localStorage first, then API
-  useEffect(() => {
+  useQueuedEffect(() => {
     const local = loadCompletionsLocal();
     if (local.length > 0) setCompletions(local);
 

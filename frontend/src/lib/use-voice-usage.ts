@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 
 export interface VoiceUsage {
@@ -27,9 +28,7 @@ export function useVoiceUsage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useQueuedEffect(() => refresh(), [refresh]);
 
   /** True when the user has exhausted their included + topup minutes. */
   const isAtLimit =

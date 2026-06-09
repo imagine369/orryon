@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { Plus, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
@@ -62,7 +63,7 @@ export function BillsTab() {
     api.get<Bill[]>("/api/bills").then(setBills).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useQueuedEffect(load, []);
   useDataRefresh(["schedule", "forecast", "dashboard"], load);
 
   const addBill = () => {

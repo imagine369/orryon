@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, buildDemoData } from "./demo-data";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 interface CategorySpend {
   category: string;
@@ -110,7 +111,7 @@ export function InsightsTab() {
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (isDemo()) {
       setData(buildDemoData());
       setLoading(false);

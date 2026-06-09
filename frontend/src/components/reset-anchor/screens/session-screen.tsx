@@ -93,18 +93,20 @@ export function SessionScreen({
       }
     }
 
-    setStepIdx((prev) => {
-      if (prev !== idx) {
-        setFadeKey((k) => k + 1);
-        setStepStartSec(elapsed);
-      }
-      return idx;
+    queueMicrotask(() => {
+      setStepIdx((prev) => {
+        if (prev !== idx) {
+          setFadeKey((k) => k + 1);
+          setStepStartSec(elapsed);
+        }
+        return idx;
+      });
     });
   }, [elapsed, steps, durationSecs, isVariable, mounted]);
 
   useEffect(() => {
     if (!done && elapsed >= durationSecs) {
-      setDone(true);
+      queueMicrotask(() => setDone(true));
       setTimeout(() => onComplete(elapsed), 600);
     }
   }, [elapsed, done, durationSecs, onComplete]);

@@ -106,9 +106,11 @@ export function usePostCheckout(
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
-    setActivating(false);
-    setActivationPlan(planDisplayName(sub.plan));
-    setUpgradeBanner(true);
+    queueMicrotask(() => {
+      setActivating(false);
+      setActivationPlan(planDisplayName(sub.plan));
+      setUpgradeBanner(true);
+    });
     const t = setTimeout(() => setUpgradeBanner(false), 8000);
     return () => clearTimeout(t);
   }, [activating, sub]);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api, isDemoMode } from "@/lib/api";
 
 export type Streak = {
@@ -106,7 +107,7 @@ export function useStreaks() {
   const fetchedRef = useRef(false);
 
   // Hydrate: read localStorage first for instant render, then fetch from API
-  useEffect(() => {
+  useQueuedEffect(() => {
     const local = loadLocal();
     if (local.length > 0) setStreaks(local);
 

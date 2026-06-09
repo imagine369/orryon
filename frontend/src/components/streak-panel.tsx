@@ -129,10 +129,12 @@ export function StreakPanel() {
 
   // If the selected streak gets deleted externally, bounce back to the list.
   useEffect(() => {
-    if (view === "detail" && selectedId && !selected) {
-      setView("list");
-      setSelectedId(null);
-    }
+    queueMicrotask(() => {
+      if (view === "detail" && selectedId && !selected) {
+        setView("list");
+        setSelectedId(null);
+      }
+    });
   }, [view, selectedId, selected]);
 
   return (
@@ -413,10 +415,12 @@ function StreakDetailView({
 
   // Keep edit fields in sync when the viewed streak changes.
   useEffect(() => {
-    setEditName(streak.name);
-    setEditEmoji(streak.emoji ?? "");
-    setEditTarget(streak.targetDays ?? null);
-    setEditing(false);
+    queueMicrotask(() => {
+      setEditName(streak.name);
+      setEditEmoji(streak.emoji ?? "");
+      setEditTarget(streak.targetDays ?? null);
+      setEditing(false);
+    });
   }, [streak.id, streak.name, streak.emoji, streak.targetDays]);
 
   const completed = useMemo(() => new Set(streak.completions), [streak.completions]);

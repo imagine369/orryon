@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { isDemo, DEMO_FORECAST } from "./demo-data";
@@ -30,7 +31,7 @@ export function ForecastTab() {
     api.get<ForecastData>("/api/forecast").then(setData).catch(() => {});
   };
 
-  useEffect(() => { loadForecast(); }, []);
+  useQueuedEffect(loadForecast, []);
   useDataRefresh(["forecast", "schedule", "dashboard"], loadForecast);
 
   if (!data) {

@@ -41,8 +41,10 @@ export function usePwaInstall() {
   const [platform] = useState<Platform>(() => detectPlatform());
 
   useEffect(() => {
-    setIsInstalled(isStandalonePwa());
-    setDismissed(isDismissed());
+    queueMicrotask(() => {
+      setIsInstalled(isStandalonePwa());
+      setDismissed(isDismissed());
+    });
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();

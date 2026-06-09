@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, DEMO_TRANSACTIONS, DEMO_TOP_CATS, DEMO_TASKS_OV } from "./demo-data";
@@ -103,7 +104,7 @@ export function OverviewTab() {
     Promise.all(fetches).catch(() => {}).finally(() => setLoading(false));
   }, [selectedMonth, isCurrentMonth]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useQueuedEffect(() => reload(), [reload]);
   useDataRefresh(["dashboard", "budget", "schedule", "overview"], reload);
 
   return (

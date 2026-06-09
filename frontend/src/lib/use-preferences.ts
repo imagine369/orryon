@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 
 import { parseLifePriorities, type LifePriorityId } from "@/lib/life-priorities";
@@ -47,7 +48,7 @@ export function usePreferences() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useQueuedEffect(() => { void load(); }, [load]);
 
   const update = useCallback(async (patch: Partial<UserPreferences>) => {
     const { life_priorities: ids, ...rest } = patch;

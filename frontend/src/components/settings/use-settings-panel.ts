@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
@@ -75,7 +76,7 @@ export function useSettingsPanel() {
     const [revokeAllLoading, setRevokeAllLoading] = useState(false);
     const [revokeAllDone, setRevokeAllDone] = useState(false);
 
-    useEffect(() => {
+    useQueuedEffect(() => {
       if (!isOpen) return;
       setView(null);
       setEmailStep("idle");
@@ -109,7 +110,7 @@ export function useSettingsPanel() {
       setSettings((prev) => prev ? { ...prev, ...updates } as Settings : prev);
     };
 
-    useEffect(() => {
+    useQueuedEffect(() => {
       if (!settings || view !== "account") return;
       setAccountDraft({
         display_name: settings.display_name || "",

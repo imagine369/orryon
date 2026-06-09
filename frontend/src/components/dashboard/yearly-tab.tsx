@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { isDemo, buildDemoYearly } from "./demo-data";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 interface MonthSummary {
   month: string;
@@ -27,7 +28,7 @@ export function YearlyTab() {
   // way to re-trigger the existing fetch without refactoring it.
   const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (isDemo()) {
       const demo = buildDemoYearly(year);
       setMonths(demo.months);

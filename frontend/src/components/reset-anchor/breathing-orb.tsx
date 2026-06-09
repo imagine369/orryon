@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import type { ResetAnimation } from "@/lib/reset-scripts";
 import { ORB_FILL } from "./tokens";
 
@@ -15,7 +16,7 @@ export function BreathingOrb({
 }) {
   const [idleExpanded, setIdleExpanded] = useState(false);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (animation !== "none") {
       setIdleExpanded(false);
       return;
