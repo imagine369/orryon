@@ -13,6 +13,7 @@ import {
   planAllowsAmbientVoiceHold,
 } from "@/lib/ambient-plan";
 import type { UserPreferences } from "@/lib/use-preferences";
+import { SensorFusionController } from "@/lib/sensor-fusion";
 
 /** User speech only — not Orryon thinking/TTS (put-down VAD hold). */
 const USER_SPEAKING_STATUSES = new Set<VoiceStatus>([
@@ -32,8 +33,8 @@ export interface UseAmbientOrryonOptions {
 }
 
 /**
- * React hook wrapping AmbientOrryonService — syncs prefs, tier gates, and voice VAD.
- * Sensor fusion and wake audio/haptics wire in via returned handlers in later phases.
+ * React hook wrapping AmbientOrryonService — syncs prefs, tier gates, voice VAD,
+ * and sensor fusion for pickup / put-down detection.
  */
 export function useAmbientOrryon({
   prefs,
@@ -43,6 +44,7 @@ export function useAmbientOrryon({
 }: UseAmbientOrryonOptions) {
   const [ambientState, setAmbientState] = useState<AmbientAvatarState>("sleeping");
   const serviceRef = useRef<AmbientOrryonService | null>(null);
+  const fusionRef = useRef<SensorFusionController | null>(null);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
@@ -95,6 +97,39 @@ export function useAmbientOrryon({
     serviceRef.current?.setConversationActive(active);
   }, [plan, voiceStatus]);
 
+  useEffect(() => {
+    fusionRef.current?.setAmbientState(ambientState);
+  }, [ambientState]);
+
+  useEffect(() => {
+    const fusion = new SensorFusionController({
+      onPickupConfidence: (score) => {
+        serviceRef.current?.reportPickupConfidence(score);
+      },
+      onPutDown: () => {
+        serviceRef.current?.reportPutDown();
+      },
+      onMotionResumed: () => {
+        serviceRef.current?.reportMotionResumed();
+      },
+    });
+    fusionRef.current = fusion;
+    fusion.setEnabled(prefs.ambient_mode_enabled);
+
+    return () => {
+      void fusion.stop();
+      fusionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    fusionRef.current?.setEnabled(prefs.ambient_mode_enabled);
+  }, [prefs.ambient_mode_enabled]);
+
+  const primeAmbientMotion = useCallback(async () => {
+    return fusionRef.current?.primePermission() ?? false;
+  }, []);
+
   const reportPickupConfidence = useCallback((score: number) => {
     serviceRef.current?.reportPickupConfidence(score);
   }, []);
@@ -114,6 +149,7 @@ export function useAmbientOrryon({
   return {
     ambientState,
     isAmbientEnabled: prefs.ambient_mode_enabled,
+    primeAmbientMotion,
     reportPickupConfidence,
     reportPutDown,
     reportMotionResumed,
