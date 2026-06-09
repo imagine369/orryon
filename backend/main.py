@@ -62,6 +62,12 @@ from backend.routers import (
 )
 from config import XAI_API_KEY
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(name)s  %(levelname)s  %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 # ── Sentry Setup ─────────────────────────────────────────────────────────────
 _sentry_dsn = os.getenv("SENTRY_DSN", "")
 if _sentry_dsn:
@@ -76,13 +82,7 @@ if _sentry_dsn:
         ],
         send_default_pii=False,
     )
-    print("Sentry initialized for backend")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(name)s  %(levelname)s  %(message)s",
-)
-logger = logging.getLogger(__name__)
+    logger.info("Sentry initialized for backend")
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
