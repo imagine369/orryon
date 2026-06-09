@@ -5,6 +5,11 @@ import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 
 import { parseLifePriorities, type LifePriorityId } from "@/lib/life-priorities";
+import {
+  clampAmbientSensitivity,
+  normalizeAmbientSoundStyle,
+  type AmbientSoundStyle,
+} from "@/lib/ambient-plan";
 
 export interface UserPreferences {
   voice_overlay_enabled: boolean;
@@ -14,6 +19,9 @@ export interface UserPreferences {
   onboarding_complete: boolean;
   life_priorities: LifePriorityId[];
   life_priorities_set: boolean;
+  ambient_mode_enabled: boolean;
+  ambient_sensitivity: number;
+  ambient_sound_style: AmbientSoundStyle;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -24,6 +32,9 @@ const DEFAULT_PREFS: UserPreferences = {
   onboarding_complete: false,
   life_priorities: [],
   life_priorities_set: false,
+  ambient_mode_enabled: false,
+  ambient_sensitivity: 0.5,
+  ambient_sound_style: "soft_glow_rise",
 };
 
 export function usePreferences() {
@@ -40,6 +51,11 @@ export function usePreferences() {
         ...data,
         life_priorities: parseLifePriorities(data.life_priorities),
         life_priorities_set: Boolean(data.life_priorities_set),
+        ambient_mode_enabled: Boolean(data.ambient_mode_enabled),
+        ambient_sensitivity: clampAmbientSensitivity(
+          Number(data.ambient_sensitivity ?? DEFAULT_PREFS.ambient_sensitivity),
+        ),
+        ambient_sound_style: normalizeAmbientSoundStyle(data.ambient_sound_style),
       });
     } catch {
       // non-fatal
@@ -71,12 +87,24 @@ export function usePreferences() {
     if (rest.golden_mode_enabled !== undefined) {
       boolToInt("golden_mode_enabled", rest.golden_mode_enabled);
     }
-    setPrefs((prev) => ({ ...prev, ...patch }));
+    if (rest.ambient_mode_enabled !== undefined) {
+      boolToInt("ambient_mode_enabled", rest.ambient_mode_enabled);
+    }
+    if (rest.ambient_sensitivity !== undefined) {
+      apiPatch.ambient_sensitivity = clampAmbientSensitivity(rest.ambient_sensitivity);
+    }
+    if (rest.ambient_sound_style !== undefined) {
+      apiPatch.ambient_sound_style = normalizeAmbientSoundStyle(rest.ambient_sound_style);
+    }
+    let snapshot: UserPreferences | null = null;
+    setPrefs((prev) => {
+      snapshot = prev;
+      return { ...prev, ...patch };
+    });
     try {
       await api.patch("/api/preferences", apiPatch);
     } catch {
-      // revert on failure
-      setPrefs((prev) => ({ ...prev }));
+      if (snapshot) setPrefs(snapshot);
     }
   }, []);
 

@@ -13,6 +13,8 @@ LIFE_PRIORITY_IDS = frozenset({
     "health", "calendar", "communication", "finance", "tasks", "notes",
 })
 
+AMBIENT_SOUND_STYLES = frozenset({"soft_glow_rise", "crystal_bloom"})
+
 # Columns upsert_user_preferences may write (excludes user_id PK).
 _ALLOWED_PREFERENCE_COLUMNS = frozenset({
     "last_reset_anchor",
@@ -23,6 +25,9 @@ _ALLOWED_PREFERENCE_COLUMNS = frozenset({
     "onboarding_complete",
     "life_priorities",
     "life_priorities_set",
+    "ambient_mode_enabled",
+    "ambient_sensitivity",
+    "ambient_sound_style",
 })
 
 
@@ -39,6 +44,21 @@ def parse_life_priorities(raw: str) -> list[str]:
 
 def normalize_life_priorities(raw: str | None) -> str:
     return ",".join(parse_life_priorities(raw or ""))
+
+
+def clamp_ambient_sensitivity(value: float | int | None) -> float:
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    if not (n == n):  # NaN
+        return 0.5
+    return max(0.0, min(1.0, n))
+
+
+def normalize_ambient_sound_style(raw: str | None) -> str:
+    style = (raw or "").strip()
+    return style if style in AMBIENT_SOUND_STYLES else "soft_glow_rise"
 
 
 def get_user_preferences(user_id: str) -> dict:
@@ -58,6 +78,9 @@ def get_user_preferences(user_id: str) -> dict:
             "onboarding_complete": 0,
             "life_priorities": "",
             "life_priorities_set": 0,
+            "ambient_mode_enabled": 0,
+            "ambient_sensitivity": 0.5,
+            "ambient_sound_style": "soft_glow_rise",
         }
     except Exception as exc:
         logger.error("get_user_preferences error: %s", exc)

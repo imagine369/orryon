@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/lib/platform.test.mjs src/lib/chat-session-api.test.mjs src/components/settings/settings-views.test.mjs src/lib/personalized-starter-prompts.test.mjs",
+    "test": "node --test src/lib/platform.test.mjs src/lib/chat-session-api.test.mjs src/components/settings/settings-views.test.mjs src/lib/personalized-starter-prompts.test.mjs src/lib/ambient-orryon-service.test.mjs",
     "test:platform": "node --test src/lib/platform.test.mjs",
     "test:download": "node --test scripts/test-download-flow.mjs",
     "test:download:local": "TEST_BASE_URL=http://127.0.0.1:3456 node --test scripts/test-download-flow.mjs",

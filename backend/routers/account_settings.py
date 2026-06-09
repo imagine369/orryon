@@ -24,7 +24,12 @@ from backend.schemas import (
 )
 from config import GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from core.display_name import normalize_display_name
-from db.preferences import normalize_life_priorities, parse_life_priorities
+from db.preferences import (
+    clamp_ambient_sensitivity,
+    normalize_ambient_sound_style,
+    normalize_life_priorities,
+    parse_life_priorities,
+)
 from db import (
     get_connection,
     update_row,
@@ -181,6 +186,9 @@ class PrefsReq(BaseModel):
     onboarding_complete: int | None = None
     life_priorities: str | None = None
     life_priorities_set: int | None = None
+    ambient_mode_enabled: int | None = None
+    ambient_sensitivity: float | None = None
+    ambient_sound_style: str | None = None
 
 
 @router.get("/api/preferences")
@@ -194,6 +202,11 @@ async def get_prefs(user: dict = Depends(get_current_user)):
         "onboarding_complete": bool(prefs.get("onboarding_complete", 0)),
         "life_priorities": parse_life_priorities(prefs.get("life_priorities", "")),
         "life_priorities_set": bool(prefs.get("life_priorities_set", 0)),
+        "ambient_mode_enabled": bool(prefs.get("ambient_mode_enabled", 0)),
+        "ambient_sensitivity": clamp_ambient_sensitivity(prefs.get("ambient_sensitivity")),
+        "ambient_sound_style": normalize_ambient_sound_style(
+            prefs.get("ambient_sound_style"),
+        ),
     }
 
 
@@ -202,6 +215,14 @@ async def update_prefs(body: PrefsReq, user: dict = Depends(get_current_user)):
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if "life_priorities" in updates:
         updates["life_priorities"] = normalize_life_priorities(updates["life_priorities"])
+    if "ambient_sensitivity" in updates:
+        updates["ambient_sensitivity"] = clamp_ambient_sensitivity(
+            updates["ambient_sensitivity"],
+        )
+    if "ambient_sound_style" in updates:
+        updates["ambient_sound_style"] = normalize_ambient_sound_style(
+            updates["ambient_sound_style"],
+        )
     if updates:
         upsert_user_preferences(user["user_id"], updates)
     return {"updated": True}
