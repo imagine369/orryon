@@ -41,7 +41,15 @@ async def extract_memories_async(
             get_monthly_token_cap,
             resolve_plan_for_user_id,
         )
-        from db import count_user_memory, get_monthly_spend, get_monthly_token_usage, record_token_spend, save_user_memory
+        from db.memory import (
+            count_user_memory,
+            save_user_memory,
+        )
+        from db.usage import (
+            get_monthly_spend,
+            get_monthly_token_usage,
+            record_token_spend,
+        )
 
         plan_info = resolve_plan_for_user_id(user_id)
         if not plan_info:

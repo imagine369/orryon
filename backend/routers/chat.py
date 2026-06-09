@@ -35,18 +35,20 @@ from backend.auth import consume_ws_ticket, create_ws_ticket, decode_token, get_
 from backend.signing import require_signed_request
 from backend.schemas import ChatReq
 from db.preferences import parse_life_priorities
-from db import (
+from db import get_connection
+from db.chat import (
     create_chat_session,
     delete_chat_session,
-    get_chat_message_count,
-    get_connection,
-    get_user_preferences,
-    increment_chat_message_count,
     list_chat_sessions,
     load_chat_history,
-    record_token_spend,
     save_chat_message,
     update_chat_session_title,
+)
+from db.preferences import get_user_preferences
+from db.usage import (
+    get_chat_message_count,
+    increment_chat_message_count,
+    record_token_spend,
 )
 from core.agent_shared import USER_FACING_CHAT_ERROR
 from core.content_policy import evaluate_content_policy

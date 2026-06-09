@@ -18,13 +18,15 @@ from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
-from db import (
+from db import get_connection
+from db.briefings import (
     get_briefing,
-    save_briefing,
     mark_briefing_read,
+    save_briefing,
+)
+from db.preferences import (
     get_user_preferences,
     upsert_user_preferences,
-    get_connection,
 )
 
 logger = logging.getLogger(__name__)

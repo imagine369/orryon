@@ -14,12 +14,12 @@ from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan, get_tier_rank
-from db import (
-    get_user_memory,
-    delete_memory_fact,
+from db import get_connection
+from db.memory import (
     count_user_memory,
+    delete_memory_fact,
+    get_user_memory,
     save_user_memory,
-    get_connection,
 )
 
 router = APIRouter(tags=["memory"])

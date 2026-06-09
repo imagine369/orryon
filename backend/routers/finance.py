@@ -18,12 +18,14 @@ from backend.auth import get_current_user
 from backend.deps import require_active_plan
 from backend.schemas import BillReq, BudgetReq, TransactionReq
 from db import (
-    adjust_balance,
     fetch_rows,
-    get_balance,
     get_connection,
     insert_row,
     update_row,
+)
+from db.finance import (
+    adjust_balance,
+    get_balance,
 )
 
 from core.tools import (
@@ -348,7 +350,7 @@ async def get_forecast(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     today = date.today()
     cycle_start, cycle_end = _cycle_boundaries(uid)
-    from db import get_total_monthly_income
+    from db.finance import get_total_monthly_income
 
     income = get_total_monthly_income(uid)
     balance = get_balance(uid)

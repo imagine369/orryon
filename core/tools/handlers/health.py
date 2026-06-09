@@ -1,7 +1,7 @@
 """Tool handlers — health vitals, medications, appointments."""
 from __future__ import annotations
 
-from db import (
+from db.health import (
     add_health_appointment,
     add_health_vital,
     add_medication,

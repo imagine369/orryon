@@ -10,7 +10,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from backend.auth import get_current_user
-from db import get_connection, insert_row
+from db import (
+    get_connection,
+    insert_row,
+)
 
 router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)

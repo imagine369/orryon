@@ -169,7 +169,7 @@ Single SQLite file (`finance.db` by default, configurable via `DB_PATH`).
 
 Key tables: `users`, `transactions`, `events`, `goals`, `notes`, `action_items`, `grocery_items`, `subscriptions`, `budget_categories`, `chat_messages`, `user_memory`, `recurring_income`, `net_worth_snapshots`, `user_lists`, `list_items`, `share_tokens`.
 
-The `db/` package handles schema creation and auto-migration on import (`db/schema.py`). No ORM — all queries are raw SQL with parameterized values.
+The `db/` package uses raw SQL (no ORM). Schema DDL lives in `db/schema/schema_*.py`; `init_db()` creates tables and applies numbered migrations from `db/migrations/`. SQLite auto-inits on import in local dev; Postgres uses `DATABASE_URL` + connection pool.
 
 ---
 

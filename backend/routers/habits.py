@@ -25,7 +25,12 @@ from backend.schemas import (
     StreakUpdate,
     UserPreferencesUpdate,
 )
-from db import delete_row, get_connection, insert_row, update_row
+from db import (
+    delete_row,
+    get_connection,
+    insert_row,
+    update_row,
+)
 
 router = APIRouter(tags=["habits"], dependencies=[Depends(require_active_plan)])
 

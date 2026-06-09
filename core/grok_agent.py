@@ -132,7 +132,7 @@ async def run_orryon_stream(
     )
     cached_session_summary = ""
     if session_id:
-        from db import get_session_summary_meta
+        from db.chat import get_session_summary_meta
         cached_session_summary = get_session_summary_meta(session_id).get("summary") or ""
     messages = build_messages(
         system_prompt,

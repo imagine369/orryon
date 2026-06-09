@@ -19,7 +19,7 @@ def compute_context_snapshot(user_id: str) -> str:
             _get_upcoming_schedule,
             _get_balance,
         )
-        from db import get_total_monthly_income
+        from db.finance import get_total_monthly_income
 
         locale = get_user_locale(user_id)
         fmt = locale.format_money

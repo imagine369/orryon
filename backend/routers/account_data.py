@@ -14,7 +14,10 @@ from fastapi.responses import Response
 
 from backend.deps import require_active_plan
 from config import APP_URL
-from db import get_connection, insert_row
+from db import (
+    get_connection,
+    insert_row,
+)
 
 router = APIRouter(tags=["account"])
 
@@ -58,7 +61,7 @@ async def create_share_link(user: dict = Depends(require_active_plan)):
 async def get_shared_dashboard(token: str):
     """Public endpoint — no auth required. Returns a read-only dashboard snapshot."""
     from datetime import date
-    from db import get_balance
+    from db.finance import get_balance
 
     with get_connection() as conn:
         tok_row = conn.execute(

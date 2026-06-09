@@ -1,4 +1,4 @@
-"""Pytest fixtures — isolated SQLite DB per session."""
+"""Pytest fixtures — isolated SQLite DB per session, or Postgres when DATABASE_URL is set."""
 from __future__ import annotations
 
 import os
@@ -18,19 +18,29 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret-for-pytest-only-32b")
 os.environ.setdefault("REQUEST_SIGNING_MODE", "off")
 os.environ.setdefault("ENABLE_DEMO", "1")
 os.environ["REDIS_URL"] = ""
-os.environ.pop("DATABASE_URL", None)
 
-# Isolated DB for the whole pytest process. Set here (not in a fixture) so test
-# modules can safely `from backend.main import app` during collection.
-_TEST_DB = Path(tempfile.gettempdir()) / f"orryon_pytest_{os.getpid()}.db"
-if _TEST_DB.exists():
-    _TEST_DB.unlink()
-os.environ["DB_PATH"] = str(_TEST_DB)
+_USE_PG_CI = bool(os.environ.get("DATABASE_URL"))
+
+if not _USE_PG_CI:
+    os.environ.pop("DATABASE_URL", None)
+    _TEST_DB = Path(tempfile.gettempdir()) / f"orryon_pytest_{os.getpid()}.db"
+    if _TEST_DB.exists():
+        _TEST_DB.unlink()
+    os.environ["DB_PATH"] = str(_TEST_DB)
+else:
+    _TEST_DB = None
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _test_db_path():
-    from db import init_db
+    if _USE_PG_CI:
+        from db import init_db, init_pool
 
-    init_db()
-    yield str(_TEST_DB)
+        init_pool()
+        init_db()
+        yield os.environ["DATABASE_URL"]
+    else:
+        from db import init_db
+
+        init_db()
+        yield str(_TEST_DB)

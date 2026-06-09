@@ -41,7 +41,8 @@ async def send_otp_email(ctx: dict, email: str, code: str) -> None:
 async def snapshot_all_net_worth(ctx: dict) -> None:
     """Take net worth snapshots for all active users."""
     try:
-        from db import get_connection, snapshot_net_worth
+        from db import get_connection
+        from db.finance import snapshot_net_worth
         conn = get_connection()
         rows = conn.execute("SELECT id FROM users").fetchall()
         conn.close()

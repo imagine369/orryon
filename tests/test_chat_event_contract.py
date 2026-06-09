@@ -11,7 +11,7 @@ from starlette.testclient import TestClient
 from backend.auth import create_token, create_ws_ticket
 from backend.main import app
 from core.chat_events import CHAT_EVENT_CONTRACT, example_events, validate_chat_event
-from db import get_or_create_user_by_email
+from db.auth import get_or_create_user_by_email
 
 _DEV_ORIGIN = "http://localhost:3000"
 

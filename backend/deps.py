@@ -67,7 +67,10 @@ def check_monthly_api_quota(user_id: str, plan: str) -> None:
     if spend_cap <= 0:
         return
 
-    from db import get_monthly_spend, get_monthly_token_usage
+    from db.usage import (
+        get_monthly_spend,
+        get_monthly_token_usage,
+    )
 
     spend = get_monthly_spend(user_id)
     if spend >= spend_cap:
@@ -265,7 +268,7 @@ def check_chat_quota(user_id: str, plan: str) -> None:
     limit = get_chat_limit(plan)
     if limit == -1:
         return  # unlimited
-    from db import get_chat_message_count
+    from db.usage import get_chat_message_count
     count = get_chat_message_count(user_id)
     if count >= limit:
         raise HTTPException(

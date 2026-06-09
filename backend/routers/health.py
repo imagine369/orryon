@@ -27,17 +27,17 @@ from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
-from db import (
+from db.health import (
+    add_health_appointment,
     add_health_vital,
-    get_health_vitals,
-    delete_health_vital,
     add_medication,
+    delete_health_appointment,
+    delete_health_vital,
+    delete_medication,
+    get_health_appointments,
+    get_health_vitals,
     get_medications,
     update_medication,
-    delete_medication,
-    add_health_appointment,
-    get_health_appointments,
-    delete_health_appointment,
 )
 
 router = APIRouter(tags=["health"], dependencies=[Depends(require_active_plan)])

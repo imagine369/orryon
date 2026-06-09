@@ -7,7 +7,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-from db import get_user_places
+from db.location import get_user_places
 from db.connection import get_connection
 
 logger = logging.getLogger(__name__)

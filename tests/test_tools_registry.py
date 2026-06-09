@@ -14,7 +14,11 @@ from core.canonical_tools import (
 from core.tools import GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
 from core.tools.handler_contract import parse_handler_outcome
 from core.tools.registry import TOOL_SPECS, TOOLS, _TOOL_MAP, validate_tool_registry
-from db import get_health_vitals, get_medications, get_or_create_user_by_email
+from db.auth import get_or_create_user_by_email
+from db.health import (
+    get_health_vitals,
+    get_medications,
+)
 
 
 @pytest.fixture

@@ -14,8 +14,17 @@ except Exception:
     _dateparser = None
 
 from db import (
-    delete_row, fetch_rows, get_connection, insert_row, update_row,
-    get_balance, adjust_balance, update_balance, get_or_create_balance_account,
+    delete_row,
+    fetch_rows,
+    get_connection,
+    insert_row,
+    update_row,
+)
+from db.finance import (
+    adjust_balance,
+    get_balance,
+    get_or_create_balance_account,
+    update_balance,
 )
 
 logger = logging.getLogger(__name__)

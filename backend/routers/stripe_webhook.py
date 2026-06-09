@@ -137,7 +137,7 @@ async def stripe_webhook(request: Request):
 
         if topup_type == "voice_topup" and user_id:
             # One-time voice minute top-up
-            from db import add_voice_topup
+            from db.usage import add_voice_topup
             from backend.deps import VOICE_TOPUP_PRICE_USD
             minutes = int(meta.get("minutes", 60))
             pi_id = session.get("payment_intent", "")

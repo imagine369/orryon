@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from backend.auth import create_token
 from backend.main import app
 from core.chat_events import validate_chat_event
-from db import get_or_create_user_by_email
+from db.auth import get_or_create_user_by_email
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "chat_event_contract.json"
 

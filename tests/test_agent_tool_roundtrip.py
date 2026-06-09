@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from core.agent_tool_round import AgentTurnState, process_client_tool
-from db import get_or_create_user_by_email, insert_row
+from db import insert_row
+from db.auth import get_or_create_user_by_email
 from core.tools.shared import _uid
 
 

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from html import unescape
 from typing import Any
 
-from db import get_user_places
+from db.location import get_user_places
 from core.user_locale import get_user_locale
 
 logger = logging.getLogger(__name__)

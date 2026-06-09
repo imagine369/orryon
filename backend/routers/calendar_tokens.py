@@ -37,20 +37,3 @@ def get_google_tokens(uid: str) -> dict | None:
     if not row:
         return None
     return json.loads(row["tokens"])
-
-
-def ensure_token_table() -> None:
-    with get_connection() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_calendar_tokens (
-                id         TEXT PRIMARY KEY,
-                user_id    TEXT NOT NULL UNIQUE,
-                tokens     TEXT NOT NULL,
-                created_at TEXT,
-                updated_at TEXT
-            )
-        """)
-        conn.commit()
-
-
-ensure_token_table()

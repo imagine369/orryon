@@ -17,7 +17,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from backend.auth import get_current_user
-from db import get_approval_requests
+from db.approvals import get_approval_requests
 
 router = APIRouter(tags=["audit"])
 

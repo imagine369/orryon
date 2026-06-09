@@ -21,7 +21,10 @@ from backend.auth import get_current_user
 from backend.deps import require_active_plan
 from backend.routers.audit import _audit_entries
 from config import APPROVALS_HITL_ENABLED
-from db import get_approval_requests, resolve_approval_request
+from db.approvals import (
+    get_approval_requests,
+    resolve_approval_request,
+)
 
 router = APIRouter(tags=["approvals"], dependencies=[Depends(require_active_plan)])
 

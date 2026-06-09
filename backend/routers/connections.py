@@ -38,7 +38,11 @@ from backend.cache import cache_get, cache_set
 from backend.deps import require_active_plan
 from backend.schemas import CSVColumnMapping, CSVImportConfirmReq
 from config import PLAID_LINK_ENABLED
-from db import adjust_balance, get_connection, insert_row
+from db import (
+    get_connection,
+    insert_row,
+)
+from db.finance import adjust_balance
 
 logger = logging.getLogger(__name__)
 

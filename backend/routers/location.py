@@ -17,12 +17,12 @@ from pydantic import BaseModel
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
-from db import (
+from db.location import (
     add_user_place,
-    get_user_places,
     delete_user_place,
-    upsert_commute_pattern,
     get_commute_pattern,
+    get_user_places,
+    upsert_commute_pattern,
 )
 
 router = APIRouter(tags=["location"], dependencies=[Depends(require_active_plan)])

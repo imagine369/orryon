@@ -4,7 +4,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from db import get_connection, insert_row, update_row
+from db import (
+    get_connection,
+    insert_row,
+    update_row,
+)
 
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")

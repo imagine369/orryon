@@ -7,7 +7,17 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from db import (
-    delete_row, fetch_rows, get_connection, insert_row, update_row, get_balance, adjust_balance, update_balance, get_or_create_balance_account
+    delete_row,
+    fetch_rows,
+    get_connection,
+    insert_row,
+    update_row,
+)
+from db.finance import (
+    adjust_balance,
+    get_balance,
+    get_or_create_balance_account,
+    update_balance,
 )
 from core.tools.shared import (
     _current_month,
@@ -351,7 +361,10 @@ def _set_notification_preferences(args: dict, user_id: str) -> dict:
     update_row("users", updates, {"id": user_id})
     return {"status": "ok", "changes": messages}
 def _add_recurring_income(args: dict, user_id: str) -> dict:
-    from db import get_recurring_income, get_total_monthly_income
+    from db.finance import (
+        get_recurring_income,
+        get_total_monthly_income,
+    )
     row = {
         "id": _uid(),
         "user_id": user_id,
@@ -373,7 +386,7 @@ def _get_money_left_after_goals(args: dict, user_id: str) -> dict:
     now = datetime.now()
 
     bal = get_balance(user_id)
-    from db import get_total_monthly_income
+    from db.finance import get_total_monthly_income
     monthly_income = get_total_monthly_income(user_id)
 
     conn = get_connection()

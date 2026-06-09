@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
 from backend.schemas import GroceryItemReq, ListItemReq, ListItemUpdate, ReorderReq, UserListReq, UserListUpdate
-from db import delete_row, get_connection, insert_row, update_row
+from db import (
+    delete_row,
+    get_connection,
+    insert_row,
+    update_row,
+)
 
 router = APIRouter(tags=["lists"], dependencies=[Depends(require_active_plan)])
 

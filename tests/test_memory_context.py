@@ -15,7 +15,12 @@ from core.session_summary import (
     should_refresh_summary,
     split_history,
 )
-from db import count_user_memory, get_or_create_user_by_email, prune_user_memory, save_user_memory
+from db.auth import get_or_create_user_by_email
+from db.memory import (
+    count_user_memory,
+    prune_user_memory,
+    save_user_memory,
+)
 
 
 @pytest.fixture

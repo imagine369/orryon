@@ -10,7 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
 from backend.schemas import EventReq
-from db import delete_row, get_connection, insert_row
+from db import (
+    delete_row,
+    get_connection,
+    insert_row,
+)
 
 router = APIRouter(tags=["events"], dependencies=[Depends(require_active_plan)])
 

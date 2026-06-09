@@ -24,7 +24,10 @@ from config import (
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
 )
-from db import get_connection, insert_row
+from db import (
+    get_connection,
+    insert_row,
+)
 
 router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)

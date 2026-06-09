@@ -121,7 +121,7 @@ def _log_destructive_action(
 ) -> None:
     """Audit trail for agent-driven deletes (visible under GET /api/audit/history)."""
     try:
-        from db import create_approval_request
+        from db.approvals import create_approval_request
         create_approval_request(
             user_id,
             action_type=tool_name,

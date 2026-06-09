@@ -24,11 +24,13 @@ from backend.schemas import AuthRes, SendCodeReq, SignupCheckoutReq, VerifyReq
 from config import CONTACT_EMAIL, SMTP_FROM, SMTP_USER
 from core.display_name import normalize_display_name
 from db import (
-    create_verification_code,
     fetch_rows,
     get_connection,
-    get_or_create_user_by_email,
     update_row,
+)
+from db.auth import (
+    create_verification_code,
+    get_or_create_user_by_email,
     verify_code,
 )
 from email_sender import send_verification_code
@@ -198,7 +200,7 @@ async def auth_send_code(body: SendCodeReq, request: Request):
 @router.post("/api/auth/verify", response_model=AuthRes)
 async def auth_verify(body: VerifyReq, request: Request):
     """Verify OTP code, create/fetch user, issue JWT."""
-    from db import _check_otp_lockout
+    from db.auth import _check_otp_lockout
     email = body.email.strip().lower()
     if _check_otp_lockout(email):
         raise HTTPException(429, "Too many attempts. Please wait 15 minutes then request a new code.")

@@ -56,6 +56,13 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **Content policy:** `core/content_policy.py` enforces the three chat limits server-side before the LLM runs.
 - **Signing:** production must set `REQUEST_SIGNING_MODE=enforce` on chat + voice. Verify with `backend/scripts/verify_signing.py`. See [DEPLOY.md](./DEPLOY.md).
 
+## Data layer (Phase 8)
+
+- **Migration strategy:** Option A — raw SQL + numbered files in `db/migrations/` (`NNN_name.postgres.sql` / `NNN_name.sqlite.sql`). Tracked in `schema_migrations`. No SQLAlchemy/Alembic/ORM on top of raw SQL.
+- **Schema:** per-domain DDL in `db/schema/schema_*.py`, assembled by `db/schema/__init__.py` → `init_db()`.
+- **Imports:** barrel `db` exports connection + CRUD + `init_db` only. Domain helpers: `from db.auth import ...`, `from db.chat import ...`, etc.
+- **Dialects:** SQLite (local/pytest default); Postgres when `DATABASE_URL` is set. CI runs full pytest on both (`backend` + `backend-postgres` jobs).
+
 ## Tool registry
 
 - **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).

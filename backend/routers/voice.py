@@ -44,7 +44,7 @@ from backend.deps import (
 )
 from backend.signing import require_signed_request
 from config import XAI_API_KEY, ELEVENLABS_API_KEY
-from db import (
+from db.usage import (
     get_voice_seconds_used,
     get_voice_topup_minutes,
     record_voice_seconds,

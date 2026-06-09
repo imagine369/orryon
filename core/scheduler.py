@@ -20,7 +20,12 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import SMTP_ENABLED
-from db import get_connection, insert_row, update_row, snapshot_net_worth
+from db import (
+    get_connection,
+    insert_row,
+    update_row,
+)
+from db.finance import snapshot_net_worth
 
 logger = logging.getLogger(__name__)
 

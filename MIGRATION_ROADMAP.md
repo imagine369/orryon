@@ -72,12 +72,14 @@ Config keys already exist in `config.py`. Implementation goes in `backend/router
 
 ### B.1 — Database Migration
 
-| Step | Action | Notes |
+**Chosen (Phase 8):** stay on raw SQL + numbered migrations in `db/migrations/` — not SQLAlchemy + Alembic + raw SQL in parallel.
+
+| Step | Status | Notes |
 |------|--------|-------|
-| 1 | Replace raw `sqlite3` with SQLAlchemy | Same schema, ORM abstraction |
-| 2 | Add Alembic for migrations | Version-controlled schema changes |
-| 3 | Swap SQLite → PostgreSQL | `DATABASE_URL` in `.env` |
-| 4 | Add connection pooling | `sqlalchemy.pool.QueuePool` |
+| 1 | **Done** | Per-domain schema in `db/schema/` |
+| 2 | **Done** | Numbered SQL migrations + `schema_migrations` table |
+| 3 | **Done** | Postgres via `DATABASE_URL` + psycopg pool; SQLite for dev |
+| 4 | Optional | Further pool tuning if needed |
 
 ### B.2 — Background Jobs
 

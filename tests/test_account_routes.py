@@ -10,7 +10,8 @@ from httpx import ASGITransport, AsyncClient
 from backend.auth import create_token
 from backend.deps import IS_LOCAL_DEV, resolve_plan_for_user
 from backend.main import app
-from db import get_connection, get_or_create_user_by_email
+from db import get_connection
+from db.auth import get_or_create_user_by_email
 
 _DEV_ORIGIN = "http://localhost:3000"
 

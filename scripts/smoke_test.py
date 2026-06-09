@@ -45,7 +45,8 @@ async def _api_health() -> bool:
 
 
 def _tools_smoke() -> bool:
-    from db import init_db, get_or_create_user_by_email
+    from db import init_db
+    from db.auth import get_or_create_user_by_email
     from core.tools import execute_tool
     from core.tools.shared import _uid
     from db import insert_row

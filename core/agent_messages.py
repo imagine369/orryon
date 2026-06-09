@@ -32,7 +32,7 @@ def _life_priorities_block(ids: list[str]) -> str:
 
 def get_user_memories(user_id: str) -> list[str]:
     try:
-        from db import get_user_memories
+        from db.memory import get_user_memories
         rows = get_user_memories(user_id, limit=MEMORY_PROMPT_LIMIT)
         return [r["fact"] for r in rows]
     except Exception:

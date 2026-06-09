@@ -126,7 +126,10 @@ _startup_error: str | None = None
 async def _run_startup() -> None:
     """Heavy init runs in the background so /api/health can answer during Railway healthchecks."""
     global _startup_ready, _startup_error
-    from db import init_pool, init_db
+    from db import (
+        init_db,
+        init_pool,
+    )
     from backend.cache import init_redis
     from core.scheduler import start_scheduler
     from backend.signing import get_signing_mode, validate_signing_config

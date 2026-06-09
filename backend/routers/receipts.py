@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from backend.cache import check_rate_limit_async
 from backend.deps import check_monthly_api_quota, require_active_plan, resolve_plan_for_user
 from config import GROK_MODEL, XAI_API_KEY
-from db import record_token_spend
+from db.usage import record_token_spend
 
 logger = logging.getLogger(__name__)
 

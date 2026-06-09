@@ -31,7 +31,11 @@ from httpx import ASGITransport, AsyncClient
 from backend.auth import create_token, decode_token, jwt_iat_unix
 from backend.main import app
 from backend.signing import _compute_signature, derive_signing_key, get_signing_mode
-from db import get_or_create_user_by_email, init_db, update_row
+from db import (
+    init_db,
+    update_row,
+)
+from db.auth import get_or_create_user_by_email
 
 
 async def main() -> None:

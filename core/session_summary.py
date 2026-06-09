@@ -73,7 +73,7 @@ def schedule_session_summary(
     if len(turns) <= HISTORY_WINDOW:
         return
     try:
-        from db import get_session_summary_meta
+        from db.chat import get_session_summary_meta
 
         meta = get_session_summary_meta(session_id)
         summarized_through = int(meta.get("summary_message_count") or 0)
@@ -105,7 +105,12 @@ async def summarize_session_async(
             get_monthly_token_cap,
             resolve_plan_for_user_id,
         )
-        from db import get_monthly_spend, get_monthly_token_usage, record_token_spend, update_session_summary
+        from db.chat import update_session_summary
+        from db.usage import (
+            get_monthly_spend,
+            get_monthly_token_usage,
+            record_token_spend,
+        )
 
         if not resolve_plan_for_user_id(user_id):
             return

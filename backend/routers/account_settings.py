@@ -26,14 +26,18 @@ from config import GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
 from core.display_name import normalize_display_name
 from db.preferences import normalize_life_priorities, parse_life_priorities
 from db import (
-    create_verification_code,
-    get_chat_message_count,
     get_connection,
-    get_user_preferences,
-    upsert_user_preferences,
     update_row,
+)
+from db.auth import (
+    create_verification_code,
     verify_code,
 )
+from db.preferences import (
+    get_user_preferences,
+    upsert_user_preferences,
+)
+from db.usage import get_chat_message_count
 from email_sender import send_verification_code
 
 logger = logging.getLogger(__name__)
@@ -229,7 +233,7 @@ async def chat_usage(user: dict = Depends(get_current_user)):
         get_suggested_upgrade_plan,
     )
     from core.usage_period import resolve_usage_period
-    from db import get_monthly_token_usage
+    from db.usage import get_monthly_token_usage
 
     uid = user["user_id"]
     with get_connection() as conn:
