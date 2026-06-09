@@ -200,27 +200,3 @@ def _notify_admin(email: str, joined_at: str, total: int, approve_token: str) ->
             )
     except Exception as exc:
         logger.warning("Failed to build waitlist notification for %s: %s", email, exc)
-
-
-@router.get("/api/waitlist/check")
-async def check_waitlist(email: str = ""):
-    """Check if an email is approved on the waitlist. Used by auth flow."""
-    email = email.strip().lower()
-    if not email:
-        return {"approved": False, "on_waitlist": False}
-
-    admin = CONTACT_EMAIL
-    if admin and email == admin.strip().lower():
-        return {"approved": True, "on_waitlist": True}
-
-    conn = db.get_connection()
-    try:
-        row = conn.execute(
-            "SELECT approved FROM waitlist WHERE email = ?", (email,)
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if not row:
-        return {"approved": False, "on_waitlist": False}
-    return {"approved": bool(row["approved"]), "on_waitlist": True}
