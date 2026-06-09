@@ -13,6 +13,18 @@ LIFE_PRIORITY_IDS = frozenset({
     "health", "calendar", "communication", "finance", "tasks", "notes",
 })
 
+# Columns upsert_user_preferences may write (excludes user_id PK).
+_ALLOWED_PREFERENCE_COLUMNS = frozenset({
+    "last_reset_anchor",
+    "voice_overlay_enabled",
+    "golden_mode_enabled",
+    "briefing_time",
+    "briefing_includes",
+    "onboarding_complete",
+    "life_priorities",
+    "life_priorities_set",
+})
+
 
 def parse_life_priorities(raw: str) -> list[str]:
     out: list[str] = []
@@ -53,14 +65,17 @@ def get_user_preferences(user_id: str) -> dict:
 
 
 def upsert_user_preferences(user_id: str, updates: dict) -> bool:
+    filtered = {k: v for k, v in updates.items() if k in _ALLOWED_PREFERENCE_COLUMNS}
+    if not filtered:
+        return False
     try:
         conn = get_connection()
         existing = conn.execute("SELECT user_id FROM user_preferences WHERE user_id=?", (user_id,)).fetchone()
         if existing:
-            sets = ", ".join(f"{k}=?" for k in updates)
-            conn.execute(f"UPDATE user_preferences SET {sets} WHERE user_id=?", (*updates.values(), user_id))
+            sets = ", ".join(f"{k}=?" for k in filtered)
+            conn.execute(f"UPDATE user_preferences SET {sets} WHERE user_id=?", (*filtered.values(), user_id))
         else:
-            row = {"user_id": user_id, **updates}
+            row = {"user_id": user_id, **filtered}
             cols = ", ".join(row.keys())
             placeholders = ", ".join("?" for _ in row)
             conn.execute(f"INSERT INTO user_preferences ({cols}) VALUES ({placeholders})", tuple(row.values()))
