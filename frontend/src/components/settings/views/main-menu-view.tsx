@@ -2,7 +2,7 @@
 
 import type { SettingsPanel } from "../panel-types";
 
-import { User, CreditCard, Accessibility, Bell, Download, Shield, Lock, HelpCircle, DollarSign, Brain, Sunrise, Activity, MapPin } from "lucide-react";
+import { User, CreditCard, Accessibility, Bell, Download, Shield, Lock, HelpCircle, DollarSign, Brain, Sunrise, Activity, MapPin, Sparkles } from "lucide-react";
 import { NavItem } from "../ui";
 
 
@@ -65,6 +65,12 @@ export function MainMenuView({ panel }: { panel: SettingsPanel }) {
         title="App"
         description="Install Orryon on your device"
         onClick={() => setView("app")}
+      />
+      <NavItem
+        icon={<Sparkles className="h-5 w-5" strokeWidth={1.5} />}
+        title="Ambient Pickup"
+        description="Wake Orryon when you pick up your phone"
+        onClick={() => setView("ambient")}
       />
 
       {/* ── Your day ── */}

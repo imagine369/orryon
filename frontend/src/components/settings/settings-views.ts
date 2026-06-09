@@ -18,6 +18,7 @@ export const SETTINGS_SUB_PANEL_VIEWS = [
   "location",
   "briefing",
   "accessibility",
+  "ambient",
 ] as const satisfies readonly Exclude<View, null>[];
 
 export type SettingsSubPanelView = (typeof SETTINGS_SUB_PANEL_VIEWS)[number];

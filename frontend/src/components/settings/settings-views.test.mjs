@@ -21,6 +21,7 @@ describe("settings sub-panels after split", () => {
       "location",
       "briefing",
       "accessibility",
+      "ambient",
     ];
     assert.deepEqual([...SETTINGS_SUB_PANEL_VIEWS], expected);
   });

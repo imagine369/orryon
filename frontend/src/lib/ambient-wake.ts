@@ -3,7 +3,8 @@
  * haptics + SFX + optional Premium spoken greeting via TTS.
  */
 
-import { playAmbientSettleSound, playAmbientWakeSound } from "@/lib/ambient-audio";
+import { playAmbientSettleSound, playAmbientWakeSound, primeAmbientAudioContext } from "@/lib/ambient-audio";
+import { requestAmbientMotionPermission } from "@/lib/sensor-fusion";
 import { pickAmbientGreeting } from "@/lib/ambient-greeting";
 import {
   triggerAmbientSleepHaptics,
@@ -15,6 +16,12 @@ import { textToSpeech } from "@/lib/voice";
 export interface AmbientWakeOptions {
   premiumGreeting: boolean;
   soundStyle: AmbientSoundStyle;
+}
+
+/** Prime Web Audio + motion permission inside a user gesture (e.g. settings toggle). */
+export async function primeAmbientWakeFromGesture(): Promise<boolean> {
+  primeAmbientAudioContext();
+  return requestAmbientMotionPermission();
 }
 
 /** Wake on pickup: bloom haptics, SFX, and Premium TTS greeting when eligible. */

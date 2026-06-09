@@ -50,7 +50,8 @@ export type View =
   | "health"
   | "location"
   | "briefing"
-  | "accessibility";
+  | "accessibility"
+  | "ambient";
 
 
 export type EmailStep = "idle" | "input" | "code";

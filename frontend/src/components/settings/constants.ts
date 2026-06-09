@@ -175,4 +175,5 @@ export const VIEW_TITLES: Record<string, string> = {
   location: "My Places",
   briefing: "Daily Briefing",
   accessibility: "Accessibility",
+  ambient: "Ambient Pickup",
 };

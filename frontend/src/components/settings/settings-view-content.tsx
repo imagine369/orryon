@@ -18,6 +18,7 @@ import { HealthView } from "./views/health-view";
 import { LocationView } from "./views/location-view";
 import { BriefingView } from "./views/briefing-view";
 import { AccessibilityView } from "./views/accessibility-view";
+import { AmbientView } from "./views/ambient-view";
 
 export function SettingsViewContent({ panel }: { panel: SettingsPanel }) {
   const { view, prefs, updatePrefs, sub } = panel;
@@ -55,6 +56,8 @@ export function SettingsViewContent({ panel }: { panel: SettingsPanel }) {
       return <BriefingView prefs={prefs} onUpdate={updatePrefs} />;
     case "accessibility":
       return <AccessibilityView prefs={prefs} onUpdate={updatePrefs} sub={sub} />;
+    case "ambient":
+      return <AmbientView prefs={prefs} onUpdate={updatePrefs} sub={sub} />;
     default:
       return <MainMenuView panel={panel} />;
   }
