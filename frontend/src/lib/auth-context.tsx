@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api, clearToken, hasAuthSignal, hasToken } from "./api";
+import { ApiError } from "./api-client";
 import { migrateHabitsToServer } from "./migrate-habits";
 import { invalidateSigningKey, prefetchSigningKey } from "./signing";
 import { clearDemoFlagIfRemote, isDemoMode } from "./demo-mode";
@@ -10,7 +11,7 @@ import { formatDisplayName } from "./format-display-name";
 import {
   clearLoginMarkers,
   isFreshLogin,
-  takeBootstrapUser,
+  peekBootstrapUser,
   type BootstrapUser,
 } from "./auth-session";
 
@@ -38,6 +39,9 @@ const AuthContext = createContext<AuthState>({
 
 const DEMO_USER: User = { id: "demo", email: "demo@orryon.app", display_name: "Alex" };
 
+const FRESH_LOGIN_DELAYS_MS = [500, 1000, 1500, 2000, 3000, 4000, 5000, 8000];
+const NORMAL_DELAYS_MS = [400, 1200];
+
 function formatUser(u: BootstrapUser): User {
   return u.display_name
     ? { ...u, display_name: formatDisplayName(u.display_name) }
@@ -48,15 +52,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isUnauthorized(err: unknown): boolean {
+  if (err instanceof ApiError && err.status === 401) return true;
+  return err instanceof Error && err.message === "Unauthorized";
+}
+
 async function fetchMeWithRetry(): Promise<User> {
-  const attempts = isFreshLogin() ? 4 : 2;
+  const fresh = isFreshLogin();
+  const delays = fresh ? FRESH_LOGIN_DELAYS_MS : NORMAL_DELAYS_MS;
+  const attempts = delays.length + 1;
   let lastErr: unknown;
+
   for (let i = 0; i < attempts; i++) {
     try {
       return await api.get<User>("/api/auth/me");
     } catch (err) {
       lastErr = err;
-      if (i < attempts - 1) await sleep(300 * (i + 1));
+      if (isUnauthorized(err)) throw err;
+      if (i < delays.length) await sleep(delays[i]);
     }
   }
   throw lastErr;
@@ -70,11 +83,38 @@ async function clearServerSession(): Promise<void> {
   }
 }
 
+function scheduleBackgroundMeCheck(setUser: (u: User | null) => void): void {
+  void (async () => {
+    for (const delay of [3000, 6000, 12000]) {
+      await sleep(delay);
+      if (!isFreshLogin()) return;
+      try {
+        const u = await api.get<User>("/api/auth/me");
+        clearLoginMarkers();
+        setUser(formatUser(u));
+        prefetchSigningKey().catch(() => {});
+        migrateHabitsToServer().catch(() => {});
+        return;
+      } catch (err) {
+        if (isUnauthorized(err)) {
+          await clearServerSession();
+          clearToken();
+          setUser(null);
+          clearLoginMarkers();
+          return;
+        }
+      }
+    }
+  })();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useQueuedEffect(() => {
+    let cancelled = false;
+
     clearDemoFlagIfRemote();
     if (isDemoMode()) {
       setUser(DEMO_USER);
@@ -83,44 +123,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     void (async () => {
-      const bootstrap = takeBootstrapUser();
+      const bootstrap = peekBootstrapUser();
       if (bootstrap) {
         setUser(formatUser(bootstrap));
       }
 
       if (!bootstrap && !hasAuthSignal() && !hasToken()) {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
         return;
       }
 
       try {
         const u = await fetchMeWithRetry();
+        if (cancelled) return;
         clearLoginMarkers();
         setUser(formatUser(u));
         prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
       } catch (err) {
-        clearLoginMarkers();
-        // Drop stale cookies so we don't loop: orryon_auth=1 with a dead session
-        // made every /home visit bounce straight back to /login.
-        if (hasAuthSignal() || bootstrap) {
-          await clearServerSession();
+        if (cancelled) return;
+        if (isUnauthorized(err)) {
+          // Definitive auth failure — drop stale cookies so we don't loop.
+          if (hasAuthSignal()) await clearServerSession();
+          clearLoginMarkers();
+          clearToken();
+          setUser(null);
+        } else if (bootstrap && isFreshLogin()) {
+          // OTP just succeeded; backend/proxy may still be cold. Trust bootstrap
+          // and revalidate in the background — never revoke a fresh session.
+          scheduleBackgroundMeCheck(setUser);
+        } else {
+          setUser(null);
         }
-        clearToken();
-        setUser(null);
         if (process.env.NODE_ENV !== "production") {
           // eslint-disable-next-line no-console
           console.warn("[auth] /api/auth/me failed:", (err as Error)?.message);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback((u: User) => {
-    // Cookies were set by /api/auth/login (or /api/auth/demo-login); we just
-    // need to remember the user object in React state.
     setUser(formatUser(u));
     prefetchSigningKey().catch(() => {});
   }, []);

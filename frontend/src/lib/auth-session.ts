@@ -17,10 +17,10 @@ export function stashBootstrapUser(user: BootstrapUser): void {
   sessionStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
 }
 
-export function takeBootstrapUser(): BootstrapUser | null {
+/** Read bootstrap user without consuming — survives React Strict Mode double-mount. */
+export function peekBootstrapUser(): BootstrapUser | null {
   if (typeof sessionStorage === "undefined") return null;
   const raw = sessionStorage.getItem(BOOTSTRAP_USER_KEY);
-  sessionStorage.removeItem(BOOTSTRAP_USER_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as BootstrapUser;
@@ -29,12 +29,12 @@ export function takeBootstrapUser(): BootstrapUser | null {
   }
 }
 
-/** True for ~15s after OTP verify — widen /api/auth/me retry window. */
+/** True for ~60s after OTP verify — widen /api/auth/me retry / trust window. */
 export function isFreshLogin(): boolean {
   if (typeof sessionStorage === "undefined") return false;
   const ts = sessionStorage.getItem(LOGIN_TS_KEY);
   if (!ts) return false;
-  return Date.now() - Number(ts) < 15_000;
+  return Date.now() - Number(ts) < 60_000;
 }
 
 export function clearLoginMarkers(): void {

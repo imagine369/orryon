@@ -36,11 +36,16 @@ export function makeCsrf(): string {
  * Read the session JWT from the incoming request, whichever way it was sent:
  *  1. the HttpOnly `orryon_session` cookie (preferred; set by login route)
  *  2. an existing `Authorization: Bearer ...` header (legacy localStorage path)
+ *
+ * When duplicate cookies exist (legacy host-only + new domain-scoped), prefer
+ * the *last* value — browsers tend to append the newest cookie last.
  */
 export function getSessionToken(req: Request): string | null {
   const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(/(?:^|;\s*)orryon_session=([^;]+)/);
-  if (match) return decodeURIComponent(match[1]);
+  const matches = [...cookieHeader.matchAll(/(?:^|;\s*)orryon_session=([^;]+)/g)];
+  if (matches.length > 0) {
+    return decodeURIComponent(matches[matches.length - 1][1]);
+  }
   const auth = req.headers.get("authorization") || "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
   return null;
@@ -48,8 +53,11 @@ export function getSessionToken(req: Request): string | null {
 
 export function getCsrfCookie(req: Request): string | null {
   const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(/(?:^|;\s*)orryon_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  const matches = [...cookieHeader.matchAll(/(?:^|;\s*)orryon_csrf=([^;]+)/g)];
+  if (matches.length > 0) {
+    return decodeURIComponent(matches[matches.length - 1][1]);
+  }
+  return null;
 }
 
 function cookieBase(host: string | undefined) {
@@ -62,6 +70,34 @@ function cookieBase(host: string | undefined) {
   };
 }
 
+/** Remove host-only and domain-scoped variants before issuing a new session. */
+function clearAllCookieVariants(
+  res: NextResponse,
+  name: string,
+  httpOnly: boolean,
+  host?: string,
+): void {
+  // Legacy host-only cookie (pre domain=.orryon.com migration)
+  res.cookies.set(name, "", {
+    httpOnly,
+    secure: IS_PROD,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  const domain = cookieDomainForHost(host);
+  if (domain) {
+    res.cookies.set(name, "", {
+      httpOnly,
+      secure: IS_PROD,
+      sameSite: "lax",
+      path: "/",
+      domain,
+      maxAge: 0,
+    });
+  }
+}
+
 /** Attach the three auth cookies to a NextResponse. */
 export function setAuthCookies(
   res: NextResponse,
@@ -69,6 +105,10 @@ export function setAuthCookies(
   csrf: string,
   host?: string,
 ): void {
+  clearAllCookieVariants(res, SESSION_COOKIE, true, host);
+  clearAllCookieVariants(res, CSRF_COOKIE, false, host);
+  clearAllCookieVariants(res, SIGNAL_COOKIE, false, host);
+
   const base = cookieBase(host);
   res.cookies.set(SESSION_COOKIE, jwt, {
     ...base,
@@ -88,14 +128,9 @@ export function setAuthCookies(
 }
 
 export function clearAuthCookies(res: NextResponse, host?: string): void {
-  const base = cookieBase(host);
-  for (const name of [SESSION_COOKIE, CSRF_COOKIE, SIGNAL_COOKIE]) {
-    res.cookies.set(name, "", {
-      ...base,
-      httpOnly: name === SESSION_COOKIE,
-      maxAge: 0,
-    });
-  }
+  clearAllCookieVariants(res, SESSION_COOKIE, true, host);
+  clearAllCookieVariants(res, CSRF_COOKIE, false, host);
+  clearAllCookieVariants(res, SIGNAL_COOKIE, false, host);
 }
 
 /**

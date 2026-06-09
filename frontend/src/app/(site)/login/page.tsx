@@ -22,6 +22,14 @@ type Tier = TierId;
 
 type Step = "breathe" | "email" | "code" | "name";
 
+/** Only allow same-origin relative paths after login (blocks open redirects). */
+function sanitizeNextPath(raw: string | null): string {
+  const fallback = "/home";
+  if (!raw) return fallback;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return fallback;
+  return raw;
+}
+
 // Build-time opt-in — must match backend NO_CARD_TRIAL=1 (verified via /api/auth/email-status).
 const NO_CARD_TRIAL_BUILD: boolean =
   (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
@@ -34,7 +42,7 @@ function LoginPageInner() {
   const stepParam  = searchParams.get("step");
   const planParam  = searchParams.get("plan");
   const tierParam  = searchParams.get("tier") as Tier | null;
-  const nextParam  = searchParams.get("next") || "/home";
+  const nextParam  = sanitizeNextPath(searchParams.get("next"));
 
   const hasTierParam = !!(tierParam && ["pro", "premium", "premium_plus"].includes(tierParam));
   const selectedTier: Tier = hasTierParam ? tierParam! : "premium";
