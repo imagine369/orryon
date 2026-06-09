@@ -25,7 +25,7 @@ router = APIRouter(tags=["account"])
 
 @router.get("/api/export")
 async def export_data(user: dict = Depends(require_active_plan)):
-    """Download all user data as a ZIP file containing the SQLite DB and JSON."""
+    """Download all user data as a ZIP (user-scoped finance.db + filtered data.json)."""
     from core.export import build_user_export_zip
 
     zip_bytes = build_user_export_zip(user["user_id"])

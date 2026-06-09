@@ -50,6 +50,11 @@ _ALL_TABLES = "\n\n".join(
 )
 
 
+def sqlite_ddl_script() -> str:
+    """SQLite CREATE TABLE script (same DDL ``init_db`` uses for SQLite)."""
+    return _ALL_TABLES
+
+
 def _exec_ddl_pg() -> None:
     conn = _pg_pool.getconn()
     try:
