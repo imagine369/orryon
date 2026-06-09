@@ -30,6 +30,30 @@ function sanitizeNextPath(raw: string | null): string {
   return raw;
 }
 
+/** Wait for /api/auth/me to succeed before leaving the login page (avoids bounce loops). */
+async function waitForSession(): Promise<{ ok: true } | { ok: false; message: string }> {
+  const delays = [0, 400, 800, 1500, 2500, 4000, 6000, 9000];
+  for (const delay of delays) {
+    if (delay) await new Promise((r) => setTimeout(r, delay));
+    const me = await fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" });
+    if (me.ok) return { ok: true };
+    if (me.status === 401) {
+      const body = (await me.json().catch(() => ({}))) as { detail?: string };
+      return {
+        ok: false,
+        message:
+          body.detail ||
+          "Your session could not be verified. Please request a new code and try again.",
+      };
+    }
+  }
+  return {
+    ok: false,
+    message:
+      "The server is taking longer than usual to respond. Please wait a moment and tap Verify again.",
+  };
+}
+
 // Build-time opt-in — must match backend NO_CARD_TRIAL=1 (verified via /api/auth/email-status).
 const NO_CARD_TRIAL_BUILD: boolean =
   (process.env.NEXT_PUBLIC_NO_CARD_TRIAL || "").toLowerCase() === "true";
@@ -272,9 +296,13 @@ function LoginPageInner() {
         }
       }
 
-      // Hard navigation so the freshly-set HttpOnly session cookie is in
-      // place for the very first request /home makes — a soft router.push
-      // has, in practice, raced ahead of the cookie write.
+      const session = await waitForSession();
+      if (!session.ok) {
+        setError(session.message);
+        setLoading(false);
+        return;
+      }
+
       window.location.assign(nextParam);
     } catch (e: unknown) {
       if (process.env.NODE_ENV !== "production") {

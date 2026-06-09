@@ -141,3 +141,8 @@ export async function readCookie(name: string): Promise<string | null> {
   const store = await nextCookies();
   return store.get(name)?.value ?? null;
 }
+
+/** Preferred session lookup for dedicated auth route handlers (Next cookies API). */
+export async function readSessionTokenFromStore(): Promise<string | null> {
+  return readCookie(SESSION_COOKIE);
+}

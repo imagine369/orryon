@@ -143,11 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (cancelled) return;
         if (isUnauthorized(err)) {
-          // Definitive auth failure — drop stale cookies so we don't loop.
-          if (hasAuthSignal()) await clearServerSession();
-          clearLoginMarkers();
-          clearToken();
-          setUser(null);
+          if (bootstrap && isFreshLogin()) {
+            // Cookie may not be visible to the server yet right after OTP — keep
+            // the bootstrap user and revalidate without revoking the session.
+            scheduleBackgroundMeCheck(setUser);
+          } else {
+            if (hasAuthSignal()) await clearServerSession();
+            clearLoginMarkers();
+            clearToken();
+            setUser(null);
+          }
         } else if (bootstrap && isFreshLogin()) {
           // OTP just succeeded; backend/proxy may still be cold. Trust bootstrap
           // and revalidate in the background — never revoke a fresh session.

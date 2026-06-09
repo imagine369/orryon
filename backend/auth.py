@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import time
 import uuid
 import logging
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 _JWT_ALGORITHM = "HS256"
 _JWT_EXPIRY_DAYS = 30
 _SESSION_CACHE_TTL = 60  # seconds
+# Allow freshly-issued JWTs through when the session row isn't visible yet
+# (multi-instance deploys, cold DB, or cache/DB race right after OTP verify).
+_FRESH_TOKEN_GRACE_SECONDS = 180
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -136,7 +140,7 @@ def jwt_iat_unix(payload: dict[str, Any]) -> int:
     return 0
 
 
-async def _check_session_valid(jti: str) -> bool:
+async def _check_session_valid(jti: str, *, issued_at_unix: int = 0) -> bool:
     """Check if a session is still active (not revoked). Cached for 60s."""
     if not jti:
         return False  # reject legacy tokens without jti — forces re-login
@@ -153,7 +157,8 @@ async def _check_session_valid(jti: str) -> bool:
         ).fetchone()
 
     if row is None:
-        valid = False  # no session row = unknown token — reject
+        age = time.time() - issued_at_unix if issued_at_unix > 0 else 999_999
+        valid = age < _FRESH_TOKEN_GRACE_SECONDS
     else:
         valid = not dict(row).get("revoked", 0)
 
@@ -179,7 +184,7 @@ async def get_current_user(
     payload = decode_token(creds.credentials)
 
     jti = payload.get("jti", "")
-    if not await _check_session_valid(jti):
+    if not await _check_session_valid(jti, issued_at_unix=jwt_iat_unix(payload)):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session revoked")
 
     return {
