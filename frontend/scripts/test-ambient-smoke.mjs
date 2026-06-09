@@ -118,8 +118,15 @@ function createApiRouter(prefs) {
         if (patch.ambient_sound_style !== undefined) {
           prefs.ambient_sound_style = patch.ambient_sound_style;
         }
-        const { ambient_mode_enabled, ambient_sensitivity, ambient_sound_style, ...rest } =
-          patch;
+        const {
+          ambient_mode_enabled: _ambientMode,
+          ambient_sensitivity: _ambientSensitivity,
+          ambient_sound_style: _ambientSoundStyle,
+          ...rest
+        } = patch;
+        void _ambientMode;
+        void _ambientSensitivity;
+        void _ambientSoundStyle;
         Object.assign(prefs, rest);
         await route.fulfill({ status: 200, json: prefs });
         return;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams as useNextSearchParams } from "next/navigation";
-import { X, Check, RotateCw } from "lucide-react";
+import { X, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatDisplayName } from "@/lib/format-display-name";
@@ -76,6 +76,10 @@ function LoginPageInner() {
   // Signed-in user from /pricing → Stripe (skip email OTP)
   useEffect(() => {
     if (authLoading || !authedUser || !hasTierParam || breatheFlow) return;
+    if (NO_CARD_TRIAL) {
+      window.location.assign(nextParam);
+      return;
+    }
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -93,7 +97,7 @@ function LoginPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authedUser, hasTierParam, selectedTier, selectedPlan, breatheFlow]);
+  }, [authLoading, authedUser, hasTierParam, selectedTier, selectedPlan, breatheFlow, nextParam]);
 
   const [authUser, setAuthUser] = useState<{ id: string; email: string; display_name: string } | null>(null);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
@@ -176,7 +180,6 @@ function LoginPageInner() {
 
       if (!resp.ok) {
         if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
           console.warn("[login] verify failed", resp.status, payload);
         }
         // 429 = OTP lockout; surface a friendlier message
@@ -206,7 +209,6 @@ function LoginPageInner() {
 
       if (!hasSignal) {
         if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
           console.error(
             "[login] /api/auth/login returned 200 but no orryon_auth cookie was set. " +
               "document.cookie = ", document.cookie,
@@ -224,8 +226,8 @@ function LoginPageInner() {
       setDisplayName(payload.user.display_name || "");
       login(payload.user);
 
-      // New sign-up from /pricing → Stripe after OTP
-      if (hasTierParam && selectedTier) {
+      // New sign-up from /pricing → Stripe after OTP (unless no-card trial beta)
+      if (hasTierParam && selectedTier && !NO_CARD_TRIAL) {
         try {
           await startTierCheckout(selectedTier, selectedPlan, {
             successUrl: `${window.location.origin}/login?step=name`,
@@ -243,7 +245,6 @@ function LoginPageInner() {
       window.location.assign(nextParam);
     } catch (e: unknown) {
       if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
         console.error("[login] verify threw", e);
       }
       const msg = e instanceof Error ? e.message : "";

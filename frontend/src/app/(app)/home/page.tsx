@@ -75,22 +75,31 @@ export default function HomePage() {
     orryonAliveState,
   );
 
+  const {
+    touchActivity,
+    reportMotionResumed,
+    primeAmbientWake,
+    isAmbientEnabled,
+  } = ambient;
+  const { handleSend: sendChatMessage, handleRetry: retryChatMessage } = chat;
+  const { setStatus: setVoiceStatus } = voice;
+
   const handleSend = useCallback(
     (text: string, source?: MessageSource) => {
-      ambient.touchActivity();
-      chat.handleSend(text, source);
+      touchActivity();
+      sendChatMessage(text, source);
     },
-    [ambient.touchActivity, chat.handleSend],
+    [touchActivity, sendChatMessage],
   );
 
   const handleOrbTap = useCallback(() => {
-    ambient.reportMotionResumed();
-  }, [ambient.reportMotionResumed]);
+    reportMotionResumed();
+  }, [reportMotionResumed]);
 
   const handleRetry = useCallback(() => {
-    ambient.touchActivity();
-    chat.handleRetry();
-  }, [ambient.touchActivity, chat.handleRetry]);
+    touchActivity();
+    retryChatMessage();
+  }, [touchActivity, retryChatMessage]);
 
   const handleVoiceStatusChange = useCallback(
     (status: VoiceStatus) => {
@@ -99,16 +108,16 @@ export default function HomePage() {
         status === "transcribing" ||
         status === "speaking"
       ) {
-        ambient.touchActivity();
+        touchActivity();
       }
-      voice.setStatus(status);
+      setVoiceStatus(status);
     },
-    [ambient.touchActivity, voice.setStatus],
+    [touchActivity, setVoiceStatus],
   );
 
   const wakePrimedRef = useRef(false);
   useEffect(() => {
-    if (!ambient.isAmbientEnabled) {
+    if (!isAmbientEnabled) {
       wakePrimedRef.current = false;
       return;
     }
@@ -117,7 +126,7 @@ export default function HomePage() {
     const prime = () => {
       if (wakePrimedRef.current) return;
       wakePrimedRef.current = true;
-      void ambient.primeAmbientWake();
+      void primeAmbientWake();
     };
 
     window.addEventListener("pointerdown", prime, { once: true, passive: true });
@@ -126,7 +135,7 @@ export default function HomePage() {
       window.removeEventListener("pointerdown", prime);
       window.removeEventListener("touchstart", prime);
     };
-  }, [ambient.isAmbientEnabled, ambient.primeAmbientWake]);
+  }, [isAmbientEnabled, primeAmbientWake]);
 
   if (activating) {
     return <ChatActivationScreen activationPlan={activationPlan} />;
