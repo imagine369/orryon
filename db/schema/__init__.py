@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-from db.connection import _USE_PG, _pg_pool
+from db import connection as db_connection
+from db.connection import init_pool
 from db.migrate import run_migrations
 from db.schema.schema_approvals import TABLES as APPROVALS_TABLES
 from db.schema.schema_auth import TABLES as AUTH_TABLES
@@ -58,7 +59,10 @@ def sqlite_ddl_script() -> str:
 
 
 def _exec_ddl_pg() -> None:
-    conn = _pg_pool.getconn()
+    pool = db_connection._pg_pool
+    if pool is None:
+        raise RuntimeError("Postgres pool not initialised — call init_pool() before init_db()")
+    conn = pool.getconn()
     try:
         cur = conn.cursor()
         for stmt in _ALL_TABLES.split(";"):
@@ -76,7 +80,7 @@ def _exec_ddl_pg() -> None:
         logger.error("Postgres init_db failed: %s", exc)
         raise
     finally:
-        _pg_pool.putconn(conn)
+        pool.putconn(conn)
 
 
 def _exec_ddl_sqlite() -> None:
@@ -94,7 +98,9 @@ def _exec_ddl_sqlite() -> None:
 
 def init_db() -> None:
     """Create all tables if they don't exist, then run numbered migrations."""
-    if _USE_PG and _pg_pool:
+    if db_connection._USE_PG:
+        if db_connection._pg_pool is None:
+            init_pool()
         _exec_ddl_pg()
     else:
         _exec_ddl_sqlite()

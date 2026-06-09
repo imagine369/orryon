@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import logging
 
-from db.connection import _USE_PG, get_connection
+import db.connection as db_connection
+from db.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def _validate_table(table: str) -> str:
 
 def _ph(n: int) -> str:
     """Return n placeholders for the current backend."""
-    p = "%s" if _USE_PG else "?"
+    p = "%s" if db_connection._USE_PG else "?"
     return ", ".join(p for _ in range(n))
 
 
@@ -58,7 +59,7 @@ def insert_row(table: str, data: dict) -> bool:
         placeholders = _ph(len(data))
         values = list(data.values())
         conn = get_connection()
-        if _USE_PG:
+        if db_connection._USE_PG:
             set_clause = ", ".join(f"{k} = EXCLUDED.{k}" for k in data if k != "id")
             conn.execute(
                 f"INSERT INTO {table} ({cols}) VALUES ({placeholders}) "
@@ -83,7 +84,7 @@ def fetch_rows(table: str, where: dict | None = None, limit: int = 500) -> list[
     try:
         _validate_table(table)
         conn = get_connection()
-        ph = "%s" if _USE_PG else "?"
+        ph = "%s" if db_connection._USE_PG else "?"
         query = f"SELECT * FROM {table}"
         params: list = []
         if where:
@@ -103,7 +104,7 @@ def update_row(table: str, data: dict, where: dict) -> bool:
     """Update rows in *table* matching *where* conditions with *data* values."""
     try:
         _validate_table(table)
-        ph = "%s" if _USE_PG else "?"
+        ph = "%s" if db_connection._USE_PG else "?"
         set_clause = ", ".join(f"{k} = {ph}" for k in data)
         where_clause = " AND ".join(f"{k} = {ph}" for k in where)
         params = list(data.values()) + list(where.values())
@@ -121,7 +122,7 @@ def delete_row(table: str, where: dict) -> bool:
     """Delete rows from *table* matching *where* conditions."""
     try:
         _validate_table(table)
-        ph = "%s" if _USE_PG else "?"
+        ph = "%s" if db_connection._USE_PG else "?"
         where_clause = " AND ".join(f"{k} = {ph}" for k in where)
         conn = get_connection()
         conn.execute(f"DELETE FROM {table} WHERE {where_clause}", list(where.values()))

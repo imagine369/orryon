@@ -203,9 +203,9 @@ async def google_status(user: dict = Depends(get_current_user)):
     tokens = get_google_tokens(uid)
     conn = get_connection()
     row = conn.execute(
-        "SELECT COUNT(*) FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
+        "SELECT COUNT(*) AS cnt FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
     ).fetchone()
-    imported_count = row[0] if row else 0
+    imported_count = row["cnt"] if isinstance(row, dict) else (row[0] if row else 0)
     oauth_on = GOOGLE_CALENDAR_OAUTH_ENABLED
     has_tokens = tokens is not None
     return {

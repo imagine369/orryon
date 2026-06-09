@@ -51,6 +51,8 @@ def init_pool() -> None:
     global _pg_pool
     if not _USE_PG:
         return
+    if _pg_pool is not None:
+        return
     from psycopg_pool import ConnectionPool
     from psycopg.rows import dict_row
     _pg_pool = ConnectionPool(
@@ -145,10 +147,20 @@ class _DbConn:
         self._conn.rollback()
 
     def close(self):
-        if self._is_pg and _pg_pool:
-            _pg_pool.putconn(self._conn)
-        else:
-            self._conn.close()
+        if self._is_pg:
+            pool = _pg_pool
+            if pool is not None:
+                try:
+                    pool.putconn(self._conn)
+                    return
+                except Exception:
+                    logger.debug("Returning connection outside active pool; closing directly")
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            return
+        self._conn.close()
 
     def __enter__(self):
         return self
@@ -159,7 +171,9 @@ class _DbConn:
 
 def get_connection() -> _DbConn:
     """Return a database connection (Postgres pool or SQLite)."""
-    if _USE_PG and _pg_pool:
+    if _USE_PG:
+        if _pg_pool is None:
+            init_pool()
         conn = _pg_pool.getconn()
         return _DbConn(conn, is_pg=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
