@@ -1,52 +1,11 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-
-const FUSION_WEIGHTS = {
-  motion: 0.35,
-  proximity: 0.3,
-  light: 0.15,
-  gyro: 0.1,
-  touch: 0.1,
-};
-
-function clamp01(value) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
-
-function fusePickupConfidence(reading) {
-  const w = FUSION_WEIGHTS;
-  return clamp01(
-    reading.motion * w.motion +
-      reading.proximity * w.proximity +
-      reading.light * w.light +
-      reading.gyro * w.gyro +
-      reading.touch * w.touch,
-  );
-}
-
-function fusePutDownConfidence(reading) {
-  const w = FUSION_WEIGHTS;
-  const stillness = 1 - reading.motion;
-  const stability = 1 - reading.gyro;
-  const far = 1 - reading.proximity;
-  const uncovered = 1 - reading.light;
-  const noTouch = 1 - reading.touch;
-  return clamp01(
-    stillness * w.motion +
-      far * w.proximity +
-      uncovered * w.light +
-      stability * w.gyro +
-      noTouch * w.touch,
-  );
-}
-
-function scoreProximityHeuristic(accel) {
-  const g = Math.sqrt(accel.x ** 2 + accel.y ** 2 + accel.z ** 2) || 1;
-  const nz = Math.abs(accel.z) / g;
-  const tilt = 1 - nz;
-  return clamp01(tilt * 1.4);
-}
+import {
+  fusePickupConfidence,
+  fusePutDownConfidence,
+  sampleThrottleMsForAmbientState,
+  scoreProximityHeuristic,
+} from "./sensor-fusion.ts";
 
 describe("fusePickupConfidence", () => {
   it("weights sum to a strong pickup when all signals high", () => {
@@ -103,16 +62,6 @@ describe("scoreProximityHeuristic", () => {
     assert.ok(upright > flat);
   });
 });
-
-const SAMPLE_THROTTLE_SLEEPING_MS = 100;
-const SAMPLE_THROTTLE_AWAKE_MS = 150;
-const SAMPLE_THROTTLE_MINIORB_MS = 300;
-
-function sampleThrottleMsForAmbientState(state) {
-  if (state === "sleeping") return SAMPLE_THROTTLE_SLEEPING_MS;
-  if (state === "miniOrb") return SAMPLE_THROTTLE_MINIORB_MS;
-  return SAMPLE_THROTTLE_AWAKE_MS;
-}
 
 describe("sampleThrottleMsForAmbientState", () => {
   it("uses the slowest interval in miniOrb for battery savings", () => {

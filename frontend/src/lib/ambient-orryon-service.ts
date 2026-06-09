@@ -44,6 +44,22 @@ export function effectivePickupThreshold(sensitivity: number): number {
   return Math.min(0.95, Math.max(0.55, PICKUP_CONFIDENCE_BASE - offset));
 }
 
+/** True when put-down should sleep from active/miniOrb (vs Premium voice hold). */
+export function shouldAmbientSleepOnPutDown(
+  state: AmbientAvatarState,
+  premiumVoiceHold: boolean,
+  conversationActive: boolean,
+): boolean {
+  if (
+    premiumVoiceHold &&
+    conversationActive &&
+    (state === "active" || state === "miniOrb")
+  ) {
+    return false;
+  }
+  return state === "active" || state === "miniOrb";
+}
+
 export class AmbientOrryonService {
   private state: AmbientAvatarState = "sleeping";
   private config: AmbientOrryonConfig;
@@ -194,16 +210,18 @@ export class AmbientOrryonService {
       return;
     }
 
-    if (
-      this.state === "miniOrb" &&
-      this.config.premiumVoiceHold &&
-      this.conversationActive
-    ) {
+    if (holdInOrb && this.state === "miniOrb") {
       this.resetInactivityTimer();
       return;
     }
 
-    if (this.state === "active" || this.state === "miniOrb") {
+    if (
+      shouldAmbientSleepOnPutDown(
+        this.state,
+        this.config.premiumVoiceHold,
+        this.conversationActive,
+      )
+    ) {
       this.transitionTo("sleeping", { sleepCallback: true });
     }
   }

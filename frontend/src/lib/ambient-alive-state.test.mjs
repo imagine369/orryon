@@ -1,26 +1,10 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-
-const AMBIENT_AWAKE_STATES = new Set(["awakening", "active", "miniOrb"]);
-
-function isAmbientAwake(state) {
-  return AMBIENT_AWAKE_STATES.has(state);
-}
-
-function shouldShowAmbientMiniOrb(ambientEnabled, ambientState, hasMessages) {
-  if (!ambientEnabled || !isAmbientAwake(ambientState)) return false;
-  if (ambientState === "miniOrb") return true;
-  if (hasMessages && (ambientState === "active" || ambientState === "awakening")) {
-    return true;
-  }
-  return false;
-}
-
-function shouldShowAmbientCenterAvatar(ambientEnabled, ambientState, hasMessages) {
-  if (!ambientEnabled || !isAmbientAwake(ambientState) || hasMessages) return false;
-  if (ambientState === "miniOrb") return false;
-  return ambientState === "awakening" || ambientState === "active";
-}
+import {
+  resolveAmbientAliveState,
+  shouldShowAmbientCenterAvatar,
+  shouldShowAmbientMiniOrb,
+} from "./ambient-alive-state.ts";
 
 describe("shouldShowAmbientCenterAvatar", () => {
   it("shows center avatar when awakening on empty chat", () => {
@@ -44,14 +28,6 @@ describe("shouldShowAmbientCenterAvatar", () => {
     assert.equal(shouldShowAmbientCenterAvatar(true, "sleeping", false), false);
   });
 });
-
-function resolveAmbientAliveState(ambientState, chatAlive) {
-  const awake = isAmbientAwake(ambientState);
-  const priority = new Set(["listening", "thinking", "streaming", "speaking"]);
-  if (!awake) return chatAlive;
-  if (priority.has(chatAlive)) return chatAlive;
-  return "idle";
-}
 
 describe("resolveAmbientAliveState", () => {
   it("passes through chat state when ambient is sleeping", () => {
