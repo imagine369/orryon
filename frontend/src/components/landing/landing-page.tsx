@@ -126,7 +126,7 @@ export default function LandingPage() {
             />
 
             <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">
-              Wellbeing should be free.<br />For everyone.
+              Peace and Clarity should be free.<br />For everyone.
             </h2>
             <div className="space-y-4 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] text-[0.82rem] sm:text-sm lg:text-base text-white/50 leading-relaxed">
               <p>That&rsquo;s why our wellness tools are free for everyone.</p>
@@ -157,7 +157,7 @@ export default function LandingPage() {
                 boxShadow: "0 0 80px rgba(62,207,190,0.28), 0 0 160px rgba(100,170,220,0.14)",
               }}
             />
-            <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Wellbeing should be free.<br />For everyone.</h2>
+            <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">Peace and Clarity should be free.<br />For everyone.</h2>
             <div className="space-y-4 mb-8 sm:mb-10 lg:mb-12 max-w-[460px] text-[0.82rem] sm:text-sm lg:text-base text-white/50 leading-relaxed">
               <p>That’s why our wellness tools are free for everyone.</p>
               <p className="font-semibold text-white/70">Use them as much as you like.</p>
