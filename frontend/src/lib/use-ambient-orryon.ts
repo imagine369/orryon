@@ -13,6 +13,11 @@ import {
   planAllowsAmbientVoiceHold,
 } from "@/lib/ambient-plan";
 import type { UserPreferences } from "@/lib/use-preferences";
+import { primeAmbientAudioContext } from "@/lib/ambient-audio";
+import {
+  playAmbientSleepSequence,
+  playAmbientWakeSequence,
+} from "@/lib/ambient-wake";
 import { SensorFusionController } from "@/lib/sensor-fusion";
 
 /** User speech only — not Orryon thinking/TTS (put-down VAD hold). */
@@ -45,8 +50,17 @@ export function useAmbientOrryon({
   const [ambientState, setAmbientState] = useState<AmbientAvatarState>("sleeping");
   const serviceRef = useRef<AmbientOrryonService | null>(null);
   const fusionRef = useRef<SensorFusionController | null>(null);
+  const wakeConfigRef = useRef({
+    soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
+    premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
+  });
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
+
+  wakeConfigRef.current = {
+    soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
+    premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
+  };
 
   useEffect(() => {
     const service = new AmbientOrryonService(
@@ -61,8 +75,14 @@ export function useAmbientOrryon({
         onStateChange: (state, previous) => {
           callbacksRef.current?.onStateChange?.(state, previous);
         },
-        onWakeStart: () => callbacksRef.current?.onWakeStart?.(),
-        onSleepStart: () => callbacksRef.current?.onSleepStart?.(),
+        onWakeStart: () => {
+          void playAmbientWakeSequence(wakeConfigRef.current);
+          callbacksRef.current?.onWakeStart?.();
+        },
+        onSleepStart: () => {
+          void playAmbientSleepSequence();
+          callbacksRef.current?.onSleepStart?.();
+        },
       },
     );
     serviceRef.current = service;
@@ -130,6 +150,12 @@ export function useAmbientOrryon({
     return fusionRef.current?.primePermission() ?? false;
   }, []);
 
+  /** Prime audio + motion inside a user gesture (settings toggle). */
+  const primeAmbientWake = useCallback(async () => {
+    primeAmbientAudioContext();
+    return fusionRef.current?.primePermission() ?? false;
+  }, []);
+
   const reportPickupConfidence = useCallback((score: number) => {
     serviceRef.current?.reportPickupConfidence(score);
   }, []);
@@ -150,6 +176,7 @@ export function useAmbientOrryon({
     ambientState,
     isAmbientEnabled: prefs.ambient_mode_enabled,
     primeAmbientMotion,
+    primeAmbientWake,
     reportPickupConfidence,
     reportPutDown,
     reportMotionResumed,
