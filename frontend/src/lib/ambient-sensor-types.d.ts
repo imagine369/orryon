@@ -1,3 +1,4 @@
+/* eslint-disable no-var -- declare var is required for global constructor augmentation */
 /** Generic Sensor API types (optional browser APIs for ambient fusion). */
 
 interface AmbientSensor extends EventTarget {

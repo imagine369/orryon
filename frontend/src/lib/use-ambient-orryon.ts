@@ -55,12 +55,14 @@ export function useAmbientOrryon({
     premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
   });
   const callbacksRef = useRef(callbacks);
-  callbacksRef.current = callbacks;
 
-  wakeConfigRef.current = {
-    soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
-    premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
-  };
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+    wakeConfigRef.current = {
+      soundStyle: normalizeAmbientSoundStyle(prefs.ambient_sound_style),
+      premiumGreeting: planAllowsAmbientSpokenGreeting(plan),
+    };
+  }, [callbacks, prefs.ambient_sound_style, plan]);
 
   useEffect(() => {
     const service = new AmbientOrryonService(
