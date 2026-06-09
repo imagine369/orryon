@@ -48,8 +48,8 @@ type FeatureCardData = {
 const LIFE_OS_CARDS: FeatureCardData[] = [
   { tag: "HANDLED",        Icon: BarChart2,         highlighted: "Your questions",     rest: "and needs answered.",         from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
   { tag: "MOMENTS",         Icon: SlidersHorizontal, highlighted: "Present, relaxed",     rest: "and connected.",           from: "#060e1f", to: "#0d1f40", glow: "rgba(96,165,250,0.12)", photo: "/budget-card.jpg"   },
-  { tag: "HEALTH",          Icon: Target,            highlighted: "Get in nature",         rest: "and recharge.",             from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"    },
   { tag: "FINANCE",         Icon: Receipt,           highlighted: "Stay on top",           rest: "of your expenses.",     from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"    },
+  { tag: "HEALTH",          Icon: Target,            highlighted: "Get in nature",         rest: "and recharge.",             from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"    },
   { tag: "DREAMS & GOALS",  Icon: TrendingUp,        highlighted: "Nurture your",          rest: "relationships.",        from: "#031a1a", to: "#063030", glow: "rgba(45,212,191,0.12)", photo: "/forecast-card.jpg" },
   { tag: "CLARITY & PEACE", Icon: Activity,          highlighted: "Make everyday life,",   rest: "more intentional and beautiful.",       from: "#08081e", to: "#14143c", glow: "rgba(129,140,248,0.12)", photo: "/yearly-card.jpg"   },
 ];
@@ -539,8 +539,8 @@ export function FeatureSection() {
 
                   {/* Top row */}
                   <div className="relative flex items-center justify-between p-4">
-                    <div className="rounded-full bg-black/50 border border-white/10 px-3 py-1.5">
-                      <span className="text-[0.55rem] font-bold tracking-widest text-white/55">{card.tag}</span>
+                    <div className="flex items-center justify-center rounded-full bg-black/50 border border-white/10 px-3 py-[0.28125rem]">
+                      <span className="text-[0.55rem] font-bold leading-none tracking-widest text-white/55">{card.tag}</span>
                     </div>
                   </div>
 
