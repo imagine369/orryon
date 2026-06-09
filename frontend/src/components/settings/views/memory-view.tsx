@@ -34,7 +34,7 @@ export function MemoryView() {
       </p>
       <div className="flex items-center justify-between text-xs text-white/30">
         <span>{count} facts stored</span>
-        {count >= 50 && <span className="text-amber-400/70">Starter cap: 50 facts</span>}
+        {count >= 100 && <span className="text-amber-400/70">Memory cap: 100 facts</span>}
       </div>
       {facts.length === 0 && (
         <p className="py-6 text-center text-sm text-white/20">No memories stored yet.</p>

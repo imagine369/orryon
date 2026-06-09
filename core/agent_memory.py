@@ -8,7 +8,7 @@ import json
 import logging
 import re
 
-from core.agent_messages import get_user_memories
+from core.memory_constants import MEMORY_CAP
 from core.xai_client import call_grok_async, has_api_keys
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def extract_memories_async(
             get_monthly_token_cap,
             resolve_plan_for_user_id,
         )
-        from db import get_monthly_spend, get_monthly_token_usage, record_token_spend, save_user_memory
+        from db import count_user_memory, get_monthly_spend, get_monthly_token_usage, record_token_spend, save_user_memory
 
         plan_info = resolve_plan_for_user_id(user_id)
         if not plan_info:
@@ -53,8 +53,7 @@ async def extract_memories_async(
         if token_usage["total_tokens"] >= get_monthly_token_cap(plan):
             return
 
-        existing = get_user_memories(user_id)
-        if len(existing) > 100:
+        if count_user_memory(user_id) >= MEMORY_CAP:
             return
 
         result = await call_grok_async([

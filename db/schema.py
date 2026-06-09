@@ -584,6 +584,15 @@ _USER_PREFERENCES_EXTRA_COLS = {
     "life_priorities_set": "INTEGER DEFAULT 0",
 }
 
+_CHAT_SESSIONS_EXTRA_COLS = {
+    "summary": "TEXT DEFAULT ''",
+    "summary_message_count": "INTEGER DEFAULT 0",
+}
+
+_USER_MEMORY_EXTRA_COLS = {
+    "confidence": "REAL DEFAULT 1.0",
+}
+
 
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call multiple times."""
@@ -611,6 +620,8 @@ def _init_db_pg() -> None:
         _migrate_extra_cols_pg(cur, "notes", _NOTES_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "waitlist", _WAITLIST_EXTRA_COLS)
         _migrate_extra_cols_pg(cur, "user_preferences", _USER_PREFERENCES_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "chat_sessions", _CHAT_SESSIONS_EXTRA_COLS)
+        _migrate_extra_cols_pg(cur, "user_memory", _USER_MEMORY_EXTRA_COLS)
         conn.commit()
         logger.info("Postgres schema initialised")
     except Exception as exc:
@@ -646,6 +657,8 @@ def _init_db_sqlite() -> None:
     _migrate_sqlite_cols(conn, "notes", _NOTES_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "waitlist", _WAITLIST_EXTRA_COLS)
     _migrate_sqlite_cols(conn, "user_preferences", _USER_PREFERENCES_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "chat_sessions", _CHAT_SESSIONS_EXTRA_COLS)
+    _migrate_sqlite_cols(conn, "user_memory", _USER_MEMORY_EXTRA_COLS)
     conn.commit()
     conn.close()
     logger.info("SQLite database initialised at: %s", DB_PATH)

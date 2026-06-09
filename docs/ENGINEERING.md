@@ -34,6 +34,14 @@ Chat uses **xAI Responses API only** (`core/xai_responses.py`). If Agent Tools (
 
 Memory extraction still uses `call_grok_async` (non-streaming Completions) — not the chat tool loop.
 
+## Memory & session context (Phase 4)
+
+- **Session summary:** when a session exceeds 20 turns, older messages are rolled into `## EARLIER IN THIS CONVERSATION` (`core/session_summary.py`, cached on `chat_sessions.summary`). Refreshed every 10 new turns via background LLM call.
+- **Memory dedup:** `save_user_memory` fuzzy-matches existing facts (`core/memory_dedup.py`) before insert.
+- **Memory cap:** 100 facts per user; prune lowest-confidence then oldest (`db/memory.py`).
+- **Context cache:** `core/context_cache.py` — financial snapshot only; do not extend for chat/memory.
+- **Embeddings:** not implemented; add only if keyword + fuzzy memory proves insufficient.
+
 ## Tool registry
 
 - **Add a tool:** follow [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) (schema → handler → `TOOL_SPECS` → canonical name → reprompt).

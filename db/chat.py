@@ -126,6 +126,51 @@ def delete_chat_session(user_id: str, session_id: str) -> bool:
         return False
 
 
+def get_session_summary_meta(session_id: str) -> dict:
+    """Return cached session summary and how many turns it covers."""
+    if not session_id:
+        return {"summary": "", "summary_message_count": 0}
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT summary, summary_message_count FROM chat_sessions WHERE id=?",
+            (session_id,),
+        ).fetchone()
+        conn.close()
+        if not row:
+            return {"summary": "", "summary_message_count": 0}
+        d = dict(row)
+        return {
+            "summary": d.get("summary") or "",
+            "summary_message_count": int(d.get("summary_message_count") or 0),
+        }
+    except Exception as exc:
+        logger.error("get_session_summary_meta error: %s", exc)
+        return {"summary": "", "summary_message_count": 0}
+
+
+def update_session_summary(
+    session_id: str,
+    summary: str,
+    message_count: int,
+) -> bool:
+    if not session_id:
+        return False
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        conn = get_connection()
+        conn.execute(
+            "UPDATE chat_sessions SET summary=?, summary_message_count=?, updated_at=? WHERE id=?",
+            (summary, message_count, now, session_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        logger.error("update_session_summary error: %s", exc)
+        return False
+
+
 def update_chat_session_title(user_id: str, session_id: str, title: str) -> bool:
     try:
         conn = get_connection()

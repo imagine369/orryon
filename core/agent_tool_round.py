@@ -9,6 +9,7 @@ from typing import Any
 
 from core.agent_context import compute_context_snapshot
 from core.agent_memory import schedule_memory_extraction
+from core.session_summary import schedule_session_summary
 from core.agent_shared import UNDO_TABLE_MAP
 from core.canonical_tools import resolve_tool_name
 from core.context_cache import invalidate_context_cache, schedule_context_refresh
@@ -57,9 +58,16 @@ def finalize_turn(
     state: AgentTurnState,
     *,
     citations: list[Any] | None = None,
+    session_id: str = "",
+    chat_history: list[dict] | None = None,
 ) -> dict:
     schedule_memory_extraction(user_message, full_content, user_id)
     schedule_context_refresh(user_id, lambda: compute_context_snapshot(user_id))
+    if session_id:
+        extended = list(chat_history or [])
+        extended.append({"role": "user", "content": user_message})
+        extended.append({"role": "assistant", "content": full_content})
+        schedule_session_summary(user_id, session_id, extended)
     return done_event(state, full_content, citations=citations)
 
 

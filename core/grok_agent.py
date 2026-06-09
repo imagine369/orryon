@@ -130,6 +130,10 @@ async def run_orryon_stream(
     context_snip = await get_context_snapshot_text(
         user_id, lambda: compute_context_snapshot(user_id),
     )
+    cached_session_summary = ""
+    if session_id:
+        from db import get_session_summary_meta
+        cached_session_summary = get_session_summary_meta(session_id).get("summary") or ""
     messages = build_messages(
         system_prompt,
         chat_history or [],
@@ -138,6 +142,7 @@ async def run_orryon_stream(
         memories,
         context_snip,
         life_priorities=life_priorities or [],
+        cached_session_summary=cached_session_summary,
     )
 
     agent_kwargs = dict(
@@ -145,6 +150,7 @@ async def run_orryon_stream(
         user_id=user_id,
         messages=messages,
         session_id=session_id,
+        chat_history=chat_history or [],
         api_key=next_api_key(),
         reprompt_note=REPROMPT_SYSTEM_NOTE,
         max_rounds=MAX_TOOL_ROUNDS,

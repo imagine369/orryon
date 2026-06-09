@@ -260,6 +260,7 @@ async def run_orryon_stream_agent(
     messages: list[dict],
     responses_tools: list[dict],
     session_id: str = "",
+    chat_history: list[dict] | None = None,
     api_key: str,
     reprompt_note: str,
     max_rounds: int = 8,
@@ -332,7 +333,13 @@ async def run_orryon_stream_agent(
                     continue
 
                 yield finalize_turn(
-                    user_message, full_content, user_id, state, citations=citations,
+                    user_message,
+                    full_content,
+                    user_id,
+                    state,
+                    citations=citations,
+                    session_id=session_id,
+                    chat_history=chat_history,
                 )
                 return
 

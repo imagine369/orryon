@@ -4,6 +4,8 @@ Agent message assembly — system prompt context, memory, and chat history.
 from __future__ import annotations
 
 from core.agent_shared import HISTORY_WINDOW
+from core.memory_constants import MEMORY_PROMPT_LIMIT
+from core.session_summary import build_summary_system_block, conversation_turns, resolve_session_summary
 
 
 _LIFE_PRIORITY_LABELS = {
@@ -31,7 +33,7 @@ def _life_priorities_block(ids: list[str]) -> str:
 def get_user_memories(user_id: str) -> list[str]:
     try:
         from db import get_user_memories
-        rows = get_user_memories(user_id, limit=30)
+        rows = get_user_memories(user_id, limit=MEMORY_PROMPT_LIMIT)
         return [r["fact"] for r in rows]
     except Exception:
         return []
@@ -45,10 +47,16 @@ def build_messages(
     memories: list[str] | None = None,
     context_snip: str = "(context unavailable)",
     life_priorities: list[str] | None = None,
+    session_summary: str = "",
+    cached_session_summary: str = "",
 ) -> list[dict]:
+    turns = conversation_turns(chat_history)
+    summary_text = session_summary or resolve_session_summary(turns, cached_session_summary)
+    summary_block = build_summary_system_block(summary_text)
+
     memory_block = ""
     if memories:
-        facts = "\n".join(f"- {m}" for m in memories[:30])
+        facts = "\n".join(f"- {m}" for m in memories[:MEMORY_PROMPT_LIMIT])
         memory_block = (
             "\n\n## USER MEMORY (facts you've learned about this user)\n"
             f"{facts}\n"
@@ -62,12 +70,13 @@ def build_messages(
                 system_prompt
                 + f"\n\n## CURRENT USER CONTEXT\n{context_snip}"
                 + _life_priorities_block(life_priorities or [])
+                + summary_block
                 + memory_block
             ),
         }
     ]
 
-    recent = [m for m in chat_history if m.get("role") in ("user", "assistant")][-HISTORY_WINDOW:]
+    recent = turns[-HISTORY_WINDOW:]
     for m in recent:
         messages.append({"role": m["role"], "content": m.get("content") or ""})
 

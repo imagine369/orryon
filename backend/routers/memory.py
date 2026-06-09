@@ -24,7 +24,7 @@ from db import (
 
 router = APIRouter(tags=["memory"])
 
-STARTER_MEMORY_CAP = 50
+STARTER_MEMORY_CAP = 100
 
 
 class MemoryPatchReq(BaseModel):
