@@ -133,9 +133,11 @@ async def _run_startup() -> None:
     from backend.cache import init_redis
     from core.scheduler import start_scheduler
     from backend.signing import get_signing_mode, validate_signing_config
+    from core.capability_budget import validate_capability_budget
 
     try:
         validate_signing_config()
+        validate_capability_budget()
 
         try:
             init_pool()
