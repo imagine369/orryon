@@ -141,6 +141,9 @@ class _DbConn:
     def commit(self):
         self._conn.commit()
 
+    def rollback(self):
+        self._conn.rollback()
+
     def close(self):
         if self._is_pg and _pg_pool:
             _pg_pool.putconn(self._conn)

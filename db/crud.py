@@ -23,8 +23,17 @@ _ALLOWED_TABLES: frozenset[str] = frozenset({
     "voice_minute_usage", "voice_topups",
     "health_vitals", "medications", "health_appointments",
     "user_places", "commute_patterns", "briefings", "approval_requests",
-    "chat_message_counts",
+    "chat_message_counts", "user_api_spend",
 })
+
+# Tables with a user_id column — purged on DELETE /api/account (users row removed last).
+_ACCOUNT_PURGE_EXCLUDED = frozenset({
+    "users",
+    "waitlist",
+    "verification_codes",
+    "contact_submissions",
+})
+USER_OWNED_TABLES: frozenset[str] = _ALLOWED_TABLES - _ACCOUNT_PURGE_EXCLUDED
 
 
 def _validate_table(table: str) -> str:
@@ -122,4 +131,27 @@ def delete_row(table: str, where: dict) -> bool:
         logger.error("delete_row(%s) error: %s", table, exc)
         return False
 
+
+def delete_user_account(user_id: str) -> None:
+    """Permanently delete all rows owned by *user_id*, then the users row.
+
+    All-or-nothing: any failure rolls back; the users row is not removed unless
+    every purge step succeeds.
+    """
+    conn = get_connection()
+    try:
+        for table in sorted(USER_OWNED_TABLES):
+            conn.execute(f"DELETE FROM {table} WHERE user_id=?", (user_id,))
+        conn.execute(
+            "DELETE FROM verification_codes WHERE email=(SELECT email FROM users WHERE id=?)",
+            (user_id,),
+        )
+        conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logger.exception("delete_user_account failed for user %s — rolled back", user_id)
+        raise
+    finally:
+        conn.close()
 

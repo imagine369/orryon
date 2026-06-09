@@ -179,9 +179,32 @@ async def test_email_change_send_and_verify(monkeypatch):
 @pytest.mark.asyncio
 async def test_delete_account_removes_user():
     """Destructive — uses a dedicated user so other tests are unaffected."""
+    from db import insert_row
+
     email = f"pytest-delete-{uuid.uuid4().hex[:12]}@orryon.app"
     headers = _headers_for_email(email)
     uid = get_or_create_user_by_email(email)["id"]
+
+    session_id = str(uuid.uuid4())
+    vital_id = str(uuid.uuid4())
+    insert_row("user_preferences", {"user_id": uid, "briefing_time": "09:00"})
+    insert_row("auth_sessions", {
+        "id": session_id,
+        "user_id": uid,
+        "device_name": "pytest",
+        "ip_address": "127.0.0.1",
+        "created_at": "2026-06-01T00:00:00+00:00",
+        "last_active": "2026-06-01T00:00:00+00:00",
+        "revoked": 0,
+    })
+    insert_row("health_vitals", {
+        "id": vital_id,
+        "user_id": uid,
+        "type": "weight",
+        "value": 70.0,
+        "recorded_at": "2026-06-01T00:00:00+00:00",
+        "created_at": "2026-06-01T00:00:00+00:00",
+    })
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -194,7 +217,16 @@ async def test_delete_account_removes_user():
 
     with get_connection() as conn:
         row = conn.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone()
-    assert row is None
+        assert row is None
+        assert conn.execute(
+            "SELECT user_id FROM user_preferences WHERE user_id=?", (uid,),
+        ).fetchone() is None
+        assert conn.execute(
+            "SELECT id FROM auth_sessions WHERE id=?", (session_id,),
+        ).fetchone() is None
+        assert conn.execute(
+            "SELECT id FROM health_vitals WHERE id=?", (vital_id,),
+        ).fetchone() is None
 
 
 @pytest.mark.asyncio

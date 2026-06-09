@@ -159,32 +159,16 @@ async def email_change_verify(
 @router.delete("/api/account")
 async def delete_account(user: dict = Depends(get_current_user)):
     """Permanently delete all user data across every table."""
-    uid = user["user_id"]
-    user_data_tables = [
-        "transactions", "accounts", "holdings", "goals", "notes", "events",
-        "subscriptions", "credit_scores", "action_items", "links", "inspo_images",
-        "budget_categories", "grocery_items", "custom_categories", "share_tokens",
-        "user_memory", "recurring_income", "net_worth_snapshots", "link_pages",
-        "chat_messages", "chat_sessions", "verification_codes",
-        "user_calendar_tokens", "goal_contributions", "user_lists", "list_items",
-    ]
-    with get_connection() as conn:
-        for table in user_data_tables:
-            try:
-                conn.execute(f"DELETE FROM {table} WHERE user_id=?", (uid,))
-            except Exception:
-                # Table may not exist in older schemas; ignore.
-                pass
-        # Delete any pending verification codes keyed by the user's email too.
-        try:
-            conn.execute(
-                "DELETE FROM verification_codes WHERE email=(SELECT email FROM users WHERE id=?)",
-                (uid,),
-            )
-        except Exception:
-            pass
-        conn.execute("DELETE FROM users WHERE id=?", (uid,))
-        conn.commit()
+    from db.crud import delete_user_account
+
+    try:
+        delete_user_account(user["user_id"])
+    except Exception:
+        logger.exception("Account deletion failed for user %s", user["user_id"])
+        raise HTTPException(
+            500,
+            "Account deletion failed. Please try again or contact support.",
+        )
     return {"deleted": True}
 
 # ── User preferences (voice overlay, golden mode, onboarding) ─────────────────
