@@ -79,15 +79,14 @@ function line3WordDelay(reducedMotion: boolean, wordIndex: number) {
   return line3Delay(reducedMotion) + (reducedMotion ? 0 : wordIndex * WORD_STAGGER);
 }
 
-function ctaDelay(reducedMotion: boolean) {
-  return (
-    line3Delay(reducedMotion) +
-    (reducedMotion ? 0 : LINE3_WORDS.length * WORD_STAGGER + PAUSE_AFTER_LINE3)
-  );
-}
-
 function closeDelay(reducedMotion: boolean) {
-  return ctaDelay(reducedMotion) + (reducedMotion ? 0 : PAUSE_AFTER_CTA);
+  if (reducedMotion) return 0;
+  return (
+    line3Delay(false) +
+    LINE3_WORDS.length * WORD_STAGGER +
+    PAUSE_AFTER_LINE3 +
+    PAUSE_AFTER_CTA
+  );
 }
 
 function RevealWord({
@@ -114,32 +113,6 @@ function RevealWord({
     >
       {children}
     </motion.span>
-  );
-}
-
-function RevealBlock({
-  children,
-  delay,
-  active,
-  reducedMotion,
-}: {
-  children: React.ReactNode;
-  delay: number;
-  active: boolean;
-  reducedMotion: boolean;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: active ? 1 : 0 }}
-      transition={{
-        duration: reducedMotion ? 0 : 0.75,
-        delay: reducedMotion ? 0 : delay,
-        ease: EASE,
-      }}
-    >
-      {children}
-    </motion.div>
   );
 }
 
@@ -445,11 +418,7 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
                     ))}
                   </p>
 
-                  <RevealBlock
-                    active={showContent}
-                    reducedMotion={reducedMotion}
-                    delay={ctaDelay(reducedMotion)}
-                  >
+                  <div style={{ opacity: showContent ? 1 : 0 }}>
                     <PillLink
                       href={loggedIn ? "/home" : "/download"}
                       variant="secondary"
@@ -458,7 +427,7 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
                     >
                       {loggedIn ? "Go to app" : "Download"}
                     </PillLink>
-                  </RevealBlock>
+                  </div>
                 </div>
               </motion.div>
 
