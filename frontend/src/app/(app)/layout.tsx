@@ -16,7 +16,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { LifeInterestsOnboarding } from "@/components/life-interests-onboarding";
 import { useSubscription } from "@/lib/use-subscription";
 import { SubscriptionProvider } from "@/lib/subscription-service";
-import { usePreferences } from "@/lib/use-preferences";
+import { PreferencesProvider, usePreferences } from "@/lib/use-preferences";
 function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -104,7 +104,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PanelProvider>
       <SubscriptionProvider>
-        <AppShell>{children}</AppShell>
+        <PreferencesProvider>
+          <AppShell>{children}</AppShell>
+        </PreferencesProvider>
       </SubscriptionProvider>
     </PanelProvider>
   );

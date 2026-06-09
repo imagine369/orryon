@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
 
@@ -37,7 +45,16 @@ const DEFAULT_PREFS: UserPreferences = {
   ambient_sound_style: "soft_glow_rise",
 };
 
-export function usePreferences() {
+export interface PreferencesContextValue {
+  prefs: UserPreferences;
+  loading: boolean;
+  update: (patch: Partial<UserPreferences>) => Promise<void>;
+  reload: () => Promise<void>;
+}
+
+const PreferencesContext = createContext<PreferencesContextValue | null>(null);
+
+export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +81,9 @@ export function usePreferences() {
     }
   }, []);
 
-  useQueuedEffect(() => { void load(); }, [load]);
+  useQueuedEffect(() => {
+    void load();
+  }, [load]);
 
   const update = useCallback(async (patch: Partial<UserPreferences>) => {
     const { life_priorities: ids, ...rest } = patch;
@@ -108,5 +127,18 @@ export function usePreferences() {
     }
   }, []);
 
-  return { prefs, loading, update, reload: load };
+  const value = useMemo(
+    () => ({ prefs, loading, update, reload: load }),
+    [prefs, loading, update, load],
+  );
+
+  return createElement(PreferencesContext.Provider, { value }, children);
+}
+
+export function usePreferences(): PreferencesContextValue {
+  const ctx = useContext(PreferencesContext);
+  if (!ctx) {
+    throw new Error("usePreferences must be used within PreferencesProvider");
+  }
+  return ctx;
 }

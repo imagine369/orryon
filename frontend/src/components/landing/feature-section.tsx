@@ -22,6 +22,7 @@ import {
   Receipt,
   Search,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   Target,
   TrendingDown,
@@ -46,9 +47,9 @@ type FeatureCardData = {
 
 const LIFE_OS_CARDS: FeatureCardData[] = [
   { tag: "BALANCE",         Icon: SlidersHorizontal, highlighted: "Relax, present,",     rest: "and connected.",           from: "#060e1f", to: "#0d1f40", glow: "rgba(96,165,250,0.12)", photo: "/budget-card.jpg"   },
-  { tag: "HEALTH",          Icon: Target,            highlighted: "Get in nature",         rest: "and recharge.",           from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"    },
+  { tag: "HEALTH",          Icon: Target,            highlighted: "Get in nature",         rest: "and recharge.",             from: "#050f08", to: "#0a2012", glow: "rgba(74,222,128,0.12)", photo: "/goals-card.jpg"    },
   { tag: "FINANCE",         Icon: Receipt,           highlighted: "Stay on top",           rest: "of your expenses.",     from: "#160800", to: "#2a1200", glow: "rgba(251,146,60,0.12)", photo: "/bills-card.jpg"    },
-  { tag: "HANDLED",         Icon: BarChart2,         highlighted: "Your questions",        rest: "and needs answered.",   from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
+  { tag: "HANDLED",        Icon: BarChart2,         highlighted: "Your questions",     rest: "and needs answered.",         from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.12)", photo: "/insights-card.jpg" },
   { tag: "DREAMS & GOALS",  Icon: TrendingUp,        highlighted: "Nurture your",          rest: "relationships.",        from: "#031a1a", to: "#063030", glow: "rgba(45,212,191,0.12)", photo: "/forecast-card.jpg" },
   { tag: "CLARITY & PEACE", Icon: Activity,          highlighted: "Make everyday life,",   rest: "more intentional and beautiful.",       from: "#08081e", to: "#14143c", glow: "rgba(129,140,248,0.12)", photo: "/yearly-card.jpg"   },
 ];
@@ -329,6 +330,36 @@ function DailyBriefPreview() {
   );
 }
 
+function AmbientPickupPreview() {
+  return (
+    <div className="w-full flex flex-col items-center gap-4 py-2">
+      <div className="relative flex items-center justify-center" style={{ width: 110, height: 110 }}>
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: 72,
+            height: 72,
+            background:
+              "radial-gradient(circle at 40% 35%, rgba(200,160,240,0.4), rgba(120,80,180,0.12) 70%, transparent)",
+            animation: "breatheOrb 3.2s ease-in-out infinite",
+            boxShadow: "0 0 32px rgba(200,160,240,0.22)",
+          }}
+        />
+        <Image
+          src="/avatar.png"
+          alt=""
+          width={40}
+          height={40}
+          className="relative rounded-full object-contain"
+        />
+      </div>
+      <p className="text-[0.65rem] text-white/45 text-center leading-relaxed max-w-[200px]">
+        Pick up your phone — Orryon wakes with a soft glow and gentle sound
+      </p>
+    </div>
+  );
+}
+
 function SilentBreakPreview() {
   return (
     <div className="w-full px-1 flex flex-col items-center gap-5">
@@ -363,6 +394,7 @@ function SilentBreakPreview() {
 
 const WELLBEING_CARDS: FeatureCardData[] = [
   { tag: "BREATHING",    Icon: Wind,          highlighted: "A moment to reset,",  rest: "anytime you need it.",        from: "#04131e", to: "#08202e", glow: "rgba(96,165,250,0.12)",  preview: <BreathingPreview /> },
+  { tag: "AMBIENT",      Icon: Smartphone,    highlighted: "Pick up your phone,", rest: "Orryon is already there.",  from: "#0d0520", to: "#1a0a32", glow: "rgba(200,160,240,0.12)", preview: <AmbientPickupPreview /> },
   { tag: "SILENT BREAK", Icon: Moon,          highlighted: "Step away.",          rest: "Come back clearer.",          from: "#08080f", to: "#10101e", glow: "rgba(148,130,255,0.10)", preview: <SilentBreakPreview /> },
   { tag: "DAILY BRIEF",  Icon: Sparkles,      highlighted: "Start every day",     rest: "with full clarity.",          from: "#110900", to: "#201500", glow: "rgba(251,191,36,0.12)",  preview: <DailyBriefPreview /> },
   { tag: "AI CHAT",      Icon: MessageCircle, highlighted: "Just talk.",           rest: "I handle everything else.",   from: "#0a0a0a", to: "#181820", glow: "rgba(255,255,255,0.06)", preview: <AIChatPreview /> },

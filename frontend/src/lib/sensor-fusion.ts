@@ -6,8 +6,19 @@
  * Uses @capacitor/motion on native shells and DeviceMotionEvent on web.
  */
 
+import { Capacitor } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import type { AmbientAvatarState } from "@/lib/ambient-avatar-state";
+import {
+  MOTION_PROBE_TIMEOUT_MS,
+  readAmbientMotionGrantedStorage,
+  storeAmbientMotionGranted,
+  validateAmbientMotionStorageGrant,
+  wasAmbientMotionPermissionGranted,
+} from "@/lib/ambient-motion-permission";
+import { deviceMotionRequiresGesture } from "@/lib/platform";
+
+export { wasAmbientMotionPermissionGranted };
 
 export const FUSION_WEIGHTS = {
   motion: 0.35,
@@ -33,6 +44,32 @@ export function sampleThrottleMsForAmbientState(state: AmbientAvatarState): numb
 export const PUT_DOWN_SUSTAIN_MS = 400;
 export const MOTION_RESUMED_DEBOUNCE_MS = 500;
 export const TOUCH_DECAY_MS = 2_000;
+
+const activeFusionControllers = new Set<SensorFusionController>();
+
+function notifyActiveFusionMotionGrant(): void {
+  for (const controller of activeFusionControllers) {
+    void controller.applyMotionPermissionGrant();
+  }
+}
+
+/** Detach motion listeners on all live fusion instances (e.g. permission revoked). */
+export function notifyActiveFusionMotionRevoked(): void {
+  for (const controller of activeFusionControllers) {
+    void controller.handleMotionPermissionRevoked();
+  }
+}
+
+function storeMotionGranted(granted: boolean): void {
+  storeAmbientMotionGranted(granted, granted ? notifyActiveFusionMotionGrant : undefined);
+}
+
+async function validateStoredMotionPermission(): Promise<boolean> {
+  return validateAmbientMotionStorageGrant({
+    timeoutMs: MOTION_PROBE_TIMEOUT_MS,
+    onRevoked: notifyActiveFusionMotionRevoked,
+  });
+}
 
 export interface SensorReading {
   motion: number;
@@ -140,6 +177,11 @@ export function scoreTouchDecay(lastTouchAt: number, now: number): number {
 export async function requestAmbientMotionPermission(): Promise<boolean> {
   if (typeof window === "undefined") return false;
 
+  if (Capacitor.isNativePlatform()) {
+    notifyActiveFusionMotionGrant();
+    return true;
+  }
+
   const motionCtor = window.DeviceMotionEvent as typeof DeviceMotionEvent & {
     requestPermission?: () => Promise<PermissionState>;
   };
@@ -147,13 +189,18 @@ export async function requestAmbientMotionPermission(): Promise<boolean> {
   if (typeof motionCtor?.requestPermission === "function") {
     try {
       const result = await motionCtor.requestPermission();
-      return result === "granted";
+      const granted = result === "granted";
+      storeMotionGranted(granted);
+      return granted;
     } catch {
+      storeMotionGranted(false);
       return false;
     }
   }
 
-  return "DeviceMotionEvent" in window;
+  const granted = "DeviceMotionEvent" in window;
+  if (granted) storeMotionGranted(true);
+  return granted;
 }
 
 export class SensorFusionController {
@@ -189,11 +236,30 @@ export class SensorFusionController {
 
   private async ensurePermissionFromGesture(): Promise<void> {
     if (this.permissionGranted || !this.enabled) return;
-    this.permissionGranted = await requestAmbientMotionPermission();
+    if (readAmbientMotionGrantedStorage()) {
+      this.permissionGranted = deviceMotionRequiresGesture()
+        ? await validateStoredMotionPermission()
+        : true;
+      if (!this.permissionGranted) {
+        this.permissionGranted = await requestAmbientMotionPermission();
+      }
+    } else {
+      this.permissionGranted = await requestAmbientMotionPermission();
+    }
     if (this.permissionGranted && !this.accelListener) {
       await this.attachMotion();
       this.attachAuxiliarySensors();
     }
+  }
+
+  /** Drop cached grant when motion events stop (revoked permission). */
+  async handleMotionPermissionRevoked(): Promise<void> {
+    this.permissionGranted = false;
+    if (this.accelListener) {
+      await this.accelListener.remove();
+      this.accelListener = null;
+    }
+    this.detachAuxiliarySensors();
   }
 
   private onProximityReading = () => {
@@ -238,9 +304,34 @@ export class SensorFusionController {
     this.putDownSignaled = false;
   }
 
+  /**
+   * Sync permission + attach sensors when grant happens outside this instance
+   * (e.g. settings panel calling requestAmbientMotionPermission).
+   */
+  async applyMotionPermissionGrant(): Promise<void> {
+    if (!Capacitor.isNativePlatform() && !readAmbientMotionGrantedStorage()) {
+      return;
+    }
+    this.permissionGranted = true;
+    if (!this.enabled || !this.running || this.accelListener) return;
+    await this.attachMotion();
+    this.attachAuxiliarySensors();
+  }
+
   /** Prime motion permission inside a user gesture (e.g. settings toggle). */
   async primePermission(): Promise<boolean> {
-    this.permissionGranted = await requestAmbientMotionPermission();
+    if (!this.permissionGranted) {
+      if (readAmbientMotionGrantedStorage()) {
+        this.permissionGranted = deviceMotionRequiresGesture()
+          ? await validateStoredMotionPermission()
+          : true;
+        if (!this.permissionGranted) {
+          this.permissionGranted = await requestAmbientMotionPermission();
+        }
+      } else {
+        this.permissionGranted = await requestAmbientMotionPermission();
+      }
+    }
     if (this.permissionGranted && this.running && this.enabled && !this.accelListener) {
       await this.attachMotion();
       this.attachAuxiliarySensors();
@@ -251,9 +342,18 @@ export class SensorFusionController {
   async start(): Promise<void> {
     if (this.running || typeof window === "undefined" || !this.enabled) return;
     this.running = true;
+    activeFusionControllers.add(this);
 
     if (!this.permissionGranted) {
-      this.permissionGranted = await requestAmbientMotionPermission();
+      if (Capacitor.isNativePlatform()) {
+        this.permissionGranted = true;
+      } else if (readAmbientMotionGrantedStorage()) {
+        this.permissionGranted = deviceMotionRequiresGesture()
+          ? await validateStoredMotionPermission()
+          : true;
+      } else if (!deviceMotionRequiresGesture()) {
+        this.permissionGranted = await requestAmbientMotionPermission();
+      }
     }
 
     window.addEventListener("touchstart", this.onTouch, { passive: true });
@@ -267,6 +367,7 @@ export class SensorFusionController {
   }
 
   async stop(): Promise<void> {
+    activeFusionControllers.delete(this);
     if (!this.running && !this.accelListener) return;
     this.running = false;
 
@@ -293,7 +394,14 @@ export class SensorFusionController {
   }
 
   private async resume(): Promise<void> {
-    if (!this.enabled || document.hidden || !this.permissionGranted) return;
+    if (!this.enabled || document.hidden) return;
+    if (deviceMotionRequiresGesture() && (this.permissionGranted || readAmbientMotionGrantedStorage())) {
+      const valid = await validateStoredMotionPermission();
+      this.permissionGranted = valid;
+      if (!valid) return;
+    } else if (!this.permissionGranted) {
+      return;
+    }
     await this.attachMotion();
     this.attachAuxiliarySensors();
   }
@@ -301,29 +409,34 @@ export class SensorFusionController {
   private async attachMotion(): Promise<void> {
     if (this.accelListener) return;
 
-    try {
-      const { Motion } = await import("@capacitor/motion");
-      this.accelListener = await Motion.addListener("accel", (event) => {
-        const accel = event.accelerationIncludingGravity ?? event.acceleration;
-        const rotation = event.rotationRate;
-        if (!accel) return;
-        this.handleMotionSample({
-          accel: { x: accel.x ?? 0, y: accel.y ?? 0, z: accel.z ?? 0 },
-          rotationRate: {
-            x: rotation?.beta ?? 0,
-            y: rotation?.gamma ?? 0,
-            z: rotation?.alpha ?? 0,
-          },
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Motion } = await import("@capacitor/motion");
+        this.accelListener = await Motion.addListener("accel", (event) => {
+          const accel = event.accelerationIncludingGravity ?? event.acceleration;
+          const rotation = event.rotationRate;
+          if (!accel) return;
+          this.handleMotionSample({
+            accel: { x: accel.x ?? 0, y: accel.y ?? 0, z: accel.z ?? 0 },
+            rotationRate: {
+              x: rotation?.beta ?? 0,
+              y: rotation?.gamma ?? 0,
+              z: rotation?.alpha ?? 0,
+            },
+          });
         });
-      });
-    } catch {
-      window.addEventListener("devicemotion", this.onDeviceMotion, { passive: true });
-      this.accelListener = {
-        remove: async () => {
-          window.removeEventListener("devicemotion", this.onDeviceMotion);
-        },
-      };
+        return;
+      } catch {
+        // Fall through to DeviceMotion if the native plugin is unavailable.
+      }
     }
+
+    window.addEventListener("devicemotion", this.onDeviceMotion, { passive: true });
+    this.accelListener = {
+      remove: async () => {
+        window.removeEventListener("devicemotion", this.onDeviceMotion);
+      },
+    };
   }
 
   private attachAuxiliarySensors(): void {

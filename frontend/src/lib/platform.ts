@@ -57,6 +57,15 @@ export function isIosSafari(): boolean {
   return /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
 }
 
+/** iOS Safari requires DeviceMotionEvent.requestPermission() inside a user gesture. */
+export function deviceMotionRequiresGesture(): boolean {
+  if (typeof window === "undefined") return false;
+  const motionCtor = window.DeviceMotionEvent as typeof DeviceMotionEvent & {
+    requestPermission?: () => Promise<PermissionState>;
+  };
+  return typeof motionCtor?.requestPermission === "function";
+}
+
 export function downloadKindForPlatform(platform: Platform): DownloadKind {
   if (platform === "ios" || platform === "android") return "pwa";
   if (platform === "mac" || platform === "windows" || platform === "linux") return "desktop";

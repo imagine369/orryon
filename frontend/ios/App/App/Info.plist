@@ -47,6 +47,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMotionUsageDescription</key>
+	<string>Orryon uses motion sensors to wake when you pick up your phone with Ambient Pickup enabled.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Orryon uses the microphone so you can speak to your AI concierge instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

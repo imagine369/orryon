@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AmbientSoundStyle } from "@/lib/ambient-plan";
 import {
   AMBIENT_SOUND_STYLES,
   planAllowsAmbientSpokenGreeting,
   planAllowsAmbientVoiceHold,
 } from "@/lib/ambient-plan";
+import {
+  MOTION_PROBE_TIMEOUT_MS,
+  validateAmbientMotionStorageGrant,
+} from "@/lib/ambient-motion-permission";
 import { primeAmbientWakeFromGesture } from "@/lib/ambient-wake";
+import { deviceMotionRequiresGesture } from "@/lib/platform";
+import { notifyActiveFusionMotionRevoked } from "@/lib/sensor-fusion";
 import type { usePreferences } from "@/lib/use-preferences";
 import type { useSubscription } from "@/lib/use-subscription";
 
@@ -35,19 +41,72 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
   const enabled = prefs.ambient_mode_enabled;
   const savedSensitivityPct = snapSensitivityPct(prefs.ambient_sensitivity);
   const [dragSensitivityPct, setDragSensitivityPct] = useState<number | null>(null);
+  const [motionGranted, setMotionGranted] = useState<boolean | null>(null);
+  const [priming, setPriming] = useState(false);
   const displaySensitivityPct = dragSensitivityPct ?? savedSensitivityPct;
+  const needsMotionGesture = deviceMotionRequiresGesture();
+
+  useEffect(() => {
+    if (!enabled || !needsMotionGesture) {
+      setMotionGranted(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncMotionGranted = async () => {
+      const granted = await validateAmbientMotionStorageGrant({
+        timeoutMs: MOTION_PROBE_TIMEOUT_MS,
+        onRevoked: notifyActiveFusionMotionRevoked,
+      });
+      if (!cancelled) {
+        setMotionGranted(granted);
+      }
+    };
+
+    void syncMotionGranted();
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void syncMotionGranted();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [enabled, needsMotionGesture]);
 
   const commitSensitivity = (pct: number) => {
     if (pct === savedSensitivityPct) return;
     void onUpdate({ ambient_sensitivity: pct / 100 });
   };
 
-  const handleAmbientToggle = () => {
-    const next = !enabled;
-    if (next) {
-      void primeAmbientWakeFromGesture();
+  const handleAmbientToggle = async () => {
+    if (priming) return;
+
+    if (!enabled) {
+      setPriming(true);
+      try {
+        const granted = await primeAmbientWakeFromGesture();
+        setMotionGranted(granted);
+        await onUpdate({ ambient_mode_enabled: true });
+      } finally {
+        setPriming(false);
+      }
+      return;
     }
-    void onUpdate({ ambient_mode_enabled: next });
+
+    setMotionGranted(null);
+    await onUpdate({ ambient_mode_enabled: false });
+  };
+
+  const handleEnableMotion = () => {
+    void primeAmbientWakeFromGesture().then((granted) => {
+      setMotionGranted(granted);
+    });
   };
 
   return (
@@ -62,10 +121,12 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
         </div>
         <button
           type="button"
-          onClick={handleAmbientToggle}
-          className="relative shrink-0 flex items-center justify-center w-11 h-11 mt-0.5"
+          onClick={() => void handleAmbientToggle()}
+          disabled={priming}
+          className="relative shrink-0 flex items-center justify-center w-11 h-11 mt-0.5 disabled:opacity-50"
           role="switch"
           aria-checked={enabled}
+          aria-busy={priming}
         >
           <span
             className={`relative w-9 h-5 rounded-full transition-colors duration-200 block ${enabled ? "bg-white/80" : "bg-white/10"}`}
@@ -76,6 +137,22 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
           </span>
         </button>
       </div>
+
+      {enabled && needsMotionGesture && motionGranted === false && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 space-y-3">
+          <p className="text-xs text-amber-100/80 leading-relaxed">
+            Allow motion access when prompted so Orryon can detect pickup. If
+            you skipped the prompt, tap below and choose Allow.
+          </p>
+          <button
+            type="button"
+            onClick={handleEnableMotion}
+            className="min-h-[44px] w-full rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 text-xs font-medium text-amber-100/90 transition hover:bg-amber-400/15"
+          >
+            Allow motion access
+          </button>
+        </div>
+      )}
 
       {enabled && (
         <>
@@ -125,6 +202,7 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
                 <button
                   key={style}
                   type="button"
+                  aria-pressed={prefs.ambient_sound_style === style}
                   onClick={() => onUpdate({ ambient_sound_style: style })}
                   className={`min-h-[44px] rounded-xl px-3 text-xs font-medium transition border ${prefs.ambient_sound_style === style ? "border-white/20 bg-white/10 text-white/90" : "border-white/[0.06] bg-white/[0.03] text-white/35 hover:bg-white/[0.06]"}`}
                 >

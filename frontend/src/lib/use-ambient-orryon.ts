@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { VoiceStatus } from "@/components/chat-input";
 import type { AmbientAvatarState } from "@/lib/ambient-avatar-state";
 import {
+  AMBIENT_INACTIVITY_MS,
   AmbientOrryonService,
   type AmbientOrryonCallbacks,
 } from "@/lib/ambient-orryon-service";
@@ -20,20 +21,46 @@ import {
 } from "@/lib/ambient-wake";
 import { SensorFusionController } from "@/lib/sensor-fusion";
 
-/** User speech only — not Orryon thinking/TTS (put-down VAD hold). */
-const USER_SPEAKING_STATUSES = new Set<VoiceStatus>([
+/** Voice statuses that keep Premium mini-orb on put-down (mic + Orryon TTS). */
+const AMBIENT_VOICE_SESSION_STATUSES = new Set<VoiceStatus>([
   "listening",
   "transcribing",
+  "speaking",
 ]);
 
-function isUserSpeaking(status: VoiceStatus): boolean {
-  return USER_SPEAKING_STATUSES.has(status);
+function isAmbientVoiceSessionActive(status: VoiceStatus): boolean {
+  return AMBIENT_VOICE_SESSION_STATUSES.has(status);
+}
+
+function isAmbientTestHookEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.NEXT_PUBLIC_AMBIENT_TEST_HOOK === "true"
+  );
+}
+
+/** Playwright smoke tests: set on `window` before navigation (dev / explicit hook only). */
+function readAmbientTestStateOverride(): AmbientAvatarState | null {
+  if (!isAmbientTestHookEnabled() || typeof window === "undefined") return null;
+  const raw = (window as Window & { __ORRYON_AMBIENT_TEST_STATE__?: string })
+    .__ORRYON_AMBIENT_TEST_STATE__;
+  if (
+    raw === "sleeping" ||
+    raw === "awakening" ||
+    raw === "active" ||
+    raw === "miniOrb"
+  ) {
+    return raw;
+  }
+  return null;
 }
 
 export interface UseAmbientOrryonOptions {
   prefs: UserPreferences;
   plan: string | undefined | null;
   voiceStatus: VoiceStatus;
+  chatStreaming?: boolean;
+  chatThinking?: boolean;
   callbacks?: AmbientOrryonCallbacks;
 }
 
@@ -45,6 +72,8 @@ export function useAmbientOrryon({
   prefs,
   plan,
   voiceStatus,
+  chatStreaming = false,
+  chatThinking = false,
   callbacks,
 }: UseAmbientOrryonOptions) {
   const [ambientState, setAmbientState] = useState<AmbientAvatarState>("sleeping");
@@ -106,9 +135,25 @@ export function useAmbientOrryon({
 
   useEffect(() => {
     const active =
-      planAllowsAmbientVoiceHold(plan) && isUserSpeaking(voiceStatus);
+      planAllowsAmbientVoiceHold(plan) &&
+      isAmbientVoiceSessionActive(voiceStatus);
     serviceRef.current?.setConversationActive(active);
   }, [plan, voiceStatus]);
+
+  /** Reset inactivity while chat streams, thinks, or Orryon TTS plays. */
+  useEffect(() => {
+    const keepAlive =
+      chatStreaming || chatThinking || voiceStatus === "speaking";
+    if (!keepAlive) return;
+
+    serviceRef.current?.touchActivity();
+    const intervalMs = Math.max(30_000, AMBIENT_INACTIVITY_MS - 15_000);
+    const intervalId = setInterval(
+      () => serviceRef.current?.touchActivity(),
+      intervalMs,
+    );
+    return () => clearInterval(intervalId);
+  }, [chatStreaming, chatThinking, voiceStatus]);
 
   useEffect(() => {
     fusionRef.current?.setAmbientState(ambientState);
@@ -139,6 +184,13 @@ export function useAmbientOrryon({
     fusionRef.current?.setEnabled(prefs.ambient_mode_enabled);
   }, [prefs.ambient_mode_enabled]);
 
+  useEffect(() => {
+    const override = readAmbientTestStateOverride();
+    if (override && prefs.ambient_mode_enabled) {
+      setAmbientState(override);
+    }
+  }, [prefs.ambient_mode_enabled]);
+
   /** Prime audio + motion inside a user gesture (settings toggle). */
   const primeAmbientWake = useCallback(async () => {
     primeAmbientAudioContext();
@@ -159,6 +211,5 @@ export function useAmbientOrryon({
     primeAmbientWake,
     reportMotionResumed,
     touchActivity,
-    service: serviceRef,
   };
 }
