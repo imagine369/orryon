@@ -56,6 +56,18 @@ _ORIGIN_EXEMPT_PATHS: frozenset[str] = frozenset({
 })
 
 
+def validate_origin_config(allowed_origins: list[str]) -> None:
+    """Fail fast on boot when production has no CORS/origin allowlist."""
+    from backend.deps import IS_PRODUCTION
+
+    allowed = [o.rstrip("/") for o in allowed_origins if o]
+    if IS_PRODUCTION and not allowed:
+        raise RuntimeError(
+            "FRONTEND_URL and/or APP_URL must be set in production — "
+            "origin enforcement requires at least one allowed origin."
+        )
+
+
 def _origin_is_allowed(request: Request, allowed: Iterable[str]) -> bool:
     origin = request.headers.get("origin") or ""
     referer = request.headers.get("referer") or ""
@@ -87,7 +99,15 @@ class OriginEnforcementMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if not self._allowed:
-            # Degrade to permissive in dev when no allowlist is configured.
+            from backend.deps import IS_PRODUCTION
+
+            if IS_PRODUCTION:
+                logger.warning(
+                    "Rejected %s %s — origin allowlist empty in production",
+                    request.method, path,
+                )
+                return JSONResponse({"detail": "Forbidden origin"}, status_code=403)
+            # Local dev: no allowlist configured.
             return await call_next(request)
 
         if _origin_is_allowed(request, self._allowed):

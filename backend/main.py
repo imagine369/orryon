@@ -25,7 +25,11 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.middleware import OriginEnforcementMiddleware, PerIpRateLimitMiddleware
+from backend.middleware import (
+    OriginEnforcementMiddleware,
+    PerIpRateLimitMiddleware,
+    validate_origin_config,
+)
 from backend.routers import (
     auth,
     chat,
@@ -137,6 +141,7 @@ async def _run_startup() -> None:
 
     try:
         validate_signing_config()
+        validate_origin_config(_cors_origins)
         validate_capability_budget()
 
         try:
