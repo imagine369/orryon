@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import type { AmbientSoundStyle } from "@/lib/ambient-plan";
 import {
   AMBIENT_SOUND_STYLES,
@@ -46,7 +47,7 @@ export function AmbientView({ prefs, onUpdate, sub }: AmbientViewProps) {
   const displaySensitivityPct = dragSensitivityPct ?? savedSensitivityPct;
   const needsMotionGesture = deviceMotionRequiresGesture();
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (!enabled || !needsMotionGesture) {
       setMotionGranted(null);
       return;

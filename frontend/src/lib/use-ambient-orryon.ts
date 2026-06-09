@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import type { VoiceStatus } from "@/components/chat-input";
 import type { AmbientAvatarState } from "@/lib/ambient-avatar-state";
 import {
@@ -184,7 +185,7 @@ export function useAmbientOrryon({
     fusionRef.current?.setEnabled(prefs.ambient_mode_enabled);
   }, [prefs.ambient_mode_enabled]);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     const override = readAmbientTestStateOverride();
     if (override && prefs.ambient_mode_enabled) {
       setAmbientState(override);

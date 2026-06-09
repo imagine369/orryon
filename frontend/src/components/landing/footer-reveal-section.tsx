@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { ORB_FILL } from "@/components/reset-anchor/tokens";
@@ -191,7 +192,7 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
     }, reducedMotion ? 0 : 600);
   }, [reducedMotion]);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     if (!open) {
       setShowContent(false);
       return;

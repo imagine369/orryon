@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { isDemo } from "@/components/dashboard/demo-data";
 import { isLocalHostClient } from "@/lib/demo-mode";
 import { api, ApiError } from "@/lib/api";
@@ -59,9 +60,7 @@ export function ErrandsTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  useQueuedEffect(() => reload(), [reload]);
 
   useDataRefresh(["errands"], reload);
 
