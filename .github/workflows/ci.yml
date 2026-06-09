@@ -26,6 +26,9 @@ jobs:
       - name: Core layering (no core/ → backend/ imports)
         run: ./scripts/check_core_layering.sh
 
+      - name: File length guard (warn >400, fail >500)
+        run: ./scripts/check_file_length.sh
+
       - name: Pytest
         env:
           NODE_ENV: development
@@ -89,7 +92,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install and build
+      - name: Install, test, and build
         working-directory: frontend
         env:
           # Placeholders so Next.js build succeeds without real secrets in CI
@@ -97,4 +100,5 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: |
           npm ci
+          npm run test
           npm run build

@@ -216,13 +216,18 @@ def _cross_feature_search(args: dict, user_id: str) -> dict:
 
     if "events" in features:
         rows = conn.execute(
-            "SELECT id, title, event_date, event_type, notes FROM events "
-            "WHERE user_id=? AND (LOWER(title) LIKE ? OR LOWER(notes) LIKE ?) "
+            "SELECT id, title, event_date, event_type, description FROM events "
+            "WHERE user_id=? AND (LOWER(title) LIKE ? OR LOWER(description) LIKE ?) "
             "ORDER BY event_date DESC LIMIT ?",
             (user_id, f"%{query}%", f"%{query}%", limit),
         ).fetchall()
         results["features"]["events"] = [
-            {"id": r["id"], "title": r["title"], "date": r["event_date"], "type": r.get("event_type", "")}
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "date": r["event_date"],
+                "type": r["event_type"] if r["event_type"] is not None else "",
+            }
             for r in rows
         ]
 

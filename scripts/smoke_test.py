@@ -34,6 +34,63 @@ def _step(name: str, ok: bool, detail: str = "") -> bool:
     return ok
 
 
+async def _optional_chat_turn() -> bool | None:
+    """One live chat turn on staging (SMOKE_BASE_URL + token) or local when opted in."""
+    base = os.getenv("SMOKE_BASE_URL", "").rstrip("/")
+    token = os.getenv("SMOKE_AUTH_TOKEN", "").strip()
+    local_key = os.getenv("XAI_API_KEY", "").strip()
+    local_enabled = os.getenv("SMOKE_ENABLE_CHAT", "").lower() in ("1", "true", "yes")
+
+    if base:
+        if not token:
+            return None
+        try:
+            import json
+            from urllib.request import Request, urlopen
+
+            body = json.dumps({"message": "Reply with one word: ok", "session_id": ""}).encode()
+            req = Request(
+                f"{base}/api/chat",
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Origin": os.getenv("SMOKE_ORIGIN", "https://orryon.com"),
+                },
+                method="POST",
+            )
+            with urlopen(req, timeout=90) as resp:
+                text = resp.read().decode("utf-8", errors="replace")
+            return "data: [DONE]" in text and '"type": "done"' in text
+        except Exception as exc:
+            print(f"    chat error: {exc}")
+            return False
+
+    if not local_key or not local_enabled:
+        return None
+
+    from httpx import ASGITransport, AsyncClient
+    from backend.auth import create_token
+    from backend.main import app
+    from db.auth import get_or_create_user_by_email
+
+    user = get_or_create_user_by_email("smoke-chat@orryon.app")
+    auth = create_token(user["id"], user["email"], device_name="smoke", ip_address="127.0.0.1")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=120) as client:
+        res = await client.post(
+            "/api/chat",
+            headers={
+                "Authorization": f"Bearer {auth}",
+                "Origin": "http://localhost:3000",
+            },
+            json={"message": "Reply with one word: ok", "session_id": ""},
+        )
+    if res.status_code != 200:
+        return False
+    return '"type": "done"' in res.text and "data: [DONE]" in res.text
+
+
 async def _api_health() -> bool:
     from httpx import ASGITransport, AsyncClient
     from backend.main import app
@@ -115,6 +172,17 @@ async def main() -> int:
         if not tools_ok:
             fails += 1
         _step("Delete confirm gate + health vital tool", tools_ok)
+
+        chat_ok = await _optional_chat_turn()
+        if chat_ok is None:
+            print(
+                "  · Live chat turn skipped "
+                "(staging: SMOKE_BASE_URL + SMOKE_AUTH_TOKEN; local: XAI_API_KEY + SMOKE_ENABLE_CHAT=1)"
+            )
+        else:
+            if not chat_ok:
+                fails += 1
+            _step("Live chat turn (one message)", chat_ok)
 
     remote = _remote_health()
     if os.getenv("SMOKE_BASE_URL"):

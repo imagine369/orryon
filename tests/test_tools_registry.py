@@ -14,6 +14,7 @@ from core.canonical_tools import (
 from core.tools import GROK_TOOL_SCHEMAS, TOOL_SCHEMAS, execute_tool
 from core.tools.handler_contract import parse_handler_outcome
 from core.tools.registry import TOOL_SPECS, TOOLS, _TOOL_MAP, validate_tool_registry
+from tool_minimal_args import minimal_args_for_tool, seed_tool_fixtures
 from db.auth import get_or_create_user_by_email
 from db.health import (
     get_health_vitals,
@@ -165,3 +166,21 @@ def test_log_medication(user_id):
     assert result.get("status") == "ok"
     rows = get_medications(user_id)
     assert any(m["name"] == "Vitamin D" for m in rows)
+
+
+@pytest.fixture
+def seeded_tools(user_id):
+    return seed_tool_fixtures(user_id)
+
+
+@pytest.mark.parametrize("tool_name", CANONICAL_TOOL_NAMES)
+def test_every_canonical_tool_executes_on_minimal_args(tool_name, user_id, seeded_tools):
+    args = minimal_args_for_tool(tool_name, seeded_tools)
+    result, tabs = execute_tool(tool_name, args, user_id)
+    assert isinstance(result, dict)
+    assert isinstance(tabs, list)
+    if result.get("needs_confirmation"):
+        return
+    if tool_name in ("get_weather", "search_web") and result.get("error"):
+        return
+    assert not result.get("error"), f"{tool_name} failed: {result}"

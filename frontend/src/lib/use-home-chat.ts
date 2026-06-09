@@ -9,6 +9,11 @@ import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
 import type { ChatMessage, ChatSession } from "@/lib/chat-types";
+import {
+  chatHistoryPath,
+  chatSessionDeletePath,
+  chatSessionsListPath,
+} from "@/lib/chat-session-api";
 
 interface UseHomeChatOptions {
   sessionId: string;
@@ -234,7 +239,7 @@ export function useChatSessions(
   const loadSessions = useCallback(() => {
     setSessionsLoading(true);
     api
-      .get<ChatSession[]>("/api/chat/sessions")
+      .get<ChatSession[]>(chatSessionsListPath())
       .then(setSessions)
       .catch(() => {})
       .finally(() => setSessionsLoading(false));
@@ -243,9 +248,7 @@ export function useChatSessions(
   const loadSessionMessages = useCallback(
     (sid: string, setMessages: (msgs: ChatMessage[]) => void) => {
       api
-        .get<{ role: string; content: string }[]>(
-          `/api/chat/history?session_id=${sid}&limit=100`,
-        )
+        .get<{ role: string; content: string }[]>(chatHistoryPath(sid))
         .then((history) => {
           if (history?.length) {
             setMessages(
@@ -283,7 +286,7 @@ export function useChatSessions(
   const handleDeleteSession = useCallback(
     (sid: string) => {
       setSessions((prev) => prev.filter((s) => s.id !== sid));
-      api.delete(`/api/chat/sessions/${sid}`).catch(() => {});
+      api.delete(chatSessionDeletePath(sid)).catch(() => {});
       if (sessionId === sid) {
         setSessionId("");
         onClearMessages();

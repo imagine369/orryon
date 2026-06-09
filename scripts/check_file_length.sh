@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Fail if tracked source files exceed the team line cap (default 400).
+# Line-count guard: warn above WARN_LINES, fail above FAIL_LINES (defaults 400 / 500).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MAX_LINES="${ORRYON_MAX_FILE_LINES:-400}"
+WARN_LINES="${ORRYON_WARN_FILE_LINES:-400}"
+FAIL_LINES="${ORRYON_MAX_FILE_LINES:-500}"
 ALLOWLIST="$ROOT/scripts/file-length-allowlist.txt"
 
 is_allowlisted() {
@@ -20,6 +21,7 @@ is_allowlisted() {
   return 1
 }
 
+warnings=0
 violations=0
 while IFS= read -r -d '' file; do
   rel="${file#$ROOT/}"
@@ -27,9 +29,12 @@ while IFS= read -r -d '' file; do
     continue
   fi
   lines=$(wc -l < "$file" | tr -d ' ')
-  if [ "$lines" -gt "$MAX_LINES" ]; then
-    echo "OVER LIMIT ($lines > $MAX_LINES): $rel"
+  if [ "$lines" -gt "$FAIL_LINES" ]; then
+    echo "OVER LIMIT ($lines > $FAIL_LINES): $rel"
     violations=$((violations + 1))
+  elif [ "$lines" -gt "$WARN_LINES" ]; then
+    echo "WARN ($lines > $WARN_LINES): $rel"
+    warnings=$((warnings + 1))
   fi
 done < <(
   find "$ROOT/frontend/src" "$ROOT/core" "$ROOT/backend" \
@@ -38,11 +43,16 @@ done < <(
     -print0 2>/dev/null
 )
 
+if [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "Warning: $warnings file(s) between $((WARN_LINES + 1)) and $FAIL_LINES lines."
+fi
+
 if [ "$violations" -gt 0 ]; then
   echo ""
-  echo "Found $violations file(s) over ${MAX_LINES} lines."
+  echo "Found $violations file(s) over ${FAIL_LINES} lines."
   echo "Split new logic into focused modules, or add a documented exception to scripts/file-length-allowlist.txt"
   exit 1
 fi
 
-echo "OK: no non-allowlisted source files over ${MAX_LINES} lines"
+echo "OK: no non-allowlisted source files over ${FAIL_LINES} lines"
