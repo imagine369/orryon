@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from fastapi import HTTPException
 
-from backend.routers import approvals, calendar_sync, connections
+from backend.routers import approvals, calendar_google, connections
 
 
 def test_plaid_stub_routes_removed():
@@ -37,16 +37,16 @@ async def test_approvals_pending_hidden_when_hitl_disabled():
 
 @pytest.mark.asyncio
 async def test_google_oauth_auth_hidden_when_disabled():
-    with patch.object(calendar_sync, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
+    with patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
         with pytest.raises(HTTPException) as exc:
-            await calendar_sync.google_auth(request=None, token="")
+            await calendar_google.google_auth(request=None, token="")
         assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_google_status_reports_oauth_availability():
-    with patch.object(calendar_sync, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
-        result = await calendar_sync.google_status(user={"user_id": "u1"})
+    with patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
+        result = await calendar_google.google_status(user={"user_id": "u1"})
     assert result["oauth_available"] is False
     assert result["connected"] is False
     assert result["sync_paused"] is False
@@ -56,22 +56,22 @@ async def test_google_status_reports_oauth_availability():
 async def test_google_status_connected_only_when_oauth_on():
     uid = "user-oauth-status"
     with (
-        patch.object(calendar_sync, "GOOGLE_CALENDAR_OAUTH_ENABLED", True),
-        patch.object(calendar_sync, "_get_google_tokens", return_value={"token": "x"}),
-        patch.object(calendar_sync, "get_connection") as mock_conn,
+        patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", True),
+        patch.object(calendar_google, "get_google_tokens", return_value={"token": "x"}),
+        patch.object(calendar_google, "get_connection") as mock_conn,
     ):
         mock_conn.return_value.execute.return_value.fetchone.return_value = (3,)
-        result = await calendar_sync.google_status(user={"user_id": uid})
+        result = await calendar_google.google_status(user={"user_id": uid})
     assert result["connected"] is True
     assert result["sync_paused"] is False
 
     with (
-        patch.object(calendar_sync, "GOOGLE_CALENDAR_OAUTH_ENABLED", False),
-        patch.object(calendar_sync, "_get_google_tokens", return_value={"token": "x"}),
-        patch.object(calendar_sync, "get_connection") as mock_conn,
+        patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", False),
+        patch.object(calendar_google, "get_google_tokens", return_value={"token": "x"}),
+        patch.object(calendar_google, "get_connection") as mock_conn,
     ):
         mock_conn.return_value.execute.return_value.fetchone.return_value = (3,)
-        result = await calendar_sync.google_status(user={"user_id": uid})
+        result = await calendar_google.google_status(user={"user_id": uid})
     assert result["connected"] is False
     assert result["sync_paused"] is True
     assert result["synced_count"] == 3

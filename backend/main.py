@@ -30,7 +30,11 @@ from backend.routers import (
     auth,
     chat,
     finance,
-    organize,
+    events,
+    goals,
+    notes,
+    tasks,
+    lists,
     account_settings,
     account_data,
     receipts,
@@ -38,7 +42,8 @@ from backend.routers import (
     stripe_webhook,
     connections,
     contact,
-    calendar_sync,
+    calendar_ics,
+    calendar_google,
     voice,
     habits,
     admin,
@@ -49,6 +54,7 @@ from backend.routers import (
     approvals,
     audit,
     waitlist,
+    waitlist_admin,
 )
 from config import XAI_API_KEY
 
@@ -262,7 +268,11 @@ app.add_middleware(PerIpRateLimitMiddleware)
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(finance.router)
-app.include_router(organize.router)
+app.include_router(events.router)
+app.include_router(goals.router)
+app.include_router(notes.router)
+app.include_router(tasks.router)
+app.include_router(lists.router)
 app.include_router(account_settings.router)
 app.include_router(account_data.router)
 app.include_router(receipts.router)
@@ -270,7 +280,8 @@ app.include_router(billing.router)
 app.include_router(stripe_webhook.router)
 app.include_router(connections.router)
 app.include_router(contact.router)
-app.include_router(calendar_sync.router)
+app.include_router(calendar_ics.router)
+app.include_router(calendar_google.router)
 app.include_router(voice.router)
 app.include_router(habits.router)
 app.include_router(admin.router)
@@ -281,6 +292,7 @@ app.include_router(briefings.router)
 app.include_router(audit.router)
 app.include_router(approvals.router)
 app.include_router(waitlist.router)
+app.include_router(waitlist_admin.router)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

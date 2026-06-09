@@ -1,0 +1,316 @@
+"""Google Calendar OAuth and pull-sync (gated by GOOGLE_CALENDAR_OAUTH_ENABLED)."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import os
+import secrets as _secrets
+import time
+import uuid
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
+
+from backend.auth import get_current_user
+from backend.routers.calendar_tokens import get_google_tokens, store_google_tokens
+from config import (
+    APP_URL as CONFIG_APP_URL,
+    GOOGLE_CALENDAR_OAUTH_ENABLED,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+)
+from db import get_connection, insert_row
+
+router = APIRouter(tags=["calendar"])
+logger = logging.getLogger(__name__)
+
+APP_URL = CONFIG_APP_URL or os.getenv("APP_URL", "http://localhost:3000")
+GOOGLE_REDIRECT_URI = f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
+GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+
+_OAUTH_STATE_TTL = 600
+
+
+def _require_google_oauth() -> None:
+    if not GOOGLE_CALENDAR_OAUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+def _oauth_state_secret() -> bytes:
+    secret = os.getenv("JWT_SECRET", "")
+    if not secret:
+        from backend.auth import _get_secret
+        secret = _get_secret()
+    return secret.encode("utf-8")
+
+
+def _sign_oauth_state(uid: str) -> str:
+    payload = {"uid": uid, "nonce": _secrets.token_urlsafe(16), "iat": int(time.time())}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
+    sig = hmac.new(_oauth_state_secret(), body, hashlib.sha256).digest()
+    sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b"=")
+    return f"{body.decode()}.{sig_b64.decode()}"
+
+
+def _verify_oauth_state(state: str) -> str:
+    try:
+        body_s, sig_s = state.split(".", 1)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid state parameter.")
+
+    def _b64decode(s: str) -> bytes:
+        pad = "=" * (-len(s) % 4)
+        return base64.urlsafe_b64decode(s + pad)
+
+    try:
+        body = _b64decode(body_s)
+        expected_sig = hmac.new(_oauth_state_secret(), body_s.encode(), hashlib.sha256).digest()
+        given_sig = _b64decode(sig_s)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed state parameter.")
+
+    if not hmac.compare_digest(expected_sig, given_sig):
+        raise HTTPException(status_code=400, detail="State signature mismatch.")
+
+    try:
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="State payload unreadable.")
+
+    if int(time.time()) - int(payload.get("iat", 0)) > _OAUTH_STATE_TTL:
+        raise HTTPException(status_code=400, detail="OAuth state expired — please retry the connect flow.")
+
+    uid = payload.get("uid", "")
+    if not uid:
+        raise HTTPException(status_code=400, detail="State is missing user id.")
+    return uid
+
+
+@router.get("/api/calendar/google/auth")
+async def google_auth(request: Request, token: str = ""):
+    """Redirect the user to Google's OAuth 2.0 consent screen."""
+    _require_google_oauth()
+
+    import jwt as pyjwt
+    jwt_secret = os.getenv("JWT_SECRET", "")
+    if not token or not jwt_secret:
+        raise HTTPException(status_code=401, detail="Missing or invalid token.")
+    try:
+        payload = pyjwt.decode(token, jwt_secret, algorithms=["HS256"])
+        uid = payload.get("user_id") or payload.get("sub", "")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
+    try:
+        from google_auth_oauthlib.flow import Flow
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Google auth library not available.")
+
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [GOOGLE_REDIRECT_URI],
+            }
+        },
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+    signed_state = _sign_oauth_state(uid)
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=signed_state,
+    )
+    return RedirectResponse(auth_url)
+
+
+@router.get("/api/calendar/google/callback")
+async def google_callback(code: str, state: str, request: Request):
+    """Handle Google's OAuth callback, store tokens, and sync events."""
+    _require_google_oauth()
+
+    try:
+        from google_auth_oauthlib.flow import Flow
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Google auth library not available.")
+
+    uid = _verify_oauth_state(state)
+
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [GOOGLE_REDIRECT_URI],
+            }
+        },
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+        state=state,
+    )
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    tokens = {
+        "token": creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_uri": creds.token_uri,
+        "client_id": creds.client_id,
+        "client_secret": creds.client_secret,
+        "scopes": list(creds.scopes or GOOGLE_SCOPES),
+    }
+    store_google_tokens(uid, tokens)
+    _sync_google_events(uid, creds)
+
+    frontend = os.getenv("FRONTEND_URL", APP_URL).rstrip("/")
+    return RedirectResponse(f"{frontend}/home?calendar_connected=1")
+
+
+@router.post("/api/calendar/google/sync")
+async def google_sync(user: dict = Depends(get_current_user)):
+    """Re-fetch events from Google Calendar and upsert into the DB."""
+    _require_google_oauth()
+
+    uid = user["user_id"]
+    tokens = get_google_tokens(uid)
+    if not tokens:
+        raise HTTPException(status_code=400, detail="Google Calendar not connected.")
+
+    try:
+        from google.oauth2.credentials import Credentials
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Google auth library not available.")
+
+    creds = Credentials(**tokens)
+    count = _sync_google_events(uid, creds)
+    return {"synced": count, "message": f"Synced {count} event{'s' if count != 1 else ''} from Google Calendar."}
+
+
+@router.delete("/api/calendar/google/disconnect")
+async def google_disconnect(user: dict = Depends(get_current_user)):
+    """Remove stored Google tokens for this user."""
+    _require_google_oauth()
+    uid = user["user_id"]
+    with get_connection() as conn:
+        conn.execute("DELETE FROM user_calendar_tokens WHERE user_id=?", (uid,))
+        conn.commit()
+    return {"disconnected": True}
+
+
+@router.get("/api/calendar/google/status")
+async def google_status(user: dict = Depends(get_current_user)):
+    """Check if Google Calendar OAuth is active for this user."""
+    uid = user["user_id"]
+    tokens = get_google_tokens(uid)
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COUNT(*) FROM events WHERE user_id=? AND is_synced_to_google=1", (uid,)
+    ).fetchone()
+    imported_count = row[0] if row else 0
+    oauth_on = GOOGLE_CALENDAR_OAUTH_ENABLED
+    has_tokens = tokens is not None
+    return {
+        "oauth_available": oauth_on,
+        "connected": oauth_on and has_tokens,
+        "sync_paused": not oauth_on and has_tokens,
+        "synced_count": imported_count,
+    }
+
+
+def _sync_google_events(uid: str, creds) -> int:
+    """Fetch upcoming events from Google Calendar and upsert into the DB."""
+    try:
+        from googleapiclient.discovery import build
+        import google.auth.transport.requests
+
+        if hasattr(creds, "expired") and creds.expired and creds.refresh_token:
+            creds.refresh(google.auth.transport.requests.Request())
+            tokens = {
+                "token": creds.token,
+                "refresh_token": creds.refresh_token,
+                "token_uri": creds.token_uri,
+                "client_id": creds.client_id,
+                "client_secret": creds.client_secret,
+                "scopes": list(creds.scopes or GOOGLE_SCOPES),
+            }
+            store_google_tokens(uid, tokens)
+
+        service = build("calendar", "v3", credentials=creds)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        result = service.events().list(
+            calendarId="primary",
+            timeMin=now_iso,
+            maxResults=250,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+
+        items = result.get("items", [])
+        conn = get_connection()
+        existing_ids = {
+            row[0]
+            for row in conn.execute(
+                "SELECT external_uid FROM events WHERE user_id=? AND external_uid IS NOT NULL", (uid,)
+            ).fetchall()
+        }
+
+        count = 0
+        for item in items:
+            ext_id = item.get("id", "")
+            if ext_id in existing_ids:
+                continue
+
+            start = item.get("start", {})
+            dtstart = start.get("dateTime", start.get("date", ""))
+            if not dtstart:
+                continue
+
+            if "T" in dtstart:
+                try:
+                    dt = datetime.fromisoformat(dtstart.replace("Z", "+00:00"))
+                    dtstart = dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
+
+            title = item.get("summary", "Untitled event")[:200]
+            description = item.get("description", "")[:500]
+            location = item.get("location", "")
+            if location:
+                description = (f"{description}\n📍 {location}" if description else f"📍 {location}")
+
+            insert_row("events", {
+                "id": str(uuid.uuid4()),
+                "user_id": uid,
+                "title": title,
+                "description": description,
+                "event_date": dtstart[:16],
+                "event_type": "event",
+                "amount": 0,
+                "is_recurring": 0,
+                "recurrence": "",
+                "is_synced_to_google": 1,
+                "reminder_minutes": 30,
+                "reminder_sent": 0,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "external_uid": ext_id,
+            })
+            existing_ids.add(ext_id)
+            count += 1
+
+        logger.info("Google Calendar sync for user %s: %d new events", uid, count)
+        return count
+    except Exception as exc:
+        logger.error("Google Calendar sync failed for user %s: %s", uid, exc)
+        raise HTTPException(status_code=500, detail=f"Google Calendar sync failed: {exc}")

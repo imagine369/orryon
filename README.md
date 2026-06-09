@@ -228,7 +228,9 @@ orryon/
 │   │   ├── auth.py             #   OTP sign-in, demo, JWT issuance
 │   │   ├── chat.py             #   SSE streaming AI chat
 │   │   ├── finance.py          #   Dashboard, transactions, budget, bills, forecast
-│   │   ├── organize.py         #   Events, goals, notes, tasks, grocery, lists
+│   │   ├── events.py, goals.py, notes.py, tasks.py, lists.py
+│   │   ├── calendar_ics.py, calendar_google.py
+│   │   ├── waitlist.py, waitlist_admin.py
 │   │   ├── account.py          #   Settings, billing, export, share, receipts
 │   │   └── connections.py      #   CSV import, Plaid bank link (upcoming)
 │   ├── Dockerfile

@@ -39,7 +39,9 @@ The primary API server. Organized as modular routers:
 | `routers/auth.py` | OTP email sign-in, demo mode, `POST /api/auth/*` |
 | `routers/chat.py` | SSE streaming AI chat, `POST /api/chat` |
 | `routers/finance.py` | Dashboard, transactions, budget, bills, income, net-worth, forecast |
-| `routers/organize.py` | Events, goals, notes, tasks, grocery, user lists |
+| `routers/events.py`, `goals.py`, `notes.py`, `tasks.py`, `lists.py` | Events, goals, notes, tasks, grocery, user lists |
+| `routers/calendar_ics.py`, `calendar_google.py` | ICS import; Google Calendar OAuth pull-sync (gated) |
+| `routers/waitlist.py`, `waitlist_admin.py` | Public waitlist; admin approve/export/email tooling |
 | `routers/account.py` | Settings, email change, export, share links, Stripe billing, receipts |
 | `routers/connections.py` | CSV import (live), Plaid bank link (stub), tiered import system |
 
