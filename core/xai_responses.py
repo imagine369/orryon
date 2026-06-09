@@ -14,6 +14,10 @@ from typing import Any, AsyncGenerator
 import httpx
 
 from config import GROK_MODEL
+from core.agent_observability import (
+    AGENT_PATH_RESPONSES,
+    capture_agent_failure,
+)
 from core.agent_shared import needs_tool_reprompt
 from core.user_locale import get_user_language
 from core.agent_tool_round import (
@@ -265,6 +269,7 @@ async def run_orryon_stream_agent(
     api_key: str,
     reprompt_note: str,
     max_rounds: int = 8,
+    agent_path: str = AGENT_PATH_RESPONSES,
 ) -> AsyncGenerator[dict, None]:
     """
     Agentic Responses API loop (web_search + x_search + Orryon function tools).
@@ -273,12 +278,15 @@ async def run_orryon_stream_agent(
     instructions, base_input = split_instructions_and_input(messages)
     state = AgentTurnState()
     reprompted_once = False
+    last_tool_name: str | None = None
+    current_round = 0
 
     previous_response_id: str | None = None
     follow_up_input: list[dict] | None = None
 
     try:
         for _round in range(max_rounds):
+            current_round = _round + 1
             content_parts: list[str] = []
             completed: dict | None = None
 
@@ -303,6 +311,14 @@ async def run_orryon_stream_agent(
                     completed = chunk["response"]
 
             if not completed:
+                capture_agent_failure(
+                    None,
+                    agent_path=agent_path,
+                    tool_name=last_tool_name,
+                    reprompt=reprompted_once,
+                    round_count=current_round,
+                    message="incomplete_responses_turn",
+                )
                 yield {"type": "error", "message": "Orryon did not receive a complete response. Try again."}
                 return
 
@@ -350,6 +366,7 @@ async def run_orryon_stream_agent(
             follow_up_input = []
             for fc in function_calls:
                 fn_name = fc["name"]
+                last_tool_name = fn_name
                 tool_args = parse_tool_args(fc["arguments"])
                 result, events = process_client_tool(fn_name, tool_args, user_id, state)
                 for ev in events:
@@ -360,10 +377,25 @@ async def run_orryon_stream_agent(
                     "output": json.dumps(result),
                 })
 
+        capture_agent_failure(
+            None,
+            agent_path=agent_path,
+            tool_name=last_tool_name,
+            reprompt=reprompted_once,
+            round_count=current_round,
+            message="max_tool_rounds_exhausted",
+        )
         yield finalize_max_rounds(user_id, state)
 
-    except httpx.TimeoutException:
-        logger.error("xAI Responses API timeout")
+    except httpx.TimeoutException as exc:
+        capture_agent_failure(
+            exc,
+            agent_path=agent_path,
+            tool_name=last_tool_name,
+            reprompt=reprompted_once,
+            round_count=current_round,
+            message="responses_timeout",
+        )
         yield {"type": "error", "message": "Orryon is taking too long — please try again."}
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
@@ -375,5 +407,12 @@ async def run_orryon_stream_agent(
             )
             raise AgentToolsUnavailable() from exc
         msg = _responses_error_message(status, body)
-        logger.error("xAI Responses HTTP error %s: %s", status, body[:300])
+        capture_agent_failure(
+            exc,
+            agent_path=agent_path,
+            tool_name=last_tool_name,
+            reprompt=reprompted_once,
+            round_count=current_round,
+            message=f"responses_http_{status}",
+        )
         yield {"type": "error", "message": msg or "Orryon's AI hit a snag. Try again shortly."}

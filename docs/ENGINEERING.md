@@ -84,3 +84,10 @@ Memory extraction still uses `call_grok_async` (non-streaming Completions) — n
 - **PR template:** `.github/pull_request_template.md` — god file, single registry, tool tests.
 - **Capabilities sync:** `docs/CAPABILITIES.md` + `tests/test_capabilities_sync.py` vs `CANONICAL_TOOL_NAMES` / `system_prompt.py`.
 - **ORM:** SQLAlchemy/Alembic **cancelled** — see [MIGRATION_ROADMAP.md](../MIGRATION_ROADMAP.md) Phase B.1.
+
+## Product & agent alignment (Phase 12)
+
+- **Boundary:** [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) — general chat vs Life OS tools vs out-of-scope automation.
+- **Delete over refactor:** remove dead agent paths, aliases, and scaffolds unless traffic/tests require them; no second chat runtime.
+- **Capability budget:** `core/capability_budget.py` — `MAX_CANONICAL_TOOLS` (72), `MAX_SYSTEM_PROMPT_LINES` (300); new features trade. CI: `tests/test_capability_budget.py`.
+- **Agent observability:** `core/agent_observability.py` — Sentry tags `agent_path`, `tool_name`, `reprompt`, `round_count` on failures; `responses` / `responses_degraded` / `completions` (background only).

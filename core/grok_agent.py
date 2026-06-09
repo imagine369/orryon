@@ -13,6 +13,12 @@ from typing import AsyncGenerator
 import httpx
 
 from core.agent_context import compute_context_snapshot
+from core.agent_observability import (
+    AGENT_PATH_RESPONSES,
+    AGENT_PATH_RESPONSES_DEGRADED,
+    capture_agent_failure,
+    record_agent_fallback,
+)
 from core.agent_messages import build_messages, get_user_memories
 from core.agent_shared import MAX_TOOL_ROUNDS, REPROMPT_SYSTEM_NOTE, USER_FACING_CHAT_ERROR
 from core.canonical_tools import filter_schemas_for_grok
@@ -161,9 +167,15 @@ async def run_orryon_stream(
             async for event in run_orryon_stream_agent(
                 **agent_kwargs,
                 responses_tools=chat_schemas_to_responses_tools(grok_tools),
+                agent_path=AGENT_PATH_RESPONSES,
             ):
                 yield event
         except AgentToolsUnavailable:
+            record_agent_fallback(
+                from_path=AGENT_PATH_RESPONSES,
+                to_path=AGENT_PATH_RESPONSES_DEGRADED,
+                reason="agent_tools_unavailable",
+            )
             logger.warning(
                 "Agent Tools unavailable for user_id=%s — degraded Responses mode (RSS search_web)",
                 user_id,
@@ -173,11 +185,12 @@ async def run_orryon_stream(
                 responses_tools=chat_schemas_to_responses_tools(
                     grok_tools, include_agent_tools=False,
                 ),
+                agent_path=AGENT_PATH_RESPONSES_DEGRADED,
             ):
                 yield event
 
-    except httpx.TimeoutException:
-        logger.error("Grok API timeout")
+    except httpx.TimeoutException as exc:
+        capture_agent_failure(exc, agent_path=AGENT_PATH_RESPONSES, message="grok_agent_timeout")
         yield {"type": "error", "message": "Orryon is taking too long — please try again."}
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
@@ -189,8 +202,12 @@ async def run_orryon_stream(
             msg = "Orryon's AI is temporarily unavailable. Try again in a few seconds."
         else:
             msg = "Orryon's AI hit a snag. Try again shortly."
-        logger.error("Grok HTTP error %s: %s", status, exc)
+        capture_agent_failure(
+            exc,
+            agent_path=AGENT_PATH_RESPONSES,
+            message=f"grok_agent_http_{status}",
+        )
         yield {"type": "error", "message": msg}
     except Exception as exc:
-        logger.exception("run_orryon_stream error")
+        capture_agent_failure(exc, agent_path=AGENT_PATH_RESPONSES, message="grok_agent_unhandled")
         yield {"type": "error", "message": USER_FACING_CHAT_ERROR}

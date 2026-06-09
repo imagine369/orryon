@@ -8,6 +8,7 @@ import json
 import logging
 import re
 
+from core.agent_observability import AGENT_PATH_COMPLETIONS, capture_agent_failure
 from core.memory_constants import MEMORY_CAP
 from core.xai_client import call_grok_async, has_api_keys
 
@@ -95,6 +96,12 @@ async def extract_memories_async(
                 save_user_memory(user_id, fact.strip())
 
     except Exception as exc:
+        capture_agent_failure(
+            exc,
+            agent_path=AGENT_PATH_COMPLETIONS,
+            message="memory_extraction_failed",
+            level="warning",
+        )
         logger.debug("Memory extraction failed (non-critical): %s", exc)
 
 

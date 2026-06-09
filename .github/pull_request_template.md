@@ -17,3 +17,5 @@
 - [ ] **Layering** — No new `core/` → `backend/` imports.
 - [ ] **File size** — No new non-allowlisted file over 500 lines; prefer staying under 400.
 - [ ] **Capabilities** — If user-facing behavior changed, updated `docs/CAPABILITIES.md` and ran `pytest tests/test_capabilities_sync.py`.
+- [ ] **Product boundary** — Change fits [docs/PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md) (Life OS tool vs general chat vs out-of-scope automation).
+- [ ] **Capability budget** — If adding a canonical tool or prompt lines, traded or updated `core/capability_budget.py`; `pytest tests/test_capability_budget.py` passes.

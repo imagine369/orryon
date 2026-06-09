@@ -1,5 +1,5 @@
 """
-Shared client-side tool execution for agent loops (Chat Completions + Responses API).
+Shared client-side tool execution for the xAI Responses API chat loop.
 """
 from __future__ import annotations
 

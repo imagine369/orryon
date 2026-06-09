@@ -2,6 +2,8 @@
 
 Single checklist for a new Orryon Life OS tool. Do every step — import-time validation and tests will fail if anything is missing.
 
+**Budget:** stay within `MAX_CANONICAL_TOOLS` (72) — see `core/capability_budget.py` and `docs/PRODUCT_BOUNDARY.md`. Add a tool only if you remove/merge another or raise the cap in review.
+
 ## Checklist
 
 1. **Schema** — `core/tools/schemas/<domain>.py`

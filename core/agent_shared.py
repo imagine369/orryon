@@ -1,5 +1,8 @@
 """
-Shared agent constants and helpers used by both Chat Completions and Responses API loops.
+Shared agent constants and helpers for the Responses API chat loop.
+
+Background tasks (memory extraction, session summary) use Chat Completions via
+core/xai_client.call_grok_async — not a second chat path. See docs/PRODUCT_BOUNDARY.md.
 """
 from __future__ import annotations
 

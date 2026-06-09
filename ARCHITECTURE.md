@@ -32,7 +32,7 @@ This document describes the system architecture, folder responsibilities, data f
               core/system_prompt.py          Redis (context cache)    core/email/
 ```
 
-**Agent unification:** All chat turns use the **xAI Responses API** (`core/xai_responses.py`). `core/grok_agent.py` builds context and delegates to `run_orryon_stream_agent()`. If Agent Tools (`web_search` / `x_search`) are unavailable, the same loop retries in **degraded mode** with function tools + RSS `search_web` only — there is no separate Chat Completions chat path.
+**Agent unification:** All chat turns use the **xAI Responses API** (`core/xai_responses.py`). `core/grok_agent.py` builds context and delegates to `run_orryon_stream_agent()`. If Agent Tools (`web_search` / `x_search`) are unavailable, the same loop retries in **degraded mode** with function tools + RSS `search_web` only — there is no separate Chat Completions chat path. Product scope (general chat vs Life OS vs automation): [docs/PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md). Agent failures tag Sentry with `agent_path`, `tool_name`, `reprompt`, `round_count` (`core/agent_observability.py`).
 
 ---
 

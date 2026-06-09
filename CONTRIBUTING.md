@@ -5,8 +5,9 @@ Thank you for helping improve Orryon. This guide covers the constraints every PR
 ## Before you open a PR
 
 1. Read [ARCHITECTURE.md](ARCHITECTURE.md) for the system diagram and chat flow.
-2. Read [docs/ENGINEERING.md](docs/ENGINEERING.md) for conventions and phase notes.
-3. Use the [PR checklist](.github/pull_request_template.md) in your description.
+2. Read [docs/PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md) for what we build vs defer.
+3. Read [docs/ENGINEERING.md](docs/ENGINEERING.md) for conventions and phase notes.
+4. Use the [PR checklist](.github/pull_request_template.md) in your description.
 
 ## Development setup
 
@@ -83,6 +84,21 @@ Follow the full checklist in [docs/ADDING_A_TOOL.md](docs/ADDING_A_TOOL.md):
 Import-time validation in `core/tools/__init__.py` fails fast if schemas and `TOOL_SPECS` diverge.
 
 **Do not** add a second tool map — `TOOL_SPECS` is the single registry; legacy aliases go through `resolve_tool_name()` only.
+
+### Capability budget
+
+Hard caps in `core/capability_budget.py`:
+
+| Cap | Limit |
+|-----|-------|
+| Canonical tools | 72 (`CANONICAL_TOOL_NAMES`) |
+| `system_prompt.py` lines | 300 |
+
+Adding a tool or growing the prompt requires **trading** (remove/merge elsewhere) or raising the cap in code review. Run `pytest tests/test_capability_budget.py`.
+
+### Delete over refactor
+
+When you touch agent code, legacy aliases, or scaffolds: **remove** unless tests or production traffic need it. Chat uses one Responses loop (`responses` / `responses_degraded` only) — do not add a Completions chat path.
 
 ## Capabilities & system prompt
 

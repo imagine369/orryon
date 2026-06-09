@@ -1,6 +1,6 @@
 # Orryon capabilities (source of truth)
 
-Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10).
+Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10). Strategic boundary: [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md).
 
 ## Product promise
 
