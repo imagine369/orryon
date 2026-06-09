@@ -539,8 +539,7 @@ export function FeatureSection() {
 
                   {/* Top row */}
                   <div className="relative flex items-center justify-between p-4">
-                    <div className="flex items-center gap-1.5 rounded-full bg-black/50 border border-white/10 px-3 py-1.5">
-                      <Icon className="h-3 w-3 text-white/55" strokeWidth={1.5} />
+                    <div className="rounded-full bg-black/50 border border-white/10 px-3 py-1.5">
                       <span className="text-[0.55rem] font-bold tracking-widest text-white/55">{card.tag}</span>
                     </div>
                   </div>
