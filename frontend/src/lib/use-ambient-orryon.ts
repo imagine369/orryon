@@ -148,22 +148,10 @@ export function useAmbientOrryon({
     fusionRef.current?.setEnabled(prefs.ambient_mode_enabled);
   }, [prefs.ambient_mode_enabled]);
 
-  const primeAmbientMotion = useCallback(async () => {
-    return fusionRef.current?.primePermission() ?? false;
-  }, []);
-
   /** Prime audio + motion inside a user gesture (settings toggle). */
   const primeAmbientWake = useCallback(async () => {
     primeAmbientAudioContext();
     return fusionRef.current?.primePermission() ?? false;
-  }, []);
-
-  const reportPickupConfidence = useCallback((score: number) => {
-    serviceRef.current?.reportPickupConfidence(score);
-  }, []);
-
-  const reportPutDown = useCallback(() => {
-    serviceRef.current?.reportPutDown();
   }, []);
 
   const reportMotionResumed = useCallback(() => {
@@ -177,10 +165,7 @@ export function useAmbientOrryon({
   return {
     ambientState,
     isAmbientEnabled: prefs.ambient_mode_enabled,
-    primeAmbientMotion,
     primeAmbientWake,
-    reportPickupConfidence,
-    reportPutDown,
     reportMotionResumed,
     touchActivity,
     service: serviceRef,
