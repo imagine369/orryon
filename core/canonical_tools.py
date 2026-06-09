@@ -2,7 +2,7 @@
 core/canonical_tools.py — Single source of truth for agent-callable tool names.
 
 Used by system_prompt.py and grok_agent soft-reprompt. Legacy aliases remain
-in core.tools._TOOL_MAP for historical tool-call IDs but are not advertised.
+in core.tools.registry.TOOLS; resolved at dispatch via LEGACY_TOOL_ALIASES.
 """
 
 from __future__ import annotations

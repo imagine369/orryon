@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessageSource } from "@/components/chat-input";
-import type { PendingDestructiveAction } from "@/components/delete-confirm-modal";
 import { streamChatAuto, api, PlanLimitError, type PlanLimitDetail } from "@/lib/api";
+import { useDestructiveConfirm } from "@/lib/use-destructive-confirm";
 import { textToSpeech } from "@/lib/voice";
 import { dispatchDataChanged } from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
@@ -35,14 +35,19 @@ export function useHomeChat({
   const [thinking, setThinking] = useState(false);
   const [toolLabel, setToolLabel] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [pendingDelete, setPendingDelete] =
-    useState<PendingDestructiveAction | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming, thinking, toolLabel]);
+
+  const runAIRef = useRef<(text: string) => void>(() => {});
+
+  const destructive = useDestructiveConfirm(
+    (text) => runAIRef.current(text),
+    (text) => setMessages((prev) => [...prev, { role: "user", content: text }]),
+  );
 
   const runAI = useCallback(
     async (text: string) => {
@@ -80,7 +85,7 @@ export function useHomeChat({
           } else if (event.type === "confirm_required") {
             setThinking(false);
             setToolLabel("");
-            setPendingDelete({
+            destructive.setPendingDelete({
               action: event.action || "delete",
               message: event.message || "",
               args: event.args,
@@ -162,38 +167,21 @@ export function useHomeChat({
         reloadChatUsage();
       }
     },
-    [sessionId, setSessionId, plan, chatUsage, openPlanLimitModal, reloadChatUsage],
+    [sessionId, setSessionId, plan, chatUsage, openPlanLimitModal, reloadChatUsage, destructive.setPendingDelete],
   );
+
+  useEffect(() => {
+    runAIRef.current = runAI;
+  }, [runAI]);
 
   const handleSend = useCallback(
     (text: string, source: MessageSource = "text") => {
-      setPendingDelete(null);
+      destructive.clearPending();
       setMessages((prev) => [...prev, { role: "user", content: text, source }]);
       runAI(text);
     },
     [runAI],
   );
-
-  const handleConfirmDelete = useCallback(() => {
-    if (!pendingDelete) return;
-    const argsJson = JSON.stringify(pendingDelete.args || {});
-    const text = [
-      `Yes, I confirm. Proceed with ${pendingDelete.action} using user_confirmed=true.`,
-      `Use these exact arguments: ${argsJson}`,
-    ].join(" ");
-    setPendingDelete(null);
-    setMessages((prev) => [...prev, { role: "user", content: "Yes, confirm delete." }]);
-    runAI(text);
-  }, [pendingDelete, runAI]);
-
-  const handleCancelDelete = useCallback(() => {
-    setPendingDelete(null);
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: "Cancel — do not delete anything." },
-    ]);
-    runAI("Cancel — do not delete anything.");
-  }, [runAI]);
 
   const handleRetry = useCallback(() => {
     if (streaming) return;
@@ -220,11 +208,11 @@ export function useHomeChat({
     thinking,
     toolLabel,
     copiedIndex,
-    pendingDelete,
+    pendingDelete: destructive.pendingDelete,
     bottomRef,
     handleSend,
-    handleConfirmDelete,
-    handleCancelDelete,
+    handleConfirmDelete: destructive.handleConfirmDelete,
+    handleCancelDelete: destructive.handleCancelDelete,
     handleRetry,
     handleCopy,
     clearMessages,

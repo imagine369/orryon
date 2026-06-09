@@ -1,0 +1,40 @@
+/** Auth token, cookie, and CSRF helpers for API requests. */
+
+export function getLegacyToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("orryon_token");
+}
+
+export function setToken(_token: string) {
+  /* no-op: JWT is set as an HttpOnly cookie by /api/auth/login */
+}
+
+export function clearToken() {
+  if (typeof window !== "undefined") localStorage.removeItem("orryon_token");
+}
+
+/** @deprecated Use `hasAuthSignal()` instead. Kept for back-compat. */
+export function hasToken(): boolean {
+  if (typeof window === "undefined") return false;
+  return hasAuthSignal() || !!localStorage.getItem("orryon_token");
+}
+
+export function hasAuthSignal(): boolean {
+  if (typeof document === "undefined") return false;
+  return /(?:^|;\s*)orryon_auth=1/.test(document.cookie);
+}
+
+export function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("orryon_demo") === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|;\s*)orryon_csrf=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}

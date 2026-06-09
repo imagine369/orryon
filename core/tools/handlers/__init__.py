@@ -65,7 +65,7 @@ from core.tools.handlers.balance import (
     _add_recurring_income,
     _get_money_left_after_goals,
 )
-from core.tools.handlers.analysis import (
+from core.tools.handlers.analysis import (  # noqa: F401 — package re-exports
     _get_subscription_health,
     _get_mood_spending_report,
     _generate_insights,

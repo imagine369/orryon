@@ -1,0 +1,17 @@
+# Grandfathered files over 400 lines (do not grow — split when touched).
+# One path per line; matched as suffix against repo-relative paths.
+frontend/src/app/(site)/login/page.tsx
+frontend/src/app/(site)/help/page.tsx
+frontend/src/components/streak-panel.tsx
+frontend/src/components/landing/feature-section.tsx
+frontend/src/components/reset-anchor-panel.tsx
+frontend/src/components/dashboard/lists-tab.tsx
+frontend/src/lib/breathing-sounds.ts
+frontend/src/lib/reset-scripts.ts
+core/tools/handlers/balance.py
+backend/routers/waitlist.py
+backend/routers/auth.py
+backend/routers/calendar_sync.py
+backend/routers/organize.py
+backend/routers/voice.py
+backend/routers/chat.py

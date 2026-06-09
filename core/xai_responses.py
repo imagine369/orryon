@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 XAI_RESPONSES_URL = "https://api.x.ai/v1/responses"
 
-# Raised when Responses + Agent Tools cannot run; grok_agent falls back to chat completions.
+# Raised when Responses + Agent Tools cannot run; grok_agent retries without them.
 class AgentToolsUnavailable(Exception):
     """xAI Agent Tools (web_search / x_search) are not available for this request."""
 
@@ -68,17 +68,25 @@ _STREAM_SERVER_TOOL_NAMES: dict[str, str] = {
 }
 
 
-def chat_schemas_to_responses_tools(schemas: list[dict]) -> list[dict]:
-    """Merge xAI built-in agent tools with Orryon function tools (Responses format)."""
-    tools: list[dict] = [
-        {"type": "web_search"},
-        {"type": "x_search"},
-    ]
+def chat_schemas_to_responses_tools(
+    schemas: list[dict],
+    *,
+    include_agent_tools: bool = True,
+) -> list[dict]:
+    """Merge xAI built-in agent tools with Orryon function tools (Responses format).
+
+    When include_agent_tools is False (degraded mode), omit web_search/x_search and
+    expose the RSS search_web function tool instead.
+    """
+    tools: list[dict] = []
+    if include_agent_tools:
+        tools.extend([{"type": "web_search"}, {"type": "x_search"}])
     for schema in schemas:
         fn = schema.get("function") or {}
         name = fn.get("name")
-        if not name or name == "search_web":
-            # Native web_search replaces RSS headlines tool.
+        if not name:
+            continue
+        if include_agent_tools and name == "search_web":
             continue
         tools.append({
             "type": "function",

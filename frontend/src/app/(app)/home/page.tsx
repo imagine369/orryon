@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSubscription } from "@/lib/use-subscription";
-import { api } from "@/lib/api";
 import { useChatUsage } from "@/lib/use-chat-usage";
 import { usePreferences } from "@/lib/use-preferences";
 import {
@@ -13,30 +11,28 @@ import {
   planShowsSpeakResponsesToggle,
 } from "@/lib/voice-plan";
 import { deriveOrryonAliveState } from "@/lib/orryon-alive-state";
-import { DeleteConfirmModal } from "@/components/delete-confirm-modal";
-import { VoiceLimitModal } from "@/components/voice-limit-modal";
-import { UpgradeLimitModal } from "@/components/upgrade-limit-modal";
 import { ChatSessionSidebar } from "@/components/chat-session-sidebar";
 import { ChatActivationScreen } from "@/components/home/chat-activation-screen";
 import { ChatEmptyState } from "@/components/home/chat-empty-state";
 import { ChatActiveView } from "@/components/home/chat-active-view";
+import { HomeChatModals } from "@/components/home/home-chat-modals";
 import { useChatTransport } from "@/lib/use-chat-transport";
 import { usePostCheckout } from "@/lib/use-post-checkout";
 import { usePlanLimitModal } from "@/lib/use-plan-limit-modal";
 import { useVoiceChat } from "@/lib/use-voice-chat";
 import { useHomeChat, useChatSessions } from "@/lib/use-home-chat";
+import { useHomeTasksDueToday } from "@/lib/use-home-tasks";
+import { useState } from "react";
 
 export default function HomePage() {
   const router = useRouter();
   const { sub, refresh: refreshSub } = useSubscription();
   const { usage: chatUsage, reload: reloadChatUsage } = useChatUsage();
   const { prefs, update: updatePrefs } = usePreferences();
-
   const [sessionId, setSessionId] = useState("");
-  const [tasksDueToday, setTasksDueToday] = useState<number | null>(null);
 
   useChatTransport();
-
+  const tasksDueToday = useHomeTasksDueToday();
   const { activating, activationPlan, upgradeBanner } = usePostCheckout(sub, refreshSub);
   const { open, setOpen, info, openModal } = usePlanLimitModal(sub?.plan, chatUsage);
   const voice = useVoiceChat();
@@ -60,24 +56,7 @@ export default function HomePage() {
   const voiceInputOn = planAllowsVoiceInput(sub?.plan);
   const voiceOverlayOn = planAllowsVoiceOutput(sub?.plan, prefs.voice_overlay_enabled);
   const showSpeakToggle = planShowsSpeakResponsesToggle(sub?.plan);
-  const orryonAliveState = deriveOrryonAliveState(
-    voice.status,
-    chat.streaming,
-    chat.thinking,
-  );
-
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    api
-      .get<{ open_tasks: { due_date: string }[] }>("/api/dashboard/stats")
-      .then((stats) => {
-        if (stats?.open_tasks) {
-          const count = stats.open_tasks.filter((t) => t.due_date === today).length;
-          setTasksDueToday(count);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const orryonAliveState = deriveOrryonAliveState(voice.status, chat.streaming, chat.thinking);
 
   if (activating) {
     return <ChatActivationScreen activationPlan={activationPlan} />;
@@ -102,38 +81,18 @@ export default function HomePage() {
 
   return (
     <>
-      <DeleteConfirmModal
-        pending={chat.pendingDelete}
-        onConfirm={chat.handleConfirmDelete}
-        onCancel={chat.handleCancelDelete}
-      />
-
-      <VoiceLimitModal
-        open={voice.limitOpen}
-        onClose={() => voice.setLimitOpen(false)}
-        onContinueText={() => voice.setLimitOpen(false)}
-        onUpgrade={() => {
-          voice.setLimitOpen(false);
-          router.push("/upgrade");
-        }}
-        minutesUsed={voice.limitInfo?.minutesUsed}
-        limitMinutes={voice.limitInfo?.limitMinutes}
-      />
-
-      <UpgradeLimitModal
-        open={open}
-        onClose={() => setOpen(false)}
-        onUpgrade={() => {
-          setOpen(false);
-          router.push("/upgrade");
-        }}
-        kind={info?.kind ?? "usage"}
-        plan={info?.plan ?? sub?.plan ?? "pro"}
-        upgradePlan={info?.upgradePlan}
-        messagesUsed={info?.messagesUsed ?? 0}
-        messageLimit={info?.messageLimit ?? 0}
-        spendUsd={info?.spendUsd ?? 0}
-        spendCapUsd={info?.spendCapUsd ?? 0}
+      <HomeChatModals
+        pendingDelete={chat.pendingDelete}
+        onConfirmDelete={chat.handleConfirmDelete}
+        onCancelDelete={chat.handleCancelDelete}
+        voiceLimitOpen={voice.limitOpen}
+        onCloseVoiceLimit={() => voice.setLimitOpen(false)}
+        voiceMinutesUsed={voice.limitInfo?.minutesUsed}
+        voiceLimitMinutes={voice.limitInfo?.limitMinutes}
+        upgradeOpen={open}
+        onCloseUpgrade={() => setOpen(false)}
+        upgradeInfo={info}
+        plan={sub?.plan}
       />
 
       <AnimatePresence>
