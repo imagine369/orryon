@@ -2,7 +2,13 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { getGreeting, CHAT_CONTAINER } from "@/lib/chat-helpers";
 import { formatDisplayName } from "@/lib/format-display-name";
+import { AmbientAvatar } from "@/components/ambient/ambient-avatar";
 import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
+import type { AmbientAvatarState } from "@/lib/ambient-avatar-state";
+import {
+  resolveAmbientAliveState,
+  shouldShowAmbientCenterAvatar,
+} from "@/lib/ambient-alive-state";
 import { ChatStarterPrompts } from "@/components/chat-starter-prompts";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 import { ChatHeaderActions, BreathePromoEmpty } from "@/components/home/chat-header-actions";
@@ -13,6 +19,8 @@ import type { MessageSource } from "@/components/chat-input";
 
 interface ChatEmptyStateProps {
   orryonAliveState: OrryonAliveState;
+  ambientEnabled?: boolean;
+  ambientState?: AmbientAvatarState;
   tasksDueToday: number | null;
   upgradeBanner: boolean;
   plan?: string | null;
@@ -32,6 +40,8 @@ interface ChatEmptyStateProps {
 
 export function ChatEmptyState({
   orryonAliveState,
+  ambientEnabled = false,
+  ambientState = "sleeping",
   tasksDueToday,
   upgradeBanner,
   plan,
@@ -50,6 +60,15 @@ export function ChatEmptyState({
 }: ChatEmptyStateProps) {
   const { user } = useAuth();
   const greeting = getGreeting();
+  const showAmbientCenter = shouldShowAmbientCenterAvatar(
+    ambientEnabled,
+    ambientState,
+    false,
+  );
+  const displayAliveState = resolveAmbientAliveState(
+    ambientState,
+    orryonAliveState,
+  );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -68,13 +87,24 @@ export function ChatEmptyState({
 
       <div className="flex flex-1 flex-col">
         <div className="flex flex-1 flex-col items-center justify-center">
-          <div className="mb-5">
-            <OrryonAliveAvatar
-              size={96}
-              state={orryonAliveState}
-              idlePulse
-              priority
-            />
+          <div className="mb-5 md:mb-6">
+            {showAmbientCenter ? (
+              <AmbientAvatar
+                ambientState={ambientState}
+                aliveState={displayAliveState}
+                size={96}
+                className="md:scale-110"
+                idlePulse
+                priority
+              />
+            ) : (
+              <OrryonAliveAvatar
+                size={96}
+                state={orryonAliveState}
+                idlePulse
+                priority
+              />
+            )}
           </div>
           <p className="mb-4 max-w-[260px] text-center text-[15px] leading-tight text-white/50">
             {greeting}
