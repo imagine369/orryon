@@ -57,7 +57,7 @@ function footnoteFor(tab: DownloadTab): string | null {
     case "linux":
       return "AppImage";
     case "ios":
-      return "Safari → Share → Add to Home Screen";
+      return "No App Store file — add to Home Screen via Safari";
     case "android":
       return "Chrome → Install app";
   }
@@ -144,8 +144,9 @@ export function DownloadPageClient() {
       </p>
 
       {iosNeedsSafari && (
-        <p className="text-sm text-white/40 mb-6 max-w-sm">
-          Open this page in <span className="text-white/70">Safari</span> to install.
+        <p className="text-sm text-amber-100/80 mb-6 max-w-sm leading-relaxed">
+          iPhone install requires <span className="text-white font-medium">Safari</span> — tap
+          Download below for steps (including how to copy the link into Safari).
         </p>
       )}
 
