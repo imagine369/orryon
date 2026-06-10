@@ -19,6 +19,8 @@
     "test:stability:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-stability.mjs",
     "test:chat": "node scripts/test-chat-avatar.mjs",
     "test:chat:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-chat-avatar.mjs",
+    "test:qa": "node scripts/test-manual-qa.mjs",
+    "test:qa:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-manual-qa.mjs",
     "test:ambient": "node scripts/test-ambient-smoke.mjs",
     "test:ambient:local": "node scripts/test-ambient-smoke.mjs --local",
     "test:ambient:device-qa": "node scripts/ambient-device-qa-checklist.mjs",
