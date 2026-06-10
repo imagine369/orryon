@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
+import {
+  type DesktopDownloadPlatform,
+  unreachableInstallerBody,
+  unconfiguredInstallerBody,
+} from "@/lib/desktop-download-api";
 
-const FILES: Record<string, { filename: string; contentType: string }> = {
+const FILES: Record<DesktopDownloadPlatform, { filename: string; contentType: string }> = {
   mac: { filename: "Orryon-mac.dmg", contentType: "application/octet-stream" },
   windows: { filename: "Orryon-windows.exe", contentType: "application/octet-stream" },
   linux: { filename: "Orryon-linux.AppImage", contentType: "application/x-executable" },
 };
 
-const ENV_URL: Record<string, string | undefined> = {
-  mac: process.env.DESKTOP_DOWNLOAD_MAC_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_MAC,
-  windows:
-    process.env.DESKTOP_DOWNLOAD_WINDOWS_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_WINDOWS,
-  linux: process.env.DESKTOP_DOWNLOAD_LINUX_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_LINUX,
+/** Prefer server-only env vars so installer URLs are not embedded in the client bundle. */
+const ENV_URL: Record<DesktopDownloadPlatform, string | undefined> = {
+  mac: process.env.DESKTOP_DOWNLOAD_MAC_URL,
+  windows: process.env.DESKTOP_DOWNLOAD_WINDOWS_URL,
+  linux: process.env.DESKTOP_DOWNLOAD_LINUX_URL,
 };
 
 async function externalDownloadOk(url: string): Promise<boolean> {
@@ -23,34 +28,21 @@ async function externalDownloadOk(url: string): Promise<boolean> {
 }
 
 async function resolveDownload(request: Request, platform: string) {
-  const meta = FILES[platform];
+  const meta = FILES[platform as DesktopDownloadPlatform];
   if (!meta) return { error: NextResponse.json({ error: "Unknown platform" }, { status: 400 }) };
 
-  const external = ENV_URL[platform]?.trim();
+  const desktopPlatform = platform as DesktopDownloadPlatform;
+  const external = ENV_URL[desktopPlatform]?.trim();
   if (external) {
     if (await externalDownloadOk(external)) return { redirect: external };
     return {
-      error: NextResponse.json(
-        {
-          error: "Mac installer URL is not reachable.",
-          hint:
-            "If the DMG is on a private GitHub repo, uploads are not public — host the file on a public URL (GitHub public repo, Vercel Blob, S3) and set DESKTOP_DOWNLOAD_MAC_URL or NEXT_PUBLIC_DESKTOP_DOWNLOAD_MAC in Vercel.",
-          configuredUrl: external,
-        },
-        { status: 503 },
-      ),
+      error: NextResponse.json(unreachableInstallerBody(desktopPlatform), { status: 503 }),
     };
   }
 
   if (process.env.NODE_ENV === "production") {
     return {
-      error: NextResponse.json(
-        {
-          error: "Desktop installer is not configured for production yet.",
-          hint: `Set DESKTOP_DOWNLOAD_${platform.toUpperCase()}_URL (or NEXT_PUBLIC_DESKTOP_DOWNLOAD_${platform.toUpperCase()}) to a public installer URL and redeploy.`,
-        },
-        { status: 503 },
-      ),
+      error: NextResponse.json(unconfiguredInstallerBody(desktopPlatform), { status: 503 }),
     };
   }
 
