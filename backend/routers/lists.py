@@ -112,6 +112,7 @@ async def get_list_items(list_id: str, user: dict = Depends(get_current_user)):
 @router.post("/api/lists/{list_id}/items")
 async def add_list_item(list_id: str, body: ListItemReq, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
+    list_id = resolve_list_items_list_id(uid, list_id)
     item_id = str(uuid.uuid4())
     with get_connection() as conn:
         owner = conn.execute(

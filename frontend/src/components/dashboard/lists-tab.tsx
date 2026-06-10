@@ -7,8 +7,12 @@ import { api } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { isDemo, DEMO_LISTS, DEMO_ITEMS } from "./demo-data";
+import { listItemLabel, listItemMatchesQuery } from "@/lib/list-item-label";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
+
+const LISTS_LOAD_ERROR = "Couldn't load lists. Try again in a moment.";
+const ITEMS_LOAD_ERROR = "Couldn't load items. Try again in a moment.";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,11 +42,6 @@ function isBuiltinGroceryList(list: UserList): boolean {
   return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
 }
 
-function listItemLabel(item: ListItem): string {
-  const notes = item.notes?.trim();
-  return notes ? `${item.name} (${notes})` : item.name;
-}
-
 // ── Icon & color palettes ────────────────────────────────────────────────────
 
 const COLORS = [
@@ -68,11 +67,14 @@ function ListsOverview({
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#ffffff");
   const [query, setQuery] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
-    if (isDemo()) { setLists(DEMO_LISTS); return; }
-    api.get<UserList[]>("/api/lists").then(setLists).catch(() => {});
+    if (isDemo()) { setLists(DEMO_LISTS); setLoadError(null); return; }
+    api.get<UserList[]>("/api/lists")
+      .then((data) => { setLists(data); setLoadError(null); })
+      .catch(() => setLoadError(LISTS_LOAD_ERROR));
   };
 
   useQueuedEffect(load, []);
@@ -180,8 +182,12 @@ function ListsOverview({
         )}
       </AnimatePresence>
 
+      {loadError && (
+        <p className="text-amber-400/80 text-xs text-center py-2 mb-2">{loadError}</p>
+      )}
+
       {/* Lists */}
-      {filtered.length === 0 && !creating && (
+      {filtered.length === 0 && !creating && !loadError && (
         <p className="text-white/30 text-sm text-center py-10">
           {query ? `No lists match "${query}"` : "No lists yet. Tap + to create one."}
         </p>
@@ -234,14 +240,17 @@ function ListDetail({
   const [newName, setNewName] = useState("");
   const [sort, setSort] = useState<ItemSort>("manual");
   const [query, setQuery] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const addRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const reorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(() => {
-    if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); return; }
-    api.get<ListItem[]>(`/api/lists/${list.id}/items`).then(setItems).catch(() => {});
+    if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); setLoadError(null); return; }
+    api.get<ListItem[]>(`/api/lists/${list.id}/items`)
+      .then((data) => { setItems(data); setLoadError(null); })
+      .catch(() => setLoadError(ITEMS_LOAD_ERROR));
   }, [list.id]);
 
   useQueuedEffect(load, [load]);
@@ -287,15 +296,13 @@ function ListDetail({
     api.delete(`/api/list-items/${id}`).catch(load);
   };
 
-  const q = query.trim().toLowerCase();
-
   const applySort = (arr: ListItem[]) => {
     if (sort === "name") return [...arr].sort((a, b) => a.name.localeCompare(b.name));
     return arr;
   };
 
-  const unchecked = applySort(items.filter((i) => !i.is_checked && (!q || i.name.toLowerCase().includes(q))));
-  const checked   = items.filter((i) => i.is_checked && (!q || i.name.toLowerCase().includes(q)));
+  const unchecked = applySort(items.filter((i) => !i.is_checked && listItemMatchesQuery(i, query)));
+  const checked   = items.filter((i) => i.is_checked && listItemMatchesQuery(i, query));
 
   return (
     <motion.div
@@ -329,6 +336,10 @@ function ListDetail({
           </button>
         </div>
       </div>
+
+      {loadError && (
+        <p className="text-amber-400/80 text-xs text-center py-2">{loadError}</p>
+      )}
 
       {/* Sort pills */}
       <div className="flex gap-1 mt-1.5 mb-3">
@@ -386,7 +397,7 @@ function ListDetail({
         </div>
       )}
 
-      {items.length === 0 && !adding && (
+      {items.length === 0 && !adding && !loadError && (
         <p className="text-white/30 text-sm text-center py-10">
           Nothing here yet. Tap + to add your first item.
         </p>
@@ -412,7 +423,7 @@ function ListDetail({
                   onClick={() => toggleItem(item)}
                   className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
                 />
-                <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item)}</p>
+                <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => deleteItem(item.id)}
@@ -432,7 +443,7 @@ function ListDetail({
                 onClick={() => toggleItem(item)}
                 className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
               />
-              <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item)}</p>
+              <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
             </div>
           </SwipeToDelete>
         ))
@@ -453,7 +464,7 @@ function ListDetail({
                 >
                   <span className="text-white/40 text-[0.55rem] leading-none">✓</span>
                 </button>
-                <p className="text-sm text-white/30 flex-1 line-through leading-snug">{listItemLabel(item)}</p>
+                <p className="text-sm text-white/30 flex-1 line-through leading-snug">{listItemLabel(item.name, item.notes)}</p>
               </div>
             </SwipeToDelete>
           ))}
