@@ -1,23 +1,12 @@
 """Tool handlers — lists."""
 from __future__ import annotations
 
-import json
-import logging
-import re
-from datetime import datetime, timedelta, timezone
-
 from db import (
     delete_row,
     fetch_rows,
     get_connection,
     insert_row,
     update_row,
-)
-from db.finance import (
-    adjust_balance,
-    get_balance,
-    get_or_create_balance_account,
-    update_balance,
 )
 from core.grocery_list import (
     GROCERY_LIST_NAME,
@@ -31,8 +20,6 @@ from core.tools.shared import (
     _now_iso,
     _uid
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _match_unchecked_grocery_item(rows, query: str):
@@ -78,7 +65,12 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
         name = str(item.get("name") or "").strip()
         if not name:
             continue
-        price = float(item.get("estimated_price", 0) or 0)
+        quantity = str(item.get("quantity") or "").strip()
+        notes = quantity
+        try:
+            price = float(item.get("estimated_price", 0) or 0)
+        except (TypeError, ValueError):
+            price = 0.0
         total_est += price
 
         insert_row("list_items", {
@@ -86,12 +78,12 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
             "list_id": list_id,
             "user_id": user_id,
             "name": name,
-            "notes": "",
+            "notes": notes,
             "is_checked": 0,
             "sort_order": max_item_order + 1 + i,
             "added_at": now,
         })
-        items_added.append(name)
+        items_added.append(f"{name} ({quantity})" if quantity else name)
 
     all_items = fetch_rows("list_items", {"list_id": list_id, "user_id": user_id, "is_checked": 0})
     return {
@@ -183,7 +175,10 @@ def _delete_list(args: dict, user_id: str) -> dict:
     return {"status": "ok", "deleted": name, "id": list_id, "items_removed": item_count}
 def _check_grocery_item(args: dict, user_id: str) -> dict:
     """Mark a grocery item as checked on the canonical Grocery list."""
-    name = args["item_name"].lower()
+    item_name = str(args.get("item_name") or "").strip()
+    if not item_name:
+        return {"status": "error", "message": "item_name is required."}
+    name = item_name.lower()
     list_id = ensure_grocery_list_ready(user_id)
     conn = get_connection()
     try:
@@ -198,7 +193,9 @@ def _check_grocery_item(args: dict, user_id: str) -> dict:
             return {"status": "ok", "checked": _row_name(matched)}
     finally:
         conn.close()
-    return {"status": "not_found", "searched": args["item_name"]}
+    return {"status": "not_found", "searched": item_name}
+
+
 def _get_grocery_list(args: dict, user_id: str) -> dict:
     """Return unchecked grocery items exactly as the Lists tab shows them."""
     names = get_unchecked_grocery_item_names(user_id)

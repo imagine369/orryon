@@ -9,6 +9,7 @@ from core.grocery_list import (
 )
 from core.tools.handlers.lists import (
     _add_grocery_items,
+    _check_grocery_item,
     _create_list,
     _delete_grocery_items,
     _delete_list,
@@ -163,6 +164,35 @@ def test_delete_grocery_items_removes_from_list():
     assert result["removed"] == ["milk", "bread"]
     assert result["count_removed"] == 2
     assert get_unchecked_grocery_item_names(uid) == ["eggs"]
+
+
+def test_add_grocery_items_stores_quantity_in_notes():
+    user = get_or_create_user_by_email("pytest-grocery-qty@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    _add_grocery_items({"items": [{"name": "milk", "quantity": "2 gallons"}]}, uid)
+    list_id = ensure_grocery_list_ready(uid)
+
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT name, notes FROM list_items WHERE list_id=? AND user_id=?",
+        (list_id, uid),
+    ).fetchone()
+    conn.close()
+
+    assert row["name"] == "milk"
+    assert row["notes"] == "2 gallons"
+    assert get_unchecked_grocery_item_names(uid) == ["milk (2 gallons)"]
+
+
+def test_check_grocery_item_requires_name():
+    user = get_or_create_user_by_email("pytest-grocery-check-miss@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    result = _check_grocery_item({}, uid)
+    assert result["status"] == "error"
 
 
 def test_delete_grocery_items_not_found():

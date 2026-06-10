@@ -107,7 +107,9 @@ SCHEMAS: list[dict] = [{'type': 'function',
  {'type': 'function',
   'function': {'name': 'delete_list',
                'description': 'Delete an entire user list AND all of its items. Resolve list_id '
-                              'via get_user_lists first. Irreversible — confirm in prose.',
+                              'via get_user_lists first. Cannot delete the built-in Grocery list '
+                              '(use delete_grocery_items to remove items). Irreversible — confirm '
+                              'in prose.',
                'parameters': {'type': 'object',
                               'properties': {'list_id': {'type': 'string',
                                                          'description': 'ID of the list '

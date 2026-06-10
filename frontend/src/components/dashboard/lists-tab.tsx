@@ -38,6 +38,11 @@ function isBuiltinGroceryList(list: UserList): boolean {
   return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
 }
 
+function listItemLabel(item: ListItem): string {
+  const notes = item.notes?.trim();
+  return notes ? `${item.name} (${notes})` : item.name;
+}
+
 // ── Icon & color palettes ────────────────────────────────────────────────────
 
 const COLORS = [
@@ -407,7 +412,7 @@ function ListDetail({
                   onClick={() => toggleItem(item)}
                   className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
                 />
-                <p className="text-sm text-white/85 flex-1 leading-snug">{item.name}</p>
+                <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item)}</p>
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => deleteItem(item.id)}
@@ -427,7 +432,7 @@ function ListDetail({
                 onClick={() => toggleItem(item)}
                 className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
               />
-              <p className="text-sm text-white/85 flex-1 leading-snug">{item.name}</p>
+              <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item)}</p>
             </div>
           </SwipeToDelete>
         ))
@@ -448,7 +453,7 @@ function ListDetail({
                 >
                   <span className="text-white/40 text-[0.55rem] leading-none">✓</span>
                 </button>
-                <p className="text-sm text-white/30 flex-1 line-through leading-snug">{item.name}</p>
+                <p className="text-sm text-white/30 flex-1 line-through leading-snug">{listItemLabel(item)}</p>
               </div>
             </SwipeToDelete>
           ))}

@@ -184,16 +184,28 @@ def grocery_list_sort_key(list_row: dict) -> tuple:
     )
 
 
+def format_list_item_label(name: str, notes: str = "") -> str:
+    """Display label for list items; appends notes (e.g. quantity) when present."""
+    label = str(name or "").strip()
+    extra = str(notes or "").strip()
+    if extra:
+        return f"{label} ({extra})"
+    return label
+
+
 def get_unchecked_grocery_item_names(user_id: str) -> list[str]:
     list_id = ensure_grocery_list_ready(user_id)
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT name FROM list_items "
+            "SELECT name, notes FROM list_items "
             "WHERE list_id=? AND user_id=? AND is_checked=0 "
             "ORDER BY sort_order ASC, added_at ASC",
             (list_id, user_id),
         ).fetchall()
-        return [_row_val(r, "name", 0) for r in rows]
+        return [
+            format_list_item_label(_row_val(r, "name", 0), _row_val(r, "notes", 1))
+            for r in rows
+        ]
     finally:
         conn.close()
