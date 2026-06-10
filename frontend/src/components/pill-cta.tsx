@@ -36,7 +36,7 @@ const fillClass = (variant: Variant) => {
     variant === "primary" ? "bg-black"
     : variant === "calm"   ? "bg-white/40"
     : "bg-white";
-  return `absolute inset-0 ${fill} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
+  return `pointer-events-none absolute inset-0 ${fill} -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`;
 };
 
 const textClass = (variant: Variant) =>
@@ -87,7 +87,7 @@ export function PillButton({
       onClick={onClick}
       type={type}
       disabled={disabled}
-      className={`${base(size)} ${borderClass(variant)} ${bgClass(variant)} ${className} disabled:opacity-40 disabled:cursor-not-allowed`}
+      className={`${base(size)} ${borderClass(variant)} ${bgClass(variant)} touch-manipulation ${className} disabled:opacity-40 disabled:cursor-not-allowed`}
     >
       <span className={fillClass(variant)} aria-hidden />
       <span className={textClass(variant)}>{children}</span>

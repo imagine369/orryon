@@ -148,6 +148,7 @@ export function DownloadPageClient() {
   }
 
   return (
+    <>
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <DownloadAvatar priority />
 
@@ -193,11 +194,11 @@ export function DownloadPageClient() {
             <button
               type="button"
               onClick={() => setSelected(p.id)}
-              className={
+              className={`min-h-11 px-2 py-2 touch-manipulation ${
                 selected === p.id
                   ? "text-white/80 font-medium"
                   : "hover:text-white/60 transition-colors"
-              }
+              }`}
             >
               {p.label}
             </button>
@@ -205,8 +206,9 @@ export function DownloadPageClient() {
         ))}
       </nav>
 
-      {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
-      {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
     </main>
+    {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+    {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
+    </>
   );
 }
