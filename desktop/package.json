@@ -1,6 +1,6 @@
 {
   "name": "orryon-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Orryon desktop app",
   "main": "main.js",
   "private": true,
@@ -8,7 +8,8 @@
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
+    "verify:mic": "node scripts/verify-mic-config.mjs",
+    "dist:mac": "npm run verify:mic && electron-builder --mac",
     "dist:mac:signed": "electron-builder --mac -c electron-builder.signed.json --publish never",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux"

@@ -37,6 +37,7 @@ export function OrryonAliveAvatar({
 
   return (
     <motion.div
+      data-testid="orryon-alive-avatar"
       className={cn("relative shrink-0", className)}
       style={{ width: size, height: size }}
       animate={

@@ -28,12 +28,12 @@ export function SwBuildSync() {
     }
 
     async function run() {
-      for (const key of [BUDDY_REMOVAL_MIGRATION, SINGLE_CHAT_AVATAR_MIGRATION]) {
-        if (!localStorage.getItem(key)) {
-          localStorage.setItem(key, "1");
-          await bustCachesAndReload();
-          return;
-        }
+      const migrationKeys = [BUDDY_REMOVAL_MIGRATION, SINGLE_CHAT_AVATAR_MIGRATION];
+      const pending = migrationKeys.filter((key) => !localStorage.getItem(key));
+      if (pending.length > 0) {
+        for (const key of pending) localStorage.setItem(key, "1");
+        await bustCachesAndReload();
+        return;
       }
 
       const prev = localStorage.getItem(LS_CANARY_KEY);

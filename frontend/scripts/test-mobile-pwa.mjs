@@ -108,7 +108,7 @@ async function testIphoneChromeShowsSafariHint() {
   const page = await context.newPage();
   try {
     await waitForDownloadPage(page);
-    const hint = page.getByText(/Safari/i);
+    const hint = page.getByText(/iPhone install requires/i);
     assert(await hint.isVisible(), "Chrome on iOS should show Safari hint");
   } finally {
     await browser.close();
