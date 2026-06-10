@@ -1,10 +1,10 @@
 /**
- * Mobile PWA smoke tests (Playwright device emulation).
+ * Download page UX tests — mobile + desktop viewports (Playwright).
  * Requires: local server on TEST_BASE_URL (default http://127.0.0.1:3456).
  *
  * Usage:
  *   npx playwright install chromium webkit   # first time
- *   TEST_BASE_URL=http://127.0.0.1:3456 node scripts/test-mobile-pwa.mjs
+ *   npm run test:download:ux:local
  */
 import { chromium, webkit, devices } from "playwright";
 
@@ -197,7 +197,134 @@ async function testPlatformSwitcher() {
   }
 }
 
-console.log(`\nMobile PWA tests → ${BASE}\n`);
+const MAC_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+async function testDesktopMacLayout() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    userAgent: MAC_UA,
+  });
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    const h1 = await page.locator("h1").innerText();
+    assert(h1.includes("macOS"), `expected macOS headline on desktop, got: ${h1}`);
+    const copy = await page.locator("main p").first().innerText();
+    assert(copy.includes("dock"), "desktop copy should mention dock install");
+    const cta = page.getByRole("button", { name: /Download for Mac/i });
+    assert(await cta.isEnabled(), "macOS CTA should be enabled");
+    const macTab = platformNav(page).getByRole("button", { name: "macOS" });
+    assert((await macTab.getAttribute("class"))?.includes("text-white"), "macOS tab should be selected");
+    assert(await page.getByText("macOS 12+").isVisible(), "macOS footnote should show");
+  } finally {
+    await browser.close();
+  }
+}
+
+async function testDesktopPlatformSwitcher() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    userAgent: MAC_UA,
+  });
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    await page.getByRole("button", { name: "Windows" }).click();
+    let h1 = await page.locator("h1").innerText();
+    assert(h1.includes("Windows"), "desktop switcher should update to Windows");
+    await page.getByRole("button", { name: "Linux" }).click();
+    h1 = await page.locator("h1").innerText();
+    assert(h1.includes("Linux"), "desktop switcher should update to Linux");
+  } finally {
+    await browser.close();
+  }
+}
+
+async function testPillFillDoesNotCapturePointer() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    userAgent: MAC_UA,
+  });
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    await page.getByRole("button", { name: "iPhone & iPad" }).click();
+    const pointerEvents = await page.evaluate(() => {
+      const fill = document.querySelector("main button span[aria-hidden]");
+      return fill ? getComputedStyle(fill).pointerEvents : null;
+    });
+    assert(pointerEvents === "none", `pill hover fill should ignore pointer events, got ${pointerEvents}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function testPillButtonClickAfterHover() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    userAgent: MAC_UA,
+  });
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    await page.getByRole("button", { name: "iPhone & iPad" }).click();
+    const cta = page.getByRole("button", { name: /Download for iPhone/i });
+    await cta.hover();
+    await cta.click();
+    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
+    assert(await page.getByRole("button", { name: "Got it" }).isVisible(), "hover should not block CTA click");
+  } finally {
+    await browser.close();
+  }
+}
+
+async function testIosModalGotItCloses() {
+  const browser = await webkit.launch();
+  const context = await browser.newContext({ ...devices["iPhone 14"] });
+  await fixLocalHttpsUpgrade(context);
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    await page.getByRole("button", { name: /Download for iPhone/i }).click();
+    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
+    await page.getByRole("button", { name: "Got it" }).click();
+    await page.waitForSelector("text=Install on iPhone & iPad", {
+      state: "hidden",
+      timeout: 5_000,
+    });
+    assert(!(await page.getByRole("dialog").isVisible().catch(() => false)), "modal should close");
+  } finally {
+    await browser.close();
+  }
+}
+
+async function testAndroidManualInstallModal() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ ...devices["Pixel 7"] });
+  const page = await context.newPage();
+  try {
+    await waitForDownloadPage(page);
+    const cta = page.getByRole("button", { name: /Install for Android/i });
+    assert(await cta.isEnabled(), "Android manual install CTA should be enabled");
+    await cta.click();
+    await page.waitForSelector("text=Install on Android", { timeout: 5_000 });
+    assert(
+      (await page.locator("text=Add to Home screen").count()) >= 1,
+      "Android modal should show install steps",
+    );
+    await page.getByRole("button", { name: "Got it" }).click();
+    await page.waitForSelector("text=Install on Android", { state: "hidden", timeout: 5_000 });
+  } finally {
+    await browser.close();
+  }
+}
+
+console.log(`\nDownload UX tests → ${BASE}\n`);
 
 await run("iPhone Safari: auto-detect, copy, install modal", testIphoneSafari);
 await run("iPad Safari: auto-detect iOS tab", testIpadSafari);
@@ -206,6 +333,12 @@ await run("Android Pixel: auto-detect, copy", testAndroidPixel);
 await run("Android: install prompt enables CTA", testAndroidInstallPrompt);
 await run("Installed (standalone): Open Orryon + Sign in", testStandaloneShowsOpenOrryon);
 await run("Platform switcher updates headline", testPlatformSwitcher);
+await run("Desktop macOS: layout, copy, CTA, tab", testDesktopMacLayout);
+await run("Desktop: platform switcher updates headline", testDesktopPlatformSwitcher);
+await run("Pill CTA: hover fill ignores pointer events", testPillFillDoesNotCapturePointer);
+await run("Pill CTA: click works after hover (desktop)", testPillButtonClickAfterHover);
+await run("iOS modal: Got it closes dialog", testIosModalGotItCloses);
+await run("Android: manual install modal opens and closes", testAndroidManualInstallModal);
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

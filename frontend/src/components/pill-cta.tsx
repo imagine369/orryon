@@ -66,7 +66,10 @@ export function PillLink({
   className = "",
 }: PillLinkProps) {
   return (
-    <Link href={href} className={`${base(size)} ${borderClass(variant)} ${bgClass(variant)} ${className}`}>
+    <Link
+      href={href}
+      className={`${base(size)} ${borderClass(variant)} ${bgClass(variant)} touch-manipulation ${className}`}
+    >
       <span className={fillClass(variant)} aria-hidden />
       <span className={textClass(variant)}>{children}</span>
     </Link>
