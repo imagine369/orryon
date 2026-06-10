@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-from core.agent_shared import _ACTION_VERB_RE, _LIVE_NEWS_QUERY_RE
+from core.agent_shared import _ACTION_VERB_RE, _GROCERY_LIST_INTENT_RE, _LIVE_NEWS_QUERY_RE
 
 # Action / query cues by ISO 639-1 code (subset of settings languages).
 _LOCALE_ACTION_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -86,7 +86,7 @@ def message_suggests_tool_action(text: str, language: str | None = "en") -> bool
         return False
     lang = _normalize_language(language)
     if lang == "en":
-        return bool(_ACTION_VERB_RE.search(text))
+        return bool(_GROCERY_LIST_INTENT_RE.search(text) or _ACTION_VERB_RE.search(text))
     pattern = _LOCALE_ACTION_PATTERNS.get(lang)
     if pattern and pattern.search(text):
         return True

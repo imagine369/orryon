@@ -37,6 +37,25 @@ _ACTION_VERB_RE = re.compile(
 
 _TRAILING_QUESTION_RE = re.compile(r"\?\s*$")
 
+_GROCERY_LIST_INTENT_RE = re.compile(
+    r"\b("
+    r"grocery list|shopping list|"
+    r"on (?:my |the )?grocery list|to (?:my |the )?(?:grocery|shopping) list"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_FALSE_WRITE_CLAIM_RE = re.compile(
+    r"\b("
+    r"i(?:'ve| have) added|i(?:'ve| have) removed|i(?:'ve| have) deleted|"
+    r"i(?:'ve| have) (?:scheduled|booked|created|logged|updated)|"
+    r"added .+ to (?:your )?(?:grocery|shopping) list|"
+    r"removed .+ from (?:your )?(?:grocery|shopping) list|"
+    r"(?:added|removed|deleted|scheduled|logged) .+ (?:to|from) your"
+    r")\b",
+    re.IGNORECASE,
+)
+
 _LIVE_NEWS_QUERY_RE = re.compile(
     r"\b("
     r"news|headlines|headline|breaking(?:\s+news)?|current events|"
@@ -83,6 +102,8 @@ def needs_tool_reprompt(
         return False
     text = (assistant_text or "").strip()
     if not text:
+        return True
+    if _FALSE_WRITE_CLAIM_RE.search(text):
         return True
     last_nonempty = [ln for ln in text.splitlines() if ln.strip()]
     if last_nonempty and _TRAILING_QUESTION_RE.search(last_nonempty[-1]):

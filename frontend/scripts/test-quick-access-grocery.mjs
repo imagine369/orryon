@@ -5,7 +5,7 @@
  *   npm run dev -- -p 3456
  *   npm run test:quick-access:local
  */
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3456";
 const SESSION_ID = "qa-quick-access-grocery";
@@ -176,7 +176,7 @@ async function openQuickAccess(page) {
   await page.getByRole("heading", { name: "Quick Access" }).waitFor({ timeout: 10_000 });
 }
 
-async function testChatThenQuickAccessShowsGroceryItem() {
+async function runChatToGroceryFlow(contextOptions) {
   const state = {
     groceryItems: [],
     lists: [
@@ -193,7 +193,7 @@ async function testChatThenQuickAccessShowsGroceryItem() {
   };
 
   const browser = await chromium.launch();
-  const context = await browser.newContext();
+  const context = await browser.newContext(contextOptions);
   await context.route("**/api/**", createApiRouter(state));
   const page = await context.newPage();
 
@@ -221,6 +221,11 @@ async function testChatThenQuickAccessShowsGroceryItem() {
 }
 
 console.log(`\nQuick Access grocery tests → ${BASE}\n`);
-await run("chat add → Quick Access Lists → Grocery shows milk", testChatThenQuickAccessShowsGroceryItem);
+await run("desktop: chat → Quick Access → Grocery shows milk", () =>
+  runChatToGroceryFlow({ viewport: { width: 1280, height: 800 } }),
+);
+await run("mobile: chat → Quick Access → Grocery shows milk", () =>
+  runChatToGroceryFlow({ ...devices["iPhone 14"] }),
+);
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

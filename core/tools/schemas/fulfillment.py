@@ -6,14 +6,12 @@ SCHEMAS: list[dict] = [{
     "function": {
         "name": "create_fulfillment_handoff",
         "description": (
-            "Create one or more location-aware errand handoffs that open external apps "
-            "(Uber ride, DoorDash delivery, Instacart groceries, OpenTable reservation, "
-            "pharmacy pickup). Orryon prepares the link; the user completes checkout in "
-            "the partner app. Use when the user wants rides, food delivery, grocery "
-            "shopping, restaurant reservations, or prescription pickup. For grocery type, items "
-            "come from the user's Grocery list unless grocery_items is passed — not from the "
-            "Groceries spending category. Pass partner_url when web_search found a specific "
-            "DoorDash or OpenTable page."
+            "Create errand handoffs for Quick Access → Errands (Uber, DoorDash, Instacart "
+            "checkout, OpenTable, pharmacy). NOT for adding items to the shopping list — use "
+            "add_grocery_items instead (Quick Access → Lists → Grocery). Use when the user "
+            "wants to order or book in an external app. For grocery type, Instacart pulls "
+            "from their Grocery list unless grocery_items is passed. Pass partner_url when "
+            "web_search found a specific DoorDash or OpenTable page."
         ),
         "parameters": {
             "type": "object",

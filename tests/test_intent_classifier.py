@@ -10,6 +10,11 @@ def test_english_action_verbs():
     assert not message_suggests_tool_action("hello there", "en")
 
 
+def test_english_grocery_list_intent():
+    assert message_suggests_tool_action("milk and eggs on my grocery list", "en")
+    assert message_suggests_tool_action("to my shopping list: bread", "en")
+
+
 def test_spanish_action_verbs():
     assert message_suggests_tool_action("registrar un gasto de café", "es")
     assert message_suggests_tool_action("cuánto gasté este mes", "es")

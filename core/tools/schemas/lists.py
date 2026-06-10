@@ -3,12 +3,13 @@ from __future__ import annotations
 
 SCHEMAS: list[dict] = [{'type': 'function',
   'function': {'name': 'add_grocery_items',
-               'description': 'Add items to the user\'s built-in Grocery list (the ONLY grocery '
-                              'list — same list shown in the Lists tab). ALWAYS use this when the '
-                              'user wants items on their shopping list. Never create_list, '
-                              'add_list_items, or log_expense / budget tools for this intent. '
-                              '("Groceries" is a separate spending category for how much they '
-                              'spent, not the shopping list.)',
+               'description': 'Add items to the built-in Grocery list (Quick Access → Lists → '
+                              'Grocery — NOT the Errands tab). ALWAYS call this when the user '
+                              'wants items on their shopping/grocery list. You MUST call this '
+                              'tool to add items; never say "added" in prose without it. Never '
+                              'create_fulfillment_handoff, create_list, add_list_items, or '
+                              'log_expense for this intent. ("Groceries" is a spending category, '
+                              'not the shopping list.)',
                'parameters': {'type': 'object',
                               'properties': {'items': {'type': 'array',
                                                        'description': 'List of grocery items to '

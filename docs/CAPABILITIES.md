@@ -42,8 +42,9 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Money** | Log expense/bill, budget status, forecasts, insights, goals |
 | **Schedule** | Calendar events, tasks |
 | **Notes & journal** | Add/search notes, journal entries |
-| **Lists** | Grocery shopping list and custom lists (what to buy) |
+| **Lists** | Grocery shopping list and custom lists (what to buy) — Quick Access → Lists → Grocery |
 | **Spending** | Groceries category tracks grocery *spend* for the month — separate from the list |
+| **Grocery vs errands** | **List** (“add milk”, shopping list) → `add_grocery_items` / `delete_grocery_items`. **Instacart checkout** (“order groceries”) → `create_fulfillment_handoff` (Quick Access → Errands). Call tools; never prose-only claims. |
 | **Health logs** | Vitals, medications, appointments (stored in Orryon) |
 | **Weather** | `get_weather` — live conditions for a city/place |
 | **News & web** | xAI `web_search` + `x_search` (Grok-style); RSS `search_web` fallback if Agent Tools unavailable |
