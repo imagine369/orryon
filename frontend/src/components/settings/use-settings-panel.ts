@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { api } from "@/lib/api";
+import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { usePanels } from "@/lib/panel-context";
 import { useSubscription } from "@/lib/use-subscription";
@@ -14,15 +15,23 @@ import type { EmailStep } from "./types";
 import { DEMO_SETTINGS } from "./constants";
 import { isDemo, parentOf } from "./utils";
 
+const SETTINGS_RETRY_DELAYS_MS = [0, 400, 1200];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function useSettingsPanel() {
     const { openPanel, close } = usePanels();
-    const { logout, login } = useAuth();
+    const { user, loading: authLoading, logout, login } = useAuth();
     const { sub, refresh: refreshSub } = useSubscription();
     const { prefs, update: updatePrefs } = usePreferences();
     const { usage: chatUsage, reload: reloadChatUsage } = useChatUsage();
     const isOpen = openPanel === "settings";
 
     const [settings, setSettings] = useState<Settings | null>(null);
+    const [settingsLoading, setSettingsLoading] = useState(false);
+    const [settingsError, setSettingsError] = useState<string | null>(null);
     const [view, setView] = useState<View>(null);
 
     // Refresh plan + usage when opening Plan & Usage (pulls billing period from Stripe).
@@ -76,15 +85,44 @@ export function useSettingsPanel() {
     const [revokeAllLoading, setRevokeAllLoading] = useState(false);
     const [revokeAllDone, setRevokeAllDone] = useState(false);
 
-    useQueuedEffect(() => {
-      if (!isOpen) return;
-      setView(null);
-      setEmailStep("idle");
-      setNewEmail("");
-      setEmailCode("");
-      setEmailError("");
-      if (isDemo()) { setSettings(DEMO_SETTINGS); return; }
-      api.get<Settings>("/api/settings").then(setSettings).catch(() => {});
+    const loadSettings = useCallback(async (cancelled: () => boolean) => {
+      if (isDemo()) {
+        setSettings(DEMO_SETTINGS);
+        setSettingsLoading(false);
+        setSettingsError(null);
+        return;
+      }
+
+      setSettingsLoading(true);
+      setSettingsError(null);
+
+      let lastErr: unknown;
+      for (let i = 0; i < SETTINGS_RETRY_DELAYS_MS.length; i++) {
+        const delay = SETTINGS_RETRY_DELAYS_MS[i];
+        if (delay > 0) await sleep(delay);
+        if (cancelled()) return;
+
+        try {
+          const data = await api.get<Settings>("/api/settings");
+          if (cancelled()) return;
+          setSettings(data);
+          setSettingsLoading(false);
+          setSettingsError(null);
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (err instanceof ApiError && err.status === 401) break;
+        }
+      }
+
+      if (cancelled()) return;
+      setSettingsLoading(false);
+      setSettingsError(
+        lastErr instanceof Error ? lastErr.message : "Couldn't load settings",
+      );
+    }, []);
+
+    const loadAuxiliaryData = useCallback((cancelled: () => boolean) => {
       api.get<{
         connected: boolean;
         oauth_available: boolean;
@@ -92,14 +130,41 @@ export function useSettingsPanel() {
         synced_count: number;
       }>("/api/calendar/google/status")
         .then((d) => {
+          if (cancelled()) return;
           setCalConnected(d.connected);
           setCalOAuthAvailable(d.oauth_available);
           setCalSyncPaused(d.sync_paused);
           setCalSynced(d.synced_count);
         })
         .catch(() => {});
-      api.get<AuthSession[]>("/api/sessions").then(setSessions).catch(() => {});
-    }, [isOpen]);
+      api.get<AuthSession[]>("/api/sessions")
+        .then((rows) => {
+          if (cancelled()) return;
+          setSessions(rows);
+        })
+        .catch(() => {});
+    }, []);
+
+    useQueuedEffect(() => {
+      if (!isOpen || authLoading || !user) return;
+
+      setView(null);
+      setEmailStep("idle");
+      setNewEmail("");
+      setEmailCode("");
+      setEmailError("");
+
+      let cancelled = false;
+      const isCancelled = () => cancelled;
+
+      void loadSettings(isCancelled);
+      loadAuxiliaryData(isCancelled);
+
+      return () => {
+        cancelled = true;
+        setSettingsLoading(false);
+      };
+    }, [isOpen, authLoading, user, loadSettings, loadAuxiliaryData]);
 
     const patch = async (updates: Record<string, unknown>) => {
       if (isDemo()) {
@@ -186,9 +251,14 @@ export function useSettingsPanel() {
 
     const goBack = () => setView(parentOf(view));
 
+  const reloadSettings = useCallback(() => {
+    if (!isOpen || authLoading || !user) return;
+    void loadSettings(() => false);
+  }, [isOpen, authLoading, user, loadSettings]);
+
   return {
     openPanel, close, logout, login, sub, refreshSub, prefs, updatePrefs, chatUsage, reloadChatUsage, isOpen,
-    settings, setSettings, view, setView,
+    settings, setSettings, settingsLoading, settingsError, reloadSettings, view, setView,
     accountDraft, setAccountDraft,
     emailStep, setEmailStep, newEmail, setNewEmail, emailCode, setEmailCode, emailLoading, emailError, setEmailError, emailDevCode, setEmailDevCode,
     deleteConfirm, setDeleteConfirm, deleteLoading, setDeleteLoading,

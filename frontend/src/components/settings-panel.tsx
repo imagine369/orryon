@@ -11,7 +11,7 @@ export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const isOpen = openPanel === "settings";
   const panel = useSettingsPanel();
-  const { view, settings, goBack } = panel;
+  const { view, settings, settingsLoading, settingsError, reloadSettings, goBack } = panel;
 
   return (
     <AnimatePresence>
@@ -65,9 +65,20 @@ export function SettingsPanel() {
                 </button>
               </div>
 
-              {!settings ? (
+              {settingsLoading || (!settings && !settingsError) ? (
                 <div className="flex items-center justify-center flex-1">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                </div>
+              ) : settingsError && !settings ? (
+                <div className="flex flex-col items-center justify-center flex-1 gap-4 px-8 text-center">
+                  <p className="text-sm text-white/50 leading-relaxed">{settingsError}</p>
+                  <button
+                    type="button"
+                    onClick={reloadSettings}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : (
                 <div className="px-5 py-5 flex-1">
