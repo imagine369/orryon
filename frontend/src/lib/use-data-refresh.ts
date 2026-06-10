@@ -129,7 +129,10 @@ export function useDataRefresh(
   reload: () => void,
 ): void {
   const reloadRef = useRef(reload);
-  reloadRef.current = reload;
+
+  useEffect(() => {
+    reloadRef.current = reload;
+  });
 
   useEffect(() => {
     const handler = (e: Event) => {
