@@ -40,8 +40,18 @@ async function fetchSignKey(): Promise<SignKey | null> {
         ...csrfHeader(),
       },
       credentials: "same-origin",
+      cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (process.env.NODE_ENV !== "production") {
+        const body = await res.json().catch(() => ({}));
+        const detail =
+          typeof body?.detail === "string" ? body.detail : `status ${res.status}`;
+        // eslint-disable-next-line no-console
+        console.warn("[signing] sign-key failed:", detail);
+      }
+      return null;
+    }
     return (await res.json()) as SignKey;
   } catch {
     return null;

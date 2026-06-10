@@ -44,6 +44,7 @@ from backend.deps import (
 )
 from backend.signing import require_signed_request
 from config import XAI_API_KEY, ELEVENLABS_API_KEY
+from core.xai_client import has_api_keys, next_api_key
 from db.usage import (
     get_voice_seconds_used,
     get_voice_topup_minutes,
@@ -92,8 +93,31 @@ class OrbTTSReq(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _require_key() -> None:
-    if not XAI_API_KEY:
+    if not has_api_keys():
         raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+
+
+def _xai_auth_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {next_api_key()}"}
+
+
+def _stt_multipart(filename: str, contents: bytes, mime: str) -> list[tuple]:
+    """Multipart fields with `file` last — required by xAI STT."""
+    return [
+        ("language", (None, _DEFAULT_LANGUAGE)),
+        ("format", (None, "true")),
+        ("keyterm", (None, "Orryon")),
+        ("file", (filename, contents, mime)),
+    ]
+
+
+def _xai_voice_error_status(resp: httpx.Response) -> int | None:
+    """Map xAI auth/config failures to 503 so clients don't blame the recording."""
+    if resp.status_code == 401:
+        return 503
+    if resp.status_code == 400 and "api key" in resp.text.lower():
+        return 503
+    return None
 
 
 import re as _re
@@ -199,13 +223,12 @@ async def speech_to_text(
             detail="Audio clip is too long. Record a shorter message (about 5 minutes max).",
         )
 
-    data = {"language": _DEFAULT_LANGUAGE, "format": "true"}
-    files = {"file": (file.filename or "audio.webm", contents, mime)}
-    headers = {"Authorization": f"Bearer {XAI_API_KEY}"}
+    multipart = _stt_multipart(file.filename or "audio.webm", contents, mime)
+    headers = _xai_auth_headers()
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(_STT_URL, headers=headers, data=data, files=files)
+            resp = await client.post(_STT_URL, headers=headers, files=multipart)
     except httpx.TimeoutException:
         logger.warning("STT timed out for user=%s", uid)
         raise HTTPException(status_code=504, detail="Transcription timed out. Please try again.")
@@ -215,15 +238,16 @@ async def speech_to_text(
 
     if resp.status_code >= 400:
         logger.error("xAI STT error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
-        if resp.status_code == 401:
-            raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+        mapped = _xai_voice_error_status(resp)
+        if mapped:
+            raise HTTPException(status_code=mapped, detail="Voice service is not configured on the server.")
         if resp.status_code == 413:
             raise HTTPException(status_code=413, detail="Audio clip is too long.")
         if resp.status_code == 429:
             raise HTTPException(status_code=429, detail="Voice service is busy — please try again in a moment.")
         if resp.status_code == 400:
             raise HTTPException(status_code=400, detail="Couldn't process that recording — try again.")
-        raise HTTPException(status_code=502, detail="Transcription failed. Please try again.")
+        raise HTTPException(status_code=502, detail="Couldn't transcribe your voice. Please try again.")
 
     try:
         body = resp.json()
@@ -268,7 +292,7 @@ async def text_to_speech(
         "language": _DEFAULT_LANGUAGE,
     }
     headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        **_xai_auth_headers(),
         "Content-Type": "application/json",
     }
 
@@ -284,6 +308,9 @@ async def text_to_speech(
 
     if resp.status_code >= 400:
         logger.error("xAI TTS error (status=%s) for user=%s: %s", resp.status_code, uid, resp.text[:500])
+        mapped = _xai_voice_error_status(resp)
+        if mapped:
+            raise HTTPException(status_code=mapped, detail="Voice service is not configured on the server.")
         raise HTTPException(status_code=502, detail="Voice synthesis failed. Please try again.")
 
     # Record usage from actual audio byte size
@@ -419,7 +446,7 @@ async def orb_text_to_speech(
         "language": _DEFAULT_LANGUAGE,
     }
     headers_xai = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        **_xai_auth_headers(),
         "Content-Type": "application/json",
     }
     try:

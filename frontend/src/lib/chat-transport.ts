@@ -11,6 +11,7 @@ import {
   hasAuthSignal,
   hasToken,
   isDemoMode,
+  parseApiDetail,
 } from "@/lib/api-client";
 
 export class PlanLimitError extends Error {
@@ -25,21 +26,33 @@ export class PlanLimitError extends Error {
   }
 }
 
-async function parseLimitResponse(res: Response): Promise<PlanLimitDetail | null> {
+async function readResponseBody(res: Response): Promise<unknown> {
   try {
-    const body = await res.json();
-    const detail = body?.detail;
-    if (
-      detail &&
-      typeof detail === "object" &&
-      (detail.code === "chat_limit_reached" || detail.code === "usage_limit_reached")
-    ) {
-      return detail as PlanLimitDetail;
-    }
+    return await res.json();
   } catch {
-    /* ignore */
+    return null;
+  }
+}
+
+async function parseLimitResponse(body: unknown): Promise<PlanLimitDetail | null> {
+  if (!body || typeof body !== "object") return null;
+  const detail = (body as { detail?: unknown }).detail;
+  if (
+    detail &&
+    typeof detail === "object" &&
+    ((detail as PlanLimitDetail).code === "chat_limit_reached" ||
+      (detail as PlanLimitDetail).code === "usage_limit_reached")
+  ) {
+    return detail as PlanLimitDetail;
   }
   return null;
+}
+
+async function parseErrorMessage(res: Response): Promise<string> {
+  const body = await readResponseBody(res);
+  const limit = await parseLimitResponse(body);
+  if (limit?.message) return limit.message;
+  return parseApiDetail(body, `Request failed (${res.status})`);
 }
 
 let _chatWs: WebSocket | null = null;
@@ -205,21 +218,34 @@ export async function* streamChatSse(
   const legacyToken = getLegacyToken();
   const csrf = getCsrfToken();
   const bodyStr = JSON.stringify({ message, session_id: sessionId || "" });
-  const { signRequest, invalidateSigningKey } = await import("@/lib/signing");
-  const sigHeaders = await signRequest("POST", "/api/chat", bodyStr);
-  const res = await fetch(`${getApiBase()}/api/chat`, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...clientHeaders(),
-      ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
-      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-      ...sigHeaders,
-    },
-    body: bodyStr,
-    signal,
-  });
+  const { signRequest, invalidateSigningKey, prefetchSigningKey } = await import(
+    "@/lib/signing",
+  );
+
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const sigHeaders = await signRequest("POST", "/api/chat", bodyStr);
+    res = await fetch(`${getApiBase()}/api/chat`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        ...clientHeaders(),
+        ...(legacyToken ? { Authorization: `Bearer ${legacyToken}` } : {}),
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        ...sigHeaders,
+      },
+      body: bodyStr,
+      signal,
+    });
+    if (res.status === 401 && attempt === 0) {
+      invalidateSigningKey();
+      await prefetchSigningKey();
+      continue;
+    }
+    break;
+  }
+  if (!res) return;
 
   if (res.status === 401) {
     if (isDemoMode()) {
@@ -232,19 +258,22 @@ export async function* streamChatSse(
     return;
   }
 
+  const errorBody = !res.ok ? await readResponseBody(res) : null;
+
   if (res.status === 402 || res.status === 429) {
-    const limit = await parseLimitResponse(res);
+    const limit = await parseLimitResponse(errorBody);
     if (limit) {
       throw new PlanLimitError(res.status, limit);
     }
   }
 
   if (!res.ok || !res.body) {
-    const limit = await parseLimitResponse(res);
+    const limit = await parseLimitResponse(errorBody);
     if (limit) {
       throw new PlanLimitError(res.status, limit);
     }
-    yield { type: "error", message: "Connection failed" };
+    const detail = parseApiDetail(errorBody, `Request failed (${res.status})`);
+    yield { type: "error", message: detail };
     return;
   }
 

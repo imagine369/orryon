@@ -370,10 +370,7 @@ async def auth_me(user: dict = Depends(get_current_user)):
 
 
 @router.post("/api/auth/sign-key")
-async def auth_sign_key(
-    request: Request,
-    user: dict = Depends(get_current_user),
-):
+async def auth_sign_key(user: dict = Depends(get_current_user)):
     """
     Issue the HMAC signing key for the current session. Used by the frontend
     to sign calls to /api/chat and /api/voice/*.
@@ -383,17 +380,20 @@ async def auth_sign_key(
     any in-flight signing keys. Clients keep this in memory only; it must
     never be persisted to localStorage/sessionStorage.
     """
-    auth = request.headers.get("authorization", "")
-    if not auth.lower().startswith("bearer "):
-        raise HTTPException(401, "Missing bearer token.")
-    token = auth.split(" ", 1)[1].strip()
-    from backend.signing import issue_signing_key_for_token
+    from backend.signing import derive_signing_key
+
+    uid = user["user_id"]
+    iat = int(user.get("iat") or 0)
+    if not iat:
+        raise HTTPException(401, "Session missing iat.")
     try:
-        return issue_signing_key_for_token(token)
-    except HTTPException:
-        raise
+        return {
+            "key": derive_signing_key(uid, iat),
+            "kid": f"{uid[:8]}:{iat}",
+            "iat": iat,
+        }
     except Exception as exc:
-        logger.exception("sign-key derivation failed for uid=%s: %s", user.get("user_id"), exc)
+        logger.exception("sign-key derivation failed for uid=%s: %s", uid, exc)
         raise HTTPException(500, "Could not issue signing key.")
 
 

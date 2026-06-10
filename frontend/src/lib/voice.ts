@@ -45,7 +45,10 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
  *
  * Accepts any Blob MediaRecorder produces (webm/opus, mp4/aac, wav, …).
  */
-export async function speechToText(audioBlob: File | Blob): Promise<string> {
+async function postVoiceStt(
+  audioBlob: File | Blob,
+  retriedSigning: boolean,
+): Promise<Response> {
   const form = new FormData();
   const filename =
     audioBlob instanceof File
@@ -63,6 +66,19 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
     credentials: "same-origin",
   });
 
+  if (res.status === 401 && !retriedSigning) {
+    const { invalidateSigningKey, prefetchSigningKey } = await import("@/lib/signing");
+    invalidateSigningKey();
+    await prefetchSigningKey();
+    return postVoiceStt(audioBlob, true);
+  }
+
+  return res;
+}
+
+export async function speechToText(audioBlob: File | Blob): Promise<string> {
+  const res = await postVoiceStt(audioBlob, false);
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const detail = body.detail;
@@ -74,8 +90,11 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
     ) {
       throw new VoiceLimitError(detail.minutes_used ?? 0, detail.limit_minutes ?? 0);
     }
+    if (res.status === 401) {
+      throw new Error("Session expired — please log in again.");
+    }
     throw new Error(
-      typeof detail === "string" ? detail : `Transcription failed (${res.status})`
+      typeof detail === "string" ? detail : `Couldn't transcribe your voice (${res.status})`
     );
   }
 

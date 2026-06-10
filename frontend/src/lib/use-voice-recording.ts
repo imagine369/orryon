@@ -256,7 +256,7 @@ export function useVoiceRecording({
         if (err instanceof VoiceLimitError) {
           onVoiceError?.(err);
         } else {
-          onVoiceError?.(err instanceof Error ? err.message : "Transcription failed.");
+          onVoiceError?.(err instanceof Error ? err.message : "Couldn't transcribe your voice.");
         }
       }
     };
