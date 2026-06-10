@@ -6,17 +6,19 @@ function InstructionBlock({
   title,
   large,
   children,
+  className,
 }: {
   title: string;
   large?: boolean;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <div
       className={
         large
-          ? "rounded-2xl border border-white/15 bg-[#141414] p-5 space-y-5 text-left"
-          : "rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 space-y-3 text-left"
+          ? `rounded-2xl border border-white/15 bg-[#141414] p-5 space-y-5 text-left ${className ?? ""}`
+          : `rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 space-y-3 text-left ${className ?? ""}`
       }
     >
       <p
@@ -75,30 +77,58 @@ function Step({
   );
 }
 
-export function IosInstallInstructions({ large = false }: { large?: boolean } = {}) {
+export function IosInstallInstructions({
+  large = false,
+  /** Reference-only steps in the install modal — not tappable controls. */
+  referenceOnly = false,
+}: { large?: boolean; referenceOnly?: boolean } = {}) {
   const iconSize = large ? "h-4 w-4" : "h-3 w-3";
   return (
-    <InstructionBlock title="In Safari" large={large}>
-      <Step
-        large={large}
-        step={1}
-        icon={<Share className={`${iconSize} text-white/70`} strokeWidth={1.5} />}
-        title='Tap Share (□↑) at the bottom of Safari'
-        detail="Look at Safari's bottom toolbar — not this popup"
-      />
-      <Step
-        large={large}
-        step={2}
-        icon={<Plus className={`${iconSize} text-white/70`} strokeWidth={1.5} />}
-        title='Tap "Add to Home Screen"'
-        detail="Scroll down in the share sheet if you don't see it"
-      />
-      <Step
-        large={large}
-        step={3}
-        title='Tap "Add" in the top-right'
-        detail="Then open Orryon from your home screen"
-      />
+    <InstructionBlock
+      title={referenceOnly ? "Then in the share sheet" : "In Safari"}
+      large={large}
+      className={referenceOnly ? "pointer-events-none select-none opacity-90" : undefined}
+    >
+      {referenceOnly ? (
+        <>
+          <Step
+            large={large}
+            step={1}
+            icon={<Plus className={`${iconSize} text-white/70`} strokeWidth={1.5} />}
+            title='Choose "Add to Home Screen"'
+            detail="Scroll down in the share sheet if you don't see it"
+          />
+          <Step
+            large={large}
+            step={2}
+            title='Tap "Add" in the top-right'
+            detail="Then open Orryon from your home screen"
+          />
+        </>
+      ) : (
+        <>
+          <Step
+            large={large}
+            step={1}
+            icon={<Share className={`${iconSize} text-white/70`} strokeWidth={1.5} />}
+            title='Tap Share (□↑) at the bottom of Safari'
+            detail="Look at Safari's bottom toolbar — not inside this popup"
+          />
+          <Step
+            large={large}
+            step={2}
+            icon={<Plus className={`${iconSize} text-white/70`} strokeWidth={1.5} />}
+            title='Tap "Add to Home Screen"'
+            detail="Scroll down in the share sheet if you don't see it"
+          />
+          <Step
+            large={large}
+            step={3}
+            title='Tap "Add" in the top-right'
+            detail="Then open Orryon from your home screen"
+          />
+        </>
+      )}
     </InstructionBlock>
   );
 }

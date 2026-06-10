@@ -155,9 +155,11 @@ async function testIphoneSafariInstallModal() {
     await page.goto(`${BASE}/download`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /Download for iPhone/i }).click();
     await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
+    const shareBtn = page.getByRole("button", { name: "Open Share Menu" });
+    assert(await shareBtn.isVisible(), "Safari should show Open Share Menu action");
     assert(
       (await page.locator("text=Add to Home Screen").count()) >= 1,
-      "iOS modal should show Add to Home Screen steps",
+      "iOS modal should show Add to Home Screen reference steps",
     );
     await page.getByRole("button", { name: "Got it" }).click();
     await page.waitForSelector("text=Install on iPhone & iPad", { state: "hidden", timeout: 5_000 });

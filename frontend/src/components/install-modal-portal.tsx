@@ -51,6 +51,7 @@ export function InstallModalPortal({ onClose, children, labelledBy }: InstallMod
           transition={{ type: "spring", stiffness: 400, damping: 32 }}
           className="pointer-events-auto w-full max-w-lg sm:max-w-md touch-manipulation"
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {children}
         </motion.div>
