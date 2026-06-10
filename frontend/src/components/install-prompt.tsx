@@ -5,18 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download } from "lucide-react";
 import { AndroidInstallModal } from "@/components/android-install-modal";
-import { IosInstallModal } from "@/components/ios-install-modal";
+import { iosInstallCtaLabel, iosInstallFootnote } from "@/lib/ios-install";
+import { useIosInstallModals } from "@/lib/use-ios-install-modals";
 import { usePwaInstall, platformLabel } from "@/lib/use-pwa-install";
 
-export function InstallPrompt() {
-  return null;
-}
-
-export function InstallButton({ variant: _variant = "settings" }: { variant?: "settings" } = {}) {
+export function InstallButton() {
   const router = useRouter();
   const { isInstalled, isIos, isInstallable, install, platform } = usePwaInstall();
-  const [iosModalOpen, setIosModalOpen] = useState(false);
   const [androidModalOpen, setAndroidModalOpen] = useState(false);
+  const { openIosInstall, iosInstallModals } = useIosInstallModals();
   const label = platformLabel(platform);
 
   if (isInstalled) {
@@ -33,7 +30,7 @@ export function InstallButton({ variant: _variant = "settings" }: { variant?: "s
       <button
         onClick={() => {
           if (isIos) {
-            setIosModalOpen(true);
+            openIosInstall();
             return;
           }
           if (platform === "android") {
@@ -50,12 +47,15 @@ export function InstallButton({ variant: _variant = "settings" }: { variant?: "s
         className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-black bg-white hover:bg-gray-100 rounded-xl transition active:scale-[0.98]"
       >
         <Download className="h-4 w-4" strokeWidth={2} />
-        Download for {label}
+        {isIos ? iosInstallCtaLabel() : `Download for ${label}`}
       </button>
+      {isIos && (
+        <p className="mt-2 text-center text-xs text-white/30">{iosInstallFootnote()}</p>
+      )}
       <Link href="/download" className="mt-3 block text-center text-xs text-white/25 hover:text-white/45 transition">
         All platforms →
       </Link>
-      {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+      {iosInstallModals}
       {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
     </>
   );

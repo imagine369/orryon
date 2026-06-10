@@ -63,15 +63,12 @@ async function testIphoneSafari() {
     const h1 = await page.locator("h1").innerText();
     assert(h1.includes("iPhone"), `expected iPhone headline, got: ${h1}`);
     const copy = await page.locator("main p").first().innerText();
-    assert(copy.includes("home screen"), "expected PWA install copy");
-    const cta = page.getByRole("button", { name: /Download for iPhone/i });
+    assert(copy.includes("web app"), "expected PWA install copy");
+    const cta = page.getByRole("button", { name: /Add to Home Screen/i });
     assert(await cta.isEnabled(), "iOS CTA should be enabled in Safari");
     await cta.click();
-    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
-    assert(
-      (await page.locator("text=Add to Home Screen").count()) >= 1,
-      "modal should show Add to Home Screen steps",
-    );
+    await page.waitForSelector("text=bottom of Safari", { timeout: 5_000 });
+    assert(await page.getByRole("dialog").isVisible(), "Safari install should show instruction modal");
     const manifestHref = await page.evaluate(() => {
       const link = document.querySelector('link[rel="manifest"]');
       return link?.getAttribute("href") ?? "";
@@ -108,8 +105,8 @@ async function testIphoneChromeShowsSafariHint() {
   const page = await context.newPage();
   try {
     await waitForDownloadPage(page);
-    const hint = page.getByText(/iPhone install requires/i);
-    assert(await hint.isVisible(), "Chrome on iOS should show Safari hint");
+    const footnote = page.getByText(/Open in Safari to install/i);
+    assert(await footnote.isVisible(), "Chrome on iOS should show Safari footnote");
   } finally {
     await browser.close();
   }
@@ -273,31 +270,30 @@ async function testPillButtonClickAfterHover() {
   try {
     await waitForDownloadPage(page);
     await page.getByRole("button", { name: "iPhone & iPad" }).click();
-    const cta = page.getByRole("button", { name: /Download for iPhone/i });
+    const cta = page.getByRole("button", { name: /Get for iPhone/i });
     await cta.hover();
     await cta.click();
-    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
-    assert(await page.getByRole("button", { name: "Got it" }).isVisible(), "hover should not block CTA click");
+    await page.waitForSelector("text=Open in Safari", { timeout: 5_000 });
+    assert(await page.getByRole("button", { name: "Copy link" }).isVisible(), "hover should not block CTA click");
   } finally {
     await browser.close();
   }
 }
 
-async function testIosModalGotItCloses() {
-  const browser = await webkit.launch();
-  const context = await browser.newContext({ ...devices["iPhone 14"] });
-  await fixLocalHttpsUpgrade(context);
+async function testIosChromeShowsCopyModal() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    ...devices["iPhone 14"],
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1",
+  });
   const page = await context.newPage();
   try {
     await waitForDownloadPage(page);
-    await page.getByRole("button", { name: /Download for iPhone/i }).click();
-    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
-    await page.getByRole("button", { name: "Got it" }).click();
-    await page.waitForSelector("text=Install on iPhone & iPad", {
-      state: "hidden",
-      timeout: 5_000,
-    });
-    assert(!(await page.getByRole("dialog").isVisible().catch(() => false)), "modal should close");
+    await page.getByRole("button", { name: /Get for iPhone/i }).click();
+    await page.waitForSelector("text=Open in Safari", { timeout: 5_000 });
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Copy link" }).waitFor({ state: "hidden", timeout: 5_000 });
   } finally {
     await browser.close();
   }
@@ -312,13 +308,9 @@ async function testAndroidManualInstallModal() {
     const cta = page.getByRole("button", { name: /Install for Android/i });
     assert(await cta.isEnabled(), "Android manual install CTA should be enabled");
     await cta.click();
-    await page.waitForSelector("text=Install on Android", { timeout: 5_000 });
-    assert(
-      (await page.locator("text=Add to Home screen").count()) >= 1,
-      "Android modal should show install steps",
-    );
-    await page.getByRole("button", { name: "Got it" }).click();
-    await page.waitForSelector("text=Install on Android", { state: "hidden", timeout: 5_000 });
+    await page.waitForSelector("text=Install Orryon", { timeout: 5_000 });
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByText("Chrome menu → Install app").waitFor({ state: "hidden", timeout: 5_000 });
   } finally {
     await browser.close();
   }
@@ -326,7 +318,7 @@ async function testAndroidManualInstallModal() {
 
 console.log(`\nDownload UX tests → ${BASE}\n`);
 
-await run("iPhone Safari: auto-detect, copy, install modal", testIphoneSafari);
+await run("iPhone Safari: Add to Home Screen instruction modal", testIphoneSafari);
 await run("iPad Safari: auto-detect iOS tab", testIpadSafari);
 await run("iPhone Chrome: Safari hint", testIphoneChromeShowsSafariHint);
 await run("Android Pixel: auto-detect, copy", testAndroidPixel);
@@ -337,7 +329,7 @@ await run("Desktop macOS: layout, copy, CTA, tab", testDesktopMacLayout);
 await run("Desktop: platform switcher updates headline", testDesktopPlatformSwitcher);
 await run("Pill CTA: hover fill ignores pointer events", testPillFillDoesNotCapturePointer);
 await run("Pill CTA: click works after hover (desktop)", testPillButtonClickAfterHover);
-await run("iOS modal: Got it closes dialog", testIosModalGotItCloses);
+await run("iPhone Chrome: copy-link modal closes", testIosChromeShowsCopyModal);
 await run("Android: manual install modal opens and closes", testAndroidManualInstallModal);
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

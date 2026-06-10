@@ -4,18 +4,15 @@ import { useEffect, useState } from "react";
 import { AnimatedHeroAvatar, HeroAvatarSkeleton } from "@/components/animated-hero-avatar";
 import { PillButton, PillLink } from "@/components/pill-cta";
 import { AndroidInstallModal } from "@/components/android-install-modal";
-import { IosInstallModal } from "@/components/ios-install-modal";
 import { usePwaInstall } from "@/lib/use-pwa-install";
+import { iosInstallCtaLabel, iosInstallFootnote } from "@/lib/ios-install";
+import { useIosInstallModals } from "@/lib/use-ios-install-modals";
 import {
   defaultDownloadTab,
   detectPlatform,
-  downloadKindForPlatform,
-  isIosSafari,
   isOrryonDesktopApp,
   isStandalonePwa,
-  platformShortLabel,
   type DownloadTab,
-  type Platform,
 } from "@/lib/platform";
 import {
   getDesktopDownloadUrl,
@@ -44,16 +41,25 @@ function ctaFor(tab: DownloadTab, installable: boolean): string {
     case "linux":
       return "Download for Linux";
     case "ios":
-      return "Download for iPhone & iPad";
+      return iosInstallCtaLabel();
     case "android":
       return installable ? "Install Orryon" : "Install for Android";
   }
 }
 
 function headlineFor(tab: DownloadTab): string {
-  if (tab === "ios") return "Download for iPhone & iPad";
-  if (tab === "android") return "Download for Android";
-  return `Download for ${platformShortLabel(tab)}`;
+  switch (tab) {
+    case "mac":
+      return "Download for macOS";
+    case "windows":
+      return "Download for Windows";
+    case "linux":
+      return "Download for Linux";
+    case "ios":
+      return "Orryon for iPhone & iPad";
+    case "android":
+      return "Download for Android";
+  }
 }
 
 function footnoteFor(tab: DownloadTab): string | null {
@@ -65,9 +71,9 @@ function footnoteFor(tab: DownloadTab): string | null {
     case "linux":
       return "AppImage";
     case "ios":
-      return "No App Store file — add to Home Screen via Safari";
+      return iosInstallFootnote();
     case "android":
-      return "Chrome → Install app";
+      return "Installs to your home screen";
   }
 }
 
@@ -77,17 +83,14 @@ function DownloadAvatar({ priority }: { priority?: boolean }) {
 
 export function DownloadPageClient() {
   const [mounted, setMounted] = useState(false);
-  const [detected, setDetected] = useState<Platform>("unknown");
   const [selected, setSelected] = useState<DownloadTab>("mac");
-  const [iosModalOpen, setIosModalOpen] = useState(false);
   const [androidModalOpen, setAndroidModalOpen] = useState(false);
+  const { openIosInstall, iosInstallModals } = useIosInstallModals();
   const { isInstallable, install } = usePwaInstall();
 
   useEffect(() => {
     queueMicrotask(() => {
-      const p = detectPlatform();
-      setDetected(p);
-      setSelected(defaultDownloadTab(p));
+      setSelected(defaultDownloadTab(detectPlatform()));
       setMounted(true);
     });
   }, []);
@@ -99,9 +102,6 @@ export function DownloadPageClient() {
   }, [mounted]);
 
   const installed = mounted && isStandalonePwa();
-  const isMobile = mounted && downloadKindForPlatform(detected) === "pwa";
-  const iosNeedsSafari = mounted && selected === "ios" && !isIosSafari();
-
   const handlePrimary = () => {
     if (isDesktopTab(selected)) {
       markDesktopDownloadStarted();
@@ -109,7 +109,7 @@ export function DownloadPageClient() {
       return;
     }
     if (selected === "ios") {
-      setIosModalOpen(true);
+      openIosInstall();
       return;
     }
     if (selected === "android") {
@@ -147,6 +147,8 @@ export function DownloadPageClient() {
     );
   }
 
+  const footnote = footnoteFor(selected);
+
   return (
     <>
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
@@ -157,17 +159,12 @@ export function DownloadPageClient() {
         </h1>
 
         <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
-          {isMobile
-            ? "Add Orryon to your home screen, then open the app to sign up."
-            : "Install the app, then open Orryon from your dock to sign up."}
+          {selected === "ios"
+            ? "Install Orryon as a web app — same as using Cursor on iPhone and iPad."
+            : isDesktopTab(selected)
+              ? "Download the desktop app, then open Orryon from your dock."
+              : "Install Orryon on your home screen, then sign in."}
         </p>
-
-        {iosNeedsSafari && (
-          <p className="text-sm text-amber-100/80 mb-6 max-w-sm leading-relaxed">
-            iPhone install requires <span className="text-white font-medium">Safari</span> — tap
-            Download below for steps (including how to copy the link into Safari).
-          </p>
-        )}
 
         <div className="w-full max-w-sm">
           <PillButton
@@ -180,9 +177,7 @@ export function DownloadPageClient() {
           </PillButton>
         </div>
 
-        {footnoteFor(selected) && (
-          <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
-        )}
+        {footnote && <p className="mt-4 text-sm text-white/30">{footnote}</p>}
 
         <nav
           className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
@@ -206,7 +201,7 @@ export function DownloadPageClient() {
           ))}
         </nav>
       </main>
-      {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+      {iosInstallModals}
       {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
     </>
   );

@@ -1,25 +1,24 @@
 "use client";
 
 import { X } from "lucide-react";
-import { AndroidInstallInstructions } from "@/components/app-install-instructions";
 import { InstallModalPortal } from "@/components/install-modal-portal";
 import { OrryonAvatar } from "@/components/orryon-avatar";
 
 export function AndroidInstallModal({ onClose }: { onClose: () => void }) {
   return (
     <InstallModalPortal onClose={onClose} labelledBy="android-install-title">
-      <div className="rounded-t-3xl sm:rounded-2xl border border-white/15 bg-black px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 shadow-[0_-8px_40px_rgba(0,0,0,0.8)] max-h-[min(92vh,640px)] overflow-y-auto overscroll-contain">
+      <div className="rounded-t-3xl sm:rounded-2xl border border-white/15 bg-black px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 shadow-[0_-8px_40px_rgba(0,0,0,0.8)]">
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden />
 
-        <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             <OrryonAvatar size={48} className="ring-1 ring-white/15 shrink-0" />
             <div className="min-w-0 text-left">
               <p id="android-install-title" className="text-lg font-semibold text-white leading-tight">
-                Install on Android
+                Install Orryon
               </p>
               <p className="text-sm text-white/55 mt-1 leading-snug">
-                Add Orryon to your home screen from Chrome
+                Chrome menu → Install app
               </p>
             </div>
           </div>
@@ -33,20 +32,10 @@ export function AndroidInstallModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <p className="mb-5 text-sm text-white/60 text-left leading-relaxed">
-          If the one-tap install button didn&apos;t appear, use Chrome&apos;s menu to add Orryon
-          to your home screen.
+        <p className="text-sm text-white/60 text-left leading-relaxed">
+          Tap the <span className="text-white">⋮</span> menu in Chrome, then{" "}
+          <span className="text-white">Install app</span>. Orryon will appear on your home screen.
         </p>
-
-        <AndroidInstallInstructions />
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full mt-5 min-h-[3rem] py-3.5 text-base font-semibold text-black bg-white rounded-xl hover:bg-white/90 active:scale-[0.99] transition touch-manipulation"
-        >
-          Got it
-        </button>
       </div>
     </InstallModalPortal>
   );

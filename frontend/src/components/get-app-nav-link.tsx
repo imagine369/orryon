@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PillButton } from "@/components/pill-cta";
-import { IosInstallModal } from "@/components/ios-install-modal";
-import { detectPlatform, isStandalonePwa } from "@/lib/platform";
+import { appNavInstallLabel, isIosInstallContext } from "@/lib/ios-install";
+import { detectPlatform } from "@/lib/platform";
+import { useIosInstallModals } from "@/lib/use-ios-install-modals";
 
-/** Download / install entry — on iPhone opens install steps instead of leaving the page. */
+/** Download / install entry — on iPhone/iPad always opens an install modal (never a silent no-op). */
 export function GetAppNavLink() {
   const router = useRouter();
-  const [iosModalOpen, setIosModalOpen] = useState(false);
+  const { openIosInstall, iosInstallModals } = useIosInstallModals();
+  const [label, setLabel] = useState("Download");
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setLabel(appNavInstallLabel(detectPlatform()));
+    });
+  }, []);
 
   function handleClick() {
     const platform = detectPlatform();
-    if (platform === "ios" && !isStandalonePwa()) {
-      setIosModalOpen(true);
+    if (isIosInstallContext(platform)) {
+      openIosInstall();
       return;
     }
     router.push("/download");
@@ -23,9 +31,9 @@ export function GetAppNavLink() {
   return (
     <>
       <PillButton type="button" onClick={handleClick} size="sm" variant="primary">
-        Download
+        {label}
       </PillButton>
-      {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+      {iosInstallModals}
     </>
   );
 }

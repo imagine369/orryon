@@ -153,16 +153,12 @@ async function testIphoneSafariInstallModal() {
   try {
     await primeStorage(page);
     await page.goto(`${BASE}/download`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /Download for iPhone/i }).click();
-    await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
-    const shareBtn = page.getByRole("button", { name: "Open Share Menu" });
-    assert(await shareBtn.isVisible(), "Safari should show Open Share Menu action");
-    assert(
-      (await page.locator("text=Add to Home Screen").count()) >= 1,
-      "iOS modal should show Add to Home Screen reference steps",
-    );
-    await page.getByRole("button", { name: "Got it" }).click();
-    await page.waitForSelector("text=Install on iPhone & iPad", { state: "hidden", timeout: 5_000 });
+    await page.waitForSelector("h1", { timeout: 20_000 });
+    const cta = page.getByRole("button", { name: /Add to Home Screen/i });
+    assert(await cta.isVisible(), "Safari should show Add to Home Screen CTA");
+    await cta.click();
+    await page.waitForSelector("text=bottom of Safari", { timeout: 5_000 });
+    assert(await page.getByRole("dialog").isVisible(), "Safari install should show Safari toolbar instructions");
   } finally {
     await browser.close();
   }
@@ -201,7 +197,7 @@ async function testAndroidManualInstallModal() {
     await primeStorage(page);
     await page.goto(`${BASE}/download`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /Install for Android/i }).click();
-    await page.waitForSelector("text=Install on Android", { timeout: 5_000 });
+    await page.waitForSelector("text=Install Orryon", { timeout: 5_000 });
   } finally {
     await browser.close();
   }
@@ -273,7 +269,7 @@ async function testDesktopSettingsInstallNavigatesDownload() {
 
 console.log(`\nManual QA automation → ${BASE}\n`);
 
-await run("iPhone Safari: install modal + Add to Home Screen steps", testIphoneSafariInstallModal);
+await run("iPhone Safari: Add to Home Screen shows Safari instructions", testIphoneSafariInstallModal);
 await run("Android Chrome: install prompt enables CTA", testAndroidInstallPromptCta);
 await run("Android Chrome: manual install modal", testAndroidManualInstallModal);
 await run("Chat: 3+ assistant replies → one avatar", testChatSingleAvatarMultiTurn);
