@@ -64,7 +64,7 @@ async function testIphoneSafari() {
     assert(h1.includes("iPhone"), `expected iPhone headline, got: ${h1}`);
     const copy = await page.locator("main p").first().innerText();
     assert(copy.includes("home screen"), "expected PWA install copy");
-    const cta = page.getByRole("button", { name: /Install for iPhone/i });
+    const cta = page.getByRole("button", { name: /Download for iPhone/i });
     assert(await cta.isEnabled(), "iOS CTA should be enabled in Safari");
     await cta.click();
     await page.waitForSelector("text=Install on iPhone & iPad", { timeout: 5_000 });
@@ -108,7 +108,7 @@ async function testIphoneChromeShowsSafariHint() {
   const page = await context.newPage();
   try {
     await waitForDownloadPage(page);
-    const hint = page.getByText(/Open this page in/i);
+    const hint = page.getByText(/Safari/i);
     assert(await hint.isVisible(), "Chrome on iOS should show Safari hint");
   } finally {
     await browser.close();

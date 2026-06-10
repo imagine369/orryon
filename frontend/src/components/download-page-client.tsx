@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatedHeroAvatar, HeroAvatarSkeleton } from "@/components/animated-hero-avatar";
 import { PillButton, PillLink } from "@/components/pill-cta";
+import { AndroidInstallModal } from "@/components/android-install-modal";
 import { IosInstallModal } from "@/components/ios-install-modal";
 import { usePwaInstall } from "@/lib/use-pwa-install";
 import {
@@ -12,6 +13,7 @@ import {
   isIosSafari,
   isOrryonDesktopApp,
   isStandalonePwa,
+  platformShortLabel,
   type DownloadTab,
   type Platform,
 } from "@/lib/platform";
@@ -48,6 +50,12 @@ function ctaFor(tab: DownloadTab, installable: boolean): string {
   }
 }
 
+function headlineFor(tab: DownloadTab): string {
+  if (tab === "ios") return "Download for iPhone & iPad";
+  if (tab === "android") return "Download for Android";
+  return `Download for ${platformShortLabel(tab)}`;
+}
+
 function footnoteFor(tab: DownloadTab): string | null {
   switch (tab) {
     case "mac":
@@ -72,6 +80,7 @@ export function DownloadPageClient() {
   const [detected, setDetected] = useState<Platform>("unknown");
   const [selected, setSelected] = useState<DownloadTab>("mac");
   const [iosModalOpen, setIosModalOpen] = useState(false);
+  const [androidModalOpen, setAndroidModalOpen] = useState(false);
   const { isInstallable, install } = usePwaInstall();
 
   useEffect(() => {
@@ -103,7 +112,14 @@ export function DownloadPageClient() {
       setIosModalOpen(true);
       return;
     }
-    void install();
+    if (selected === "android") {
+      if (isInstallable) {
+        void install();
+      } else {
+        setAndroidModalOpen(true);
+      }
+      return;
+    }
   };
 
   if (!mounted) {
@@ -131,11 +147,13 @@ export function DownloadPageClient() {
     );
   }
 
-  const primaryDisabled = selected === "android" && !isInstallable;
-
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
       <DownloadAvatar priority />
+
+      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
+        {headlineFor(selected)}
+      </h1>
 
       <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
         {isMobile
@@ -154,7 +172,6 @@ export function DownloadPageClient() {
         <PillButton
           type="button"
           onClick={handlePrimary}
-          disabled={primaryDisabled}
           variant="primary"
           className="w-full"
         >
@@ -189,6 +206,7 @@ export function DownloadPageClient() {
       </nav>
 
       {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+      {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
     </main>
   );
 }

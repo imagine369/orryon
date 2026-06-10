@@ -97,6 +97,13 @@ describe("HTTP routes (requires dev server)", () => {
     }
   });
 
+  it("/sw.js is served for PWA install", async () => {
+    const { status, headers } = await fetchCheck("/sw.js");
+    assert.equal(status, 200, "/sw.js should be reachable");
+    const ct = headers.get("content-type") || "";
+    assert.match(ct, /javascript/, "sw.js should be JavaScript");
+  });
+
   it("/manifest.json is valid PWA", async () => {
     const { status, res } = await fetchCheck("/manifest.json");
     assert.equal(status, 200);
