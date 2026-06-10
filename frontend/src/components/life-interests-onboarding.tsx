@@ -7,6 +7,19 @@ import { LifePrioritiesPicker } from "@/components/life-priorities-picker";
 import type { LifePriorityId } from "@/lib/life-priorities";
 import { usePreferences } from "@/lib/use-preferences";
 
+const DISMISS_KEY = "orryon_life_onboarding_dismissed";
+
+function isDismissedLocally(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  return localStorage.getItem(DISMISS_KEY) === "1";
+}
+
+function markDismissedLocally(): void {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(DISMISS_KEY, "1");
+  }
+}
+
 /**
  * One-screen interest onboarding (X-style): pick up to 3 focus areas.
  * Shown once per account until skipped or saved.
@@ -16,8 +29,10 @@ export function LifeInterestsOnboarding() {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<LifePriorityId[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useQueuedEffect(() => {
+    if (isDismissedLocally()) return;
     if (!loading && !prefs.life_priorities_set) {
       setOpen(true);
     }
@@ -30,12 +45,26 @@ export function LifeInterestsOnboarding() {
 
   async function finish(picks: LifePriorityId[]) {
     setSaving(true);
+    setError("");
     try {
-      await update({
+      const ok = await update({
         life_priorities: picks,
         life_priorities_set: true,
         onboarding_complete: true,
       });
+
+      if (!ok) {
+        if (picks.length === 0) {
+          // Skip — close locally even if the server save failed (e.g. CSRF blip).
+          markDismissedLocally();
+          setOpen(false);
+          return;
+        }
+        setError("Couldn't save your picks. Please try again.");
+        return;
+      }
+
+      markDismissedLocally();
       setOpen(false);
     } finally {
       setSaving(false);
@@ -80,11 +109,15 @@ export function LifeInterestsOnboarding() {
               {selected.length}/{3} selected
             </p>
 
+            {error && (
+              <p className="mt-3 text-center text-sm text-red-400">{error}</p>
+            )}
+
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => finish([])}
+                onClick={() => void finish([])}
                 className="text-sm text-white/40 hover:text-white/65 disabled:opacity-40 py-2"
               >
                 Skip for now
@@ -92,10 +125,14 @@ export function LifeInterestsOnboarding() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => finish(selected)}
+                onClick={() => void finish(selected)}
                 className="rounded-full bg-white/90 px-6 py-2.5 text-sm font-medium text-black hover:bg-white disabled:opacity-50"
               >
-                {selected.length > 0 ? "Continue" : "Continue without picks"}
+                {saving
+                  ? "Saving…"
+                  : selected.length > 0
+                    ? "Continue"
+                    : "Continue without picks"}
               </button>
             </div>
           </motion.div>

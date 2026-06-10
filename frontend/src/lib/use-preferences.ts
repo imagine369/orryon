@@ -48,7 +48,7 @@ const DEFAULT_PREFS: UserPreferences = {
 export interface PreferencesContextValue {
   prefs: UserPreferences;
   loading: boolean;
-  update: (patch: Partial<UserPreferences>) => Promise<void>;
+  update: (patch: Partial<UserPreferences>) => Promise<boolean>;
   reload: () => Promise<void>;
 }
 
@@ -122,8 +122,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     });
     try {
       await api.patch("/api/preferences", apiPatch);
+      return true;
     } catch {
       if (snapshot) setPrefs(snapshot);
+      return false;
     }
   }, []);
 

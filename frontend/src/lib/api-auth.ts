@@ -28,6 +28,7 @@ export { isDemoMode } from "./demo-mode";
 
 export function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
-  const m = document.cookie.match(/(?:^|;\s*)orryon_csrf=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
+  const matches = [...document.cookie.matchAll(/(?:^|;\s*)orryon_csrf=([^;]+)/g)];
+  if (matches.length === 0) return null;
+  return decodeURIComponent(matches[matches.length - 1][1]);
 }
