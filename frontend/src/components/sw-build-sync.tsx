@@ -3,18 +3,26 @@
 import { useEffect } from "react";
 import { CANARY } from "@/lib/integrity";
 import { registerServiceWorker } from "@/lib/register-service-worker";
+import {
+  LS_CANARY_KEY,
+  PWA_UI_MIGRATION_KEYS,
+  pendingPwaMigrations,
+} from "@/lib/sw-build-sync-helpers";
 
-const LS_CANARY_KEY = "orryon_build_canary";
-/** One-time flag — bust stale PWA bundles that still ship the removed floating Orryon. */
-const BUDDY_REMOVAL_MIGRATION = "orryon_floating_buddy_removed_v1";
-/** One-time flag — bust bundles that still render Orryon on every assistant reply. */
-const SINGLE_CHAT_AVATAR_MIGRATION = "orryon_single_chat_avatar_v1";
+const CACHE_BUST_FLAG = "orryon_cache_bust_in_progress";
+
+let buildSyncInFlight = false;
 
 export function SwBuildSync() {
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (buildSyncInFlight) return;
+    buildSyncInFlight = true;
 
     async function bustCachesAndReload() {
+      if (sessionStorage.getItem(CACHE_BUST_FLAG)) return;
+      sessionStorage.setItem(CACHE_BUST_FLAG, "1");
+
       if ("serviceWorker" in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map((r) => r.unregister()));
@@ -28,25 +36,30 @@ export function SwBuildSync() {
     }
 
     async function run() {
-      const migrationKeys = [BUDDY_REMOVAL_MIGRATION, SINGLE_CHAT_AVATAR_MIGRATION];
-      const pending = migrationKeys.filter((key) => !localStorage.getItem(key));
-      if (pending.length > 0) {
-        for (const key of pending) localStorage.setItem(key, "1");
-        await bustCachesAndReload();
-        return;
-      }
+      try {
+        const pending = pendingPwaMigrations(PWA_UI_MIGRATION_KEYS, localStorage);
+        if (pending.length > 0) {
+          for (const key of pending) localStorage.setItem(key, "1");
+          await bustCachesAndReload();
+          return;
+        }
 
-      const prev = localStorage.getItem(LS_CANARY_KEY);
-      if (prev && prev !== CANARY) {
-        await bustCachesAndReload();
-        return;
-      }
+        const prev = localStorage.getItem(LS_CANARY_KEY);
+        if (prev && prev !== CANARY) {
+          await bustCachesAndReload();
+          return;
+        }
 
-      if (!prev) localStorage.setItem(LS_CANARY_KEY, CANARY);
+        if (!prev) localStorage.setItem(LS_CANARY_KEY, CANARY);
 
-      await registerServiceWorker();
-      if ("serviceWorker" in navigator) {
-        void navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
+        sessionStorage.removeItem(CACHE_BUST_FLAG);
+
+        await registerServiceWorker();
+        if ("serviceWorker" in navigator) {
+          void navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
+        }
+      } finally {
+        buildSyncInFlight = false;
       }
     }
 

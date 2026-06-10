@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { AmbientOrb } from "@/components/ambient/ambient-orb";
 import type { AmbientAvatarState } from "@/lib/ambient-avatar-state";
@@ -14,8 +15,33 @@ type AmbientOverlayProps = {
   onOrbTap?: () => void;
 };
 
+function ambientOverlayPropsEqual(
+  prev: AmbientOverlayProps,
+  next: AmbientOverlayProps,
+): boolean {
+  const prevShow = shouldShowAmbientMiniOrb(
+    prev.ambientEnabled,
+    prev.ambientState,
+    prev.hasMessages,
+  );
+  const nextShow = shouldShowAmbientMiniOrb(
+    next.ambientEnabled,
+    next.ambientState,
+    next.hasMessages,
+  );
+  if (!prevShow && !nextShow) return true;
+
+  return (
+    prev.ambientEnabled === next.ambientEnabled &&
+    prev.ambientState === next.ambientState &&
+    prev.hasMessages === next.hasMessages &&
+    prev.aliveState === next.aliveState &&
+    prev.onOrbTap === next.onOrbTap
+  );
+}
+
 /** Floating mini-orb layer for ambient mode (put-down hold + active chat). */
-export function AmbientOverlay({
+export const AmbientOverlay = memo(function AmbientOverlay({
   ambientEnabled,
   ambientState,
   aliveState,
@@ -28,16 +54,16 @@ export function AmbientOverlay({
     hasMessages,
   );
 
+  if (!showOrb) return null;
+
   return (
     <AnimatePresence>
-      {showOrb && (
-        <AmbientOrb
-          key="ambient-orb"
-          ambientState={ambientState}
-          aliveState={aliveState}
-          onTap={onOrbTap}
-        />
-      )}
+      <AmbientOrb
+        key="ambient-orb"
+        ambientState={ambientState}
+        aliveState={aliveState}
+        onTap={onOrbTap}
+      />
     </AnimatePresence>
   );
-}
+}, ambientOverlayPropsEqual);
