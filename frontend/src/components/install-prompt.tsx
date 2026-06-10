@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Download } from "lucide-react";
 import { AndroidInstallModal } from "@/components/android-install-modal";
 import { IosInstallModal } from "@/components/ios-install-modal";
@@ -12,6 +13,7 @@ export function InstallPrompt() {
 }
 
 export function InstallButton({ variant: _variant = "settings" }: { variant?: "settings" } = {}) {
+  const router = useRouter();
   const { isInstalled, isIos, isInstallable, install, platform } = usePwaInstall();
   const [iosModalOpen, setIosModalOpen] = useState(false);
   const [androidModalOpen, setAndroidModalOpen] = useState(false);
@@ -39,7 +41,11 @@ export function InstallButton({ variant: _variant = "settings" }: { variant?: "s
             else setAndroidModalOpen(true);
             return;
           }
-          if (isInstallable) void install();
+          if (isInstallable) {
+            void install();
+            return;
+          }
+          router.push("/download");
         }}
         className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-black bg-white hover:bg-gray-100 rounded-xl transition active:scale-[0.98]"
       >

@@ -149,66 +149,65 @@ export function DownloadPageClient() {
 
   return (
     <>
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
-      <DownloadAvatar priority />
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-24 text-center">
+        <DownloadAvatar priority />
 
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
-        {headlineFor(selected)}
-      </h1>
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3 font-[family-name:var(--font-playfair)]">
+          {headlineFor(selected)}
+        </h1>
 
-      <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
-        {isMobile
-          ? "Add Orryon to your home screen, then open the app to sign up."
-          : "Install the app, then open Orryon from your dock to sign up."}
-      </p>
-
-      {iosNeedsSafari && (
-        <p className="text-sm text-amber-100/80 mb-6 max-w-sm leading-relaxed">
-          iPhone install requires <span className="text-white font-medium">Safari</span> — tap
-          Download below for steps (including how to copy the link into Safari).
+        <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
+          {isMobile
+            ? "Add Orryon to your home screen, then open the app to sign up."
+            : "Install the app, then open Orryon from your dock to sign up."}
         </p>
-      )}
 
-      <div className="w-full max-w-sm">
-        <PillButton
-          type="button"
-          onClick={handlePrimary}
-          variant="primary"
-          className="w-full"
+        {iosNeedsSafari && (
+          <p className="text-sm text-amber-100/80 mb-6 max-w-sm leading-relaxed">
+            iPhone install requires <span className="text-white font-medium">Safari</span> — tap
+            Download below for steps (including how to copy the link into Safari).
+          </p>
+        )}
+
+        <div className="w-full max-w-sm">
+          <PillButton
+            type="button"
+            onClick={handlePrimary}
+            variant="primary"
+            className="w-full"
+          >
+            {ctaFor(selected, isInstallable)}
+          </PillButton>
+        </div>
+
+        {footnoteFor(selected) && (
+          <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
+        )}
+
+        <nav
+          className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
+          aria-label="Other platforms"
         >
-          {ctaFor(selected, isInstallable)}
-        </PillButton>
-      </div>
-
-      {footnoteFor(selected) && (
-        <p className="mt-4 text-sm text-white/30">{footnoteFor(selected)}</p>
-      )}
-
-      <nav
-        className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"
-        aria-label="Other platforms"
-      >
-        {PLATFORM_LINKS.map((p, i) => (
-          <span key={p.id} className="inline-flex items-center gap-1">
-            {i > 0 && <span className="text-white/15 px-1">·</span>}
-            <button
-              type="button"
-              onClick={() => setSelected(p.id)}
-              className={`min-h-11 px-2 py-2 touch-manipulation ${
-                selected === p.id
-                  ? "text-white/80 font-medium"
-                  : "hover:text-white/60 transition-colors"
-              }`}
-            >
-              {p.label}
-            </button>
-          </span>
-        ))}
-      </nav>
-
-    </main>
-    {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
-    {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
+          {PLATFORM_LINKS.map((p, i) => (
+            <span key={p.id} className="inline-flex items-center gap-1">
+              {i > 0 && <span className="text-white/15 px-1">·</span>}
+              <button
+                type="button"
+                onClick={() => setSelected(p.id)}
+                className={`min-h-11 px-2 py-2 touch-manipulation ${
+                  selected === p.id
+                    ? "text-white/80 font-medium"
+                    : "hover:text-white/60 transition-colors"
+                }`}
+              >
+                {p.label}
+              </button>
+            </span>
+          ))}
+        </nav>
+      </main>
+      {iosModalOpen && <IosInstallModal onClose={() => setIosModalOpen(false)} />}
+      {androidModalOpen && <AndroidInstallModal onClose={() => setAndroidModalOpen(false)} />}
     </>
   );
 }

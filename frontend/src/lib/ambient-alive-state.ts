@@ -4,13 +4,13 @@ import {
 } from "@/lib/ambient-avatar-state";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 
-/** Mini floating orb — empty chat only; active threads use the single in-thread avatar. */
+/** Mini floating orb — put-down (miniOrb) only; active chat uses the in-thread avatar. */
 export function shouldShowAmbientMiniOrb(
   ambientEnabled: boolean,
   ambientState: AmbientAvatarState,
-  hasMessages: boolean,
+  _hasMessages: boolean,
 ): boolean {
-  if (!ambientEnabled || !isAmbientAwake(ambientState) || hasMessages) return false;
+  if (!ambientEnabled || !isAmbientAwake(ambientState)) return false;
   return ambientState === "miniOrb";
 }
 

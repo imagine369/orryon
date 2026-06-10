@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { CANARY } from "@/lib/integrity";
+import { registerServiceWorker } from "@/lib/register-service-worker";
 
 const LS_CANARY_KEY = "orryon_build_canary";
 /** One-time flag — bust stale PWA bundles that still ship the removed floating Orryon. */
@@ -43,6 +44,7 @@ export function SwBuildSync() {
 
       if (!prev) localStorage.setItem(LS_CANARY_KEY, CANARY);
 
+      await registerServiceWorker();
       if ("serviceWorker" in navigator) {
         void navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
       }

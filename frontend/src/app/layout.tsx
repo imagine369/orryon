@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IntegrityGate } from "@/components/integrity-gate";
 import { ScrollToTopOnNavigate } from "@/components/scroll-to-top-on-navigate";
-import { PwaRegister } from "@/components/pwa-register";
 import { SwBuildSync } from "@/components/sw-build-sync";
 import "./globals.css";
 
@@ -71,7 +70,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <ErrorBoundary>
               <TooltipProvider>
                 <SwBuildSync />
-                <PwaRegister />
                 <ScrollToTopOnNavigate />
                 {children}
               </TooltipProvider>

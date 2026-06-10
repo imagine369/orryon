@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 interface InstallModalPortalProps {
   onClose: () => void;
@@ -18,11 +19,11 @@ interface InstallModalPortalProps {
 export function InstallModalPortal({ onClose, children, labelledBy }: InstallModalPortalProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     setContainer(document.body);
   }, []);
 
-  useEffect(() => {
+  useQueuedEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
