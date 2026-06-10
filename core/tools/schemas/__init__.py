@@ -38,6 +38,7 @@ _LEGACY_ORDER = (
     "add_note",
     "set_budget",
     "check_grocery_item",
+    "uncheck_grocery_item",
     "complete_task",
     "get_spending_summary",
     "get_net_worth",

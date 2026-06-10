@@ -39,8 +39,9 @@ SCHEMAS: list[dict] = [{'type': 'function',
                               'for spending, not the shopping list.',
                'parameters': {'type': 'object',
                               'properties': {'item_names': {'type': 'array',
-                                                            'description': 'Item names to remove '
-                                                                           '(partial match OK)',
+                                                            'description': 'Exact item names to '
+                                                                           'remove (checked or '
+                                                                           'unchecked)',
                                                             'items': {'type': 'string'}}},
                               'required': ['item_names']}}},
  {'type': 'function',
@@ -51,6 +52,15 @@ SCHEMAS: list[dict] = [{'type': 'function',
                               'properties': {'item_name': {'type': 'string',
                                                            'description': 'Name of the item to '
                                                                           'mark as bought'}},
+                              'required': ['item_name']}}},
+ {'type': 'function',
+  'function': {'name': 'uncheck_grocery_item',
+               'description': 'Mark a checked grocery item as unchecked on the shopping list '
+                              '(undo a check-off).',
+               'parameters': {'type': 'object',
+                              'properties': {'item_name': {'type': 'string',
+                                                           'description': 'Exact name of the item '
+                                                                          'to uncheck'}},
                               'required': ['item_name']}}},
  {'type': 'function',
   'function': {'name': 'get_grocery_list',

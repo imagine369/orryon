@@ -113,7 +113,7 @@ Subscription tier affects **usage limits** (messages, voice, etc.), not whether 
 
 ## Registered agent tools
 
-Orryon exposes **70 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
+Orryon exposes **71 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
 
 | Domain | Tools (summary) |
 |--------|-----------------|

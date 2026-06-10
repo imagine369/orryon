@@ -184,6 +184,17 @@ def grocery_list_sort_key(list_row: dict) -> tuple:
     )
 
 
+def format_grocery_item_notes(quantity: str = "", estimated_price: float = 0.0) -> str:
+    """Build list_items.notes from optional quantity and estimated price."""
+    parts: list[str] = []
+    q = str(quantity or "").strip()
+    if q:
+        parts.append(q)
+    if estimated_price and estimated_price > 0:
+        parts.append(f"est ${estimated_price:.2f}")
+    return " · ".join(parts)
+
+
 def format_list_item_label(name: str, notes: str = "") -> str:
     """Display label for list items; appends notes (e.g. quantity) when present."""
     label = str(name or "").strip()
@@ -191,6 +202,30 @@ def format_list_item_label(name: str, notes: str = "") -> str:
     if extra:
         return f"{label} ({extra})"
     return label
+
+
+def _item_field(row, field: str, index: int) -> str:
+    if isinstance(row, dict):
+        return str(row.get(field, "") or "")
+    return str(row[index] if len(row) > index else "")
+
+
+def resolve_grocery_item_row(rows, query: str):
+    """Match by exact item name or full display label (case-insensitive)."""
+    needle = str(query or "").strip().lower()
+    if not needle:
+        return None
+    for row in rows:
+        if _item_field(row, "name", 1).strip().lower() == needle:
+            return row
+    for row in rows:
+        label = format_list_item_label(
+            _item_field(row, "name", 1),
+            _item_field(row, "notes", 2),
+        ).lower()
+        if label == needle:
+            return row
+    return None
 
 
 def get_unchecked_grocery_item_names(user_id: str) -> list[str]:

@@ -11,27 +11,18 @@ from db import (
 from core.grocery_list import (
     GROCERY_LIST_NAME,
     ensure_grocery_list_ready,
+    format_grocery_item_notes,
+    format_list_item_label,
     get_unchecked_grocery_item_names,
     grocery_list_sort_key,
     is_builtin_grocery_list,
     is_grocery_list_name,
+    resolve_grocery_item_row,
 )
 from core.tools.shared import (
     _now_iso,
     _uid
 )
-
-
-def _match_unchecked_grocery_item(rows, query: str):
-    """First unchecked row whose name contains query (case-insensitive)."""
-    needle = str(query or "").strip().lower()
-    if not needle:
-        return None
-    for row in rows:
-        name = row["name"] if isinstance(row, dict) else row[1]
-        if needle in str(name).lower():
-            return row
-    return None
 
 
 def _row_id(row) -> str:
@@ -40,6 +31,12 @@ def _row_id(row) -> str:
 
 def _row_name(row) -> str:
     return row["name"] if isinstance(row, dict) else row[1]
+
+
+def _row_display_name(row) -> str:
+    if isinstance(row, dict):
+        return format_list_item_label(str(row.get("name", "")), str(row.get("notes", "") or ""))
+    return format_list_item_label(str(row[1]), str(row[2]) if len(row) > 2 else "")
 
 
 def _add_grocery_items(args: dict, user_id: str) -> dict:
@@ -66,12 +63,12 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
         if not name:
             continue
         quantity = str(item.get("quantity") or "").strip()
-        notes = quantity
         try:
             price = float(item.get("estimated_price", 0) or 0)
         except (TypeError, ValueError):
             price = 0.0
         total_est += price
+        notes = format_grocery_item_notes(quantity, price)
 
         insert_row("list_items", {
             "id": _uid(),
@@ -83,7 +80,7 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
             "sort_order": max_item_order + 1 + i,
             "added_at": now,
         })
-        items_added.append(f"{name} ({quantity})" if quantity else name)
+        items_added.append(format_list_item_label(name, notes))
 
     all_items = fetch_rows("list_items", {"list_id": list_id, "user_id": user_id, "is_checked": 0})
     return {
@@ -98,7 +95,7 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
 
 
 def _delete_grocery_items(args: dict, user_id: str) -> dict:
-    """Remove items from the user's Grocery list (unchecked items only)."""
+    """Remove items from the user's Grocery list (checked or unchecked)."""
     raw_names = list(args.get("item_names") or [])
     single = str(args.get("item_name") or "").strip()
     if single:
@@ -111,21 +108,20 @@ def _delete_grocery_items(args: dict, user_id: str) -> dict:
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT id, name FROM list_items "
-            "WHERE list_id=? AND user_id=? AND is_checked=0",
+            "SELECT id, name, notes FROM list_items WHERE list_id=? AND user_id=?",
             (list_id, user_id),
         ).fetchall()
         remaining = list(rows)
         removed: list[str] = []
         not_found: list[str] = []
         for query in names:
-            matched = _match_unchecked_grocery_item(remaining, query)
+            matched = resolve_grocery_item_row(remaining, query)
             if not matched:
                 not_found.append(query)
                 continue
             item_id = _row_id(matched)
             delete_row("list_items", {"id": item_id, "user_id": user_id})
-            removed.append(_row_name(matched))
+            removed.append(_row_display_name(matched))
             remaining = [row for row in remaining if _row_id(row) != item_id]
     finally:
         conn.close()
@@ -178,19 +174,40 @@ def _check_grocery_item(args: dict, user_id: str) -> dict:
     item_name = str(args.get("item_name") or "").strip()
     if not item_name:
         return {"status": "error", "message": "item_name is required."}
-    name = item_name.lower()
     list_id = ensure_grocery_list_ready(user_id)
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT id, name FROM list_items "
+            "SELECT id, name, notes FROM list_items "
             "WHERE list_id=? AND user_id=? AND is_checked=0",
             (list_id, user_id),
         ).fetchall()
-        matched = _match_unchecked_grocery_item(rows, name)
+        matched = resolve_grocery_item_row(rows, item_name)
         if matched:
             update_row("list_items", {"is_checked": 1}, {"id": _row_id(matched)})
-            return {"status": "ok", "checked": _row_name(matched)}
+            return {"status": "ok", "checked": _row_display_name(matched)}
+    finally:
+        conn.close()
+    return {"status": "not_found", "searched": item_name}
+
+
+def _uncheck_grocery_item(args: dict, user_id: str) -> dict:
+    """Mark a checked grocery item as unchecked on the canonical Grocery list."""
+    item_name = str(args.get("item_name") or "").strip()
+    if not item_name:
+        return {"status": "error", "message": "item_name is required."}
+    list_id = ensure_grocery_list_ready(user_id)
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, notes FROM list_items "
+            "WHERE list_id=? AND user_id=? AND is_checked=1",
+            (list_id, user_id),
+        ).fetchall()
+        matched = resolve_grocery_item_row(rows, item_name)
+        if matched:
+            update_row("list_items", {"is_checked": 0}, {"id": _row_id(matched)})
+            return {"status": "ok", "unchecked": _row_display_name(matched)}
     finally:
         conn.close()
     return {"status": "not_found", "searched": item_name}

@@ -13,6 +13,7 @@ from core.tools.handlers.lists import (
     _create_list,
     _delete_grocery_items,
     _delete_list,
+    _uncheck_grocery_item,
 )
 from core.tools.shared import _now_iso, _uid
 from db import get_connection, insert_row
@@ -206,6 +207,69 @@ def test_delete_grocery_items_not_found():
     assert result["status"] == "not_found"
     assert result["removed"] == []
     assert get_unchecked_grocery_item_names(uid) == ["butter"]
+
+
+def test_grocery_item_match_requires_exact_name():
+    user = get_or_create_user_by_email("pytest-grocery-exact-match@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    _add_grocery_items({"items": [{"name": "milk"}, {"name": "almond milk"}]}, uid)
+    result = _delete_grocery_items({"item_names": ["milk"]}, uid)
+
+    assert result["status"] == "ok"
+    assert result["removed"] == ["milk"]
+    assert get_unchecked_grocery_item_names(uid) == ["almond milk"]
+
+
+def test_add_grocery_items_stores_estimated_price_in_notes():
+    user = get_or_create_user_by_email("pytest-grocery-price@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    _add_grocery_items(
+        {"items": [{"name": "eggs", "quantity": "1 dozen", "estimated_price": 4.5}]},
+        uid,
+    )
+    list_id = ensure_grocery_list_ready(uid)
+
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT name, notes FROM list_items WHERE list_id=? AND user_id=?",
+        (list_id, uid),
+    ).fetchone()
+    conn.close()
+
+    assert row["notes"] == "1 dozen · est $4.50"
+    assert get_unchecked_grocery_item_names(uid) == ["eggs (1 dozen · est $4.50)"]
+
+
+def test_delete_grocery_items_removes_checked_items():
+    user = get_or_create_user_by_email("pytest-grocery-delete-checked@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    _add_grocery_items({"items": [{"name": "milk"}]}, uid)
+    _check_grocery_item({"item_name": "milk"}, uid)
+    result = _delete_grocery_items({"item_names": ["milk"]}, uid)
+
+    assert result["status"] == "ok"
+    assert result["removed"] == ["milk"]
+    assert get_unchecked_grocery_item_names(uid) == []
+
+
+def test_uncheck_grocery_item_restores_unchecked():
+    user = get_or_create_user_by_email("pytest-grocery-uncheck@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    _add_grocery_items({"items": [{"name": "bread"}]}, uid)
+    _check_grocery_item({"item_name": "bread"}, uid)
+    assert get_unchecked_grocery_item_names(uid) == []
+
+    result = _uncheck_grocery_item({"item_name": "bread"}, uid)
+    assert result["status"] == "ok"
+    assert get_unchecked_grocery_item_names(uid) == ["bread"]
 
 
 def test_delete_list_blocks_builtin_grocery():
