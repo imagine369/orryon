@@ -43,14 +43,7 @@ function isBuiltinGroceryList(list: UserList): boolean {
 }
 
 async function fetchListItems(list: UserList): Promise<ListItem[]> {
-  if (!isBuiltinGroceryList(list)) {
-    return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
-  }
-  try {
-    return await api.get<ListItem[]>("/api/grocery/items");
-  } catch {
-    return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
-  }
+  return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
 }
 
 // ── Icon & color palettes ────────────────────────────────────────────────────
