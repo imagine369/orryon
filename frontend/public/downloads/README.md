@@ -17,6 +17,10 @@ DESKTOP_DOWNLOAD_LINUX_URL=https://your-public-host/Orryon-linux.AppImage
 
 4. Redeploy. The site downloads via `/api/download/{platform}`, which redirects to those URLs.
 
+**Quick publish (Vercel Blob):** from `desktop/`, run `npm run publish:mac` after `npm run dist:mac`.
+
+**Verify production:** from `frontend/`, run `npm run verify:download:production`.
+
 Copy the asset link from GitHub only if the repository is **public** (right-click `Orryon-mac.dmg` on the release page → Copy link address).
 
 ## Local dev

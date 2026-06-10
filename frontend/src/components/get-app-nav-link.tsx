@@ -7,8 +7,19 @@ import { appNavInstallLabel, isIosInstallContext } from "@/lib/ios-install";
 import { detectPlatform } from "@/lib/platform";
 import { useIosInstallModals } from "@/lib/use-ios-install-modals";
 
-/** Download / install entry — on iPhone/iPad always opens an install modal (never a silent no-op). */
-export function GetAppNavLink() {
+type CtaSize = "sm" | "md" | "lg";
+type CtaVariant = "primary" | "secondary" | "calm";
+
+/** Shared install CTA — iOS opens install modal; other platforms go to /download. */
+export function GetAppInstallCta({
+  size = "sm",
+  variant = "primary",
+  className,
+}: {
+  size?: CtaSize;
+  variant?: CtaVariant;
+  className?: string;
+} = {}) {
   const router = useRouter();
   const { openIosInstall, iosInstallModals } = useIosInstallModals();
   // Stable "Download" for SSR + first paint — updated after mount to avoid hydration mismatch on iOS.
@@ -31,10 +42,15 @@ export function GetAppNavLink() {
 
   return (
     <>
-      <PillButton type="button" onClick={handleClick} size="sm" variant="primary">
+      <PillButton type="button" onClick={handleClick} size={size} variant={variant} className={className}>
         {label}
       </PillButton>
       {iosInstallModals}
     </>
   );
+}
+
+/** Compact nav install entry (alias for GetAppInstallCta). */
+export function GetAppNavLink() {
+  return <GetAppInstallCta size="sm" variant="primary" />;
 }

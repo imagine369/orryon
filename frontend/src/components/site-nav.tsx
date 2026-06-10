@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { PillLink } from "@/components/pill-cta";
-import { GetAppNavLink } from "@/components/get-app-nav-link";
+import { GetAppInstallCta, GetAppNavLink } from "@/components/get-app-nav-link";
 import { siteChromePaddingX } from "@/lib/site-chrome";
 import { cn } from "@/lib/utils";
 
-export { GetAppNavLink };
+export { GetAppInstallCta, GetAppNavLink };
 
 /** Homepage nav shell — shared padding, blur, and ORRYON wordmark. */
 export const siteNavClass = cn(

@@ -11,6 +11,7 @@
     "test:platform": "node --test src/lib/platform.test.mjs",
     "test:download": "node --test scripts/test-download-flow.mjs",
     "test:download:local": "TEST_BASE_URL=http://127.0.0.1:3456 node --test scripts/test-download-flow.mjs",
+    "verify:download:production": "node scripts/verify-production-download.mjs",
     "test:mobile": "node scripts/test-mobile-pwa.mjs",
     "test:mobile:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-mobile-pwa.mjs",
     "test:download:ux": "node scripts/test-mobile-pwa.mjs",

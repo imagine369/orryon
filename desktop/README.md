@@ -22,6 +22,12 @@ npm run dist:linux
 
 After mic permission changes, users must **install the new `.dmg`** and allow Microphone in **System Settings → Privacy & Security → Microphone → Orryon**.
 
-Upload `dist/Orryon-mac.dmg` to Vercel Blob, set `DESKTOP_DOWNLOAD_MAC_URL` in Vercel, redeploy.
+Upload `dist/Orryon-mac.dmg` to Vercel Blob, set `DESKTOP_DOWNLOAD_MAC_URL` in Vercel, redeploy:
+
+```bash
+npm run dist:mac
+npm run publish:mac          # uploads to Vercel Blob, prints env var to set
+cd ../frontend && npm run verify:download:production
+```
 
 **Public Mac releases (like Cursor):** follow **[MAC_SIGNING.md](./MAC_SIGNING.md)** — Apple Developer Program, sign, notarize, then host the `.dmg`. No App Store required; repo can stay private.

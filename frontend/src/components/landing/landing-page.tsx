@@ -5,7 +5,7 @@ import { hasToken } from "@/lib/api";
 import { AnimatedHeroAvatar } from "@/components/animated-hero-avatar";
 import { FadeIn } from "@/components/motion";
 import { PillLink } from "@/components/pill-cta";
-import { GetAppNavLink, SignInNavLink, SiteNav } from "@/components/site-nav";
+import { GetAppInstallCta, GetAppNavLink, SignInNavLink, SiteNav } from "@/components/site-nav";
 import { AppTourDemo } from "@/components/landing/app-tour-demo";
 import { FeatureSection } from "@/components/landing/feature-section";
 import { FooterRevealSection } from "@/components/landing/footer-reveal-section";
@@ -83,7 +83,7 @@ export default function LandingPage() {
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <PillLink href="/download" size="sm">Download</PillLink>
+    <GetAppInstallCta size="sm" />
   );
 
   return (

@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download } from "lucide-react";
 import { AndroidInstallModal } from "@/components/android-install-modal";
-import { iosInstallCtaLabel, iosInstallFootnote } from "@/lib/ios-install";
+import { iosInstallCtaLabel, iosInstallFootnote, isIosInstallContext } from "@/lib/ios-install";
 import { useIosInstallModals } from "@/lib/use-ios-install-modals";
+import { detectPlatform } from "@/lib/platform";
 import { usePwaInstall, platformLabel } from "@/lib/use-pwa-install";
+
+const DEFAULT_CTA = `Download for ${platformLabel("unknown")}`;
 
 export function InstallButton() {
   const router = useRouter();
-  const { isInstalled, isIos, isInstallable, install, platform } = usePwaInstall();
+  const { isInstalled, isInstallable, install } = usePwaInstall();
   const [androidModalOpen, setAndroidModalOpen] = useState(false);
   const { openIosInstall, iosInstallModals } = useIosInstallModals();
-  const label = platformLabel(platform);
+  const [ctaLabel, setCtaLabel] = useState(DEFAULT_CTA);
+  const [showIosFootnote, setShowIosFootnote] = useState(false);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      const platform = detectPlatform();
+      const ios = isIosInstallContext(platform);
+      setCtaLabel(ios ? iosInstallCtaLabel() : `Download for ${platformLabel(platform)}`);
+      setShowIosFootnote(ios);
+    });
+  }, []);
 
   if (isInstalled) {
     return (
@@ -29,7 +42,8 @@ export function InstallButton() {
     <>
       <button
         onClick={() => {
-          if (isIos) {
+          const platform = detectPlatform();
+          if (isIosInstallContext(platform)) {
             openIosInstall();
             return;
           }
@@ -47,9 +61,9 @@ export function InstallButton() {
         className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-black bg-white hover:bg-gray-100 rounded-xl transition active:scale-[0.98]"
       >
         <Download className="h-4 w-4" strokeWidth={2} />
-        {isIos ? iosInstallCtaLabel() : `Download for ${label}`}
+        {ctaLabel}
       </button>
-      {isIos && (
+      {showIosFootnote && (
         <p className="mt-2 text-center text-xs text-white/30">{iosInstallFootnote()}</p>
       )}
       <Link href="/download" className="mt-3 block text-center text-xs text-white/25 hover:text-white/45 transition">

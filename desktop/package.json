@@ -12,7 +12,8 @@
     "dist:mac": "npm run verify:mic && electron-builder --mac",
     "dist:mac:signed": "electron-builder --mac -c electron-builder.signed.json --publish never",
     "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "publish:mac": "node scripts/publish-mac-dmg.mjs"
   },
   "build": {
     "appId": "com.orryon.app",
