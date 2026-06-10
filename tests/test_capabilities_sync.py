@@ -30,3 +30,12 @@ def test_capabilities_doc_references_system_prompt():
     text = _CAPABILITIES_PATH.read_text()
     assert "core/system_prompt.py" in text
     assert "CANONICAL_TOOL_NAMES" in text or str(len(CANONICAL_TOOL_NAMES)) in text
+
+
+def test_system_prompt_includes_link_and_action_rules():
+    prompt = get_system_prompt()
+    assert "## LINK & ACTION RULES" in prompt
+    assert "plain prose" in prompt
+    assert "PLACES (restaurants, hotels, venues)" in prompt
+    assert "tel:" in prompt
+    assert "maps.google.com" in prompt

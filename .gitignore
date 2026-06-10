@@ -11,6 +11,7 @@ finance.db-wal
 *.db-wal
 
 # Local notes and generated files
+.tmp-orb-frames/
 notes/
 calendar.ics
 report_*.csv
