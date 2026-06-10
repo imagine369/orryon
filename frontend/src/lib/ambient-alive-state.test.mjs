@@ -46,13 +46,14 @@ describe("resolveAmbientAliveState", () => {
 });
 
 describe("shouldShowAmbientMiniOrb", () => {
-  it("shows mini orb in miniOrb state", () => {
+  it("shows mini orb in miniOrb state on empty chat only", () => {
     assert.equal(shouldShowAmbientMiniOrb(true, "miniOrb", false), true);
-    assert.equal(shouldShowAmbientMiniOrb(true, "miniOrb", true), true);
+    assert.equal(shouldShowAmbientMiniOrb(true, "miniOrb", true), false);
   });
 
-  it("shows mini orb when active with messages", () => {
-    assert.equal(shouldShowAmbientMiniOrb(true, "active", true), true);
+  it("hides mini orb during active chat — thread avatar is the single Orryon", () => {
+    assert.equal(shouldShowAmbientMiniOrb(true, "active", true), false);
+    assert.equal(shouldShowAmbientMiniOrb(true, "awakening", true), false);
   });
 
   it("hides mini orb when active on empty chat", () => {

@@ -11,6 +11,10 @@ import {
   MAX_RECORDING_MS,
   stickyDeniedHelpText,
 } from "@/lib/chat-input-helpers";
+import {
+  mapMicrophoneAccessError,
+  requestMicrophoneStream,
+} from "@/lib/microphone-access";
 
 interface UseVoiceRecordingOptions {
   disabled?: boolean;
@@ -126,23 +130,13 @@ export function useVoiceRecording({
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await requestMicrophoneStream();
     } catch (err) {
       const e = err as DOMException | Error;
       const name = (e as DOMException)?.name || "";
       // eslint-disable-next-line no-console
       console.error("[voice] getUserMedia failed:", name, e);
-      const msg =
-        name === "NotAllowedError" || name === "SecurityError"
-          ? stickyDeniedHelpText()
-          : name === "NotFoundError" || name === "OverconstrainedError"
-            ? "No microphone was detected on this device."
-            : name === "NotReadableError" || name === "TrackStartError"
-              ? "Your microphone is in use by another app. Close it (Zoom, Discord, etc.) and try again."
-              : name === "AbortError"
-                ? "Recording was interrupted. Please try again."
-                : `Couldn't access the microphone (${name || "unknown error"}).`;
-      onVoiceError?.(msg);
+      onVoiceError?.(mapMicrophoneAccessError(err));
       return;
     }
 

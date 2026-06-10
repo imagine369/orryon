@@ -36,7 +36,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Orryon uses the microphone so you can speak to your AI concierge instead of typing."
+      }
     },
     "win": {
       "icon": "build/icon.png",

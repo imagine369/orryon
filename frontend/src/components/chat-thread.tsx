@@ -10,7 +10,6 @@ import {
   assistantBubbleClass,
 } from "@/components/chat-bubble-primitives";
 import { OrryonAliveAvatar } from "@/components/orryon-alive-avatar";
-import { OrryonAvatar } from "@/components/orryon-avatar";
 import type { OrryonAliveState } from "@/lib/orryon-alive-state";
 import { FulfillmentCardList } from "@/components/fulfillment/fulfillment-card";
 import type { FulfillmentHandoff } from "@/lib/fulfillment-types";
@@ -243,21 +242,10 @@ export function ChatThread({
         const showStreamingEmpty =
           isLast && streaming && !thinking && !msg.content && !toolLabel;
 
-        return (
-          <div key={i} className="group flex w-full min-w-0 items-start gap-3.5">
-            {i === lastAssistantIndex ? (
-              <OrryonAliveAvatar
-                size={CHAT_AVATAR_SIZE}
-                state={aliveState}
-                idlePulse
-                className="mt-0.5"
-              />
-            ) : (
-              <OrryonAvatar size={CHAT_AVATAR_SIZE} className="mt-0.5 ring-1 ring-white/[0.08]" />
-            )}
+        const isCurrentTurn = i === lastAssistantIndex;
 
-            {/* Content column */}
-            <div className="flex min-w-0 flex-1 flex-col">
+        const turnBody = (
+          <div className="flex min-w-0 flex-1 flex-col">
               {/* Tool-use caption */}
               {isLast && toolLabel && !showThinking && (
                 <p className="mb-2 flex items-center gap-1.5 text-[12px] text-white/28">
@@ -334,7 +322,26 @@ export function ChatThread({
                   </button>
                 )}
               </div>
+          </div>
+        );
+
+        if (!isCurrentTurn) {
+          return (
+            <div key={i} className="group w-full min-w-0">
+              {turnBody}
             </div>
+          );
+        }
+
+        return (
+          <div key={i} className="group flex w-full min-w-0 items-start gap-3.5">
+            <OrryonAliveAvatar
+              size={CHAT_AVATAR_SIZE}
+              state={aliveState}
+              idlePulse
+              className="mt-0.5"
+            />
+            {turnBody}
           </div>
         );
       })}

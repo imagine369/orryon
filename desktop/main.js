@@ -1,8 +1,33 @@
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, session, systemPreferences } = require("electron");
 const path = require("path");
 
 const APP_URL = (process.env.ORRYON_APP_URL || "https://orryon.vercel.app").replace(/\/$/, "");
 const DESKTOP_UA = "OrryonDesktop/1.0";
+const MIC_PERMISSIONS = new Set(["media", "audioCapture", "videoCapture"]);
+
+function configureMediaPermissions() {
+  const ses = session.defaultSession;
+
+  ses.setPermissionRequestHandler(async (_webContents, permission, callback) => {
+    if (!MIC_PERMISSIONS.has(permission)) {
+      callback(false);
+      return;
+    }
+    if (process.platform === "darwin") {
+      try {
+        callback(await systemPreferences.askForMediaAccess("microphone"));
+      } catch {
+        callback(false);
+      }
+      return;
+    }
+    callback(true);
+  });
+
+  ses.setPermissionCheckHandler((_webContents, permission) =>
+    MIC_PERMISSIONS.has(permission),
+  );
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -35,7 +60,10 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  configureMediaPermissions();
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

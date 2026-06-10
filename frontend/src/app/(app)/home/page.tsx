@@ -215,13 +215,15 @@ export default function HomePage() {
         />
       )}
 
-      <AmbientOverlay
-        ambientEnabled={ambient.isAmbientEnabled}
-        ambientState={ambient.ambientState}
-        aliveState={displayAliveState}
-        hasMessages={chat.messages.length > 0}
-        onOrbTap={handleOrbTap}
-      />
+      {chat.messages.length === 0 && (
+        <AmbientOverlay
+          ambientEnabled={ambient.isAmbientEnabled}
+          ambientState={ambient.ambientState}
+          aliveState={displayAliveState}
+          hasMessages={false}
+          onOrbTap={handleOrbTap}
+        />
+      )}
     </>
   );
 }
