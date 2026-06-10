@@ -103,7 +103,7 @@ export function useVoiceRecording({
     }
   };
 
-  const startRecording = async () => {
+  const startRecording = async (gestureStream?: Promise<MediaStream>) => {
     if (!navigator.mediaDevices?.getUserMedia) {
       onVoiceError?.("Microphone access is not available in this browser.");
       return;
@@ -115,27 +115,32 @@ export function useVoiceRecording({
       return;
     }
 
-    try {
-      const perms = (navigator as Navigator & {
-        permissions?: { query?: (d: PermissionDescriptor) => Promise<PermissionStatus> };
-      }).permissions;
-      const status = await perms?.query?.({ name: "microphone" as PermissionName });
-      if (status?.state === "denied") {
-        onVoiceError?.(stickyDeniedHelpText());
-        return;
-      }
-    } catch {
-      // Permissions API unavailable — fall through to getUserMedia.
-    }
-
     let stream: MediaStream;
     try {
-      stream = await requestMicrophoneStream();
+      stream = await requestMicrophoneStream(
+        gestureStream ? { gestureStream } : undefined,
+      );
     } catch (err) {
       const e = err as DOMException | Error;
       const name = (e as DOMException)?.name || "";
       // eslint-disable-next-line no-console
       console.error("[voice] getUserMedia failed:", name, e);
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        onVoiceError?.(stickyDeniedHelpText());
+        return;
+      }
+      try {
+        const perms = (navigator as Navigator & {
+          permissions?: { query?: (d: PermissionDescriptor) => Promise<PermissionStatus> };
+        }).permissions;
+        const status = await perms?.query?.({ name: "microphone" as PermissionName });
+        if (status?.state === "denied") {
+          onVoiceError?.(stickyDeniedHelpText());
+          return;
+        }
+      } catch {
+        // Permissions API unavailable or unsupported for microphone.
+      }
       onVoiceError?.(mapMicrophoneAccessError(err));
       return;
     }
@@ -282,7 +287,23 @@ export function useVoiceRecording({
     }
     if (voiceStatus === "transcribing") return;
     onVoiceUserGesture?.();
-    void startRecording();
+
+    const media = navigator.mediaDevices;
+    if (!media?.getUserMedia) {
+      onVoiceError?.("Microphone access is not available in this browser.");
+      return;
+    }
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      onVoiceError?.(
+        "Voice only works over HTTPS. Open the site at its https:// URL and try again.",
+      );
+      return;
+    }
+
+    // Must call getUserMedia synchronously in the click turn — Firefox/Safari reject
+    // calls that happen after an await (e.g. permissions.query) in the same handler.
+    const gestureStream = media.getUserMedia({ audio: true });
+    void startRecording(gestureStream);
   };
 
   useEffect(() => {

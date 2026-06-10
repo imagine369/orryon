@@ -16,9 +16,22 @@ describe("mapMicrophoneAccessError", () => {
     assert.match(msg, /microphone/i);
   });
 
-  it("maps NotFoundError to no-mic help", () => {
+  it("maps NotFoundError to Firefox macOS TCC help", () => {
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, "navigator", {
+      value: {
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+      },
+      configurable: true,
+    });
     const msg = mapMicrophoneAccessError(domException("NotFoundError"));
-    assert.match(msg, /microphone/i);
+    assert.match(msg, /Firefox/i);
+    assert.match(msg, /System Settings/i);
+    Object.defineProperty(globalThis, "navigator", {
+      value: originalNavigator,
+      configurable: true,
+    });
   });
 
   it("maps NotReadableError to in-use message", () => {
