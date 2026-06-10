@@ -26,6 +26,7 @@ describe("expandDataChangeTabs", () => {
 describe("isMutatingTool", () => {
   it("treats write tools as mutating", () => {
     assert.equal(isMutatingTool("add_grocery_items"), true);
+    assert.equal(isMutatingTool("add_calendar_event"), true);
     assert.equal(isMutatingTool("delete_task"), true);
     assert.equal(isMutatingTool("create_fulfillment_handoff"), true);
   });

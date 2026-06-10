@@ -25,7 +25,7 @@ export const TASK_SORT_OPTIONS: { key: TaskSort; label: string }[] = [
   { key: "manual",   label: "Custom"   },
 ];
 
-export function useNavBarToday(notifOpen: boolean) {
+export function useNavBarToday() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -71,9 +71,7 @@ export function useNavBarToday(notifOpen: boolean) {
     }).catch(() => {});
   }, [today]);
 
-  useQueuedEffect(() => {
-    if (notifOpen) loadToday();
-  }, [notifOpen, loadToday]);
+  useQueuedEffect(() => loadToday(), [loadToday]);
 
   useDataRefresh(["today", "schedule", "dashboard", "calendar"], loadToday);
 

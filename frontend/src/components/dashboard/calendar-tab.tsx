@@ -74,8 +74,9 @@ export function CalendarTab() {
   const [monthYear, setMonthYear]   = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(today);
 
-  const reload = useCallback(() => {
+  const reload = useCallback((opts?: { silent?: boolean }) => {
     if (isDemo()) { setEvents(DEMO_EVENTS); setTasks(DEMO_TASKS); setLoading(false); return; }
+    if (!opts?.silent) setLoading(true);
     Promise.all([
       api.get<CalEvent[]>("/api/events?upcoming=true&limit=100"),
       api.get<CalTask[]>("/api/tasks?status=open"),
@@ -83,7 +84,7 @@ export function CalendarTab() {
   }, []);
 
   useQueuedEffect(() => reload(), [reload]);
-  useDataRefresh(["calendar", "schedule", "dashboard"], reload);
+  useDataRefresh(["calendar", "schedule", "dashboard"], () => reload({ silent: true }));
 
   const handleIcsUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".ics")) {

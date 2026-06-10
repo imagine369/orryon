@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { ErrandsTab } from "@/components/nav-bar/errands-tab";
@@ -10,7 +10,11 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TodayTab } from "@/components/nav-bar/today-tab";
 import type { Tab } from "@/components/nav-bar/types";
 import type { useNavBarToday } from "@/components/nav-bar/use-nav-bar-today";
-import { QUICK_ACCESS_TAB_KEYS, scheduleDataChanged } from "@/lib/use-data-refresh";
+import {
+  DATA_CHANGED_EVENT,
+  QUICK_ACCESS_TAB_KEYS,
+  scheduleDataChanged,
+} from "@/lib/use-data-refresh";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Today" },
@@ -36,36 +40,57 @@ export function QuickAccessDrawer({
   today,
   onOpenDashboard,
 }: QuickAccessDrawerProps) {
+  // Keep tab panels mounted after first open or chat refresh so listeners survive drawer close.
+  const [tabsLive, setTabsLive] = useState(false);
+
+  useEffect(() => {
+    if (open) setTabsLive(true);
+  }, [open]);
+
+  useEffect(() => {
+    const primeTabs = () => setTabsLive(true);
+    window.addEventListener(DATA_CHANGED_EVENT, primeTabs);
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, primeTabs);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     scheduleDataChanged([...QUICK_ACCESS_TAB_KEYS, "schedule", "dashboard"]);
   }, [open]);
 
-  if (!open) return null;
-
   return (
     <>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="qa-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
+        initial={false}
+        animate={{ x: open ? 0 : "100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 32, mass: 0.9 }}
-        drag="x"
+        drag={open ? "x" : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0, right: 0.2 }}
         onDragEnd={(_, info) => {
           if (info.offset.x > 80 || info.velocity.x > 500) onClose();
         }}
         className="fixed top-0 right-0 h-full z-50 flex flex-col"
-        style={{ width: "95vw", maxWidth: 600 }}
+        style={{
+          width: "95vw",
+          maxWidth: 600,
+          pointerEvents: open ? "auto" : "none",
+          visibility: open ? "visible" : "hidden",
+        }}
+        aria-hidden={!open}
       >
         <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl flex flex-col">
           <div
@@ -117,19 +142,27 @@ export function QuickAccessDrawer({
                 </div>
               }
             >
-              {/* Keep all tabs mounted while open so chat refreshes reach every panel */}
-              <div className={activeTab === "today" ? undefined : "hidden"}>
-                <TodayTab today={today} />
-              </div>
-              <div className={activeTab === "errands" ? undefined : "hidden"}>
-                <ErrandsTab />
-              </div>
-              <div className={activeTab === "calendar" ? undefined : "hidden"}>
-                <CalendarTab />
-              </div>
-              <div className={activeTab === "lists" ? undefined : "hidden"}>
-                <ListsTab />
-              </div>
+              {tabsLive ? (
+                <>
+                  {/* Hidden tabs stay mounted so chat/voice refreshes apply before reopen */}
+                  <div className={activeTab === "today" ? undefined : "hidden"}>
+                    <TodayTab today={today} />
+                  </div>
+                  <div className={activeTab === "errands" ? undefined : "hidden"}>
+                    <ErrandsTab />
+                  </div>
+                  <div className={activeTab === "calendar" ? undefined : "hidden"}>
+                    <CalendarTab />
+                  </div>
+                  <div className={activeTab === "lists" ? undefined : "hidden"}>
+                    <ListsTab />
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-center py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                </div>
+              )}
             </ErrorBoundary>
           </div>
 

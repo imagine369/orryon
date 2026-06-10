@@ -16,7 +16,7 @@ export function NavBar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("today");
 
-  const today = useNavBarToday(notifOpen);
+  const today = useNavBarToday();
 
   return (
     <>
@@ -35,21 +35,17 @@ export function NavBar() {
         {searchOpen && <SearchPanel onClose={() => setSearchOpen(false)} />}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {notifOpen && (
-          <QuickAccessDrawer
-            open={notifOpen}
-            onClose={() => setNotifOpen(false)}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            today={today}
-            onOpenDashboard={() => {
-              setNotifOpen(false);
-              toggle("dashboard");
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <QuickAccessDrawer
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        today={today}
+        onOpenDashboard={() => {
+          setNotifOpen(false);
+          toggle("dashboard");
+        }}
+      />
     </>
   );
 }
