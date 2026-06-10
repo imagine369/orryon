@@ -24,6 +24,12 @@ function legacyBearer(): Record<string, string> {
 
 let _cached: SignKey | null = null;
 let _inflight: Promise<SignKey | null> | null = null;
+let _lastSignKeyError: string | null = null;
+
+/** Last sign-key fetch failure detail (for user-visible chat errors). */
+export function getLastSignKeyError(): string | null {
+  return _lastSignKeyError;
+}
 
 function csrfHeader(): Record<string, string> {
   const csrf = getCsrfToken();
@@ -43,16 +49,23 @@ async function fetchSignKey(): Promise<SignKey | null> {
       cache: "no-store",
     });
     if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail =
+        typeof body?.detail === "string" ? body.detail : `HTTP ${res.status}`;
+      _lastSignKeyError = detail;
       if (process.env.NODE_ENV !== "production") {
-        const body = await res.json().catch(() => ({}));
-        const detail =
-          typeof body?.detail === "string" ? body.detail : `status ${res.status}`;
         // eslint-disable-next-line no-console
         console.warn("[signing] sign-key failed:", detail);
       }
       return null;
     }
-    return (await res.json()) as SignKey;
+    _lastSignKeyError = null;
+    const data = (await res.json()) as SignKey;
+    if (!data?.key) {
+      _lastSignKeyError = "sign-key response missing key";
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }

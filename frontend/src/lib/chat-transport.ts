@@ -211,15 +211,16 @@ export async function* streamChatSse(
   const legacyToken = getLegacyToken();
   const csrf = getCsrfToken();
   const bodyStr = JSON.stringify({ message, session_id: sessionId || "" });
-  const { signRequest, invalidateSigningKey, prefetchSigningKey } = await import(
-    "@/lib/signing",
-  );
+  const { signRequest, invalidateSigningKey, prefetchSigningKey, getLastSignKeyError } =
+    await import("@/lib/signing");
 
   if (!(await prefetchSigningKey())) {
+    const reason = getLastSignKeyError();
     yield {
       type: "error",
-      message:
-        "Couldn't secure this chat turn. Refresh the page, or log out and back in.",
+      message: reason
+        ? `Couldn't prepare secure chat (${reason}). Refresh the page.`
+        : "Couldn't secure this chat turn. Refresh the page, or log out and back in.",
     };
     return;
   }

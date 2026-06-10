@@ -24,14 +24,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated" }, { status: 401 });
   }
 
+  // Backend origin middleware requires Origin on mutating requests. Browser
+  // same-origin fetches often omit the Origin header; bind the page origin
+  // explicitly (same pattern as src/app/api/[[...path]]/route.ts).
+  const pageOrigin = req.nextUrl.origin;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${jwt}`,
+    "X-Orryon-Client": "web",
+  };
+  if (pageOrigin && pageOrigin !== "null") {
+    headers.Origin = pageOrigin;
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(`${backendBase()}/api/auth/sign-key`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        "X-Orryon-Client": "web",
-      },
+      headers,
       cache: "no-store",
     });
   } catch {
