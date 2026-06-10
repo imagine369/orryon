@@ -82,19 +82,27 @@ export async function speechToText(audioBlob: File | Blob): Promise<string> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const detail = body.detail;
-    // Structured 402 from voice-minute cap enforcement
-    if (
-      res.status === 402 &&
-      typeof detail === "object" &&
-      detail?.code === "voice_limit_reached"
-    ) {
-      throw new VoiceLimitError(detail.minutes_used ?? 0, detail.limit_minutes ?? 0);
+    if (res.status === 402 && typeof detail === "object" && detail) {
+      if (detail.code === "voice_limit_reached") {
+        throw new VoiceLimitError(detail.minutes_used ?? 0, detail.limit_minutes ?? 0);
+      }
+      if (detail.code === "usage_limit_reached") {
+        throw new Error(detail.message || "You've reached your monthly AI usage limit.");
+      }
+    }
+    if (res.status === 429) {
+      const msg = typeof detail === "string" ? detail : detail?.message;
+      throw new Error(msg || "Too many voice requests — please wait a moment.");
     }
     if (res.status === 401) {
       throw new Error("Session expired — please log in again.");
     }
+    if (res.status === 402) {
+      const msg = typeof detail === "object" && detail?.message ? detail.message : "You've reached your monthly AI usage limit. Upgrade for more.";
+      throw new Error(msg);
+    }
     throw new Error(
-      typeof detail === "string" ? detail : `Couldn't transcribe your voice (${res.status})`
+      typeof detail === "string" ? detail : "Couldn't transcribe your voice. Please try again."
     );
   }
 

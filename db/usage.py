@@ -9,12 +9,16 @@ from datetime import datetime, timezone
 
 from db.connection import _USE_PG, get_connection
 from db.crud import insert_row
+from config import (
+    XAI_COST_PER_MILLION_INPUT_TOKENS,
+    XAI_COST_PER_MILLION_OUTPUT_TOKENS,
+)
 
 logger = logging.getLogger(__name__)
 
 
-_COST_PER_INPUT_TOKEN  = 0.30 / 1_000_000
-_COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000
+_COST_PER_INPUT_TOKEN  = XAI_COST_PER_MILLION_INPUT_TOKENS / 1_000_000
+_COST_PER_OUTPUT_TOKEN = XAI_COST_PER_MILLION_OUTPUT_TOKENS / 1_000_000
 
 
 def _usage_period_key(user_id: str) -> str:

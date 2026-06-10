@@ -307,6 +307,25 @@ export async function* streamChatSse(
     if (limit) {
       throw new PlanLimitError(res.status, limit);
     }
+    if (res.status === 402) {
+      yield {
+        type: "error",
+        message:
+          "You've reached your monthly AI usage limit. Upgrade for more.",
+      };
+      return;
+    }
+    if (res.status === 429) {
+      const msg =
+        errorBody && typeof errorBody === "object"
+          ? (errorBody as any).detail?.message || (errorBody as any).message
+          : null;
+      yield {
+        type: "error",
+        message: msg || "Too many requests. Please wait a moment.",
+      };
+      return;
+    }
     const detail = parseApiDetail(errorBody, `Request failed (${res.status})`);
     yield { type: "error", message: detail };
     return;

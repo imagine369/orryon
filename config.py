@@ -36,6 +36,15 @@ XAI_API_KEYS: list[str] = [
 ]
 GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-4.3")
 
+# Token cost rates used to estimate spend for quota enforcement (in USD per million tokens).
+# These should be set to match the actual pricing of the model in use.
+XAI_COST_PER_MILLION_INPUT_TOKENS: float = float(
+    os.getenv("XAI_COST_PER_MILLION_INPUT_TOKENS", "0.30")
+)
+XAI_COST_PER_MILLION_OUTPUT_TOKENS: float = float(
+    os.getenv("XAI_COST_PER_MILLION_OUTPUT_TOKENS", "0.50")
+)
+
 # Ollama (local fallback — not used in v1 rebuild but kept for compatibility)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1")
