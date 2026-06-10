@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { motion } from "framer-motion";
 import { ListsTab } from "@/components/dashboard/lists-tab";
@@ -9,6 +10,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TodayTab } from "@/components/nav-bar/today-tab";
 import type { Tab } from "@/components/nav-bar/types";
 import type { useNavBarToday } from "@/components/nav-bar/use-nav-bar-today";
+import { QUICK_ACCESS_TAB_KEYS, scheduleDataChanged } from "@/lib/use-data-refresh";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Today" },
@@ -34,6 +36,11 @@ export function QuickAccessDrawer({
   today,
   onOpenDashboard,
 }: QuickAccessDrawerProps) {
+  useEffect(() => {
+    if (!open) return;
+    scheduleDataChanged([...QUICK_ACCESS_TAB_KEYS, "schedule", "dashboard"]);
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -110,10 +117,19 @@ export function QuickAccessDrawer({
                 </div>
               }
             >
-              {activeTab === "today" && <TodayTab today={today} />}
-              {activeTab === "errands" && <ErrandsTab />}
-              {activeTab === "calendar" && <CalendarTab />}
-              {activeTab === "lists" && <ListsTab />}
+              {/* Keep all tabs mounted while open so chat refreshes reach every panel */}
+              <div className={activeTab === "today" ? undefined : "hidden"}>
+                <TodayTab today={today} />
+              </div>
+              <div className={activeTab === "errands" ? undefined : "hidden"}>
+                <ErrandsTab />
+              </div>
+              <div className={activeTab === "calendar" ? undefined : "hidden"}>
+                <CalendarTab />
+              </div>
+              <div className={activeTab === "lists" ? undefined : "hidden"}>
+                <ListsTab />
+              </div>
             </ErrorBoundary>
           </div>
 

@@ -70,7 +70,7 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
         total_est += price
         notes = format_grocery_item_notes(quantity, price)
 
-        insert_row("list_items", {
+        ok = insert_row("list_items", {
             "id": _uid(),
             "list_id": list_id,
             "user_id": user_id,
@@ -80,6 +80,13 @@ def _add_grocery_items(args: dict, user_id: str) -> dict:
             "sort_order": max_item_order + 1 + i,
             "added_at": now,
         })
+        if not ok:
+            return {
+                "status": "error",
+                "message": f"Could not save grocery item: {name}",
+                "added": items_added,
+                "count_added": len(items_added),
+            }
         items_added.append(format_list_item_label(name, notes))
 
     all_items = fetch_rows("list_items", {"list_id": list_id, "user_id": user_id, "is_checked": 0})

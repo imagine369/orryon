@@ -104,6 +104,35 @@ def test_post_items_resolves_canonical_grocery_list_id():
         assert "bananas" in names
 
 
+def test_get_grocery_items_uses_canonical_list():
+    email = "pytest-grocery-items-endpoint@orryon.app"
+    user = get_or_create_user_by_email(email)
+    uid = user["id"]
+    headers = _headers(email)
+    _reset_lists(uid)
+
+    _add_grocery_items({"items": [{"name": "peas"}, {"name": "potatoes"}]}, uid)
+
+    with TestClient(app) as client:
+        lists = client.get("/api/lists", headers=headers).json()
+        stale_id = next(row["id"] for row in lists if row.get("is_builtin"))
+
+        names = [
+            row["name"]
+            for row in client.get("/api/grocery/items", headers=headers).json()
+            if not row["is_checked"]
+        ]
+        assert names == ["peas", "potatoes"]
+
+        # Canonical endpoint still works if the client holds an older list id.
+        via_list = [
+            row["name"]
+            for row in client.get(f"/api/lists/{stale_id}/items", headers=headers).json()
+            if not row["is_checked"]
+        ]
+        assert via_list == ["peas", "potatoes"]
+
+
 def test_chat_grocery_tools_match_api_list():
     email = "pytest-lists-chat-sync@orryon.app"
     user = get_or_create_user_by_email(email)

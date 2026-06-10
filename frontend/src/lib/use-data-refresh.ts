@@ -17,12 +17,41 @@
  * force a refresh across the whole UI if they ever need to.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export const DATA_CHANGED_EVENT = "orryon:data-changed";
 
 export interface DataChangedDetail {
   tabs?: string[];
+}
+
+/** Quick Access drawer tab keys — kept in sync with nav-bar/quick-access-drawer.tsx */
+export const QUICK_ACCESS_TAB_KEYS = [
+  "today",
+  "errands",
+  "calendar",
+  "lists",
+] as const;
+
+/**
+ * Map backend tool tab keys (e.g. "schedule") to Quick Access + dashboard listeners.
+ */
+export function expandDataChangeTabs(serverTabs: string[]): string[] {
+  const out = new Set<string>(serverTabs);
+  for (const tab of serverTabs) {
+    if (tab === "schedule" || tab === "dashboard") {
+      out.add("today");
+      out.add("calendar");
+    }
+    if (tab === "calendar") out.add("today");
+    if (tab === "today") {
+      out.add("calendar");
+      out.add("schedule");
+    }
+    if (tab === "lists") out.add("lists");
+    if (tab === "errands") out.add("errands");
+  }
+  return [...out];
 }
 
 export function dispatchDataChanged(tabs: string[]): void {
@@ -33,6 +62,59 @@ export function dispatchDataChanged(tabs: string[]): void {
       detail: { tabs },
     }),
   );
+}
+
+let _pendingTabs: Set<string> | null = null;
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Coalesce rapid refresh signals (multi-tool turns) into one event. */
+export function scheduleDataChanged(tabs: string[]): void {
+  if (typeof window === "undefined" || !tabs?.length) return;
+  if (!_pendingTabs) _pendingTabs = new Set();
+  for (const t of tabs) _pendingTabs.add(t);
+  if (_flushTimer) return;
+  _flushTimer = setTimeout(() => {
+    const batch = [..._pendingTabs!];
+    _pendingTabs = null;
+    _flushTimer = null;
+    dispatchDataChanged(batch);
+  }, 60);
+}
+
+/** True when a tool likely wrote user data (not a read/search). */
+export function isMutatingTool(toolName: string): boolean {
+  if (!toolName) return false;
+  if (toolName.startsWith("get_") || toolName.startsWith("search_")) return false;
+  if (
+    toolName === "web_search" ||
+    toolName === "x_search" ||
+    toolName === "get_weather" ||
+    toolName === "generate_insights" ||
+    toolName === "generate_forecast" ||
+    toolName === "generate_yearly_summary"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Notify the UI after chat tools run. Refreshes all Quick Access tabs when any
+ * action was taken; otherwise expands server tab keys for read-only turns.
+ */
+export function notifyChatDataChanged(
+  actions: unknown[] | undefined,
+  serverTabs: string[] | undefined,
+): void {
+  const acted = Array.isArray(actions) && actions.length > 0;
+  if (acted) {
+    scheduleDataChanged(["*", ...QUICK_ACCESS_TAB_KEYS]);
+    return;
+  }
+  const tabs = expandDataChangeTabs(
+    Array.isArray(serverTabs) ? serverTabs : [],
+  );
+  if (tabs.length > 0) scheduleDataChanged(tabs);
 }
 
 /**
@@ -46,17 +128,20 @@ export function useDataRefresh(
   watchedTabs: readonly string[],
   reload: () => void,
 ): void {
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<DataChangedDetail>).detail;
       const changed = detail?.tabs ?? [];
       if (changed.length === 0) return;
       if (changed.includes("*")) {
-        reload();
+        reloadRef.current();
         return;
       }
       if (changed.some((t) => watchedTabs.includes(t))) {
-        reload();
+        reloadRef.current();
       }
     };
     window.addEventListener(DATA_CHANGED_EVENT, handler);

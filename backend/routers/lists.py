@@ -97,16 +97,29 @@ async def delete_list(list_id: str, user: dict = Depends(get_current_user)):
     return {"deleted": True}
 
 
+def _fetch_list_items(user_id: str, list_id: str) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM list_items WHERE list_id=? AND user_id=? "
+            "ORDER BY is_checked ASC, sort_order ASC, added_at ASC",
+            (list_id, user_id),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.get("/api/grocery/items")
+async def get_grocery_items(user: dict = Depends(get_current_user)):
+    """Unchecked/checked items for the built-in Grocery list (canonical id)."""
+    uid = user["user_id"]
+    list_id = ensure_grocery_list_ready(uid)
+    return _fetch_list_items(uid, list_id)
+
+
 @router.get("/api/lists/{list_id}/items")
 async def get_list_items(list_id: str, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     list_id = resolve_list_items_list_id(uid, list_id)
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT * FROM list_items WHERE list_id=? AND user_id=? ORDER BY is_checked ASC, sort_order ASC, added_at ASC",
-            (list_id, uid),
-        ).fetchall()
-    return [dict(r) for r in rows]
+    return _fetch_list_items(uid, list_id)
 
 
 @router.post("/api/lists/{list_id}/items")

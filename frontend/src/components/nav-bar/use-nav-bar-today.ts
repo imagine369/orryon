@@ -75,9 +75,7 @@ export function useNavBarToday(notifOpen: boolean) {
     if (notifOpen) loadToday();
   }, [notifOpen, loadToday]);
 
-  useDataRefresh(["today", "schedule", "dashboard", "calendar"], () => {
-    if (notifOpen) loadToday();
-  });
+  useDataRefresh(["today", "schedule", "dashboard", "calendar"], loadToday);
 
   const sortedTasks = useMemo(() => {
     if (taskSort === "manual") return tasks;

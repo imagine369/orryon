@@ -42,6 +42,10 @@ function isBuiltinGroceryList(list: UserList): boolean {
   return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
 }
 
+function listItemsPath(list: UserList): string {
+  return isBuiltinGroceryList(list) ? "/api/grocery/items" : `/api/lists/${list.id}/items`;
+}
+
 // ── Icon & color palettes ────────────────────────────────────────────────────
 
 const COLORS = [
@@ -248,10 +252,10 @@ function ListDetail({
 
   const load = useCallback(() => {
     if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); setLoadError(null); return; }
-    api.get<ListItem[]>(`/api/lists/${list.id}/items`)
+    api.get<ListItem[]>(listItemsPath(list))
       .then((data) => { setItems(data); setLoadError(null); })
       .catch(() => setLoadError(ITEMS_LOAD_ERROR));
-  }, [list.id]);
+  }, [list]);
 
   useQueuedEffect(load, [load]);
   useDataRefresh(["lists"], load);
@@ -404,7 +408,7 @@ function ListDetail({
       )}
 
       {/* Unchecked items */}
-      {sort === "manual" && !q ? (
+      {sort === "manual" && !query.trim() ? (
         <Reorder.Group
           axis="y"
           values={unchecked}

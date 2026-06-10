@@ -6,7 +6,11 @@ import { api, PlanLimitError, type PlanLimitDetail } from "@/lib/api";
 import { streamChatMessage } from "@/lib/chat-transport";
 import { useDestructiveConfirm } from "@/lib/use-destructive-confirm";
 import { textToSpeech } from "@/lib/voice";
-import { dispatchDataChanged } from "@/lib/use-data-refresh";
+import {
+  isMutatingTool,
+  notifyChatDataChanged,
+  scheduleDataChanged,
+} from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
 import { extractFulfillmentHandoffs } from "@/lib/extract-fulfillment-handoffs";
 import type { ChatMessage, ChatSession } from "@/lib/chat-types";
@@ -89,6 +93,9 @@ export function useHomeChat({
               setThinking(true);
               setToolLabel("");
             }
+            if (isMutatingTool(toolName)) {
+              scheduleDataChanged(["*"]);
+            }
           } else if (event.type === "confirm_required") {
             setThinking(false);
             setToolLabel("");
@@ -119,8 +126,7 @@ export function useHomeChat({
               }
             }
 
-            const tabs = Array.isArray(event.tabs) ? (event.tabs as string[]) : [];
-            if (tabs.length > 0) dispatchDataChanged(tabs);
+            notifyChatDataChanged(event.actions, event.tabs as string[] | undefined);
           } else if (event.type === "error") {
             if (event.limit?.code) {
               openPlanLimitModal(event.limit);
