@@ -96,8 +96,8 @@ def _absorb_misnamed_grocery_lists(conn, user_id: str, canonical_id: str) -> Non
     """Fold stray groc*-prefixed list rows into the canonical list, then drop them."""
     rows = conn.execute(
         "SELECT id FROM user_lists WHERE user_id=? AND id!=? "
-        "AND LOWER(TRIM(name)) LIKE 'groc%' AND LOWER(TRIM(name))!=?",
-        (user_id, canonical_id, GROCERY_LIST_NAME.lower()),
+        "AND LOWER(TRIM(name)) LIKE ? AND LOWER(TRIM(name))!=?",
+        (user_id, canonical_id, "groc%", GROCERY_LIST_NAME.lower()),
     ).fetchall()
     for row in rows:
         other_id = _row_val(row)

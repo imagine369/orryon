@@ -280,3 +280,54 @@ def test_delete_list_blocks_builtin_grocery():
 
     result = _delete_list({"list_id": list_id}, uid)
     assert result["status"] == "error"
+
+
+def test_misnamed_groc_prefixed_list_absorbed():
+    """LIKE 'groc%' must use a bound param (Postgres rejects raw % in SQL text)."""
+    user = get_or_create_user_by_email("pytest-grocery-absorb@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    canonical_id = ensure_grocery_list_ready(uid)
+    stray_id = _uid()
+    now = _now_iso()
+    insert_row(
+        "user_lists",
+        {
+            "id": stray_id,
+            "user_id": uid,
+            "name": "Groceries",
+            "icon": "",
+            "color": "#fff",
+            "sort_order": 2,
+            "created_at": now,
+        },
+    )
+    insert_row(
+        "list_items",
+        {
+            "id": _uid(),
+            "list_id": stray_id,
+            "user_id": uid,
+            "name": "bananas",
+            "notes": "",
+            "is_checked": 0,
+            "sort_order": 0,
+            "added_at": now,
+        },
+    )
+
+    ensure_grocery_list_ready(uid)
+
+    conn = get_connection()
+    lists = conn.execute(
+        "SELECT id FROM user_lists WHERE user_id=?", (uid,)
+    ).fetchall()
+    items = conn.execute(
+        "SELECT name FROM list_items WHERE list_id=? AND user_id=? AND is_checked=0",
+        (canonical_id, uid),
+    ).fetchall()
+    conn.close()
+
+    assert len(lists) == 1
+    assert [r["name"] if isinstance(r, dict) else r[0] for r in items] == ["bananas"]

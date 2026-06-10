@@ -42,8 +42,15 @@ function isBuiltinGroceryList(list: UserList): boolean {
   return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
 }
 
-function listItemsPath(list: UserList): string {
-  return isBuiltinGroceryList(list) ? "/api/grocery/items" : `/api/lists/${list.id}/items`;
+async function fetchListItems(list: UserList): Promise<ListItem[]> {
+  if (!isBuiltinGroceryList(list)) {
+    return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
+  }
+  try {
+    return await api.get<ListItem[]>("/api/grocery/items");
+  } catch {
+    return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
+  }
 }
 
 // ── Icon & color palettes ────────────────────────────────────────────────────
@@ -252,7 +259,7 @@ function ListDetail({
 
   const load = useCallback(() => {
     if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); setLoadError(null); return; }
-    api.get<ListItem[]>(listItemsPath(list))
+    fetchListItems(list)
       .then((data) => { setItems(data); setLoadError(null); })
       .catch(() => setLoadError(ITEMS_LOAD_ERROR));
   }, [list]);
