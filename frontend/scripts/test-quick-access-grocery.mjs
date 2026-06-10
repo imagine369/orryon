@@ -11,6 +11,11 @@ const BASE = process.env.TEST_BASE_URL || "http://localhost:3456";
 const SESSION_ID = "qa-quick-access-grocery";
 const GROCERY_LIST_ID = "grocery-list-id";
 
+const PWA_MIGRATION_KEYS = [
+  "orryon_floating_buddy_removed_v1",
+  "orryon_single_chat_avatar_v1",
+];
+
 const DEFAULT_PREFS = {
   voice_overlay_enabled: false,
   golden_mode_enabled: false,
@@ -157,15 +162,17 @@ function createApiRouter(state) {
 }
 
 async function primeAuth(page) {
-  await page.addInitScript(() => {
+  await page.addInitScript((migrationKeys) => {
     localStorage.removeItem("orryon_demo");
+    for (const key of migrationKeys) localStorage.setItem(key, "1");
+    sessionStorage.removeItem("orryon_cache_bust_in_progress");
     document.cookie = "orryon_auth=1; path=/";
     document.cookie = "orryon_csrf=e2e-csrf; path=/";
-  });
+  }, PWA_MIGRATION_KEYS);
 }
 
 async function openQuickAccess(page) {
-  await page.locator("button:has(svg.lucide-bell)").click();
+  await page.locator("button:has(svg.lucide-bell)").first().click();
   await page.getByRole("heading", { name: "Quick Access" }).waitFor({ timeout: 10_000 });
 }
 
@@ -205,10 +212,9 @@ async function testChatThenQuickAccessShowsGroceryItem() {
     await page.getByRole("button", { name: "Lists" }).click();
     await page.getByRole("button", { name: "Grocery" }).click();
 
-    assert(
-      await page.getByText("milk", { exact: true }).isVisible(),
-      "grocery list should show milk after chat add",
-    );
+    const milk = page.getByText("milk", { exact: true });
+    await milk.waitFor({ state: "visible", timeout: 10_000 });
+    assert(await milk.isVisible(), "grocery list should show milk after chat add");
   } finally {
     await browser.close();
   }
