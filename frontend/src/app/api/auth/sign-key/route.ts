@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getCsrfCookie,
   getSessionToken,
   readSessionTokenFromStore,
 } from "@/lib/server/auth-cookies";
@@ -23,12 +22,6 @@ export async function POST(req: NextRequest) {
 
   if (!jwt) {
     return NextResponse.json({ detail: "Not authenticated" }, { status: 401 });
-  }
-
-  const expected = getCsrfCookie(req);
-  const got = req.headers.get("x-csrf-token");
-  if (!expected || !got || expected !== got) {
-    return NextResponse.json({ detail: "CSRF check failed" }, { status: 403 });
   }
 
   let upstream: Response;

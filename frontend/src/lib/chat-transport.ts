@@ -48,13 +48,6 @@ async function parseLimitResponse(body: unknown): Promise<PlanLimitDetail | null
   return null;
 }
 
-async function parseErrorMessage(res: Response): Promise<string> {
-  const body = await readResponseBody(res);
-  const limit = await parseLimitResponse(body);
-  if (limit?.message) return limit.message;
-  return parseApiDetail(body, `Request failed (${res.status})`);
-}
-
 let _chatWs: WebSocket | null = null;
 let _wsConnected = false;
 let _wsConnecting = false;
@@ -222,6 +215,15 @@ export async function* streamChatSse(
     "@/lib/signing",
   );
 
+  if (!(await prefetchSigningKey())) {
+    yield {
+      type: "error",
+      message:
+        "Couldn't secure this chat turn. Refresh the page, or log out and back in.",
+    };
+    return;
+  }
+
   let res: Response | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const sigHeaders = await signRequest("POST", "/api/chat", bodyStr);
@@ -248,13 +250,45 @@ export async function* streamChatSse(
   if (!res) return;
 
   if (res.status === 401) {
+    const authBody = await readResponseBody(res);
+    const detail = parseApiDetail(authBody, "");
+    const lower = detail.toLowerCase();
+    const signingRelated =
+      lower.includes("signature") || lower.includes("missing session iat");
+    const sessionDead =
+      lower.includes("revoked") ||
+      lower.includes("missing authorization") ||
+      lower.includes("invalid token") ||
+      lower.includes("not authenticated");
+
     if (isDemoMode()) {
       yield { type: "error", message: "Chat isn't available in the demo." };
       return;
     }
-    clearToken();
+
+    if (signingRelated) {
+      invalidateSigningKey();
+      yield {
+        type: "error",
+        message:
+          "Secure chat handshake failed. Refresh the page — your login is still valid.",
+      };
+      return;
+    }
+
+    if (sessionDead) {
+      clearToken();
+      invalidateSigningKey();
+      yield { type: "error", message: "Session expired — please log in again." };
+      return;
+    }
+
     invalidateSigningKey();
-    yield { type: "error", message: "Session expired — please log in again." };
+    yield {
+      type: "error",
+      message:
+        detail || "Couldn't verify your session. Refresh the page or log in again.",
+    };
     return;
   }
 

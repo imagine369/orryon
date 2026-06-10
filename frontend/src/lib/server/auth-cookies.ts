@@ -134,6 +134,22 @@ export function clearAuthCookies(res: NextResponse, host?: string): void {
 }
 
 /**
+ * Legacy sessions may have `orryon_session` without `orryon_csrf`. POST routes
+ * (chat, sign-key) need the CSRF cookie — mint one when /api/auth/me succeeds.
+ */
+export function ensureCsrfCookie(res: NextResponse, req: Request): void {
+  if (getCsrfCookie(req)) return;
+  const host = req.headers.get("host") ?? undefined;
+  const csrf = makeCsrf();
+  clearAllCookieVariants(res, CSRF_COOKIE, false, host);
+  res.cookies.set(CSRF_COOKIE, csrf, {
+    ...cookieBase(host),
+    httpOnly: false,
+    maxAge: SESSION_MAX_AGE,
+  });
+}
+
+/**
  * Look up a cookie on the current request (for route handlers that don't have
  * direct access to the Request object).
  */

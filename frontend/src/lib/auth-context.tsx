@@ -92,7 +92,7 @@ function scheduleBackgroundMeCheck(setUser: (u: User | null) => void): void {
         const u = await api.get<User>("/api/auth/me");
         clearLoginMarkers();
         setUser(formatUser(u));
-        prefetchSigningKey().catch(() => {});
+        await prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
         return;
       } catch (err) {
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         clearLoginMarkers();
         setUser(formatUser(u));
-        prefetchSigningKey().catch(() => {});
+        await prefetchSigningKey().catch(() => {});
         migrateHabitsToServer().catch(() => {});
       } catch (err) {
         if (cancelled) return;
@@ -176,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback((u: User) => {
     setUser(formatUser(u));
-    prefetchSigningKey().catch(() => {});
+    void prefetchSigningKey();
   }, []);
 
   const logout = useCallback(async () => {

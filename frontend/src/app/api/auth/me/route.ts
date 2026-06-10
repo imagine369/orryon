@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  ensureCsrfCookie,
   getSessionToken,
   readSessionTokenFromStore,
 } from "@/lib/server/auth-cookies";
@@ -46,5 +47,9 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await upstream.json().catch(() => ({}));
-  return NextResponse.json(data, { status: upstream.status });
+  const res = NextResponse.json(data, { status: upstream.status });
+  if (upstream.ok) {
+    ensureCsrfCookie(res, req);
+  }
+  return res;
 }

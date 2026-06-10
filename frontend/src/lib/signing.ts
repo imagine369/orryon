@@ -75,8 +75,15 @@ export function invalidateSigningKey(): void {
  * chat/voice request is not rejected when the backend enforces signatures.
  */
 export async function prefetchSigningKey(): Promise<boolean> {
-  const key = await ensureKey();
-  return key !== null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      _cached = null;
+      await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+    }
+    const key = await ensureKey();
+    if (key) return true;
+  }
+  return false;
 }
 
 async function hmacSha256Hex(keyHex: string, data: string): Promise<string> {
