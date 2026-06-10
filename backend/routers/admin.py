@@ -61,6 +61,51 @@ def _fmt_user(row: dict) -> dict:
     }
 
 
+@router.post("/api/admin/reset-spend")
+async def admin_reset_spend(
+    email: str,
+    _admin: dict = Depends(_require_admin),
+) -> dict:
+    """
+    Zero out user_api_spend for the given email for their current billing period.
+    One-time remediation endpoint — call once, then the quota check will pass again.
+    Protected: only the admin account may call this.
+    """
+    from core.usage_period import resolve_usage_period
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE email=?", (email.strip().lower(),)
+        ).fetchone()
+
+    if not row:
+        raise HTTPException(404, f"No user found with email {email!r}.")
+
+    user_row = dict(row)
+    period = resolve_usage_period(user_row)
+    period_key = period.key
+
+    with get_connection() as conn:
+        result = conn.execute(
+            "DELETE FROM user_api_spend WHERE user_id=? AND month=?",
+            (user_row["id"], period_key),
+        )
+        conn.commit()
+        rows_deleted = result.rowcount
+
+    logger.info(
+        "Admin reset spend: email=%s user_id=%s period=%s rows_deleted=%d",
+        email, user_row["id"], period_key, rows_deleted,
+    )
+    return {
+        "ok": True,
+        "email": user_row["email"],
+        "user_id": user_row["id"],
+        "period_key": period_key,
+        "rows_deleted": rows_deleted,
+    }
+
+
 @router.get("/api/admin/users")
 async def admin_list_users(_admin: dict = Depends(_require_admin)) -> dict:
     """Return all users grouped by segment/plan for the admin dashboard."""
