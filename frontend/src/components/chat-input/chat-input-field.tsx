@@ -46,8 +46,10 @@ export function ChatInputField({
       disabled={disabled}
       rows={1}
       className={cn(
-        "flex-1 min-w-0 resize-none bg-transparent text-[15px] text-white/90 outline-none overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
-        isMultiline ? "py-1 leading-relaxed" : "h-11 py-0 leading-[44px]",
+        "flex-1 min-w-0 resize-none bg-transparent text-[15px] leading-[1.7] text-white/90 outline-none overflow-y-auto [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar-thumb]:hidden [&::-webkit-scrollbar-track]:hidden",
+        // Match chat bubble line height on all viewports — avoid leading-[44px] on
+        // single-line mode, which iOS treats as 44px per wrapped visual line.
+        isMultiline ? "py-0.5" : "min-h-11 py-[9px]",
         isRecording ? "placeholder:text-white/60" : "placeholder:text-white/30",
       )}
       style={{ maxHeight: "200px", scrollbarWidth: "none" }}
