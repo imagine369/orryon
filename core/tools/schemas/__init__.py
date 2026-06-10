@@ -32,6 +32,7 @@ _LEGACY_ORDER = (
     "log_expense",
     "add_calendar_event",
     "add_grocery_items",
+    "delete_grocery_items",
     "log_bill",
     "add_task",
     "add_note",

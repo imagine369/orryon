@@ -120,13 +120,6 @@ class ReorderReq(BaseModel):
     ids: List[str]
 
 
-# ── Grocery ───────────────────────────────────────────────────────────────────
-
-class GroceryItemReq(BaseModel):
-    name: str
-    quantity: Optional[str] = "1"
-
-
 # ── User Lists ────────────────────────────────────────────────────────────────
 
 class UserListReq(BaseModel):

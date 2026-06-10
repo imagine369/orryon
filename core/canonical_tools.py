@@ -25,7 +25,7 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "add_task", "edit_task", "complete_task", "delete_task",
     # Lists & grocery
     "create_list", "get_user_lists", "add_list_items", "delete_list",
-    "add_grocery_items", "check_grocery_item", "get_grocery_list",
+    "add_grocery_items", "delete_grocery_items", "check_grocery_item", "get_grocery_list",
     # Analysis
     "generate_insights", "generate_forecast", "generate_yearly_summary",
     # Balance & budget helpers (read/write)
@@ -88,7 +88,7 @@ _REPROMPT_SECTIONS = (
     "GOALS: create_goal, get_goals, update_goal, delete_goal",
     "TASKS: add_task, edit_task, complete_task, delete_task",
     "LISTS: create_list, get_user_lists, add_list_items, delete_list, "
-    "add_grocery_items, check_grocery_item, get_grocery_list",
+    "add_grocery_items, delete_grocery_items, check_grocery_item, get_grocery_list",
     "ANALYSIS: generate_insights, generate_forecast, generate_yearly_summary",
     "BALANCE/BUDGET: set_balance, add_money, get_balance, set_budget, get_budget_status, "
     "get_spending_summary, get_spending_recap, get_spending_patterns, "

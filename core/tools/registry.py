@@ -51,6 +51,7 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     "add_list_items": {"impl": h._add_list_items, "tabs": ["lists"]},
     "delete_list": {"impl": h._delete_list, "tabs": ["lists"]},
     "add_grocery_items": {"impl": h._add_grocery_items, "tabs": ["lists", "dashboard"]},
+    "delete_grocery_items": {"impl": h._delete_grocery_items, "tabs": ["lists", "dashboard"]},
     "check_grocery_item": {"impl": h._check_grocery_item, "tabs": ["lists"]},
     "get_grocery_list": {"impl": h._get_grocery_list, "tabs": []},
     "generate_insights": {"impl": h._generate_insights, "tabs": ["insights"]},

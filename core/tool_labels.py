@@ -31,6 +31,7 @@ _TOOL_LABELS: dict[str, str] = {
     "add_money": "Adding to balance",
     "get_balance": "Checking balance",
     "add_grocery_items": "Updating grocery list",
+    "delete_grocery_items": "Removing from grocery list",
     "add_task": "Creating task",
     "set_budget": "Setting budget",
     "check_grocery_item": "Checking off item",

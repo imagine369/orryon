@@ -51,7 +51,7 @@ The primary API server. Organized as modular routers:
 | `routers/auth.py` | OTP email sign-in, demo mode, `POST /api/auth/*` |
 | `routers/chat.py` | SSE streaming AI chat, `POST /api/chat` |
 | `routers/finance.py` | Dashboard, transactions, budget, bills, income, net-worth, forecast |
-| `routers/events.py`, `goals.py`, `notes.py`, `tasks.py`, `lists.py` | Events, goals, notes, tasks, grocery, user lists |
+| `routers/events.py`, `goals.py`, `notes.py`, `tasks.py`, `lists.py` | Events, goals, notes, tasks, lists (built-in Grocery + custom) |
 | `routers/calendar_ics.py`, `calendar_google.py` | ICS import; Google Calendar OAuth pull-sync (gated) |
 | `routers/waitlist.py`, `waitlist_admin.py` | Public waitlist; admin approve/export/email tooling |
 | `routers/account.py` | Settings, email change, export, share links, Stripe billing, receipts |
@@ -178,7 +178,7 @@ Two server-side safety nets wrap the dispatcher:
 
 Single SQLite file (`finance.db` by default, configurable via `DB_PATH`).
 
-Key tables: `users`, `transactions`, `events`, `goals`, `notes`, `action_items`, `grocery_items`, `subscriptions`, `budget_categories`, `chat_messages`, `user_memory`, `recurring_income`, `net_worth_snapshots`, `user_lists`, `list_items`, `share_tokens`.
+Key tables: `users`, `transactions`, `events`, `goals`, `notes`, `action_items`, `subscriptions`, `budget_categories`, `chat_messages`, `user_memory`, `recurring_income`, `net_worth_snapshots`, `user_lists`, `list_items`, `share_tokens`.
 
 The `db/` package uses **raw SQL only** (no ORM — SQLAlchemy was considered and declined; see `MIGRATION_ROADMAP.md`). Schema DDL lives in `db/schema/schema_*.py`; `init_db()` creates tables and applies numbered migrations from `db/migrations/`. SQLite for local dev; Postgres via `DATABASE_URL` + connection pool (CI tests both).
 

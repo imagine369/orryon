@@ -20,6 +20,7 @@ from db import (
     insert_row,
     update_row,
 )
+from core.grocery_list import ensure_grocery_list_ready
 from core.tools.shared import _now_iso, _uid
 from db.finance import (
     adjust_balance,
@@ -156,19 +157,20 @@ def seed_sample_data(user_id: str) -> None:
         })
 
     # ── Grocery list ─────────────────────────────────────────────────────────
-    groceries = [
-        ("Milk", "1 gallon", 4.50),
-        ("Eggs", "1 dozen", 5.00),
-        ("Bread", "1 loaf", 4.00),
-        ("Chicken breast", "2 lbs", 9.00),
-        ("Spinach", "1 bag", 3.50),
-        ("Greek yogurt", "2 cups", 6.00),
+    grocery_list_id = ensure_grocery_list_ready(user_id)
+    grocery_seed_rows = [
+        "Milk",
+        "Eggs",
+        "Bread",
+        "Chicken breast",
+        "Spinach",
+        "Greek yogurt",
     ]
-    for name, qty, price in groceries:
-        insert_row("grocery_items", {
-            "id": _uid(), "user_id": user_id, "name": name,
-            "quantity": qty, "estimated_price": price,
-            "is_checked": 0, "added_at": _now_iso(),
+    for i, name in enumerate(grocery_seed_rows):
+        insert_row("list_items", {
+            "id": _uid(), "list_id": grocery_list_id, "user_id": user_id,
+            "name": name, "notes": "", "is_checked": 0,
+            "sort_order": i + 1, "added_at": _now_iso(),
         })
 
     # ── Notes ────────────────────────────────────────────────────────────────

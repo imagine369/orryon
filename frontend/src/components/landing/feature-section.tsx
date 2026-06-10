@@ -246,7 +246,7 @@ function SearchPreview() {
 
 const ORGANIZE_CARDS: FeatureCardData[] = [
   { tag: "TASKS",    Icon: Check,    highlighted: "From idea",            rest: "to done in seconds.",      from: "#060e1f", to: "#0d2040", glow: "rgba(96,165,250,0.10)",  preview: <TasksPreview />    },
-  { tag: "LISTS",    Icon: List,     highlighted: "Groceries, errands,",  rest: "anything. Just say it.",   from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)",  preview: <ListsPreview />    },
+  { tag: "LISTS",    Icon: List,     highlighted: "Grocery, errands,",  rest: "anything. Just say it.",   from: "#050f08", to: "#0a2014", glow: "rgba(74,222,128,0.10)",  preview: <ListsPreview />    },
   { tag: "CALENDAR", Icon: Calendar, highlighted: "Your whole week,",     rest: "organized instantly.",     from: "#120900", to: "#221400", glow: "rgba(251,146,60,0.10)",  preview: <CalendarPreview /> },
   { tag: "JOURNAL",  Icon: BookOpen, highlighted: "Capture thoughts,",    rest: "track what matters.",      from: "#0d0520", to: "#1c0a3a", glow: "rgba(192,132,252,0.10)", preview: <JournalPreview />  },
   { tag: "STREAKS",  Icon: Flame,    highlighted: "Build habits,",        rest: "don't break the chain.",   from: "#1a0800", to: "#2d1200", glow: "rgba(255,154,20,0.10)",  preview: <StreaksPreview />  },

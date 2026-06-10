@@ -21,7 +21,10 @@ SCHEMAS: list[dict] = [{'type': 'function',
                                              'category': {'type': 'string',
                                                           'description': 'Canonical category. One '
                                                                          'of: Food & Dining, '
-                                                                         'Groceries, Transport, '
+                                                                         'Groceries (monthly '
+                                                                         'spending only — not the '
+                                                                         'Grocery shopping list), '
+                                                                         'Transport, '
                                                                          'Subscriptions, Health & '
                                                                          'Fitness, Shopping, Rent '
                                                                          '& Housing, Travel, '

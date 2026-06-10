@@ -178,7 +178,7 @@ const FAQ: FAQCategory[] = [
   {
     id: "lists",
     title: "Lists",
-    description: "Groceries, errands, and anything you need to track.",
+    description: "Grocery, errands, and anything you need to track.",
     icon: <ListChecks className="h-5 w-5" strokeWidth={1.5} />,
     items: [
       {

@@ -42,7 +42,8 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Money** | Log expense/bill, budget status, forecasts, insights, goals |
 | **Schedule** | Calendar events, tasks |
 | **Notes & journal** | Add/search notes, journal entries |
-| **Lists** | Grocery and custom lists |
+| **Lists** | Grocery shopping list and custom lists (what to buy) |
+| **Spending** | Groceries category tracks grocery *spend* for the month — separate from the list |
 | **Health logs** | Vitals, medications, appointments (stored in Orryon) |
 | **Weather** | `get_weather` — live conditions for a city/place |
 | **News & web** | xAI `web_search` + `x_search` (Grok-style); RSS `search_web` fallback if Agent Tools unavailable |
@@ -112,7 +113,7 @@ Subscription tier affects **usage limits** (messages, voice, etc.), not whether 
 
 ## Registered agent tools
 
-Orryon exposes **69 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
+Orryon exposes **70 canonical function tools** (`core/canonical_tools.CANONICAL_TOOL_NAMES`), plus xAI Agent Tools (`web_search`, `x_search`) when available, and RSS `search_web` as degraded fallback.
 
 | Domain | Tools (summary) |
 |--------|-----------------|
@@ -121,7 +122,7 @@ Orryon exposes **69 canonical function tools** (`core/canonical_tools.CANONICAL_
 | Calendar & tasks | events + tasks CRUD |
 | Notes & journal | notes CRUD, search, pin; journal CRUD |
 | Goals | create/get/update/delete |
-| Lists & grocery | lists, grocery items |
+| Lists & grocery list | lists CRUD, grocery list tools |
 | Money & budget | balance, budget, spending summaries, forecasts, insights |
 | Health | vitals, medications, appointments |
 | Errands | `create_fulfillment_handoff` (deeplink handoffs) |

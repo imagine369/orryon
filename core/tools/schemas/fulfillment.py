@@ -10,8 +10,10 @@ SCHEMAS: list[dict] = [{
             "(Uber ride, DoorDash delivery, Instacart groceries, OpenTable reservation, "
             "pharmacy pickup). Orryon prepares the link; the user completes checkout in "
             "the partner app. Use when the user wants rides, food delivery, grocery "
-            "shopping, restaurant reservations, or prescription pickup. Pass partner_url "
-            "when web_search found a specific DoorDash or OpenTable page."
+            "shopping, restaurant reservations, or prescription pickup. For grocery type, items "
+            "come from the user's Grocery list unless grocery_items is passed — not from the "
+            "Groceries spending category. Pass partner_url when web_search found a specific "
+            "DoorDash or OpenTable page."
         ),
         "parameters": {
             "type": "object",

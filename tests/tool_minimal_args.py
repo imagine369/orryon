@@ -161,6 +161,7 @@ def minimal_args_for_tool(name: str, seeded: SeededToolIds) -> dict[str, Any]:
         "add_list_items": {"list_id": seeded.list_id, "items": ["item-a"]},
         "delete_list": {"list_id": seeded.list_id},
         "add_grocery_items": {"items": [{"name": "butter"}]},
+        "delete_grocery_items": {"item_names": ["butter"]},
         "check_grocery_item": {"item_name": "bread"},
         "get_grocery_list": {},
         "generate_insights": {},

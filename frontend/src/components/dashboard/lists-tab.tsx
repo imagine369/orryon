@@ -19,6 +19,7 @@ interface UserList {
   color: string;
   sort_order: number;
   item_count: number;
+  is_builtin?: boolean;
 }
 
 interface ListItem {
@@ -32,6 +33,10 @@ interface ListItem {
 }
 
 type ItemSort = "manual" | "name";
+
+function isBuiltinGroceryList(list: UserList): boolean {
+  return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
+}
 
 // ── Icon & color palettes ────────────────────────────────────────────────────
 
@@ -177,8 +182,8 @@ function ListsOverview({
         </p>
       )}
 
-      {filtered.map((list) => (
-        <SwipeToDelete key={list.id} onDelete={() => deleteList(list.id)}>
+      {filtered.map((list) => {
+        const row = (
           <button
             onClick={() => onSelect(list)}
             className="w-full flex items-center gap-3 py-3 border-b border-white/5 active:bg-white/[0.02] transition group"
@@ -197,8 +202,15 @@ function ListsOverview({
             </div>
             <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition shrink-0" strokeWidth={1.5} />
           </button>
-        </SwipeToDelete>
-      ))}
+        );
+        return isBuiltinGroceryList(list) ? (
+          <div key={list.id}>{row}</div>
+        ) : (
+          <SwipeToDelete key={list.id} onDelete={() => deleteList(list.id)}>
+            {row}
+          </SwipeToDelete>
+        );
+      })}
     </div>
   );
 }

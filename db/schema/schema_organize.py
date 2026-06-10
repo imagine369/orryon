@@ -50,17 +50,6 @@ CREATE TABLE IF NOT EXISTS action_items (
     sort_order  INTEGER DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS grocery_items (
-    id               TEXT PRIMARY KEY,
-    user_id          TEXT NOT NULL,
-    name             TEXT NOT NULL,
-    quantity         TEXT DEFAULT '1',
-    estimated_price  REAL DEFAULT 0,
-    is_checked       INTEGER DEFAULT 0,
-    sort_order       INTEGER DEFAULT 0,
-    added_at         TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS user_lists (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL,

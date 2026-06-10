@@ -44,6 +44,7 @@ from core.tools.handlers.goals import (
 )
 from core.tools.handlers.lists import (
     _add_grocery_items,
+    _delete_grocery_items,
     _delete_list,
     _check_grocery_item,
     _get_grocery_list,
@@ -121,6 +122,7 @@ __all__ = [
     "_update_goal_progress",
     "_get_goals",
     "_add_grocery_items",
+    "_delete_grocery_items",
     "_delete_list",
     "_check_grocery_item",
     "_get_grocery_list",

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _ALLOWED_TABLES: frozenset[str] = frozenset({
     "users", "transactions", "accounts", "holdings", "goals", "notes", "events",
     "subscriptions", "credit_scores", "action_items", "links", "inspo_images",
-    "budget_categories", "budget_templates", "grocery_items", "custom_categories",
+    "budget_categories", "budget_templates", "custom_categories",
     "share_tokens", "user_memory", "recurring_income", "net_worth_snapshots",
     "link_pages", "chat_messages", "chat_sessions", "verification_codes",
     "user_calendar_tokens", "goal_contributions", "user_lists", "list_items",

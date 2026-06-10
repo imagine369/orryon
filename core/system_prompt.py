@@ -232,7 +232,10 @@ Section routing (quick reference):
   GOALS     — create_goal, get_goals, update_goal, delete_goal
   TASKS     — add_task, edit_task, complete_task, delete_task
   LISTS     — create_list, get_user_lists, add_list_items, delete_list,
-              add_grocery_items, check_grocery_item, get_grocery_list
+              add_grocery_items, delete_grocery_items, check_grocery_item, get_grocery_list
+  GROCERY   — built-in "Grocery" list (Lists tab): add/delete/get/check; Instacart handoff.
+              Never create_list, add_list_items, log_expense, or budget tools for list/order.
+  GROCERIES — expense category only (log_expense, get_spending_*): monthly spend — not the list.
   ANALYSIS  — generate_insights, generate_forecast, generate_yearly_summary
   BALANCE   — set_balance, add_money, get_balance
   BUDGET    — set_budget, get_budget_status, get_spending_summary, get_spending_recap,
@@ -245,8 +248,7 @@ Section routing (quick reference):
   FULFILL   — create_fulfillment_handoff (Uber ride, DoorDash, Instacart, OpenTable, pharmacy)
   WORLD     — get_weather, web_search, x_search, search_web (RSS fallback)
 
-Boundary: past spending -> log_expense. Future recurring obligations -> log_bill.
-Mood/reflection -> journal (not notes).
+Boundary: past spending -> log_expense; recurring -> log_bill; mood -> journal (not notes).
 
 ═══════════════════════════════════════════════════════════════
 ## ROUTING (data & live facts)
