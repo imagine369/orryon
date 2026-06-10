@@ -79,6 +79,23 @@ async function testIphoneSafari() {
   }
 }
 
+async function testIphoneSafariNavLabel() {
+  const browser = await webkit.launch();
+  const context = await browser.newContext({ ...devices["iPhone 14"] });
+  await fixLocalHttpsUpgrade(context);
+  const page = await context.newPage();
+  try {
+    await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
+    const navCta = page.getByRole("button", { name: /Add to Home Screen/i });
+    await navCta.waitFor({ state: "visible", timeout: 5_000 });
+    await navCta.click();
+    await page.waitForSelector("text=bottom of Safari", { timeout: 5_000 });
+    assert(await page.getByRole("dialog").isVisible(), "nav CTA should open Safari install modal");
+  } finally {
+    await browser.close();
+  }
+}
+
 async function testIpadSafari() {
   const browser = await webkit.launch();
   const context = await browser.newContext({ ...devices["iPad Pro 11"] });
@@ -319,6 +336,7 @@ async function testAndroidManualInstallModal() {
 console.log(`\nDownload UX tests → ${BASE}\n`);
 
 await run("iPhone Safari: Add to Home Screen instruction modal", testIphoneSafari);
+await run("iPhone Safari: nav shows Add to Home Screen on login", testIphoneSafariNavLabel);
 await run("iPad Safari: auto-detect iOS tab", testIpadSafari);
 await run("iPhone Chrome: Safari hint", testIphoneChromeShowsSafariHint);
 await run("Android Pixel: auto-detect, copy", testAndroidPixel);

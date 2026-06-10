@@ -27,6 +27,17 @@ async function externalDownloadOk(url: string): Promise<boolean> {
   }
 }
 
+/** Dev-only: verify `public/downloads/{filename}` is actually served before redirecting. */
+async function localStaticDownloadOk(request: Request, filename: string): Promise<boolean> {
+  try {
+    const url = new URL(`/downloads/${filename}`, request.url);
+    const res = await fetch(url, { method: "HEAD", redirect: "manual" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveDownload(request: Request, platform: string) {
   const meta = FILES[platform as DesktopDownloadPlatform];
   if (!meta) return { error: NextResponse.json({ error: "Unknown platform" }, { status: 400 }) };
@@ -46,8 +57,14 @@ async function resolveDownload(request: Request, platform: string) {
     };
   }
 
-  // Local dev: serve from `public/downloads/` (no fs — avoids Turbopack NFT tracing warnings).
-  return { redirect: new URL(`/downloads/${meta.filename}`, request.url).toString() };
+  // Local dev: redirect to `public/downloads/` only when the file exists (avoids redirect loops / 404 chains).
+  const localUrl = new URL(`/downloads/${meta.filename}`, request.url).toString();
+  if (await localStaticDownloadOk(request, meta.filename)) {
+    return { redirect: localUrl };
+  }
+  return {
+    error: NextResponse.json(unconfiguredInstallerBody(desktopPlatform), { status: 503 }),
+  };
 }
 
 export async function HEAD(

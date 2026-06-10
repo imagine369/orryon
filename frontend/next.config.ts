@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
-  // Legacy DMG URL: `src/app/downloads/Orryon-mac.dmg/route.ts` (keeps next.config out of NFT trace).
+  // Local Mac DMG: `public/downloads/Orryon-mac.dmg` (dev). Production: `/api/download/mac` → DESKTOP_DOWNLOAD_MAC_URL.
   // API proxy: `app/api/[[...path]]/route.ts` (runtime BACKEND_URL), not rewrites (build-time).
 };
 

@@ -103,6 +103,13 @@ describe("isIosInstallContext", () => {
     mockBrowser({ ua: MAC_CHROME_UA });
     assert.equal(isIosInstallContext("mac"), false);
   });
+
+  it("uses detectPlatform() when platform is omitted", () => {
+    mockBrowser({ ua: IPHONE_SAFARI_UA, standalone: false });
+    assert.equal(isIosInstallContext(), true);
+    mockBrowser({ ua: MAC_CHROME_UA });
+    assert.equal(isIosInstallContext(), false);
+  });
 });
 
 describe("appNavInstallLabel", () => {

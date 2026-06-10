@@ -11,6 +11,7 @@ import { useIosInstallModals } from "@/lib/use-ios-install-modals";
 export function GetAppNavLink() {
   const router = useRouter();
   const { openIosInstall, iosInstallModals } = useIosInstallModals();
+  // Stable "Download" for SSR + first paint — updated after mount to avoid hydration mismatch on iOS.
   const [label, setLabel] = useState("Download");
 
   useEffect(() => {
