@@ -136,6 +136,28 @@ export const GENDER_OPTIONS = [
   { label: "Other", value: "other" },
 ];
 
+/** Minimal settings shell from auth user so the panel can render before /api/settings returns. */
+export function bootstrapSettingsFromUser(user: {
+  email: string;
+  display_name: string;
+}): Settings {
+  return {
+    display_name: user.display_name,
+    email: user.email,
+    currency: "USD",
+    budget_cycle_start: 1,
+    spending_alert_pct: 80,
+    bill_due_alert_days: 3,
+    default_reminder_minutes: 30,
+    daily_digest_enabled: 0,
+    daily_digest_time: "08:00",
+    weekly_report_enabled: 0,
+    smtp_enabled: false,
+    ai_connected: false,
+    grok_model: "grok-4.3",
+  };
+}
+
 export const DEMO_SETTINGS: Settings = {
   display_name: "Alex",
   email: "demo@orryon.app",

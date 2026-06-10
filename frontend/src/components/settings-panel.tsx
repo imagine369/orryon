@@ -1,17 +1,33 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowLeft } from "lucide-react";
 import { usePanels } from "@/lib/panel-context";
-import { VIEW_TITLES } from "@/components/settings/constants";
+import { useAuth } from "@/lib/auth-context";
+import { VIEW_TITLES, bootstrapSettingsFromUser, DEMO_SETTINGS } from "@/components/settings/constants";
+import { isDemo } from "@/components/settings/utils";
 import { useSettingsPanel } from "@/components/settings/use-settings-panel";
 import { SettingsViewContent } from "@/components/settings/settings-view-content";
 
 export function SettingsPanel() {
   const { openPanel, close } = usePanels();
   const isOpen = openPanel === "settings";
+  const { user } = useAuth();
   const panel = useSettingsPanel();
-  const { view, settings, settingsLoading, settingsError, reloadSettings, goBack } = panel;
+  const { view, settingsLoading, settingsError, reloadSettings, goBack } = panel;
+
+  const displaySettings = useMemo(() => {
+    if (panel.settings) return panel.settings;
+    if (isDemo()) return DEMO_SETTINGS;
+    if (user) return bootstrapSettingsFromUser(user);
+    return null;
+  }, [panel.settings, user]);
+
+  const resolvedPanel = useMemo(
+    () => (displaySettings ? { ...panel, settings: displaySettings } : panel),
+    [panel, displaySettings],
+  );
 
   return (
     <AnimatePresence>
@@ -65,23 +81,30 @@ export function SettingsPanel() {
                 </button>
               </div>
 
-              {settingsLoading || (!settings && !settingsError) ? (
+              {!displaySettings ? (
                 <div className="flex items-center justify-center flex-1">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 </div>
-              ) : settingsError && !settings ? (
-                <div className="flex flex-col items-center justify-center flex-1 gap-4 px-8 text-center">
-                  <p className="text-sm text-white/50 leading-relaxed">{settingsError}</p>
-                  <button
-                    type="button"
-                    onClick={reloadSettings}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-                  >
-                    Try again
-                  </button>
-                </div>
               ) : (
                 <div className="px-5 py-5 flex-1">
+                  {settingsLoading && (
+                    <div className="mb-3 flex items-center gap-2 text-xs text-white/35">
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/15 border-t-white/50" />
+                      Syncing account details…
+                    </div>
+                  )}
+                  {settingsError && !settingsLoading && (
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2">
+                      <p className="text-xs text-amber-100/75">{settingsError}</p>
+                      <button
+                        type="button"
+                        onClick={reloadSettings}
+                        className="shrink-0 text-xs font-medium text-amber-100/90 hover:text-amber-50"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={view ?? "main"}
@@ -90,7 +113,7 @@ export function SettingsPanel() {
                       exit={{ opacity: 0, x: -20 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
                     >
-                      <SettingsViewContent panel={panel} />
+                      <SettingsViewContent panel={resolvedPanel} />
                     </motion.div>
                   </AnimatePresence>
                 </div>

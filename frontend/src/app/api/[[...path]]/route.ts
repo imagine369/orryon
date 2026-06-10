@@ -5,12 +5,13 @@ import {
   SIGNAL_COOKIE,
   getCsrfCookie,
   getSessionToken,
+  readSessionTokenFromStore,
 } from "@/lib/server/auth-cookies";
 
 /**
  * Runtime proxy for every `/api/*` request not handled by a more specific
  * route (`/api/auth/login`, `/api/auth/logout`, `/api/auth/demo-login`,
- * `/api/settings/email-change/verify`). Responsibilities:
+ * `/api/settings`, `/api/settings/email-change/verify`). Responsibilities:
  *
  *  1. Translate the HttpOnly `orryon_session` cookie into an
  *     `Authorization: Bearer` header for the FastAPI backend. The backend
@@ -102,7 +103,8 @@ function isMutating(method: string): boolean {
 
 async function proxy(req: NextRequest, pathSegments: string[] | undefined): Promise<NextResponse> {
   const method = req.method;
-  const jwt = getSessionToken(req);
+  // Prefer the Next.js cookies API — more reliable than regex on Cookie (see /api/auth/me).
+  const jwt = (await readSessionTokenFromStore()) ?? getSessionToken(req);
 
   // Double-submit CSRF: only enforced when auth came from cookie. A legacy
   // client sending `Authorization: Bearer` directly (Capacitor mobile) will
