@@ -34,9 +34,19 @@ def is_builtin_grocery_list(user_id: str, list_id: str) -> bool:
     return is_grocery_list_name(str(_row_val(row, "name", 0)))
 
 
-def resolve_list_items_list_id(user_id: str, list_id: str) -> str:
+def get_canonical_grocery_list_id(user_id: str) -> str:
+    """Canonical Grocery list id for read APIs (merge duplicates, no absorb/migrate)."""
+    existing = consolidate_grocery_lists(user_id)
+    if existing:
+        return existing
+    return get_or_create_grocery_list_id(user_id)
+
+
+def resolve_list_items_list_id(user_id: str, list_id: str, *, write: bool = False) -> str:
     if is_builtin_grocery_list(user_id, list_id):
-        return ensure_grocery_list_ready(user_id)
+        if write:
+            return ensure_grocery_list_ready(user_id)
+        return get_canonical_grocery_list_id(user_id)
     return list_id
 
 

@@ -12,6 +12,7 @@ from backend.deps import require_active_plan
 from backend.schemas import ListItemReq, ListItemUpdate, ReorderReq, UserListReq, UserListUpdate
 from core.grocery_list import (
     ensure_grocery_list_ready,
+    get_canonical_grocery_list_id,
     grocery_list_sort_key,
     is_builtin_grocery_list,
     is_grocery_list_name,
@@ -32,7 +33,7 @@ router = APIRouter(tags=["lists"], dependencies=[Depends(require_active_plan)])
 @router.get("/api/lists")
 async def get_lists(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    canonical_grocery_id = ensure_grocery_list_ready(uid)
+    canonical_grocery_id = get_canonical_grocery_list_id(uid)
     with get_connection() as conn:
         lists = conn.execute(
             "SELECT * FROM user_lists WHERE user_id=? ORDER BY sort_order ASC, created_at ASC",
@@ -111,21 +112,21 @@ def _fetch_list_items(user_id: str, list_id: str) -> list[dict]:
 async def get_grocery_items(user: dict = Depends(get_current_user)):
     """Unchecked/checked items for the built-in Grocery list (canonical id)."""
     uid = user["user_id"]
-    list_id = ensure_grocery_list_ready(uid)
+    list_id = get_canonical_grocery_list_id(uid)
     return _fetch_list_items(uid, list_id)
 
 
 @router.get("/api/lists/{list_id}/items")
 async def get_list_items(list_id: str, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    list_id = resolve_list_items_list_id(uid, list_id)
+    list_id = resolve_list_items_list_id(uid, list_id, write=False)
     return _fetch_list_items(uid, list_id)
 
 
 @router.post("/api/lists/{list_id}/items")
 async def add_list_item(list_id: str, body: ListItemReq, user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    list_id = resolve_list_items_list_id(uid, list_id)
+    list_id = resolve_list_items_list_id(uid, list_id, write=True)
     item_id = str(uuid.uuid4())
     with get_connection() as conn:
         owner = conn.execute(
