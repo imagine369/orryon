@@ -29,8 +29,14 @@ const mainJs = read("main.js");
 if (!mainJs.includes("askForMediaAccess")) {
   failures.push("main.js missing askForMediaAccess handler");
 }
+if (!mainJs.includes("getMediaAccessStatus")) {
+  failures.push("main.js missing getMediaAccessStatus check in permission handler");
+}
 if (!mainJs.includes("audioCapture")) {
   failures.push("main.js missing audioCapture permission");
+}
+if (!mainJs.includes("webRequest.onBeforeSendHeaders")) {
+  failures.push("main.js missing Origin injection for /api requests");
 }
 
 if (failures.length > 0) {

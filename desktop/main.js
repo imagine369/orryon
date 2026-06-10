@@ -1,9 +1,24 @@
 const { app, BrowserWindow, shell, session, systemPreferences } = require("electron");
 const path = require("path");
 
-const APP_URL = (process.env.ORRYON_APP_URL || "https://orryon.vercel.app").replace(/\/$/, "");
+const APP_URL = (process.env.ORRYON_APP_URL || "https://www.orryon.com").replace(/\/$/, "");
 const DESKTOP_UA = "OrryonDesktop/1.0";
 const MIC_PERMISSIONS = new Set(["media", "audioCapture", "videoCapture"]);
+
+function macMicrophoneGranted() {
+  if (process.platform !== "darwin") return true;
+  return systemPreferences.getMediaAccessStatus("microphone") === "granted";
+}
+
+async function ensureMacMicrophoneAccess() {
+  if (process.platform !== "darwin") return;
+  if (macMicrophoneGranted()) return;
+  try {
+    await systemPreferences.askForMediaAccess("microphone");
+  } catch {
+    // User declined or OS error — page-level getUserMedia will surface a message.
+  }
+}
 
 function configureMediaPermissions() {
   const ses = session.defaultSession;
@@ -24,8 +39,19 @@ function configureMediaPermissions() {
     callback(true);
   });
 
-  ses.setPermissionCheckHandler((_webContents, permission) =>
-    MIC_PERMISSIONS.has(permission),
+  // Must reflect real macOS status — returning true unconditionally skips askForMediaAccess.
+  ses.setPermissionCheckHandler((_webContents, permission) => {
+    if (!MIC_PERMISSIONS.has(permission)) return false;
+    return macMicrophoneGranted();
+  });
+
+  // Electron may omit Origin on same-origin API POSTs; backend origin enforcement needs it.
+  ses.webRequest.onBeforeSendHeaders(
+    { urls: [`${APP_URL}/api/*`] },
+    (details, callback) => {
+      details.requestHeaders.Origin = APP_URL;
+      callback({ requestHeaders: details.requestHeaders });
+    },
   );
 }
 
@@ -60,8 +86,9 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   configureMediaPermissions();
+  await ensureMacMicrophoneAccess();
   createWindow();
 });
 

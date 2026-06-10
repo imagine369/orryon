@@ -68,18 +68,52 @@ def validate_origin_config(allowed_origins: list[str]) -> None:
         )
 
 
-def _origin_is_allowed(request: Request, allowed: Iterable[str]) -> bool:
-    origin = request.headers.get("origin") or ""
-    referer = request.headers.get("referer") or ""
-    if not origin and not referer:
-        return False
+def _host_matches_allowed(host: str, allowed: Iterable[str]) -> bool:
+    host = host.split(":")[0].lower()
     for allowed_origin in allowed:
         if not allowed_origin:
             continue
-        if origin and origin.startswith(allowed_origin):
+        # https://www.orryon.com → www.orryon.com
+        origin_host = allowed_origin.split("://", 1)[-1].split("/")[0].split(":")[0].lower()
+        if host == origin_host:
             return True
-        if referer and referer.startswith(allowed_origin):
-            return True
+    return False
+
+
+def _has_signed_request_headers(request: Request) -> bool:
+    """True when the client sent HMAC signing headers for expensive endpoints.
+
+    Voice/chat routes validate the signature in ``require_signed_request``; we
+    skip the coarse Origin gate here so the Electron desktop shell (which may
+    omit or send a stale Origin on same-origin POSTs) is not blocked before
+    the real auth + signing checks run.
+    """
+    auth = request.headers.get("authorization") or ""
+    return bool(
+        auth.startswith("Bearer ")
+        and request.headers.get("x-orryon-sig")
+        and request.headers.get("x-orryon-ts")
+        and request.headers.get("x-orryon-nonce")
+    )
+
+
+def _origin_is_allowed(request: Request, allowed: Iterable[str]) -> bool:
+    origin = request.headers.get("origin") or ""
+    referer = request.headers.get("referer") or ""
+    if origin or referer:
+        for allowed_origin in allowed:
+            if not allowed_origin:
+                continue
+            if origin and origin.startswith(allowed_origin):
+                return True
+            if referer and referer.startswith(allowed_origin):
+                return True
+    # Next.js / Railway proxy may strip Origin; trust X-Forwarded-Host when present.
+    forwarded = request.headers.get("x-forwarded-host") or ""
+    if forwarded:
+        for host in forwarded.split(","):
+            if _host_matches_allowed(host.strip(), allowed):
+                return True
     return False
 
 
@@ -96,6 +130,9 @@ class OriginEnforcementMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
         if path in _ORIGIN_EXEMPT_PATHS:
+            return await call_next(request)
+
+        if _has_signed_request_headers(request):
             return await call_next(request)
 
         if not self._allowed:

@@ -30,7 +30,7 @@ jobs:
       - name: Build Mac DMG
         working-directory: desktop
         env:
-          ORRYON_APP_URL: https://orryon.vercel.app
+          ORRYON_APP_URL: https://www.orryon.com
         run: npm run dist:mac
 
       - name: Publish GitHub Release

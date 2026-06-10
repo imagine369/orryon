@@ -50,11 +50,12 @@ describe("noMicDetectedHelpText", () => {
     assert.match(noMicDetectedHelpText(), /Orryon/i);
   });
 
-  it("shows browser guidance on macOS Safari", () => {
+  it("shows Safari-specific guidance on macOS Safari", () => {
     setUserAgent(
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
     );
-    assert.match(noMicDetectedHelpText(), /browser/i);
+    assert.match(noMicDetectedHelpText(), /Safari/i);
+    assert.match(noMicDetectedHelpText(), /www\.orryon\.com/i);
   });
 
   it("shows generic guidance on other platforms", () => {

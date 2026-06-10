@@ -84,6 +84,12 @@ function forwardRequestHeaders(req: NextRequest, bearer: string | null): Headers
   const cookie = sanitizeCookieHeader(req.headers.get("cookie"));
   if (cookie) out.set("cookie", cookie);
   if (bearer) out.set("authorization", `Bearer ${bearer}`);
+  // Always bind Origin to the page the user loaded — desktop Electron may omit or
+  // send a stale origin on same-origin API POSTs; backend enforcement needs this.
+  const pageOrigin = req.nextUrl.origin;
+  if (pageOrigin && pageOrigin !== "null") {
+    out.set("origin", pageOrigin);
+  }
   return out;
 }
 

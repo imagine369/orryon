@@ -258,6 +258,10 @@ def _append_origins_from_env(value: str) -> None:
 # Comma-separated allowed; APP_URL often matches the Next.js origin when FRONTEND_URL was forgotten.
 _append_origins_from_env(os.getenv("FRONTEND_URL", ""))
 _append_origins_from_env(os.getenv("APP_URL", ""))
+# Known frontend aliases — older desktop builds / bare domain redirects.
+for _alias in ("https://orryon.vercel.app", "https://orryon.com"):
+    if _alias not in _cors_origins:
+        _cors_origins.append(_alias)
 
 # Middleware execution order = reverse of add_middleware calls. We want, per
 # incoming request: (1) per-IP rate-limit circuit breaker, then (2) origin
