@@ -144,12 +144,12 @@ export function NotesTab() {
           className="w-full text-left py-3 border-b border-white/5 active:bg-white/[0.02] transition"
         >
           <div className="flex items-baseline justify-between mb-0.5">
-            <p className="text-sm font-semibold text-white/85 truncate flex-1 pr-3">
+            <p className="text-[16px] font-semibold text-white/85 truncate flex-1 pr-3">
               <Highlight text={n.title || "Untitled"} query={highlight || ""} />
             </p>
             <span className="text-[0.6rem] text-white/25 shrink-0">{smartDate(n.updated_at || n.created_at)}</span>
           </div>
-          <p className="text-[0.78rem] text-white/35 truncate">
+          <p className="text-sm text-white/35 truncate">
             {snippet
               ? <Highlight text={snippet} query={highlight || ""} />
               : <span className="text-white/20 italic">No content</span>}

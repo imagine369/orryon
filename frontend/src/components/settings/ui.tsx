@@ -22,8 +22,8 @@ export function Row({ label, sublabel, right }: { label: string; sublabel?: stri
   return (
     <div className="flex items-center justify-between px-3 py-3 border-b border-white/5 last:border-0 gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/85">{label}</p>
-        {sublabel && <p className="text-xs text-white/30 mt-0.5">{sublabel}</p>}
+        <p className="text-[16px] text-white/85">{label}</p>
+        {sublabel && <p className="text-sm text-white/30 mt-0.5">{sublabel}</p>}
       </div>
       <div className="shrink-0">{right}</div>
     </div>
@@ -94,8 +94,8 @@ export function NavItem({
     <>
       <span className="text-white/25 shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-[15px] text-white/85">{title}</p>
-        <p className="text-xs text-white/30 mt-0.5 leading-relaxed">{description}</p>
+        <p className="text-[16px] text-white/85">{title}</p>
+        <p className="text-sm text-white/30 mt-0.5 leading-relaxed">{description}</p>
       </div>
       {external ? (
         <ExternalLink className="h-3.5 w-3.5 text-white/15 shrink-0" strokeWidth={1.5} />

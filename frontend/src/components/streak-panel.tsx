@@ -272,8 +272,8 @@ function StreakListView({
             <div className="w-14 h-14 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
               <Flame className="h-6 w-6 text-white/30" strokeWidth={1.5} />
             </div>
-            <p className="text-sm text-white/60 mb-1">No streaks yet</p>
-            <p className="text-xs text-white/30 max-w-[240px]">
+            <p className="text-[16px] text-white/60 mb-1">No streaks yet</p>
+            <p className="text-sm text-white/30 max-w-[240px]">
               Create a daily habit to track. One tap a day — don&apos;t break the chain.
             </p>
           </div>
@@ -295,8 +295,8 @@ function StreakListView({
                   {s.emoji || <Flame className="h-4 w-4 text-white/40" strokeWidth={1.5} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white/90 truncate">{s.name}</p>
-                  <p className="text-xs text-white/40 mt-0.5">
+                  <p className="text-[16px] font-semibold text-white/90 truncate">{s.name}</p>
+                  <p className="text-sm text-white/40 mt-0.5">
                     {count === 0
                       ? s.targetDays
                         ? `${s.targetDays}-day goal · start today`

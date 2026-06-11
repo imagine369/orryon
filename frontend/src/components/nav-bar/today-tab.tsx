@@ -140,7 +140,7 @@ export function TodayTab({ today }: { today: NavBarToday }) {
             <div className="shrink-0 w-5 h-5 rounded-full border border-white/15 flex items-center justify-center">
               <Calendar className="h-2.5 w-2.5 text-white/25" strokeWidth={1.5} />
             </div>
-            <p className="text-sm text-white/70 flex-1 leading-snug">{e.title}</p>
+            <p className="text-[16px] text-white/70 flex-1 leading-snug">{e.title}</p>
             <span className="text-[0.55rem] uppercase tracking-widest text-white/20 shrink-0">{e.event_type}</span>
           </div>
         </SwipeToDelete>
@@ -171,7 +171,7 @@ export function TodayTab({ today }: { today: NavBarToday }) {
                     className="w-5 h-5 rounded-full border-2 block"
                   />
                 </button>
-                <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+                <p className="text-[16px] text-white/85 flex-1 leading-snug">{t.title}</p>
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => changeTaskPriority(t)}
@@ -206,7 +206,7 @@ export function TodayTab({ today }: { today: NavBarToday }) {
                   className="w-5 h-5 rounded-full border-2 block"
                 />
               </button>
-              <p className="text-sm text-white/85 flex-1 leading-snug">{t.title}</p>
+              <p className="text-[16px] text-white/85 flex-1 leading-snug">{t.title}</p>
               <button
                 onClick={() => changeTaskPriority(t)}
                 style={{ color: priorityBorderColor(t.priority) }}
@@ -225,7 +225,7 @@ export function TodayTab({ today }: { today: NavBarToday }) {
           <div className="shrink-0 w-5 h-5 rounded-full border border-red-400/30 flex items-center justify-center">
             <span className="text-red-400/50 text-[0.55rem] font-bold leading-none">$</span>
           </div>
-          <p className="text-sm text-white/70 flex-1 leading-snug">{b.name}</p>
+          <p className="text-[16px] text-white/70 flex-1 leading-snug">{b.name}</p>
           <span className="text-[0.8rem] font-semibold text-red-400/70 shrink-0 tabular-nums">
             ${Number(b.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
