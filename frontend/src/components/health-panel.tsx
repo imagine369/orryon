@@ -860,6 +860,10 @@ function StreakDetailView({ streak, onBack, onToggleDay, onUpdate }: StreakDetai
   const nextMonth = () =>
     setDisplayMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
 
+  const isCurrentMonth =
+    displayMonth.getFullYear() === today.getFullYear() &&
+    displayMonth.getMonth() === today.getMonth();
+
   const saveEdit = () => {
     const name = editName.trim();
     if (!name) return;
@@ -995,8 +999,9 @@ function StreakDetailView({ streak, onBack, onToggleDay, onUpdate }: StreakDetai
           </button>
           <button
             onClick={nextMonth}
+            disabled={isCurrentMonth}
             aria-label="Next month"
-            className="flex items-center justify-center w-7 h-7 rounded-full text-white/60 hover:text-white hover:bg-white/5 transition"
+            className="flex items-center justify-center w-7 h-7 rounded-full text-white/60 hover:text-white hover:bg-white/5 transition disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
           </button>
