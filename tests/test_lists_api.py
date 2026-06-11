@@ -34,6 +34,13 @@ def test_lists_api_crud_and_builtin_grocery():
     _reset_lists(uid)
 
     with TestClient(app) as client:
+        create_grocery = client.post(
+            "/api/lists",
+            json={"name": "Grocery", "color": "#22c55e"},
+            headers=headers,
+        )
+        assert create_grocery.status_code == 200
+
         lists_res = client.get("/api/lists", headers=headers)
         assert lists_res.status_code == 200
         lists = lists_res.json()
@@ -79,6 +86,26 @@ def test_lists_api_crud_and_builtin_grocery():
         assert del_list.status_code == 200
 
 
+def test_get_grocery_items_read_only_without_creating_list():
+    """GET /api/grocery/items must not create or migrate lists — returns [] when missing."""
+    email = "pytest-grocery-items-readonly@orryon.app"
+    user = get_or_create_user_by_email(email)
+    uid = user["id"]
+    headers = _headers(email)
+    _reset_lists(uid)
+
+    with TestClient(app) as client:
+        assert client.get("/api/grocery/items", headers=headers).json() == []
+
+        conn = get_connection()
+        count = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM user_lists WHERE user_id=?", (uid,)
+        ).fetchone()
+        conn.close()
+        cnt = count["cnt"] if isinstance(count, dict) else count[0]
+        assert int(cnt) == 0
+
+
 def test_post_items_resolves_canonical_grocery_list_id():
     email = "pytest-lists-grocery-post@orryon.app"
     user = get_or_create_user_by_email(email)
@@ -86,8 +113,13 @@ def test_post_items_resolves_canonical_grocery_list_id():
     _reset_lists(user["id"])
 
     with TestClient(app) as client:
-        lists = client.get("/api/lists", headers=headers).json()
-        grocery_id = next(row["id"] for row in lists if row.get("is_builtin"))
+        create_grocery = client.post(
+            "/api/lists",
+            json={"name": "Grocery", "color": "#22c55e"},
+            headers=headers,
+        )
+        assert create_grocery.status_code == 200
+        grocery_id = create_grocery.json()["id"]
 
         add_res = client.post(
             f"/api/lists/{grocery_id}/items",

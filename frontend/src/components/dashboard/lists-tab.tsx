@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, GripVertical, Plus, Search, X } from "lucide-react";
 import { AnimatePresence, motion, Reorder } from "framer-motion";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { cn } from "@/lib/utils";
 import { isDemo, DEMO_LISTS, DEMO_ITEMS } from "./demo-data";
@@ -42,13 +42,20 @@ function isBuiltinGroceryList(list: UserList): boolean {
   return list.is_builtin === true || list.name.trim().toLowerCase() === "grocery";
 }
 
+function normalizeListItems(data: unknown): ListItem[] {
+  return Array.isArray(data) ? data : [];
+}
+
 async function fetchListItems(list: UserList): Promise<ListItem[]> {
-  // Built-in Grocery always reads via the canonical endpoint so stale list ids
-  // from an earlier overview fetch never miss items after chat/voice writes.
-  if (isBuiltinGroceryList(list)) {
-    return api.get<ListItem[]>("/api/grocery/items");
+  if (!isBuiltinGroceryList(list)) {
+    return normalizeListItems(await api.get<ListItem[]>(`/api/lists/${list.id}/items`));
   }
-  return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
+  try {
+    return normalizeListItems(await api.get<ListItem[]>("/api/grocery/items"));
+  } catch {
+    // Fallback for older backends or transient canonical-endpoint failures.
+    return normalizeListItems(await api.get<ListItem[]>(`/api/lists/${list.id}/items`));
+  }
 }
 
 // ── Icon & color palettes ────────────────────────────────────────────────────
@@ -259,7 +266,13 @@ function ListDetail({
     if (isDemo()) { setItems(DEMO_ITEMS[list.id] ?? []); setLoadError(null); return; }
     fetchListItems(list)
       .then((data) => { setItems(data); setLoadError(null); })
-      .catch(() => setLoadError(ITEMS_LOAD_ERROR));
+      .catch((err: unknown) => {
+        const detail =
+          err instanceof ApiError ? err.message
+          : err instanceof Error ? err.message
+          : ITEMS_LOAD_ERROR;
+        setLoadError(detail || ITEMS_LOAD_ERROR);
+      });
   }, [list]);
 
   useQueuedEffect(load, [load]);
@@ -347,7 +360,16 @@ function ListDetail({
       </div>
 
       {loadError && (
-        <p className="text-amber-400/80 text-xs text-center py-2">{loadError}</p>
+        <div className="text-center py-2">
+          <p className="text-amber-400/80 text-xs">{loadError}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="text-[0.65rem] text-white/40 hover:text-white/70 underline mt-1"
+          >
+            Try again
+          </button>
+        </div>
       )}
 
       {/* Sort pills */}

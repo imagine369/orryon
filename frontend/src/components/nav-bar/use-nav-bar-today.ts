@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { api } from "@/lib/api";
+import { localDateStr } from "@/lib/utils";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import {
@@ -39,7 +40,7 @@ export function useNavBarToday() {
   const taskInputRef = useRef<HTMLInputElement>(null);
   const eventInputRef = useRef<HTMLInputElement>(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const totalCount = tasks.length + events.length;
 
   const taskReorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

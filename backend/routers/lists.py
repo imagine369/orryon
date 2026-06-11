@@ -16,6 +16,7 @@ from core.grocery_list import (
     grocery_list_sort_key,
     is_builtin_grocery_list,
     is_grocery_list_name,
+    lookup_grocery_list_id,
     resolve_list_items_list_id,
 )
 from db import (
@@ -33,7 +34,7 @@ router = APIRouter(tags=["lists"], dependencies=[Depends(require_active_plan)])
 @router.get("/api/lists")
 async def get_lists(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
-    canonical_grocery_id = get_canonical_grocery_list_id(uid)
+    canonical_grocery_id = lookup_grocery_list_id(uid)
     with get_connection() as conn:
         lists = conn.execute(
             "SELECT * FROM user_lists WHERE user_id=? ORDER BY sort_order ASC, created_at ASC",
@@ -46,7 +47,9 @@ async def get_lists(user: dict = Depends(get_current_user)):
                 "SELECT COUNT(*) as cnt FROM list_items WHERE list_id=? AND is_checked=0", (d["id"],)
             ).fetchone()
             d["item_count"] = _cnt_row["cnt"] if isinstance(_cnt_row, dict) else _cnt_row[0]
-            d["is_builtin"] = d["id"] == canonical_grocery_id
+            d["is_builtin"] = (
+                canonical_grocery_id is not None and d["id"] == canonical_grocery_id
+            ) or is_grocery_list_name(d["name"])
             result.append(d)
     result.sort(key=grocery_list_sort_key)
     return result
@@ -110,9 +113,11 @@ def _fetch_list_items(user_id: str, list_id: str) -> list[dict]:
 
 @router.get("/api/grocery/items")
 async def get_grocery_items(user: dict = Depends(get_current_user)):
-    """Unchecked/checked items for the built-in Grocery list (canonical id)."""
+    """Unchecked/checked items for the built-in Grocery list (read-only; no migrate)."""
     uid = user["user_id"]
-    list_id = get_canonical_grocery_list_id(uid)
+    list_id = lookup_grocery_list_id(uid)
+    if not list_id:
+        return []
     return _fetch_list_items(uid, list_id)
 
 

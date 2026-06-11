@@ -285,6 +285,8 @@ def test_delete_list_blocks_builtin_grocery():
 
 def test_get_canonical_read_path_does_not_merge_duplicates():
     """Read APIs must not mutate — merge runs only on write (ensure_grocery_list_ready)."""
+    from core.grocery_list import lookup_grocery_list_id
+
     user = get_or_create_user_by_email("pytest-grocery-read-only@test.app")
     uid = user["id"]
     _reset_user(uid)
@@ -306,6 +308,7 @@ def test_get_canonical_read_path_does_not_merge_duplicates():
         )
 
     assert get_canonical_grocery_list_id(uid) == first_id
+    assert lookup_grocery_list_id(uid) == first_id
 
     conn = get_connection()
     dup_count = conn.execute(

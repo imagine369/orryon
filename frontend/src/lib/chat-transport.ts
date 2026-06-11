@@ -316,10 +316,17 @@ export async function* streamChatSse(
       return;
     }
     if (res.status === 429) {
-      const msg =
-        errorBody && typeof errorBody === "object"
-          ? (errorBody as any).detail?.message || (errorBody as any).message
-          : null;
+      let msg: string | null = null;
+      if (errorBody && typeof errorBody === "object") {
+        const record = errorBody as { detail?: { message?: string } | string; message?: string };
+        if (typeof record.detail === "object" && record.detail?.message) {
+          msg = record.detail.message;
+        } else if (typeof record.detail === "string") {
+          msg = record.detail;
+        } else if (typeof record.message === "string") {
+          msg = record.message;
+        }
+      }
       yield {
         type: "error",
         message: msg || "Too many requests. Please wait a moment.",

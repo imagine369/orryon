@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
+import { localDateStr } from "@/lib/utils";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
@@ -43,7 +44,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+  return localDateStr(d);
 }
 
 function fmtDayLabel(dateStr: string, today: string) {

@@ -15,7 +15,7 @@ def is_grocery_list_name(name: str) -> bool:
     return str(name or "").strip().lower() == GROCERY_LIST_NAME.lower()
 
 
-def _lookup_grocery_list_id(user_id: str) -> str | None:
+def lookup_grocery_list_id(user_id: str) -> str | None:
     """Read-only lookup — no merges, absorb, or normalize (safe under concurrent writes)."""
     conn = get_connection()
     try:
@@ -29,9 +29,13 @@ def _lookup_grocery_list_id(user_id: str) -> str | None:
         conn.close()
 
 
+# Back-compat alias for internal callers
+_lookup_grocery_list_id = lookup_grocery_list_id
+
+
 def is_builtin_grocery_list(user_id: str, list_id: str) -> bool:
     """True when list_id refers to the built-in Grocery list."""
-    canonical_id = _lookup_grocery_list_id(user_id)
+    canonical_id = lookup_grocery_list_id(user_id)
     if canonical_id and list_id == canonical_id:
         return True
 
@@ -49,8 +53,8 @@ def is_builtin_grocery_list(user_id: str, list_id: str) -> bool:
 
 
 def get_canonical_grocery_list_id(user_id: str) -> str:
-    """Canonical Grocery list id for read APIs (lookup only — no absorb/migrate)."""
-    existing = _lookup_grocery_list_id(user_id)
+    """Ensure the built-in Grocery list row exists; may run consolidate/create (write path)."""
+    existing = lookup_grocery_list_id(user_id)
     if existing:
         return existing
     return get_or_create_grocery_list_id(user_id)
@@ -60,7 +64,8 @@ def resolve_list_items_list_id(user_id: str, list_id: str, *, write: bool = Fals
     if is_builtin_grocery_list(user_id, list_id):
         if write:
             return ensure_grocery_list_ready(user_id)
-        return get_canonical_grocery_list_id(user_id)
+        canonical = lookup_grocery_list_id(user_id)
+        return canonical or list_id
     return list_id
 
 
