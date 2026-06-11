@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { api } from "@/lib/api";
-import { useDataRefresh } from "@/lib/use-data-refresh";
+import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import {
   PRIORITY_CONFIG,
@@ -150,7 +150,10 @@ export function useNavBarToday() {
     setAddingEvent(false);
     if (isDemo()) return;
     api.post<{ id: string }>("/api/events", { title, date: today, event_type: "event" })
-      .then((res) => setEvents((prev) => prev.map((e) => e.id === optimistic.id ? { ...optimistic, id: res.id } : e)))
+      .then((res) => {
+        setEvents((prev) => prev.map((e) => e.id === optimistic.id ? { ...optimistic, id: res.id } : e));
+        scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
+      })
       .catch(() => setEvents((prev) => prev.filter((e) => e.id !== optimistic.id)));
   };
 

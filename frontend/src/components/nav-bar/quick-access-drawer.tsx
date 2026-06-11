@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ListsTab } from "@/components/dashboard/lists-tab";
@@ -11,7 +11,6 @@ import { TodayTab } from "@/components/nav-bar/today-tab";
 import type { Tab } from "@/components/nav-bar/types";
 import type { useNavBarToday } from "@/components/nav-bar/use-nav-bar-today";
 import {
-  DATA_CHANGED_EVENT,
   QUICK_ACCESS_TAB_KEYS,
   scheduleDataChanged,
 } from "@/lib/use-data-refresh";
@@ -40,19 +39,6 @@ export function QuickAccessDrawer({
   today,
   onOpenDashboard,
 }: QuickAccessDrawerProps) {
-  // Keep tab panels mounted after first open or chat refresh so listeners survive drawer close.
-  const [tabsLive, setTabsLive] = useState(false);
-
-  useEffect(() => {
-    if (open) setTabsLive(true);
-  }, [open]);
-
-  useEffect(() => {
-    const primeTabs = () => setTabsLive(true);
-    window.addEventListener(DATA_CHANGED_EVENT, primeTabs);
-    return () => window.removeEventListener(DATA_CHANGED_EVENT, primeTabs);
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     scheduleDataChanged([...QUICK_ACCESS_TAB_KEYS, "schedule", "dashboard"]);
@@ -142,27 +128,19 @@ export function QuickAccessDrawer({
                 </div>
               }
             >
-              {tabsLive ? (
-                <>
-                  {/* Hidden tabs stay mounted so chat/voice refreshes apply before reopen */}
-                  <div className={activeTab === "today" ? undefined : "hidden"}>
-                    <TodayTab today={today} />
-                  </div>
-                  <div className={activeTab === "errands" ? undefined : "hidden"}>
-                    <ErrandsTab />
-                  </div>
-                  <div className={activeTab === "calendar" ? undefined : "hidden"}>
-                    <CalendarTab />
-                  </div>
-                  <div className={activeTab === "lists" ? undefined : "hidden"}>
-                    <ListsTab />
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-center py-12">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                </div>
-              )}
+              {/* Panels stay mounted (hidden when inactive) so chat/voice refreshes always land */}
+              <div className={activeTab === "today" ? undefined : "hidden"}>
+                <TodayTab today={today} />
+              </div>
+              <div className={activeTab === "errands" ? undefined : "hidden"}>
+                <ErrandsTab />
+              </div>
+              <div className={activeTab === "calendar" ? undefined : "hidden"}>
+                <CalendarTab />
+              </div>
+              <div className={activeTab === "lists" ? undefined : "hidden"}>
+                <ListsTab />
+              </div>
             </ErrorBoundary>
           </div>
 

@@ -28,9 +28,12 @@ async def list_events(
     uid = user["user_id"]
     with get_connection() as conn:
         if upcoming:
+            today = date.today().isoformat()
+            # Compare date portion only — event_date is stored as "YYYY-MM-DD" or "YYYY-MM-DD HH:MM".
             rows = conn.execute(
-                "SELECT * FROM events WHERE user_id=? AND event_date>=? ORDER BY event_date LIMIT ?",
-                (uid, date.today().isoformat(), limit),
+                "SELECT * FROM events WHERE user_id=? AND substr(event_date, 1, 10)>=? "
+                "ORDER BY event_date LIMIT ?",
+                (uid, today, limit),
             ).fetchall()
         else:
             rows = conn.execute(

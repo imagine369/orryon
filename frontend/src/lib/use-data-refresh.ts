@@ -78,6 +78,8 @@ export function scheduleDataChanged(tabs: string[]): void {
     _pendingTabs = null;
     _flushTimer = null;
     dispatchDataChanged(batch);
+    // Second pass after React commits any mounts triggered by the first event.
+    setTimeout(() => dispatchDataChanged(batch), 120);
   }, 60);
 }
 

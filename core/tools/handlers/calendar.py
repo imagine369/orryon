@@ -65,7 +65,11 @@ def _add_calendar_event(args: dict, user_id: str) -> dict:
         "reminder_sent": 0,
         "created_at": _now_iso(),
     }
-    insert_row("events", row)
+    if not insert_row("events", row):
+        return {
+            "status": "error",
+            "message": f"Could not save calendar event: {title}",
+        }
     from core.integrations.google_calendar import push_event_to_google
     push_event_to_google(user_id, row)
 
@@ -111,7 +115,8 @@ def _get_upcoming_schedule(args: dict, user_id: str) -> dict:
 
     conn = get_connection()
     events = conn.execute(
-        "SELECT * FROM events WHERE user_id=? AND event_date>=? ORDER BY event_date ASC LIMIT 20",
+        "SELECT * FROM events WHERE user_id=? AND substr(event_date, 1, 10)>=? "
+        "ORDER BY event_date ASC LIMIT 20",
         (user_id, today),
     ).fetchall()
     tasks = conn.execute(

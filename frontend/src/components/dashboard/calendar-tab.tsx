@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X } from "lucide-rea
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
-import { useDataRefresh } from "@/lib/use-data-refresh";
+import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 
 interface CalEvent {
@@ -80,7 +80,13 @@ export function CalendarTab() {
     Promise.all([
       api.get<CalEvent[]>("/api/events?upcoming=true&limit=100"),
       api.get<CalTask[]>("/api/tasks?status=open"),
-    ]).then(([e, t]) => { setEvents(e); setTasks(t); }).catch(() => {}).finally(() => setLoading(false));
+    ])
+      .then(([e, t]) => {
+        setEvents(Array.isArray(e) ? e : []);
+        setTasks(Array.isArray(t) ? t : []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   useQueuedEffect(() => reload(), [reload]);
@@ -108,7 +114,8 @@ export function CalendarTab() {
       setImportStatus("success");
       // Reload events to show the new ones
       const fresh = await api.get<CalEvent[]>("/api/events?upcoming=true&limit=100");
-      setEvents(fresh);
+      setEvents(Array.isArray(fresh) ? fresh : []);
+      scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
       setTimeout(() => setImportStatus("idle"), 4000);
     } catch (err: unknown) {
       setImportMsg(err instanceof Error ? err.message : "Import failed.");
