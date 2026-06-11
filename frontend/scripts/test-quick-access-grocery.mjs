@@ -142,6 +142,11 @@ function createApiRouter(state) {
       return;
     }
 
+    if (url.includes("/api/lists") && url.includes("/items")) {
+      await route.fulfill({ status: 200, json: state.groceryItems });
+      return;
+    }
+
     if (url.includes("/api/tasks") || url.includes("/api/events") || url.includes("/api/bills")) {
       await route.fulfill({ status: 200, json: [] });
       return;

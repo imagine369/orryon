@@ -7,9 +7,7 @@ import { streamChatMessage } from "@/lib/chat-transport";
 import { useDestructiveConfirm } from "@/lib/use-destructive-confirm";
 import { textToSpeech } from "@/lib/voice";
 import {
-  isMutatingTool,
   notifyChatDataChanged,
-  scheduleDataChanged,
 } from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
 import { extractFulfillmentHandoffs } from "@/lib/extract-fulfillment-handoffs";
@@ -92,9 +90,6 @@ export function useHomeChat({
             } else {
               setThinking(true);
               setToolLabel("");
-            }
-            if (isMutatingTool(toolName)) {
-              scheduleDataChanged(["*"]);
             }
           } else if (event.type === "confirm_required") {
             setThinking(false);

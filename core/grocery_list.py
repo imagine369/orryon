@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from db.connection import get_connection
-from db.crud import insert_row, update_row
+from db.crud import insert_row
 
 GROCERY_LIST_NAME = "Grocery"
 GROCERY_LIST_COLOR = "#22c55e"
@@ -15,9 +15,23 @@ def is_grocery_list_name(name: str) -> bool:
     return str(name or "").strip().lower() == GROCERY_LIST_NAME.lower()
 
 
+def _lookup_grocery_list_id(user_id: str) -> str | None:
+    """Read-only lookup — no merges, absorb, or normalize (safe under concurrent writes)."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id FROM user_lists WHERE user_id=? AND LOWER(TRIM(name))=? "
+            "ORDER BY created_at ASC LIMIT 1",
+            (user_id, GROCERY_LIST_NAME.lower()),
+        ).fetchone()
+        return _row_val(row) if row else None
+    finally:
+        conn.close()
+
+
 def is_builtin_grocery_list(user_id: str, list_id: str) -> bool:
     """True when list_id refers to the built-in Grocery list."""
-    canonical_id = consolidate_grocery_lists(user_id)
+    canonical_id = _lookup_grocery_list_id(user_id)
     if canonical_id and list_id == canonical_id:
         return True
 
@@ -35,8 +49,8 @@ def is_builtin_grocery_list(user_id: str, list_id: str) -> bool:
 
 
 def get_canonical_grocery_list_id(user_id: str) -> str:
-    """Canonical Grocery list id for read APIs (merge duplicates, no absorb/migrate)."""
-    existing = consolidate_grocery_lists(user_id)
+    """Canonical Grocery list id for read APIs (lookup only — no absorb/migrate)."""
+    existing = _lookup_grocery_list_id(user_id)
     if existing:
         return existing
     return get_or_create_grocery_list_id(user_id)
@@ -96,7 +110,11 @@ def _normalize_canonical_grocery_list(conn, user_id: str, list_id: str) -> None:
     if sort_order != 0:
         updates["sort_order"] = 0
     if updates:
-        update_row("user_lists", updates, {"id": list_id, "user_id": user_id})
+        set_clause = ", ".join(f"{k}=?" for k in updates)
+        conn.execute(
+            f"UPDATE user_lists SET {set_clause} WHERE id=? AND user_id=?",
+            (*updates.values(), list_id, user_id),
+        )
 
     _dedupe_unchecked_items(conn, list_id, user_id)
     conn.commit()

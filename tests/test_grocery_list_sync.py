@@ -4,6 +4,7 @@ from __future__ import annotations
 from core.grocery_list import (
     GROCERY_LIST_NAME,
     ensure_grocery_list_ready,
+    get_canonical_grocery_list_id,
     get_unchecked_grocery_item_names,
     grocery_list_sort_key,
 )
@@ -280,6 +281,49 @@ def test_delete_list_blocks_builtin_grocery():
 
     result = _delete_list({"list_id": list_id}, uid)
     assert result["status"] == "error"
+
+
+def test_get_canonical_read_path_does_not_merge_duplicates():
+    """Read APIs must not mutate — merge runs only on write (ensure_grocery_list_ready)."""
+    user = get_or_create_user_by_email("pytest-grocery-read-only@test.app")
+    uid = user["id"]
+    _reset_user(uid)
+
+    first_id = _uid()
+    second_id = _uid()
+    for list_id, created_at in ((first_id, "2020-01-01"), (second_id, "2021-01-01")):
+        insert_row(
+            "user_lists",
+            {
+                "id": list_id,
+                "user_id": uid,
+                "name": "Grocery",
+                "icon": "",
+                "color": "#fff",
+                "sort_order": 0,
+                "created_at": created_at,
+            },
+        )
+
+    assert get_canonical_grocery_list_id(uid) == first_id
+
+    conn = get_connection()
+    dup_count = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM user_lists WHERE user_id=? AND LOWER(TRIM(name))=?",
+        (uid, GROCERY_LIST_NAME.lower()),
+    ).fetchone()
+    conn.close()
+    cnt = dup_count["cnt"] if isinstance(dup_count, dict) else dup_count[0]
+    assert int(cnt) == 2
+
+    ensure_grocery_list_ready(uid)
+
+    conn = get_connection()
+    lists = conn.execute(
+        "SELECT id FROM user_lists WHERE user_id=?", (uid,)
+    ).fetchall()
+    conn.close()
+    assert len(lists) == 1
 
 
 def test_misnamed_groc_prefixed_list_absorbed():

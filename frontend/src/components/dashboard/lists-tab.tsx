@@ -43,6 +43,11 @@ function isBuiltinGroceryList(list: UserList): boolean {
 }
 
 async function fetchListItems(list: UserList): Promise<ListItem[]> {
+  // Built-in Grocery always reads via the canonical endpoint so stale list ids
+  // from an earlier overview fetch never miss items after chat/voice writes.
+  if (isBuiltinGroceryList(list)) {
+    return api.get<ListItem[]>("/api/grocery/items");
+  }
   return api.get<ListItem[]>(`/api/lists/${list.id}/items`);
 }
 
