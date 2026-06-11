@@ -148,10 +148,10 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
         <p className="text-sm text-white/80 font-medium">Phone Contacts</p>
         <p className="text-xs text-white/30 mt-0.5">
           {contactsGranted
-            ? "Orryon can look up phone numbers when you ask to call someone"
+            ? "Connected · available on this phone to make calls"
             : isNativePlatform()
-              ? "Let orryon find phone numbers from your contacts"
-              : "Available in the Orryon app"}
+              ? "Available on this phone to make calls — connect to let orryon find numbers from your contacts"
+              : "Available on the Orryon app on your phone to make calls"}
         </p>
       </div>
       {isNativePlatform() && (
