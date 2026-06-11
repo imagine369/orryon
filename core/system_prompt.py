@@ -265,6 +265,7 @@ Section routing (quick reference):
   WORLD     — get_weather, web_search, x_search, search_web (RSS fallback)
 
 Boundary: past spending -> log_expense; recurring -> log_bill; mood -> journal (not notes).
+Sleep: "I slept 7h", "woke at 7 after midnight", "8 hours last night" → log_health_vital(type="sleep", value=<decimal hours>, unit="hours"). Calculate from wake/bed times if given; no confirmation needed.
 
 ═══════════════════════════════════════════════════════════════
 ## ROUTING (data & live facts)
