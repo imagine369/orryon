@@ -44,6 +44,15 @@ const HOP_BY_HOP = new Set([
   "upgrade",
 ]);
 
+// Headers that describe the *wire* representation of the upstream response.
+// Node's `fetch` transparently decompresses response bodies, so by the time
+// we stream `upstream.body` back to the browser it is already decoded and
+// its length may differ from `Content-Length`. Forwarding the original
+// `Content-Encoding` makes the browser try to decode an already-decoded
+// body and produces "Decoding failed". Drop both. Likewise `content-length`
+// would be wrong after decompression — let the runtime recompute it.
+const STRIP_FROM_RESPONSE = new Set(["content-encoding", "content-length"]);
+
 const ORRYON_COOKIES = new Set([SESSION_COOKIE, CSRF_COOKIE, SIGNAL_COOKIE]);
 
 function buildTargetUrl(req: NextRequest, pathSegments: string[] | undefined): string {
@@ -96,7 +105,9 @@ function forwardRequestHeaders(req: NextRequest, bearer: string | null): Headers
 function forwardResponseHeaders(res: Response): Headers {
   const out = new Headers();
   res.headers.forEach((value, key) => {
-    if (HOP_BY_HOP.has(key.toLowerCase())) return;
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower)) return;
+    if (STRIP_FROM_RESPONSE.has(lower)) return;
     out.set(key, value);
   });
   return out;
