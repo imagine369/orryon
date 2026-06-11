@@ -8,7 +8,7 @@ import { PanelProvider, usePanels } from "@/lib/panel-context";
 import { NavBar } from "@/components/nav-bar";
 import { DashboardPanel } from "@/components/dashboard-panel";
 import { SettingsPanel } from "@/components/settings-panel";
-import { StreakPanel } from "@/components/streak-panel";
+import { HealthPanel } from "@/components/health-panel";
 import { JournalPanel } from "@/components/journal-panel";
 import { ResetAnchorPanel } from "@/components/reset-anchor-panel";
 import { TrialBanner } from "@/components/trial-banner";
@@ -90,7 +90,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Overlay panels */}
       <DashboardPanel />
       <SettingsPanel />
-      <StreakPanel />
+      <HealthPanel />
       <JournalPanel />
       <ResetAnchorPanel />
       <LifeInterestsOnboarding />

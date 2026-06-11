@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import {
-  Settings, LayoutGrid, Bell, Search, Flame, Feather,
+  Settings, LayoutGrid, Bell, Search, Heart, Feather,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Panel = "dashboard" | "settings" | "streaks" | "journal" | "reset" | null;
+type Panel = "dashboard" | "settings" | "health" | "journal" | "reset" | null;
 
 interface NavBarHeaderActionsProps {
   openPanel: Panel;
@@ -71,15 +71,15 @@ export function NavBarHeaderActions({
       </button>
 
       <button
-        onClick={() => toggle("streaks")}
+        onClick={() => toggle("health")}
         className={cn(
           "flex items-center justify-center rounded-lg p-2 transition-colors",
           "text-white/60 hover:text-white hover:bg-white/5",
-          openPanel === "streaks" && "text-white bg-white/5",
+          openPanel === "health" && "text-white bg-white/5",
         )}
-        aria-label="Streaks"
+        aria-label="Health"
       >
-        <Flame className="h-5 w-5" strokeWidth={1.5} />
+        <Heart className="h-5 w-5" strokeWidth={1.5} />
       </button>
 
       <button
