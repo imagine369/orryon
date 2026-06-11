@@ -1,9 +1,11 @@
 "use client";
 
+import React from "react";
 import type { SettingsPanel } from "../panel-types";
 
-import { CalendarDays, RefreshCw, Unlink, ChevronRight } from "lucide-react";
+import { CalendarDays, RefreshCw, Unlink, ChevronRight, BookUser } from "lucide-react";
 import { getApiBase, api } from "@/lib/api";
+import { isNativePlatform, requestContactsPermission, getContactsPermissionStatus } from "@/lib/device-contacts";
 
 function calendarStatusLine(panel: SettingsPanel): string {
   const { calOAuthAvailable, calConnected, calSyncPaused, calSynced } = panel;
@@ -34,7 +36,35 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
   const {
     calConnected, setCalConnected, calOAuthAvailable,
     calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
+    contactsGranted, setContactsGranted,
   } = panel;
+
+  const [contactsLoading, setContactsLoading] = React.useState(false);
+
+  async function connectContacts() {
+    setContactsLoading(true);
+    try {
+      const granted = await requestContactsPermission();
+      setContactsGranted(granted);
+    } finally {
+      setContactsLoading(false);
+    }
+  }
+
+  function disconnectContacts() {
+    setContactsGranted(false);
+  }
+
+  // On mount (native only), sync permission state in case user changed it in OS Settings.
+  React.useEffect(() => {
+    if (!isNativePlatform()) return;
+    getContactsPermissionStatus().then((status) => {
+      if (status !== "granted" && contactsGranted) {
+        setContactsGranted(false);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function connectGoogle() {
     const token = localStorage.getItem("orryon_token") ?? "";
@@ -100,6 +130,46 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
             <button
               onClick={connectGoogle}
               className="text-xs px-3 py-2.5 min-h-[44px] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
+            >
+              <ChevronRight className="w-3 h-3" strokeWidth={2} />
+              Connect
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Phone Contacts */}
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex items-center gap-3">
+      <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+        <BookUser className="w-4 h-4 text-white/50" strokeWidth={1.5} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white/80 font-medium">Phone Contacts</p>
+        <p className="text-xs text-white/30 mt-0.5">
+          {contactsGranted
+            ? "Orryon can look up phone numbers when you ask to call someone"
+            : isNativePlatform()
+              ? "Let orryon find phone numbers from your contacts"
+              : "Available in the Orryon app"}
+        </p>
+      </div>
+      {isNativePlatform() && (
+        <div className="flex items-center gap-2 shrink-0">
+          {contactsGranted ? (
+            <button
+              onClick={disconnectContacts}
+              disabled={contactsLoading}
+              className="w-11 h-11 flex items-center justify-center text-white/20 hover:text-red-400 transition disabled:opacity-40"
+              title="Disconnect"
+            >
+              <Unlink className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          ) : (
+            <button
+              onClick={connectContacts}
+              disabled={contactsLoading}
+              className="text-xs px-3 py-2.5 min-h-[44px] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5 disabled:opacity-40"
             >
               <ChevronRight className="w-3 h-3" strokeWidth={2} />
               Connect

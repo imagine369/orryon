@@ -11,6 +11,8 @@ import {
 } from "@/lib/use-data-refresh";
 import { shouldShowToolCaption } from "@/lib/chat-tool-ui";
 import { extractFulfillmentHandoffs } from "@/lib/extract-fulfillment-handoffs";
+import { isNativePlatform, searchContactsByName } from "@/lib/device-contacts";
+import { extractContactName, buildContactsContext } from "@/lib/contact-intent";
 import type { ChatMessage, ChatSession } from "@/lib/chat-types";
 import {
   chatHistoryPath,
@@ -188,10 +190,26 @@ export function useHomeChat({
   }, [runAI]);
 
   const handleSend = useCallback(
-    (text: string, source: MessageSource = "text") => {
+    async (text: string, source: MessageSource = "text") => {
       destructive.clearPending();
       setMessages((prev) => [...prev, { role: "user", content: text, source }]);
-      runAI(text);
+
+      let enrichedText = text;
+      const contactsGranted =
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem("orryon_contacts_granted") === "true";
+
+      if (contactsGranted && isNativePlatform()) {
+        const name = extractContactName(text);
+        if (name) {
+          const matches = await searchContactsByName(name);
+          if (matches.length > 0) {
+            enrichedText = text + buildContactsContext(name, matches);
+          }
+        }
+      }
+
+      runAI(enrichedText);
     },
     [runAI],
   );

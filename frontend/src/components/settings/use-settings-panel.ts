@@ -102,6 +102,14 @@ export function useSettingsPanel() {
   const [gmailAvailable, setGmailAvailable] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [gmailMsg, setGmailMsg] = useState("");
+  const [contactsGranted, setContactsGrantedState] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return false;
+    return localStorage.getItem("orryon_contacts_granted") === "true";
+  });
+  const setContactsGranted = (granted: boolean) => {
+    localStorage.setItem("orryon_contacts_granted", granted ? "true" : "false");
+    setContactsGrantedState(granted);
+  };
   const [sessions, setSessions] = useState<AuthSession[]>([]);
   const [revokeAllLoading, setRevokeAllLoading] = useState(false);
   const [revokeAllDone, setRevokeAllDone] = useState(false);
@@ -318,6 +326,7 @@ export function useSettingsPanel() {
     calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
     gmailConnected, setGmailConnected, gmailAvailable, setGmailAvailable,
     gmailLoading, setGmailLoading, gmailMsg, setGmailMsg,
+    contactsGranted, setContactsGranted,
     sessions, setSessions, revokeAllLoading, setRevokeAllLoading, revokeAllDone, setRevokeAllDone,
     patch, saveProfileField, sendEmailCode, verifyEmailCode, handleDeleteAccount, goBack,
   };

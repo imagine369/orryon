@@ -53,5 +53,7 @@
 	<string>Orryon uses the microphone so you can speak to your AI concierge instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Orryon converts your voice to text to send messages to your AI concierge.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Orryon searches your contacts to find phone numbers when you ask to call someone. Orryon does not place calls for you.</string>
 </dict>
 </plist>
