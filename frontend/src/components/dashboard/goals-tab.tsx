@@ -163,7 +163,7 @@ export function GoalsTab() {
             <Card className="bg-white/[0.03] border-white/[0.06] mb-3">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-sm">{g.name}</span>
+                  <span className="font-semibold text-[16px]">{g.name}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-green-400">{Math.round(pct)}%</span>
                     <button
@@ -180,7 +180,7 @@ export function GoalsTab() {
                 <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                   <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${barColor(pct)}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="flex justify-between text-[0.7rem] text-white/30">
+                <div className="flex justify-between text-sm text-white/30">
                   <span>{fmt(g.current_amount)} saved of {fmt(g.target_amount)}</span>
                   <span>{fmt(remaining)} to go{g.target_date ? ` · ${daysLeft(g.target_date)}` : ""}</span>
                 </div>

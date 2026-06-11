@@ -149,7 +149,7 @@ export function NotesTab() {
             </p>
             <span className="text-[0.6rem] text-white/25 shrink-0">{smartDate(n.updated_at || n.created_at)}</span>
           </div>
-          <p className="text-sm text-white/35 truncate">
+          <p className="text-sm text-white/45 truncate">
             {snippet
               ? <Highlight text={snippet} query={highlight || ""} />
               : <span className="text-white/20 italic">No content</span>}

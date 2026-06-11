@@ -154,8 +154,8 @@ export function BankTab() {
               className="flex items-center justify-between py-3 border-b border-white/5"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white/85 truncate">{t.merchant}</p>
-                <p className="text-[0.7rem] text-white/25">{formatDate(t.date)}</p>
+                <p className="text-[16px] text-white/85 truncate">{t.merchant}</p>
+                <p className="text-sm text-white/25">{formatDate(t.date)}</p>
               </div>
               <span className="text-sm font-semibold text-emerald-400 ml-3">
                 +{fmt(Math.abs(t.amount))}

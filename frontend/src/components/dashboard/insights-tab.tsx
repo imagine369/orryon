@@ -219,7 +219,7 @@ export function InsightsTab() {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-white/85 truncate">{c.category}</p>
+                  <p className="text-[16px] text-white/85 truncate">{c.category}</p>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     {prevCat && trendIcon(c.total, prevCat.total)}
                     <span className={`text-xs ${trendColor(c.total, prevCat?.total || 0)}`}>

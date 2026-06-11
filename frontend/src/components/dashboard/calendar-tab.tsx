@@ -277,8 +277,8 @@ export function CalendarTab() {
             <div key={e.id} className="flex items-start gap-3 py-3 border-b border-white/5">
               <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: EVENT_COLOR[e.event_type] ?? "#60a5fa" }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/85 leading-snug">{e.title}</p>
-                {e.description && <p className="text-[0.68rem] text-white/30 mt-0.5">{e.description}</p>}
+                <p className="text-[16px] font-medium text-white/85 leading-snug">{e.title}</p>
+                {e.description && <p className="text-sm text-white/30 mt-0.5">{e.description}</p>}
               </div>
               <span className="text-[0.55rem] text-white/20 shrink-0 mt-0.5 uppercase tracking-wide">
                 {e.event_type.replace("_", " ")}
@@ -291,8 +291,8 @@ export function CalendarTab() {
             <div key={t.id} className="flex items-center gap-3 py-3 border-b border-white/5">
               <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLOR[t.priority] ?? "#555" }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white/85 truncate">{t.title}</p>
-                <p className="text-[0.62rem] text-white/25 mt-0.5">{t.category || "general"}</p>
+                <p className="text-[16px] text-white/85 truncate">{t.title}</p>
+                <p className="text-sm text-white/25 mt-0.5">{t.category || "general"}</p>
               </div>
               <span className="text-[0.55rem] uppercase tracking-wide shrink-0" style={{ color: PRIORITY_COLOR[t.priority] ?? "#555", opacity: 0.7 }}>
                 {t.priority === "none" ? "P4" : t.priority === "low" ? "P3" : t.priority === "medium" ? "P2" : "P1"}

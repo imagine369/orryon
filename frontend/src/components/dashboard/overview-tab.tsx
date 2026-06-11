@@ -151,8 +151,8 @@ export function OverviewTab() {
               {deposits.map((t) => (
                 <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
                   <div className="flex-1 min-w-0">
-                    <p className="text-white/85 truncate">{t.merchant}</p>
-                    <p className="text-[0.7rem] text-white/25">{t.date}</p>
+                    <p className="text-[16px] text-white/85 truncate">{t.merchant}</p>
+                    <p className="text-sm text-white/25">{t.date}</p>
                   </div>
                   <span className="font-semibold text-emerald-400 ml-3">+{fmt(Math.abs(t.amount))}</span>
                 </div>
@@ -166,8 +166,8 @@ export function OverviewTab() {
               {transactions.map((t) => (
                 <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
                   <div className="flex-1 min-w-0">
-                    <p className="text-white/85 truncate">{t.merchant}</p>
-                    <p className="text-[0.7rem] text-white/25">{t.category} · {t.date}</p>
+                    <p className="text-[16px] text-white/85 truncate">{t.merchant}</p>
+                    <p className="text-sm text-white/25">{t.category} · {t.date}</p>
                   </div>
                   <span className="font-semibold text-white/85 ml-3">-{fmt(t.amount)}</span>
                 </div>
@@ -181,7 +181,7 @@ export function OverviewTab() {
               {tasks.map((t) => (
                 <div key={t.id} className="flex items-center gap-2 py-2 border-b border-white/5 text-sm">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityColor(t.priority)}`} />
-                  <span className="text-white/80 flex-1">{t.title}</span>
+                  <span className="text-[16px] text-white/80 flex-1">{t.title}</span>
                   {t.due_date && <span className="text-white/25 text-xs">{t.due_date}</span>}
                 </div>
               ))}

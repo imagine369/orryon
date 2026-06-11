@@ -140,7 +140,7 @@ export function YearlyTab() {
           <p className="text-[0.65rem] uppercase tracking-wide text-white/25 mb-2">Top Categories</p>
           {topCategories.map((c) => (
             <div key={c.category} className="flex items-center justify-between py-2.5 border-b border-white/5">
-              <span className="text-sm text-white/80">{c.category}</span>
+              <span className="text-[16px] text-white/80">{c.category}</span>
               <div className="text-right">
                 <p className="text-sm font-semibold text-white/85">{fmt(c.total)}</p>
                 {yearTotal > 0 && (

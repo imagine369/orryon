@@ -159,7 +159,7 @@ export function BudgetTab() {
           >
             <div className="py-3 border-b border-white/5">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold">{c.category}</span>
+                <span className="text-[16px] font-semibold">{c.category}</span>
                 <span className="text-sm text-white/50">{fmt(c.spent)} / {fmt(c.planned)}</span>
               </div>
               <div className="relative h-2 rounded-full bg-white/5 overflow-hidden">

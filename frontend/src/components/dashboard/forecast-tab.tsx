@@ -92,8 +92,8 @@ export function ForecastTab() {
           {data.bills.map((b, i) => (
             <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
               <div>
-                <p className="text-white">{b.name}</p>
-                <p className="text-[0.65rem] text-white/25">{b.frequency} · Due {b.next_due}</p>
+                <p className="text-[16px] text-white">{b.name}</p>
+                <p className="text-sm text-white/25">{b.frequency} · Due {b.next_due}</p>
               </div>
               <span className="font-semibold">{fmt(b.amount)}</span>
             </div>

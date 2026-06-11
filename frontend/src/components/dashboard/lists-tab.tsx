@@ -220,9 +220,9 @@ function ListsOverview({
               style={{ backgroundColor: list.color === "#ffffff" ? "rgba(255,255,255,0.25)" : list.color }}
             />
             <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-medium text-white/85 truncate">{list.name}</p>
+              <p className="text-[16px] font-medium text-white/85 truncate">{list.name}</p>
               {list.item_count > 0 && (
-                <p className="text-[0.65rem] text-white/30 mt-0.5">
+                <p className="text-sm text-white/30 mt-0.5">
                   {list.item_count} {list.item_count === 1 ? "item" : "items"} remaining
                 </p>
               )}
@@ -454,7 +454,7 @@ function ListDetail({
                   onClick={() => toggleItem(item)}
                   className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
                 />
-                <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
+                <p className="text-[16px] text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => deleteItem(item.id)}
@@ -474,7 +474,7 @@ function ListDetail({
                 onClick={() => toggleItem(item)}
                 className="shrink-0 w-5 h-5 rounded-full border border-white/25 flex items-center justify-center hover:border-white/60 transition active:scale-90"
               />
-              <p className="text-sm text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
+              <p className="text-[16px] text-white/85 flex-1 leading-snug">{listItemLabel(item.name, item.notes)}</p>
             </div>
           </SwipeToDelete>
         ))
@@ -495,7 +495,7 @@ function ListDetail({
                 >
                   <span className="text-white/40 text-[0.55rem] leading-none">✓</span>
                 </button>
-                <p className="text-sm text-white/30 flex-1 line-through leading-snug">{listItemLabel(item.name, item.notes)}</p>
+                <p className="text-[16px] text-white/30 flex-1 line-through leading-snug">{listItemLabel(item.name, item.notes)}</p>
               </div>
             </SwipeToDelete>
           ))}

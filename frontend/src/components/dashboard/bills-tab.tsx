@@ -168,11 +168,11 @@ export function BillsTab() {
             <div className="flex items-center gap-3 py-3 border-b border-white/5">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-white/85 truncate">{b.name}</p>
+                  <p className="text-[16px] font-medium text-white/85 truncate">{b.name}</p>
                   <p className="text-sm font-semibold text-white/85 ml-3">{fmt(b.amount)}</p>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-[0.65rem] text-white/30">{freqLabel(b.frequency)}</p>
+                  <p className="text-sm text-white/30">{freqLabel(b.frequency)}</p>
                   <p className={`text-[0.65rem] ${daysUntilColor(b.next_due)}`}>
                     {daysUntil(b.next_due)}
                   </p>
