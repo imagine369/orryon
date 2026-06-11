@@ -152,7 +152,7 @@ export function OverviewTab() {
                 <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
                   <div className="flex-1 min-w-0">
                     <p className="text-[16px] text-white/85 truncate">{t.merchant}</p>
-                    <p className="text-sm text-white/25">{t.date}</p>
+                    <p className="text-sm text-white/35">{t.date}</p>
                   </div>
                   <span className="font-semibold text-emerald-400 ml-3">+{fmt(Math.abs(t.amount))}</span>
                 </div>
@@ -167,7 +167,7 @@ export function OverviewTab() {
                 <div key={t.id} className="flex items-center justify-between py-2 border-b border-white/5 text-sm">
                   <div className="flex-1 min-w-0">
                     <p className="text-[16px] text-white/85 truncate">{t.merchant}</p>
-                    <p className="text-sm text-white/25">{t.category} · {t.date}</p>
+                    <p className="text-sm text-white/35">{t.category} · {t.date}</p>
                   </div>
                   <span className="font-semibold text-white/85 ml-3">-{fmt(t.amount)}</span>
                 </div>

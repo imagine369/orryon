@@ -222,7 +222,7 @@ function ListsOverview({
             <div className="flex-1 text-left min-w-0">
               <p className="text-[16px] font-medium text-white/85 truncate">{list.name}</p>
               {list.item_count > 0 && (
-                <p className="text-sm text-white/30 mt-0.5">
+                <p className="text-sm text-white/40 mt-0.5">
                   {list.item_count} {list.item_count === 1 ? "item" : "items"} remaining
                 </p>
               )}
@@ -495,7 +495,7 @@ function ListDetail({
                 >
                   <span className="text-white/40 text-[0.55rem] leading-none">✓</span>
                 </button>
-                <p className="text-[16px] text-white/30 flex-1 line-through leading-snug">{listItemLabel(item.name, item.notes)}</p>
+                <p className="text-[16px] text-white/40 flex-1 line-through leading-snug">{listItemLabel(item.name, item.notes)}</p>
               </div>
             </SwipeToDelete>
           ))}

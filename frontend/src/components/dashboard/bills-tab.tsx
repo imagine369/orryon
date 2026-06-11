@@ -172,7 +172,7 @@ export function BillsTab() {
                   <p className="text-sm font-semibold text-white/85 ml-3">{fmt(b.amount)}</p>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
-                  <p className="text-sm text-white/30">{freqLabel(b.frequency)}</p>
+                  <p className="text-sm text-white/40">{freqLabel(b.frequency)}</p>
                   <p className={`text-[0.65rem] ${daysUntilColor(b.next_due)}`}>
                     {daysUntil(b.next_due)}
                   </p>

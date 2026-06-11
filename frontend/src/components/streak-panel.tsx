@@ -273,7 +273,7 @@ function StreakListView({
               <Flame className="h-6 w-6 text-white/30" strokeWidth={1.5} />
             </div>
             <p className="text-[16px] text-white/60 mb-1">No streaks yet</p>
-            <p className="text-sm text-white/30 max-w-[240px]">
+            <p className="text-sm text-white/40 max-w-[240px]">
               Create a daily habit to track. One tap a day — don&apos;t break the chain.
             </p>
           </div>
@@ -296,7 +296,7 @@ function StreakListView({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[16px] font-semibold text-white/90 truncate">{s.name}</p>
-                  <p className="text-sm text-white/40 mt-0.5">
+                  <p className="text-sm text-white/50 mt-0.5">
                     {count === 0
                       ? s.targetDays
                         ? `${s.targetDays}-day goal · start today`

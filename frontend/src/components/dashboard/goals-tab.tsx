@@ -180,7 +180,7 @@ export function GoalsTab() {
                 <div className="relative h-2 rounded-full bg-white/5 overflow-hidden mb-2">
                   <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${barColor(pct)}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="flex justify-between text-sm text-white/30">
+                <div className="flex justify-between text-sm text-white/40">
                   <span>{fmt(g.current_amount)} saved of {fmt(g.target_amount)}</span>
                   <span>{fmt(remaining)} to go{g.target_date ? ` · ${daysLeft(g.target_date)}` : ""}</span>
                 </div>
