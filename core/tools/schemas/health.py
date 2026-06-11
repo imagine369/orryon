@@ -4,12 +4,12 @@ from __future__ import annotations
 SCHEMAS: list[dict] = [{'type': 'function',
   'function': {'name': 'log_health_vital',
                'description': 'Log a health vital (blood pressure, weight, heart rate, glucose, '
-                              'etc.).',
+                              'sleep hours, mood score 1–5, etc.).',
                'parameters': {'type': 'object',
                               'properties': {'type': {'type': 'string',
-                                                      'description': 'Vital type, e.g. '
+                                                      'description': 'Vital type: '
                                                                      'blood_pressure, weight, '
-                                                                     'heart_rate'},
+                                                                     'heart_rate, sleep, mood'},
                                              'value': {'type': 'number',
                                                        'description': 'Numeric reading'},
                                              'unit': {'type': 'string',

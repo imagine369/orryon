@@ -264,8 +264,9 @@ Section routing (quick reference):
   FULFILL   — create_fulfillment_handoff (Uber ride, DoorDash, Instacart, OpenTable, pharmacy)
   WORLD     — get_weather, web_search, x_search, search_web (RSS fallback)
 
-Boundary: past spending -> log_expense; recurring -> log_bill; mood -> journal (not notes).
+Boundary: past spending -> log_expense; recurring -> log_bill; mood diary entry (feelings, reflections) → log_journal_entry; quick mood score → log_health_vital(type="mood").
 Sleep: "I slept 7h", "woke at 7 after midnight", "8 hours last night" → log_health_vital(type="sleep", value=<decimal hours>, unit="hours"). Calculate from wake/bed times if given; no confirmation needed.
+Mood score: "feeling great / 4 out of 5 / pretty low today" → log_health_vital(type="mood", value=1–5, unit="score"). Map words: great/amazing=5, good=4, okay/alright/fine=3, bad/low=2, terrible/awful=1. No confirmation needed.
 
 ═══════════════════════════════════════════════════════════════
 ## ROUTING (data & live facts)
