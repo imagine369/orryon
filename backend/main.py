@@ -48,6 +48,7 @@ from backend.routers import (
     contact,
     calendar_ics,
     calendar_google,
+    gmail,
     voice,
     habits,
     admin,
@@ -310,6 +311,7 @@ app.include_router(connections.router)
 app.include_router(contact.router)
 app.include_router(calendar_ics.router)
 app.include_router(calendar_google.router)
+app.include_router(gmail.router)
 app.include_router(voice.router)
 app.include_router(habits.router)
 app.include_router(admin.router)

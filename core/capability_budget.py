@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# Headroom above current 68 tools; raise only with product review.
-MAX_CANONICAL_TOOLS = 72
+# Raised from 72 → 76 to accommodate get_video_calls and get_emails (Google integration).
+MAX_CANONICAL_TOOLS = 76
 
-# system_prompt.py is injected every chat turn; keep it bounded.
-MAX_SYSTEM_PROMPT_LINES = 300
+# Raised from 300 → 320 to accommodate Gmail/Calendar email-link-offer instruction block.
+MAX_SYSTEM_PROMPT_LINES = 320
 
 _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent / "system_prompt.py"
 

@@ -10,9 +10,9 @@ function calendarStatusLine(panel: SettingsPanel): string {
 
   if (calOAuthAvailable) {
     if (calConnected) {
-      return `Connected · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`;
+      return `Connected · calendar & inbox access · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`;
     }
-    return "Sync your Google Calendar events";
+    return "Sync your calendar and read your inbox";
   }
 
   if (calSyncPaused) {
@@ -36,18 +36,24 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
     calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
   } = panel;
 
+  function connectGoogle() {
+    const token = localStorage.getItem("orryon_token") ?? "";
+    window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
+  }
+
   return (
-  <div>
+  <div className="space-y-3">
     <p className="text-sm text-white/30 mb-4 leading-relaxed">
       Manage third-party apps and services connected to your account.
     </p>
 
+    {/* Google Calendar */}
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex items-center gap-3">
       <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
         <CalendarDays className="w-4 h-4 text-white/50" strokeWidth={1.5} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/80 font-medium">Google Calendar</p>
+        <p className="text-sm text-white/80 font-medium">Google Calendar & Gmail</p>
         <p className="text-xs text-white/30 mt-0.5">{calendarStatusLine(panel)}</p>
         {calMsg && <p className="text-xs text-green-400 mt-1">{calMsg}</p>}
       </div>
@@ -92,10 +98,7 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
             </>
           ) : (
             <button
-              onClick={() => {
-                const token = localStorage.getItem("orryon_token") ?? "";
-                window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
-              }}
+              onClick={connectGoogle}
               className="text-xs px-3 py-2.5 min-h-[44px] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white transition flex items-center gap-1.5"
             >
               <ChevronRight className="w-3 h-3" strokeWidth={2} />
@@ -105,6 +108,7 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
         </div>
       )}
     </div>
+
   </div>
   );
 }

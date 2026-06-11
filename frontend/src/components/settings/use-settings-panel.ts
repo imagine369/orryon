@@ -98,6 +98,10 @@ export function useSettingsPanel() {
   const [calSynced, setCalSynced] = useState(0);
   const [calLoading, setCalLoading] = useState(false);
   const [calMsg, setCalMsg] = useState("");
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailAvailable, setGmailAvailable] = useState(false);
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailMsg, setGmailMsg] = useState("");
   const [sessions, setSessions] = useState<AuthSession[]>([]);
   const [revokeAllLoading, setRevokeAllLoading] = useState(false);
   const [revokeAllDone, setRevokeAllDone] = useState(false);
@@ -161,6 +165,13 @@ export function useSettingsPanel() {
         setCalOAuthAvailable(d.oauth_available);
         setCalSyncPaused(d.sync_paused);
         setCalSynced(d.synced_count);
+      })
+      .catch(() => {});
+    api.get<{ gmail_available: boolean; connected: boolean }>("/api/gmail/status")
+      .then((d) => {
+        if (cancelled()) return;
+        setGmailAvailable(d.gmail_available);
+        setGmailConnected(d.connected);
       })
       .catch(() => {});
     api.get<AuthSession[]>("/api/sessions")
@@ -305,6 +316,8 @@ export function useSettingsPanel() {
     calConnected, setCalConnected, calOAuthAvailable, setCalOAuthAvailable,
     calSyncPaused, setCalSyncPaused,
     calSynced, setCalSynced, calLoading, setCalLoading, calMsg, setCalMsg,
+    gmailConnected, setGmailConnected, gmailAvailable, setGmailAvailable,
+    gmailLoading, setGmailLoading, gmailMsg, setGmailMsg,
     sessions, setSessions, revokeAllLoading, setRevokeAllLoading, revokeAllDone, setRevokeAllDone,
     patch, saveProfileField, sendEmailCode, verifyEmailCode, handleDeleteAccount, goBack,
   };

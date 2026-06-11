@@ -204,6 +204,163 @@ def _edit_event(args: dict, user_id: str) -> dict:
         return {"status": "no_changes"}
     update_row("events", updates, {"id": eid})
     return {"status": "ok", "id": eid, "updated": list(updates.keys()), "title": updates.get("title", row["title"])}
+def _get_emails(args: dict, user_id: str) -> dict:
+    """Fetch recent Gmail messages for the user, optionally filtered by a search query."""
+    query = (args.get("query") or "").strip()
+    max_results = min(int(args.get("max_results", 10)), 25)
+
+    try:
+        from core.integrations.gmail import fetch_gmail_messages, get_gmail_profile
+    except ImportError:
+        return {"status": "error", "message": "Gmail integration not available."}
+
+    if query:
+        messages = _search_gmail(user_id, query, max_results)
+    else:
+        messages = fetch_gmail_messages(user_id, max_results=max_results)
+
+    if not messages and messages is not None:
+        profile = get_gmail_profile(user_id)
+        if profile is None:
+            return {
+                "status": "not_connected",
+                "message": "Gmail is not connected. The user can connect it in Settings → Connected Accounts.",
+            }
+
+    if messages is None:
+        return {
+            "status": "not_connected",
+            "message": "Gmail is not connected. The user can connect it in Settings → Connected Accounts.",
+        }
+
+    return {
+        "status": "ok",
+        "count": len(messages),
+        "query": query or None,
+        "messages": messages,
+        "gmail_inbox_url": "https://mail.google.com/mail/u/0/#inbox",
+        "gmail_search_url": (
+            f"https://mail.google.com/mail/u/0/#search/{query.replace(' ', '+')}"
+            if query else None
+        ),
+    }
+
+
+def _search_gmail(user_id: str, query: str, max_results: int) -> list | None:
+    """Search Gmail messages using the Gmail API query syntax."""
+    from core.integrations.google_tokens import get_google_tokens, store_google_tokens
+    from config import GOOGLE_GMAIL_ENABLED
+
+    if not GOOGLE_GMAIL_ENABLED:
+        return None
+
+    tokens = get_google_tokens(user_id)
+    if not tokens or not any("gmail" in s for s in tokens.get("scopes", [])):
+        return None
+
+    try:
+        from google.oauth2.credentials import Credentials
+        import google.auth.transport.requests
+        from googleapiclient.discovery import build
+    except ImportError:
+        return None
+
+    creds = Credentials(**tokens)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(google.auth.transport.requests.Request())
+        store_google_tokens(user_id, {
+            "token": creds.token, "refresh_token": creds.refresh_token,
+            "token_uri": creds.token_uri, "client_id": creds.client_id,
+            "client_secret": creds.client_secret,
+            "scopes": list(creds.scopes or tokens.get("scopes", [])),
+        })
+
+    service = build("gmail", "v1", credentials=creds)
+    result = service.users().messages().list(
+        userId="me", q=query, maxResults=max_results,
+    ).execute()
+    refs = result.get("messages", [])
+
+    messages = []
+    for ref in refs:
+        try:
+            msg = service.users().messages().get(
+                userId="me", id=ref["id"], format="metadata",
+                metadataHeaders=["Subject", "From", "Date"],
+            ).execute()
+            headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+            messages.append({
+                "id": msg["id"],
+                "thread_id": msg.get("threadId", ""),
+                "subject": headers.get("Subject", "(no subject)"),
+                "from": headers.get("From", ""),
+                "date": headers.get("Date", ""),
+                "snippet": msg.get("snippet", ""),
+                "labels": msg.get("labelIds", []),
+            })
+        except Exception:
+            pass
+    return messages
+
+
+_VIDEO_PATTERNS = [
+    (re.compile(r"https?://[a-z0-9.-]*zoom\.us/j/\S+", re.I), "Zoom"),
+    (re.compile(r"https?://meet\.google\.com/[a-z0-9-]+", re.I), "Google Meet"),
+    (re.compile(r"https?://teams\.microsoft\.com/l/meetup[^\s>\"']+", re.I), "Microsoft Teams"),
+    (re.compile(r"https?://[a-z0-9.-]*webex\.com/[^\s>\"']+", re.I), "Webex"),
+    (re.compile(r"https?://around\.co/r/\S+", re.I), "Around"),
+    (re.compile(r"https?://whereby\.com/[^\s>\"']+", re.I), "Whereby"),
+]
+
+def _extract_video_link(text: str) -> tuple[str, str] | None:
+    """Return (url, platform) for the first video call link found in text, or None."""
+    for pattern, platform in _VIDEO_PATTERNS:
+        m = pattern.search(text or "")
+        if m:
+            url = m.group(0).rstrip(".,;)")
+            return url, platform
+    return None
+
+
+def _get_video_calls(args: dict, user_id: str) -> dict:
+    """Return upcoming calendar events that contain a video call join link."""
+    days = int(args.get("days", 7))
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    end_date = (now + timedelta(days=days)).strftime("%Y-%m-%d")
+
+    conn = get_connection()
+    events = conn.execute(
+        "SELECT id, title, description, event_date FROM events "
+        "WHERE user_id=? AND substr(event_date,1,10)>=? AND substr(event_date,1,10)<=? "
+        "ORDER BY event_date ASC LIMIT 50",
+        (user_id, today, end_date),
+    ).fetchall()
+    conn.close()
+
+    calls = []
+    for e in events:
+        combined = f"{e['title'] or ''} {e['description'] or ''}"
+        result = _extract_video_link(combined)
+        if result:
+            join_url, platform = result
+            calls.append({
+                "title": e["title"],
+                "date": e["event_date"][:10] if e["event_date"] else "",
+                "time": e["event_date"][11:16] if len(e["event_date"] or "") > 10 else "",
+                "platform": platform,
+                "join_url": join_url,
+                "event_id": e["id"],
+            })
+
+    return {
+        "status": "ok",
+        "days_ahead": days,
+        "calls": calls,
+        "count": len(calls),
+    }
+
+
 def _edit_task(args: dict, user_id: str) -> dict:
     tid = args["task_id"]
     conn = get_connection()

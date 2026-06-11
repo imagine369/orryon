@@ -100,6 +100,8 @@ _LEGACY_ORDER = (
     "get_weather",
     "search_web",
     "create_fulfillment_handoff",
+    "get_video_calls",
+    "get_emails",
 )
 
 _by_name = {s["function"]["name"]: s for s in _ALL}

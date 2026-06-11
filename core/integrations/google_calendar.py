@@ -12,7 +12,10 @@ from db import get_connection, insert_row, update_row
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+GOOGLE_SCOPES = [
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
 
 
 def _credentials_for_user(uid: str):

@@ -28,6 +28,8 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     "get_calendar": {"impl": h._get_upcoming_schedule, "tabs": []},
     "edit_event": {"impl": h._edit_event, "tabs": ["dashboard", "schedule", "calendar", "today"]},
     "delete_event": {"impl": h._delete_event, "tabs": ["dashboard", "schedule", "calendar", "today"]},
+    "get_video_calls": {"impl": h._get_video_calls, "tabs": []},
+    "get_emails": {"impl": h._get_emails, "tabs": []},
     "add_note": {"impl": h._add_note, "tabs": ["notes"]},
     "get_notes": {"impl": h._get_notes, "tabs": []},
     "search_notes": {"impl": h._search_notes, "tabs": []},

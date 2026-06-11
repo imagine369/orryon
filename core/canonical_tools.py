@@ -13,8 +13,9 @@ CANONICAL_TOOL_NAMES: tuple[str, ...] = (
     "log_bill", "get_bills", "edit_bill", "delete_bill",
     # Expenses
     "log_expense", "get_expenses", "edit_expense", "delete_expense", "split_expense",
-    # Calendar
-    "add_calendar_event", "get_calendar", "edit_event", "delete_event",
+    # Calendar & email
+    "add_calendar_event", "get_calendar", "edit_event", "delete_event", "get_video_calls",
+    "get_emails",
     # Notes
     "add_note", "get_notes", "search_notes", "edit_note", "pin_note", "delete_note",
     # Journal
@@ -83,7 +84,7 @@ def validate_canonical_schemas(all_schemas: list[dict]) -> None:
 _REPROMPT_SECTIONS = (
     "BILLS: log_bill, get_bills, edit_bill, delete_bill",
     "EXPENSES: log_expense, get_expenses, edit_expense, delete_expense, split_expense",
-    "CALENDAR: add_calendar_event, get_calendar, edit_event, delete_event",
+    "CALENDAR: add_calendar_event, get_calendar, edit_event, delete_event, get_video_calls, get_emails",
     "NOTES: add_note, get_notes, search_notes, edit_note, pin_note, delete_note",
     "JOURNAL: log_journal_entry, get_journal, edit_journal_entry, delete_journal_entry",
     "GOALS: create_goal, get_goals, update_goal, delete_goal",

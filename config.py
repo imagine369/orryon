@@ -63,12 +63,17 @@ PLAID_LINK_ENABLED: bool = (
     and PLAID_ENABLED
 )
 
-# Google Calendar OAuth sync (ICS file import works without this).
+# Google OAuth — one app covers both Calendar and Gmail.
 GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+_google_oauth_creds: bool = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 GOOGLE_CALENDAR_OAUTH_ENABLED: bool = (
     os.getenv("GOOGLE_CALENDAR_OAUTH_ENABLED", "").lower() in ("1", "true", "yes")
-    and bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+    and _google_oauth_creds
+)
+GOOGLE_GMAIL_ENABLED: bool = (
+    os.getenv("GOOGLE_GMAIL_ENABLED", "1").lower() in ("1", "true", "yes")
+    and _google_oauth_creds
 )
 
 # ── Instant fulfillment (deeplink handoffs — zero partner API cost in v1) ─────

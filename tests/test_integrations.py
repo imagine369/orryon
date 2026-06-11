@@ -24,10 +24,20 @@ def test_plaid_routes_absent_from_app():
 
 
 def test_google_oauth_routes_hidden_from_openapi_when_disabled():
-    """OAuth routes use include_in_schema=GOOGLE_CALENDAR_OAUTH_ENABLED (off in tests)."""
+    """OAuth routes use include_in_schema=GOOGLE_CALENDAR_OAUTH_ENABLED.
+    When credentials are configured (enabled), routes appear in schema.
+    When disabled, they are hidden. Status endpoint is always visible.
+    """
+    from config import GOOGLE_CALENDAR_OAUTH_ENABLED
     paths = _openapi_paths()
-    assert "/api/calendar/google/auth" not in paths
-    assert "/api/calendar/google/sync" not in paths
+    if GOOGLE_CALENDAR_OAUTH_ENABLED:
+        # Credentials present — routes should be visible
+        assert "/api/calendar/google/auth" in paths
+        assert "/api/calendar/google/sync" in paths
+    else:
+        # No credentials — routes should be hidden
+        assert "/api/calendar/google/auth" not in paths
+        assert "/api/calendar/google/sync" not in paths
     assert "/api/calendar/google/status" in paths
 
 

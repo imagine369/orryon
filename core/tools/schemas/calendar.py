@@ -147,6 +147,36 @@ SCHEMAS: list[dict] = [{'type': 'function',
                                                                          'delete'}},
                               'required': ['event_id']}}},
  {'type': 'function',
+  'function': {'name': 'get_emails',
+               'description': "Read the user's Gmail inbox. Use when the user asks about their "
+                              "email — 'do I have any emails from my doctor?', 'did I get a "
+                              "reply from John?', 'any emails about my package?', 'what's in "
+                              "my inbox?', 'did I get an email about my prescription?'. "
+                              "Only call this tool when the user explicitly asks about email. "
+                              "Returns subject, sender, date, and a short snippet (preview). "
+                              "After answering, always offer a link to open Gmail.",
+               'parameters': {'type': 'object',
+                              'properties': {'query': {'type': 'string',
+                                                       'description': 'Optional search — e.g. '
+                                                                      '"from:doctor", '
+                                                                      '"prescription", '
+                                                                      '"subject:appointment". '
+                                                                      'Leave empty to fetch '
+                                                                      'recent inbox.'},
+                                             'max_results': {'type': 'integer',
+                                                             'description': 'Max emails to fetch '
+                                                                            '(default 10, max 25)'}}}}},
+ {'type': 'function',
+  'function': {'name': 'get_video_calls',
+               'description': "Get upcoming calendar events that have a video call join link "
+                              "(Zoom, Google Meet, Teams, Webex, etc.). Use when the user asks "
+                              "'do I have any calls today?', 'what's my Zoom link?', "
+                              "'when's my next meeting?', or any question about joining a call.",
+               'parameters': {'type': 'object',
+                              'properties': {'days': {'type': 'integer',
+                                                      'description': 'How many days ahead to look '
+                                                                     '(default 7, max 30).'}}}}},
+ {'type': 'function',
   'function': {'name': 'delete_task',
                'description': "Delete/remove a task by its ID. Use when user says 'remove that "
                               "task' or 'delete the task I just added'.",

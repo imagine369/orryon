@@ -23,6 +23,8 @@ from core.tools.handlers.calendar import (
     _delete_task,
     _edit_event,
     _edit_task,
+    _get_video_calls,
+    _get_emails,
 )
 from core.tools.handlers.notes import (
     _add_note,
@@ -108,6 +110,8 @@ __all__ = [
     "_delete_task",
     "_edit_event",
     "_edit_task",
+    "_get_video_calls",
+    "_get_emails",
     "_add_note",
     "_search_notes",
     "_edit_note",
