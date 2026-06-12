@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Trash2 } from "lucide-react";
 
@@ -14,7 +14,6 @@ const DELETE_THRESHOLD = -72;
 export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
   const x = useMotionValue(0);
   const [swiped, setSwiped] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const deleteOpacity = useTransform(x, [0, DELETE_THRESHOLD], [0, 1]);
   const deleteScale = useTransform(x, [0, DELETE_THRESHOLD], [0.7, 1]);
@@ -28,7 +27,8 @@ export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
     animate(x, -400, {
       type: "tween",
       duration: 0.25,
@@ -44,7 +44,7 @@ export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
   };
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden" onClick={swiped ? handleTapOutside : undefined}>
+    <div className="relative overflow-hidden" onClick={swiped ? handleTapOutside : undefined}>
       {/* Delete button revealed behind */}
       <motion.div
         style={{ opacity: deleteOpacity, scale: deleteScale }}
