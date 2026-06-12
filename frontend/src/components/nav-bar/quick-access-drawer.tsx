@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { ListsTab } from "@/components/dashboard/lists-tab";
 import { CalendarTab } from "@/components/dashboard/calendar-tab";
 import { ErrandsTab } from "@/components/nav-bar/errands-tab";
@@ -39,6 +39,13 @@ export function QuickAccessDrawer({
   today,
   onOpenDashboard,
 }: QuickAccessDrawerProps) {
+  const dragControls = useDragControls();
+
+  const startHeaderDrag = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragControls.start(e);
+  };
+
   useEffect(() => {
     if (!open) return;
     scheduleDataChanged([...QUICK_ACCESS_TAB_KEYS, "schedule", "dashboard"]);
@@ -64,6 +71,8 @@ export function QuickAccessDrawer({
         animate={{ x: open ? 0 : "100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 32, mass: 0.9 }}
         drag={open ? "x" : false}
+        dragControls={dragControls}
+        dragListener={false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0, right: 0.2 }}
         onDragEnd={(_, info) => {
@@ -80,12 +89,15 @@ export function QuickAccessDrawer({
       >
         <div className="h-full bg-[#080808] rounded-l-2xl shadow-2xl flex flex-col">
           <div
-            className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0"
+            className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0 cursor-grab active:cursor-grabbing touch-none"
             style={{ paddingTop: "max(1rem, calc(1rem + env(safe-area-inset-top)))" }}
+            onPointerDown={startHeaderDrag}
           >
-            <h1 className="text-2xl font-extrabold">Quick Access</h1>
+            <h1 className="text-2xl font-extrabold select-none">Quick Access</h1>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close Quick Access"
               className="flex items-center justify-center w-11 h-11 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
             >
               <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />

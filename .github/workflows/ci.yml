@@ -111,21 +111,10 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium
 
-      - name: Quick Access grocery E2E
+      - name: Quick Access E2E
         working-directory: frontend
         env:
           JWT_SECRET: ci-build-jwt-secret-minimum-32-characters-long
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
           TEST_BASE_URL: http://127.0.0.1:3456
-        run: |
-          npm run start -- -p 3456 &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-          for i in $(seq 1 30); do
-            if curl -sf "$TEST_BASE_URL/home" >/dev/null; then
-              break
-            fi
-            sleep 2
-          done
-          curl -sf "$TEST_BASE_URL/home" >/dev/null
-          npm run test:quick-access:local
+        run: bash scripts/run-e2e-with-server.sh npm run test:quick-access:e2e

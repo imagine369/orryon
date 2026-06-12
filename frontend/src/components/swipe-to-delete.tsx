@@ -6,12 +6,21 @@ import { Trash2 } from "lucide-react";
 
 interface SwipeToDeleteProps {
   onDelete: () => void;
+  /** Fires on tap/click when the row is not swiped open (works with drag on touch). */
+  onPress?: () => void;
   children: React.ReactNode;
+  /** Distinct accessible name so swipe delete does not clash with in-form delete buttons. */
+  deleteAriaLabel?: string;
 }
 
 const DELETE_THRESHOLD = -72;
 
-export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
+export function SwipeToDelete({
+  onDelete,
+  onPress,
+  children,
+  deleteAriaLabel = "Swipe to delete",
+}: SwipeToDeleteProps) {
   const x = useMotionValue(0);
   const [swiped, setSwiped] = useState(false);
 
@@ -50,9 +59,13 @@ export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
         style={{ opacity: deleteOpacity, scale: deleteScale }}
         className="absolute right-0 top-0 bottom-0 w-[72px] flex items-center justify-center bg-red-500/90 rounded-r-lg"
       >
-        <button onClick={handleDelete} className="flex flex-col items-center gap-0.5">
+        <button
+          onClick={handleDelete}
+          aria-label={deleteAriaLabel}
+          className="flex flex-col items-center gap-0.5"
+        >
           <Trash2 className="h-4 w-4 text-white" strokeWidth={1.5} />
-          <span className="text-[0.6rem] text-white font-medium">Delete</span>
+          <span className="text-[0.6rem] text-white font-medium" aria-hidden="true">Delete</span>
         </button>
       </motion.div>
 
@@ -61,9 +74,27 @@ export function SwipeToDelete({ onDelete, children }: SwipeToDeleteProps) {
         drag="x"
         dragConstraints={{ left: DELETE_THRESHOLD, right: 0 }}
         dragElastic={{ left: 0.1, right: 0.05 }}
-        style={{ x }}
+        dragDirectionLock
+        style={{ x, touchAction: "pan-y" }}
         onDragEnd={handleDragEnd}
-        className="relative bg-transparent cursor-grab active:cursor-grabbing"
+        onTap={() => {
+          if (!swiped && onPress) onPress();
+        }}
+        role={onPress ? "button" : undefined}
+        tabIndex={onPress ? 0 : undefined}
+        onKeyDown={
+          onPress
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (!swiped) onPress();
+                }
+              }
+            : undefined
+        }
+        className={`relative bg-transparent ${
+          onPress ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+        }`}
       >
         {children}
       </motion.div>
