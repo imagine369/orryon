@@ -5,7 +5,8 @@ export type FulfillmentHandoffType =
   | "delivery"
   | "grocery"
   | "reservation"
-  | "pharmacy";
+  | "pharmacy"
+  | "errand";
 
 export interface FulfillmentHandoff {
   id: string;
@@ -25,4 +26,5 @@ export const FULFILLMENT_TYPE_ICONS: Record<FulfillmentHandoffType, string> = {
   grocery: "🛒",
   reservation: "📅",
   pharmacy: "💊",
+  errand: "✓",
 };

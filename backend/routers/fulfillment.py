@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class CreateHandoffReq(BaseModel):
     title: str = Field(min_length=1)
-    type: str = "grocery"
+    type: str = "errand"
 
 
 @router.get("/api/fulfillment/handoffs")

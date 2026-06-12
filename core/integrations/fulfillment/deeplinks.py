@@ -290,12 +290,15 @@ def action_label_for_type(handoff_type: str, *, platform: str = "") -> str:
         "delivery": "Order on DoorDash",
         "grocery": "Shop on Instacart",
         "pharmacy": "Find pharmacy",
+        "errand": "",
     }
     return labels.get(handoff_type, "Open")
 
 
 def build_action_url(handoff_type: str, payload: dict[str, Any], *, uber_client_id: str = "") -> str:
     """Resolve a handoff type + payload into a partner deeplink."""
+    if handoff_type == "errand":
+        return ""
     if handoff_type == "ride":
         pickup = payload.get("pickup") or {}
         dropoff = payload.get("dropoff") or {}

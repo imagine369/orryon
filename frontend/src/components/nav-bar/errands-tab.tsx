@@ -12,8 +12,30 @@ import { DEMO_FULFILLMENT_HANDOFFS } from "@/lib/fulfillment-demo-data";
 import { UPGRADE_PATH } from "@/lib/pricing-tiers";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
-import { FulfillmentCard } from "@/components/fulfillment/fulfillment-card";
-import type { FulfillmentHandoff } from "@/lib/fulfillment-types";
+import {
+  FULFILLMENT_TYPE_ICONS,
+  type FulfillmentHandoff,
+} from "@/lib/fulfillment-types";
+
+function ErrandRow({ handoff }: { handoff: FulfillmentHandoff }) {
+  const icon = FULFILLMENT_TYPE_ICONS[handoff.type] ?? "✦";
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+      <div className="flex items-start gap-3">
+        <span className="text-lg leading-none mt-0.5" aria-hidden>
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-white/85 leading-snug">{handoff.title}</p>
+          {handoff.subtitle ? (
+            <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{handoff.subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ErrandsTab() {
   const { user } = useAuth();
@@ -87,11 +109,11 @@ export function ErrandsTab() {
     if (!title) return;
     const optimistic: FulfillmentHandoff = {
       id: `tmp-${Date.now()}`,
-      type: "grocery",
+      type: "errand",
       title,
       subtitle: "",
-      action_label: "Shop on Instacart",
-      action_url: "https://www.instacart.com/store/s",
+      action_label: "",
+      action_url: "",
       status: "pending",
       created_at: new Date().toISOString(),
     };
@@ -246,7 +268,7 @@ export function ErrandsTab() {
         <div className="space-y-2.5 pb-2">
           {handoffs.map((h) => (
             <SwipeToDelete key={h.id} onDelete={() => dismiss(h.id)}>
-              <FulfillmentCard handoff={h} compact />
+              <ErrandRow handoff={h} />
             </SwipeToDelete>
           ))}
         </div>

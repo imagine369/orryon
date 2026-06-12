@@ -22,7 +22,7 @@ from db.location import get_user_places
 
 logger = logging.getLogger(__name__)
 
-VALID_TYPES = frozenset({"ride", "delivery", "grocery", "reservation", "pharmacy"})
+VALID_TYPES = frozenset({"ride", "delivery", "grocery", "reservation", "pharmacy", "errand"})
 
 _EMPTY_PLACE: dict[str, Any] = {"label": "", "address": "", "lat": None, "lng": None}
 
@@ -150,10 +150,17 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         if cached:
             action_url = cached
 
-    grocery_items = _grocery_items_for_user(
-        user_id,
-        spec.get("grocery_items") or spec.get("items"),
-    )
+    if handoff_type == "grocery":
+        grocery_items = _grocery_items_for_user(
+            user_id,
+            spec.get("grocery_items") or spec.get("items"),
+        )
+    else:
+        grocery_items = [
+            str(i).strip()
+            for i in (spec.get("grocery_items") or spec.get("items") or [])
+            if str(i).strip()
+        ]
 
     payload: dict[str, Any] = {
         "pickup": pickup,
