@@ -60,9 +60,8 @@ async function runCalendarCrudFlow() {
     assert(state.events[0]?.title === "QA Calendar Updated", "PATCH should update title");
 
     await calendarPanel(page).getByRole("button", { name: "Edit QA Calendar Updated" }).click();
-    const sheet = page.locator(".rounded-xl.border.border-white\\/10.bg-white\\/\\[0\\.03\\]");
-    await sheet.getByRole("button", { name: "Delete event" }).click();
-    await sheet.getByRole("button", { name: "Confirm delete event" }).click();
+    await page.getByRole("button", { name: "Delete event" }).click();
+    await page.getByRole("button", { name: "Confirm delete event" }).click();
     await page.waitForTimeout(300);
     assert(state.events.length === 0, "DELETE should remove event");
     assert(await calendarPanel(page).getByText("QA Calendar Updated").count() === 0, "UI should remove deleted event");

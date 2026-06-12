@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X, Plus, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, getApiBase } from "@/lib/api";
+import { api } from "@/lib/api";
 import { localDateStr } from "@/lib/utils";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
-import { EventDetailSheet, fmtEventTime, type EventFormData } from "./event-detail-sheet";
-import { eventsInMonth, monthRange, mergeEventsWithPendingOptimistic } from "./calendar-tab-helpers";
+import { EventDetailSheet, type EventFormData } from "./event-detail-sheet";
+import { eventsInMonth, eventDateKey, fmtEventTime, monthRange, mergeEventsWithPendingOptimistic, calendarCrudErrorMessage } from "./calendar-tab-helpers";
 
 interface CalEvent {
   id: string;
@@ -130,7 +130,9 @@ export function CalendarTab() {
         );
         setTasks(Array.isArray(t) ? t : []);
       })
-      .catch(() => showCrudError("Couldn't load calendar. Please try again."))
+      .catch((err: unknown) =>
+        showCrudError(calendarCrudErrorMessage(err, "Couldn't load calendar. Please try again.")),
+      )
       .finally(() => setLoading(false));
   }, [monthYear, eventsQuery, showCrudError]);
 
@@ -146,15 +148,7 @@ export function CalendarTab() {
     setImportStatus("loading");
     setImportMsg("");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(`${getApiBase()}/api/calendar/import/ics`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("orryon_token") ?? ""}` },
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? "Import failed.");
+      const data = await api.upload<{ message: string }>("/api/calendar/import/ics", file);
       setImportMsg(data.message);
       setImportStatus("success");
       const fresh = await api.get<CalEvent[]>(eventsQuery(monthYear.year, monthYear.month));
@@ -162,7 +156,7 @@ export function CalendarTab() {
       scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
       setTimeout(() => setImportStatus("idle"), 4000);
     } catch (err: unknown) {
-      setImportMsg(err instanceof Error ? err.message : "Import failed.");
+      setImportMsg(calendarCrudErrorMessage(err, "Import failed."));
       setImportStatus("error");
     }
   };
@@ -174,9 +168,9 @@ export function CalendarTab() {
     if (isDemo()) return;
     api.delete(`/api/events/${id}`)
       .then(() => scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]))
-      .catch(() => {
+      .catch((err: unknown) => {
         if (removed) setEvents((prev) => [...prev, removed]);
-        showCrudError("Couldn't delete event. Please try again.");
+        showCrudError(calendarCrudErrorMessage(err, "Couldn't delete event. Please try again."));
       });
   };
 
@@ -205,9 +199,9 @@ export function CalendarTab() {
           );
           scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           setEvents((prev) => prev.filter((e) => e.id !== optimistic.id));
-          showCrudError("Couldn't save event. Please try again.");
+          showCrudError(calendarCrudErrorMessage(err, "Couldn't save event. Please try again."));
         });
       return;
     }
@@ -237,9 +231,9 @@ export function CalendarTab() {
         description: data.description,
       })
         .then(() => scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]))
-        .catch(() => {
+        .catch((err: unknown) => {
           setEvents((prev) => prev.map((e) => (e.id === event.id ? event : e)));
-          showCrudError("Couldn't save event. Please try again.");
+          showCrudError(calendarCrudErrorMessage(err, "Couldn't save event. Please try again."));
         });
     }
   };
@@ -270,7 +264,7 @@ export function CalendarTab() {
   const datesWithItems = useMemo(() => {
     const map = new Map<string, string[]>();
     events.forEach((e) => {
-      const ds = e.event_date.slice(0, 10);
+      const ds = eventDateKey(e.event_date);
       if (!map.has(ds)) map.set(ds, []);
       map.get(ds)!.push(EVENT_COLOR[e.event_type] ?? "#60a5fa");
     });
@@ -282,7 +276,7 @@ export function CalendarTab() {
     return map;
   }, [events, tasks]);
 
-  const dayEvents = events.filter((e) => e.event_date.startsWith(selectedDate));
+  const dayEvents = events.filter((e) => eventDateKey(e.event_date) === selectedDate);
   const dayTasks  = tasks.filter((t) => t.due_date === selectedDate);
 
   const sheetKey = sheet

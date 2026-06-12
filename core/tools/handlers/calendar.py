@@ -6,6 +6,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
+from backend.event_dates import format_event_date, split_event_date
 from db import (
     delete_row,
     fetch_rows,
@@ -191,11 +192,10 @@ def _edit_event(args: dict, user_id: str) -> dict:
     new_date = args.get("date")
     new_time = args.get("time")
     if new_date or new_time:
-        old_date_str = (row["event_date"] or "")[:10]
-        old_time_str = (row["event_date"] or "")[11:16] if len(row["event_date"] or "") > 10 else ""
+        old_date_str, old_time_str = split_event_date(row["event_date"])
         d = new_date or old_date_str
-        t = new_time or old_time_str
-        updates["event_date"] = f"{d} {t}".strip()
+        t = new_time if new_time is not None else old_time_str
+        updates["event_date"] = format_event_date(d, t)
     if "title" in args:
         updates["title"] = args["title"]
     if "description" in args:

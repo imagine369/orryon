@@ -41,6 +41,11 @@ export function QuickAccessDrawer({
 }: QuickAccessDrawerProps) {
   const dragControls = useDragControls();
 
+  const startHeaderDrag = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragControls.start(e);
+  };
+
   useEffect(() => {
     if (!open) return;
     scheduleDataChanged([...QUICK_ACCESS_TAB_KEYS, "schedule", "dashboard"]);
@@ -86,11 +91,13 @@ export function QuickAccessDrawer({
           <div
             className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0 cursor-grab active:cursor-grabbing touch-none"
             style={{ paddingTop: "max(1rem, calc(1rem + env(safe-area-inset-top)))" }}
-            onPointerDown={(e) => dragControls.start(e)}
+            onPointerDown={startHeaderDrag}
           >
-            <h1 className="text-2xl font-extrabold">Quick Access</h1>
+            <h1 className="text-2xl font-extrabold select-none">Quick Access</h1>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close Quick Access"
               className="flex items-center justify-center w-11 h-11 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
             >
               <X className="h-4 w-4 text-white/60" strokeWidth={1.5} />

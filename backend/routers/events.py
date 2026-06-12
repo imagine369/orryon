@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
+from backend.event_dates import format_event_date, split_event_date
 from backend.schemas import EventReq, EventUpdate
 from db import (
     delete_row,
@@ -93,15 +94,10 @@ async def update_event(
     updates: dict = {}
     fields_set = body.model_fields_set
     if "date" in fields_set or "time" in fields_set:
-        old_date_str = (row["event_date"] or "")[:10]
-        old_time_str = (
-            (row["event_date"] or "")[11:16]
-            if len(row["event_date"] or "") > 10
-            else ""
-        )
+        old_date_str, old_time_str = split_event_date(row["event_date"])
         d = body.date if "date" in fields_set else old_date_str
         t = body.time if "time" in fields_set else old_time_str
-        updates["event_date"] = f"{d} {t}".strip()
+        updates["event_date"] = format_event_date(d, t)
     if "title" in fields_set:
         if not (body.title or "").strip():
             raise HTTPException(422, "Title cannot be empty")
