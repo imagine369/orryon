@@ -142,7 +142,16 @@ export function CalendarTab() {
       api.get<CalTask[]>("/api/tasks?status=open"),
     ])
       .then(([e, t]) => {
-        setEvents(Array.isArray(e) ? e : []);
+        setEvents((prev) => {
+          const fromApi = Array.isArray(e) ? e : [];
+          const pending = prev.filter((row) => row.id.startsWith("tmp-"));
+          if (pending.length === 0) return fromApi;
+          const merged = [...fromApi];
+          for (const row of pending) {
+            if (!merged.some((r) => r.id === row.id)) merged.push(row);
+          }
+          return merged;
+        });
         setTasks(Array.isArray(t) ? t : []);
       })
       .catch(() => showCrudError("Couldn't load calendar. Please try again."))
