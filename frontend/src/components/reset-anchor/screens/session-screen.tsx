@@ -270,7 +270,9 @@ export function SessionScreen({
           paddingBottom: "clamp(66px, 3vh, 98px)",
         }}
       >
-        <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
+        <div style={{ flexShrink: 0 }}>
+          <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
+        </div>
 
         {showPhaseLabel && (
           <motion.p

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import type { ResetAnimation } from "@/lib/reset-scripts";
 import { ORB_FILL } from "./tokens";
+
+/** One square size token so width/height can never diverge in flex layouts. */
+const ORB_SIZE = "min(max(200px, min(62vw, 42vh)), 320px)";
 
 export function BreathingOrb({
   animation,
@@ -14,6 +17,7 @@ export function BreathingOrb({
   expanded: boolean;
   transitionSecs?: number;
 }) {
+  const ringGradientId = useId().replace(/:/g, "");
   const [idleExpanded, setIdleExpanded] = useState(false);
 
   useQueuedEffect(() => {
@@ -39,50 +43,65 @@ export function BreathingOrb({
 
   return (
     <div
+      aria-hidden="true"
       style={{
         position: "relative",
-        width: "clamp(200px, 62vw, 320px)",
-        height: "clamp(200px, 62vw, 320px)",
-        maxWidth: "min(62vw, 42vh)",
-        maxHeight: "min(62vw, 42vh)",
-        borderRadius: "50%",
-        overflow: "hidden",
-        transform: `scale(${scale})`,
-        transition: `transform ${transitionDuration}s ease-in-out`,
-        opacity: 0.72,
+        width: ORB_SIZE,
+        aspectRatio: "1",
+        flexShrink: 0,
       }}
     >
-      <svg
-        viewBox="0 0 100 100"
-        aria-hidden="true"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-      >
-        <defs>
-          <linearGradient id="ra-ring-grad" x1="0.3" y1="0" x2="0.7" y2="1">
-            <stop offset="0%" stopColor="#3ecfba" stopOpacity="0.45" />
-            <stop offset="50%" stopColor="#a8c8e8" stopOpacity="0.20" />
-            <stop offset="100%" stopColor="#8866a0" stopOpacity="0.08" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx="50"
-          cy="50"
-          r="47"
-          fill="none"
-          stroke="url(#ra-ring-grad)"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
-      </svg>
-
       <div
         style={{
           position: "absolute",
           inset: 0,
           borderRadius: "50%",
-          background: ORB_FILL,
+          overflow: "hidden",
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+          transition: `transform ${transitionDuration}s ease-in-out`,
+          willChange: "transform",
+          opacity: 0.72,
         }}
-      />
+      >
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid meet"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            display: "block",
+          }}
+        >
+          <defs>
+            <linearGradient id={ringGradientId} x1="0.3" y1="0" x2="0.7" y2="1">
+              <stop offset="0%" stopColor="#3ecfba" stopOpacity="0.45" />
+              <stop offset="50%" stopColor="#a8c8e8" stopOpacity="0.20" />
+              <stop offset="100%" stopColor="#8866a0" stopOpacity="0.08" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx="50"
+            cy="50"
+            r="47"
+            fill="none"
+            stroke={`url(#${ringGradientId})`}
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            background: ORB_FILL,
+          }}
+        />
+      </div>
     </div>
   );
 }
