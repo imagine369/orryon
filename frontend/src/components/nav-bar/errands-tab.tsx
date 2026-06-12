@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { useAuth } from "@/lib/auth-context";
 import { isDemo } from "@/components/dashboard/demo-data";
@@ -12,22 +12,48 @@ import { DEMO_FULFILLMENT_HANDOFFS } from "@/lib/fulfillment-demo-data";
 import { UPGRADE_PATH } from "@/lib/pricing-tiers";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
-import {
-  FULFILLMENT_TYPE_ICONS,
-  type FulfillmentHandoff,
-} from "@/lib/fulfillment-types";
+import type { FulfillmentHandoff } from "@/lib/fulfillment-types";
 
-function ErrandRow({ handoff }: { handoff: FulfillmentHandoff }) {
-  const icon = FULFILLMENT_TYPE_ICONS[handoff.type] ?? "✦";
+function ErrandRow({
+  handoff,
+  onComplete,
+}: {
+  handoff: FulfillmentHandoff;
+  onComplete: () => void;
+}) {
+  const [completed, setCompleted] = useState(false);
+
+  const handleComplete = () => {
+    if (completed) return;
+    setCompleted(true);
+    window.setTimeout(onComplete, 300);
+  };
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
-      <div className="flex items-start gap-3">
-        <span className="text-lg leading-none mt-0.5" aria-hidden>
-          {icon}
-        </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleComplete}
+          className="shrink-0 w-11 h-11 flex items-center justify-center hover:opacity-70 active:scale-95 transition"
+          title="Complete errand"
+        >
+          {completed ? (
+            <span className="w-5 h-5 rounded-full border-2 border-white/50 flex items-center justify-center">
+              <Check className="h-3 w-3 text-white/70" strokeWidth={2.5} />
+            </span>
+          ) : (
+            <span className="w-5 h-5 rounded-full border-2 border-white/25 block" />
+          )}
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white/85 leading-snug">{handoff.title}</p>
+          <p
+            className={`text-sm font-medium leading-snug ${
+              completed ? "text-white/40 line-through" : "text-white/85"
+            }`}
+          >
+            {handoff.title}
+          </p>
           {handoff.subtitle ? (
             <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{handoff.subtitle}</p>
           ) : null}
@@ -93,7 +119,7 @@ export function ErrandsTab() {
 
   useDataRefresh(["errands"], reload);
 
-  const dismiss = async (id: string) => {
+  const completeErrand = async (id: string) => {
     setHandoffs((prev) => prev.filter((h) => h.id !== id));
     if (demoPreview) return;
     try {
@@ -267,8 +293,8 @@ export function ErrandsTab() {
       {handoffs.length > 0 && (
         <div className="space-y-2.5 pb-2">
           {handoffs.map((h) => (
-            <SwipeToDelete key={h.id} onDelete={() => dismiss(h.id)}>
-              <ErrandRow handoff={h} />
+            <SwipeToDelete key={h.id} onDelete={() => completeErrand(h.id)}>
+              <ErrandRow handoff={h} onComplete={() => completeErrand(h.id)} />
             </SwipeToDelete>
           ))}
         </div>
