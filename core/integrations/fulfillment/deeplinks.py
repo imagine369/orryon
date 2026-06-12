@@ -10,6 +10,17 @@ import urllib.parse
 from typing import Any
 
 
+def _append_params(url: str, params: dict[str, str]) -> str:
+    """Append query params to a URL, preserving any existing params. New values override."""
+    if not params:
+        return url
+    parsed = urllib.parse.urlparse(url)
+    existing = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+    merged = {k: v[0] for k, v in existing.items()}
+    merged.update(params)
+    return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(merged)))
+
+
 def _has_lat_lng(lat: Any, lng: Any) -> bool:
     """True when both coordinates are present (0.0 is valid — Gulf of Guinea / prime meridian)."""
     return lat is not None and lng is not None
@@ -100,10 +111,21 @@ def build_opentable_link(
     query: str = "",
     lat: float | None = None,
     lng: float | None = None,
+    date: str = "",
+    time: str = "",
+    covers: int | None = None,
 ) -> str:
-    """OpenTable restaurant page or nearby search."""
+    """OpenTable restaurant page or nearby search, with optional pre-filled booking params."""
+    booking_params: dict[str, str] = {}
+    if date:
+        booking_params["date"] = date
+    if time:
+        booking_params["time"] = time
+    if covers is not None:
+        booking_params["covers"] = str(covers)
+
     if partner_url and _opentable_restaurant_url(partner_url):
-        return partner_url
+        return _append_params(partner_url, booking_params)
     params: dict[str, str] = {}
     if query:
         params["term"] = query.strip()
@@ -115,6 +137,122 @@ def build_opentable_link(
     if partner_url and partner_url.startswith("http"):
         return partner_url
     return "https://www.opentable.com/"
+
+
+def _resy_venue_url(partner_url: str) -> bool:
+    """True when partner_url is a Resy venue page, not the homepage."""
+    if not partner_url.startswith("http"):
+        return False
+    normalized = partner_url.rstrip("/").lower()
+    if normalized in (
+        "https://resy.com",
+        "http://resy.com",
+        "https://www.resy.com",
+        "http://www.resy.com",
+    ):
+        return False
+    return "/venues/" in normalized
+
+
+def build_resy_link(
+    *,
+    partner_url: str = "",
+    date: str = "",
+    seats: int | None = None,
+) -> str:
+    """Resy venue page with optional pre-filled date and party size."""
+    booking_params: dict[str, str] = {}
+    if date:
+        booking_params["date"] = date
+    if seats is not None:
+        booking_params["seats"] = str(seats)
+
+    if partner_url and _resy_venue_url(partner_url):
+        return _append_params(partner_url, booking_params)
+    if partner_url and partner_url.startswith("http"):
+        return partner_url
+    return "https://resy.com/"
+
+
+def _yelp_biz_url(partner_url: str) -> bool:
+    """True when partner_url is a Yelp business page, not the homepage."""
+    if not partner_url.startswith("http"):
+        return False
+    normalized = partner_url.rstrip("/").lower()
+    if normalized in (
+        "https://www.yelp.com",
+        "http://www.yelp.com",
+        "https://yelp.com",
+        "http://yelp.com",
+    ):
+        return False
+    return "/biz/" in normalized
+
+
+def build_yelp_link(
+    *,
+    partner_url: str = "",
+    query: str = "",
+    date: str = "",
+    time: str = "",
+    covers: int | None = None,
+) -> str:
+    """Yelp business page with optional reservation pre-fill, or name-search fallback."""
+    booking_params: dict[str, str] = {}
+    if date:
+        booking_params["reservation_date"] = date
+    if time:
+        booking_params["reservation_time"] = time
+    if covers is not None:
+        booking_params["reservation_covers"] = str(covers)
+
+    if partner_url and _yelp_biz_url(partner_url):
+        return _append_params(partner_url, booking_params)
+    if query:
+        q = urllib.parse.quote_plus(query.strip())
+        return f"https://www.yelp.com/search?find_desc={q}"
+    if partner_url and partner_url.startswith("http"):
+        return partner_url
+    return "https://www.yelp.com/"
+
+
+def _tock_venue_url(partner_url: str) -> bool:
+    """True when partner_url is a specific Tock venue page (not the homepage)."""
+    if not partner_url.startswith("http"):
+        return False
+    normalized = partner_url.rstrip("/").lower()
+    if normalized in (
+        "https://www.exploretock.com",
+        "http://www.exploretock.com",
+        "https://exploretock.com",
+        "http://exploretock.com",
+    ):
+        return False
+    parsed = urllib.parse.urlparse(normalized)
+    return bool(parsed.path.strip("/"))
+
+
+def build_tock_link(
+    *,
+    partner_url: str = "",
+    date: str = "",
+    time: str = "",
+    size: int | None = None,
+) -> str:
+    """Tock venue page with optional pre-filled date, time, and party size."""
+    booking_params: dict[str, str] = {}
+    if date:
+        booking_params["date"] = date
+    if time:
+        booking_params["time"] = time
+    if size is not None:
+        booking_params["size"] = str(size)
+
+    if partner_url and _tock_venue_url(partner_url):
+        return _append_params(partner_url, booking_params)
+    if partner_url and partner_url.startswith("http"):
+        return partner_url
+    return "https://www.exploretock.com/"
 
 
 def build_pharmacy_link(
@@ -135,12 +273,21 @@ def build_pharmacy_link(
     return f"https://www.google.com/maps/search/?api=1&query={q}"
 
 
-def action_label_for_type(handoff_type: str) -> str:
+_RESERVATION_PLATFORM_LABELS: dict[str, str] = {
+    "opentable": "Book on OpenTable",
+    "resy": "Book on Resy",
+    "yelp": "Book on Yelp",
+    "tock": "Book on Tock",
+}
+
+
+def action_label_for_type(handoff_type: str, *, platform: str = "") -> str:
+    if handoff_type == "reservation":
+        return _RESERVATION_PLATFORM_LABELS.get(platform.lower(), "Book on OpenTable")
     labels = {
         "ride": "Open Uber",
         "delivery": "Order on DoorDash",
         "grocery": "Shop on Instacart",
-        "reservation": "Book on OpenTable",
         "pharmacy": "Find pharmacy",
     }
     return labels.get(handoff_type, "Open")
@@ -179,11 +326,42 @@ def build_action_url(handoff_type: str, payload: dict[str, Any], *, uber_client_
     if handoff_type == "reservation":
         lat = payload.get("lat")
         lng = payload.get("lng")
+        platform = str(payload.get("reservation_platform") or "").lower()
+        date = str(payload.get("reservation_date") or "")
+        time_ = str(payload.get("reservation_time") or "")
+        party_size = payload.get("party_size")
+        covers = int(party_size) if party_size is not None else None
+        partner_url = str(payload.get("partner_url") or "")
+
+        if platform == "resy":
+            return build_resy_link(
+                partner_url=partner_url,
+                date=date,
+                seats=covers,
+            )
+        if platform == "yelp":
+            return build_yelp_link(
+                partner_url=partner_url,
+                query=str(payload.get("restaurant_name") or payload.get("title") or ""),
+                date=date,
+                time=time_,
+                covers=covers,
+            )
+        if platform == "tock":
+            return build_tock_link(
+                partner_url=partner_url,
+                date=date,
+                time=time_,
+                size=covers,
+            )
         return build_opentable_link(
-            partner_url=str(payload.get("partner_url") or ""),
+            partner_url=partner_url,
             query=str(payload.get("restaurant_name") or payload.get("title") or ""),
             lat=float(lat) if lat is not None else None,
             lng=float(lng) if lng is not None else None,
+            date=date,
+            time=time_,
+            covers=covers,
         )
     if handoff_type == "pharmacy":
         lat = payload.get("lat")

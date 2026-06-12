@@ -52,7 +52,10 @@ function inferLinkKind(href: string, label: string): ContactLinkKind {
   if (
     lower.includes("calendly.com") ||
     lower.includes("acuityscheduling.com") ||
-    lower.includes("opentable.com")
+    lower.includes("opentable.com") ||
+    lower.includes("resy.com") ||
+    lower.includes("exploretock.com") ||
+    (lower.includes("yelp.com") && lower.includes("/biz/"))
   ) {
     return "booking";
   }

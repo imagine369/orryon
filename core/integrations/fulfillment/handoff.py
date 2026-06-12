@@ -124,12 +124,23 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
     lat = _first_present_coord(destination.get("lat"), pickup.get("lat"))
     lng = _first_present_coord(destination.get("lng"), pickup.get("lng"))
 
+    reservation_platform = str(spec.get("reservation_platform") or "").strip().lower()
+    reservation_date = str(spec.get("reservation_date") or "").strip()
+    reservation_time = str(spec.get("reservation_time") or "").strip()
+    party_size = spec.get("party_size")
+
     cache_key = ""
     action_url = ""
     if partner_url and handoff_type in ("delivery", "reservation"):
+        # For reservations, fold platform + date + time + party into the cache key so that
+        # the same venue on a different date/platform never returns a stale cached URL.
+        cache_partner_url = partner_url
+        if handoff_type == "reservation":
+            res_suffix = f"|{reservation_platform}|{reservation_date}|{reservation_time}|{party_size}"
+            cache_partner_url = partner_url + res_suffix
         cache_key = _fulfillment_url_cache_key(
             handoff_type,
-            partner_url,
+            cache_partner_url,
             restaurant_name=restaurant_name,
             near_address=near_address,
             lat=lat,
@@ -157,6 +168,10 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         "lat": lat,
         "lng": lng,
         "title": title,
+        "reservation_platform": reservation_platform,
+        "reservation_date": reservation_date,
+        "reservation_time": reservation_time,
+        "party_size": party_size,
     }
 
     if not action_url:
@@ -196,7 +211,10 @@ def _build_handoff_row(user_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         "type": handoff_type,
         "title": title,
         "subtitle": subtitle,
-        "action_label": str(spec.get("action_label") or action_label_for_type(handoff_type)),
+        "action_label": str(
+            spec.get("action_label")
+            or action_label_for_type(handoff_type, platform=reservation_platform)
+        ),
         "action_url": action_url,
         "metadata_json": json.dumps(metadata),
         "status": "pending",

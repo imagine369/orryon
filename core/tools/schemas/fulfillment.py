@@ -7,11 +7,13 @@ SCHEMAS: list[dict] = [{
         "name": "create_fulfillment_handoff",
         "description": (
             "Create errand handoffs for Quick Access → Errands (Uber, DoorDash, Instacart "
-            "checkout, OpenTable, pharmacy). NOT for adding items to the shopping list — use "
-            "add_grocery_items instead (Quick Access → Lists → Grocery). Use when the user "
-            "wants to order or book in an external app. For grocery type, Instacart pulls "
-            "from their Grocery list unless grocery_items is passed. Pass partner_url when "
-            "web_search found a specific DoorDash or OpenTable page."
+            "checkout, restaurant reservations on OpenTable/Resy/Yelp/Tock, pharmacy). NOT "
+            "for adding items to the shopping list — use add_grocery_items instead (Quick "
+            "Access → Lists → Grocery). Use when the user wants to order or book in an "
+            "external app. For grocery type, Instacart pulls from their Grocery list unless "
+            "grocery_items is passed. For reservations: pass reservation_platform, partner_url "
+            "(the exact venue page found via web_search), reservation_date, reservation_time, "
+            "and party_size to generate a pre-filled booking link."
         ),
         "parameters": {
             "type": "object",
@@ -49,7 +51,30 @@ SCHEMAS: list[dict] = [{
                             },
                             "partner_url": {
                                 "type": "string",
-                                "description": "Direct DoorDash/OpenTable URL from web_search.",
+                                "description": (
+                                    "Direct venue/store URL found via web_search "
+                                    "(DoorDash, OpenTable, Resy, Yelp, or Tock page)."
+                                ),
+                            },
+                            "reservation_platform": {
+                                "type": "string",
+                                "enum": ["opentable", "resy", "yelp", "tock"],
+                                "description": (
+                                    "Booking platform for reservation type. "
+                                    "Determines which deeplink builder and action label to use."
+                                ),
+                            },
+                            "reservation_date": {
+                                "type": "string",
+                                "description": "Desired reservation date in YYYY-MM-DD format.",
+                            },
+                            "reservation_time": {
+                                "type": "string",
+                                "description": "Desired reservation time in HH:MM (24-hour) format.",
+                            },
+                            "party_size": {
+                                "type": "integer",
+                                "description": "Number of guests for the reservation.",
                             },
                             "restaurant_name": {
                                 "type": "string",
