@@ -18,6 +18,8 @@
     "test:download:ux:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-mobile-pwa.mjs",
     "test:stability": "node scripts/test-stability.mjs",
     "test:stability:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-stability.mjs",
+    "test:sw-build-sync": "node scripts/test-sw-build-sync.mjs",
+    "test:sw-build-sync:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-sw-build-sync.mjs",
     "test:chat": "node scripts/test-chat-avatar.mjs",
     "test:chat:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-chat-avatar.mjs",
     "test:chat:links": "node scripts/test-chat-links.mjs",

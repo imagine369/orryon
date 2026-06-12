@@ -32,6 +32,8 @@ const BUILD_SHA = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_S
 const CANARY = `orr-${BUILD_SHA}`;
 
 const nextConfig: NextConfig = {
+  // Playwright and some dev tools open http://127.0.0.1 — allow client hydration/HMR.
+  allowedDevOrigins: ["127.0.0.1"],
   turbopack: {
     root: appRoot,
   },
