@@ -111,7 +111,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium
 
-      - name: Quick Access grocery E2E
+      - name: Quick Access E2E (grocery, calendar, sync)
         working-directory: frontend
         env:
           JWT_SECRET: ci-build-jwt-secret-minimum-32-characters-long
@@ -129,3 +129,5 @@ jobs:
           done
           curl -sf "$TEST_BASE_URL/home" >/dev/null
           npm run test:quick-access:local
+          npm run test:calendar:local
+          npm run test:quick-access:sync:local

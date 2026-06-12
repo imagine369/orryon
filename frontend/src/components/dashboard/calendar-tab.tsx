@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
 import { localDateStr } from "@/lib/utils";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
+import { SwipeToDelete } from "@/components/swipe-to-delete";
+import { EventDetailSheet, fmtEventTime, type EventFormData } from "./event-detail-sheet";
 
 interface CalEvent {
   id: string;
@@ -25,6 +27,11 @@ interface CalTask {
   due_date: string;
   category: string;
 }
+
+type SheetState =
+  | { mode: "create" }
+  | { mode: "edit"; event: CalEvent }
+  | null;
 
 const EVENT_COLOR: Record<string, string> = {
   event:    "#60a5fa",
@@ -59,10 +66,29 @@ function fmtDayLabel(dateStr: string, today: string) {
 
 type ImportStatus = "idle" | "loading" | "success" | "error";
 
+function monthRange(year: number, month: number) {
+  const m = String(month + 1).padStart(2, "0");
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return {
+    from: `${year}-${m}-01`,
+    to: `${year}-${m}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+function eventsInMonth(events: CalEvent[], year: number, month: number) {
+  const { from, to } = monthRange(year, month);
+  return events.filter((e) => {
+    const ds = e.event_date.slice(0, 10);
+    return ds >= from && ds <= to;
+  });
+}
+
 export function CalendarTab() {
   const [events, setEvents]   = useState<CalEvent[]>([]);
   const [tasks, setTasks]     = useState<CalTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sheet, setSheet]     = useState<SheetState>(null);
+  const [crudError, setCrudError] = useState("");
 
   // ICS import state
   const fileRef                         = useRef<HTMLInputElement>(null);
@@ -75,20 +101,53 @@ export function CalendarTab() {
   const [monthYear, setMonthYear]   = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(today);
 
+  const crudErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (crudErrorTimerRef.current) clearTimeout(crudErrorTimerRef.current);
+  }, []);
+
+  const showCrudError = useCallback((message: string) => {
+    setCrudError(message);
+    if (crudErrorTimerRef.current) clearTimeout(crudErrorTimerRef.current);
+    crudErrorTimerRef.current = setTimeout(() => {
+      setCrudError("");
+      crudErrorTimerRef.current = null;
+    }, 4000);
+  }, []);
+
+  const dismissCrudError = useCallback(() => {
+    setCrudError("");
+    if (crudErrorTimerRef.current) {
+      clearTimeout(crudErrorTimerRef.current);
+      crudErrorTimerRef.current = null;
+    }
+  }, []);
+
+  const eventsQuery = useCallback((year: number, month: number) => {
+    const { from, to } = monthRange(year, month);
+    return `/api/events?from_date=${from}&to_date=${to}&limit=200`;
+  }, []);
+
   const reload = useCallback((opts?: { silent?: boolean }) => {
-    if (isDemo()) { setEvents(DEMO_EVENTS); setTasks(DEMO_TASKS); setLoading(false); return; }
+    if (isDemo()) {
+      setEvents(eventsInMonth(DEMO_EVENTS, monthYear.year, monthYear.month));
+      setTasks(DEMO_TASKS);
+      setLoading(false);
+      return;
+    }
     if (!opts?.silent) setLoading(true);
     Promise.all([
-      api.get<CalEvent[]>("/api/events?upcoming=true&limit=100"),
+      api.get<CalEvent[]>(eventsQuery(monthYear.year, monthYear.month)),
       api.get<CalTask[]>("/api/tasks?status=open"),
     ])
       .then(([e, t]) => {
         setEvents(Array.isArray(e) ? e : []);
         setTasks(Array.isArray(t) ? t : []);
       })
-      .catch(() => {})
+      .catch(() => showCrudError("Couldn't load calendar. Please try again."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [monthYear, eventsQuery, showCrudError]);
 
   useQueuedEffect(() => reload(), [reload]);
   useDataRefresh(["calendar", "schedule", "dashboard"], () => reload({ silent: true }));
@@ -113,14 +172,90 @@ export function CalendarTab() {
       if (!res.ok) throw new Error(data.detail ?? "Import failed.");
       setImportMsg(data.message);
       setImportStatus("success");
-      // Reload events to show the new ones
-      const fresh = await api.get<CalEvent[]>("/api/events?upcoming=true&limit=100");
+      const fresh = await api.get<CalEvent[]>(eventsQuery(monthYear.year, monthYear.month));
       setEvents(Array.isArray(fresh) ? fresh : []);
       scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
       setTimeout(() => setImportStatus("idle"), 4000);
     } catch (err: unknown) {
       setImportMsg(err instanceof Error ? err.message : "Import failed.");
       setImportStatus("error");
+    }
+  };
+
+  const deleteEvent = (id: string) => {
+    const removed = events.find((e) => e.id === id);
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setSheet(null);
+    if (isDemo()) return;
+    api.delete(`/api/events/${id}`)
+      .then(() => scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]))
+      .catch(() => {
+        if (removed) setEvents((prev) => [...prev, removed]);
+        showCrudError("Couldn't delete event. Please try again.");
+      });
+  };
+
+  const saveEvent = (data: EventFormData) => {
+    if (sheet?.mode === "create") {
+      const optimistic: CalEvent = {
+        id: `tmp-${Date.now()}`,
+        title: data.title,
+        event_date: data.allDay ? data.date : `${data.date} ${data.time}`,
+        event_type: "event",
+        description: data.description,
+      };
+      setEvents((prev) => [...prev, optimistic]);
+      setSheet(null);
+      if (isDemo()) return;
+      api.post<{ id: string }>("/api/events", {
+        title: data.title,
+        date: data.date,
+        time: data.allDay ? "" : data.time,
+        description: data.description,
+        event_type: "event",
+      })
+        .then((res) => {
+          setEvents((prev) =>
+            prev.map((e) => (e.id === optimistic.id ? { ...optimistic, id: res.id } : e)),
+          );
+          scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]);
+        })
+        .catch(() => {
+          setEvents((prev) => prev.filter((e) => e.id !== optimistic.id));
+          showCrudError("Couldn't save event. Please try again.");
+        });
+      return;
+    }
+
+    if (sheet?.mode === "edit") {
+      const { event } = sheet;
+      const eventDate = data.allDay ? data.date : `${data.date} ${data.time}`;
+      const updated: CalEvent = {
+        ...event,
+        title: data.title,
+        event_date: eventDate,
+        description: data.description,
+      };
+      setEvents((prev) =>
+        eventsInMonth(
+          prev.map((e) => (e.id === event.id ? updated : e)),
+          monthYear.year,
+          monthYear.month,
+        ),
+      );
+      setSheet(null);
+      if (isDemo()) return;
+      api.patch(`/api/events/${event.id}`, {
+        title: data.title,
+        date: data.date,
+        time: data.allDay ? "" : data.time,
+        description: data.description,
+      })
+        .then(() => scheduleDataChanged(["calendar", "today", "schedule", "dashboard"]))
+        .catch(() => {
+          setEvents((prev) => prev.map((e) => (e.id === event.id ? event : e)));
+          showCrudError("Couldn't save event. Please try again.");
+        });
     }
   };
 
@@ -147,7 +282,6 @@ export function CalendarTab() {
       return { year: d.getFullYear(), month: d.getMonth() };
     });
 
-  // Map of date -> dot colors for the calendar grid
   const datesWithItems = useMemo(() => {
     const map = new Map<string, string[]>();
     events.forEach((e) => {
@@ -163,9 +297,14 @@ export function CalendarTab() {
     return map;
   }, [events, tasks]);
 
-  // Only the selected day's items
   const dayEvents = events.filter((e) => e.event_date.startsWith(selectedDate));
   const dayTasks  = tasks.filter((t) => t.due_date === selectedDate);
+
+  const sheetKey = sheet
+    ? sheet.mode === "create"
+      ? `create-${selectedDate}`
+      : `edit-${sheet.event.id}`
+    : "closed";
 
   if (loading) {
     return <div className="flex justify-center py-8"><div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" /></div>;
@@ -237,7 +376,7 @@ export function CalendarTab() {
           return (
             <div key={i} className="flex flex-col items-center gap-0.5 py-0.5">
               <button
-                onClick={() => setSelectedDate(ds)}
+                onClick={() => { setSelectedDate(ds); setSheet(null); }}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-xs transition-all duration-150"
                 style={{
                   background:  isSel ? "white" : isToday ? "rgba(255,255,255,0.1)" : "transparent",
@@ -258,7 +397,7 @@ export function CalendarTab() {
         })}
       </div>
 
-      {/* Day detail — fades in/out when selectedDate changes */}
+      {/* Day detail */}
       <AnimatePresence mode="wait">
         <motion.div
           key={selectedDate}
@@ -267,26 +406,55 @@ export function CalendarTab() {
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
-          {/* Day label */}
           <p className="text-[0.58rem] uppercase tracking-widest text-white/25 mb-3">
             {fmtDayLabel(selectedDate, today)}
           </p>
 
-          {/* Events */}
-          {dayEvents.map((e) => (
-            <div key={e.id} className="flex items-start gap-3 py-3 border-b border-white/5">
-              <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: EVENT_COLOR[e.event_type] ?? "#60a5fa" }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[16px] font-medium text-white/85 leading-snug">{e.title}</p>
-                {e.description && <p className="text-sm text-white/40 mt-0.5">{e.description}</p>}
-              </div>
-              <span className="text-[0.55rem] text-white/20 shrink-0 mt-0.5 uppercase tracking-wide">
-                {e.event_type.replace("_", " ")}
-              </span>
+          {crudError && (
+            <div className="flex items-center justify-between gap-2 mb-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2">
+              <span>{crudError}</span>
+              <button type="button" onClick={dismissCrudError} aria-label="Dismiss">
+                <X className="w-3 h-3" />
+              </button>
             </div>
-          ))}
+          )}
 
-          {/* Tasks */}
+          {dayEvents.map((e) => {
+            const timeLabel = fmtEventTime(e.event_date);
+            return (
+              <SwipeToDelete
+                key={e.id}
+                deleteAriaLabel="Swipe to delete event"
+                onDelete={() => deleteEvent(e.id)}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSheet({ mode: "edit", event: e })}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      setSheet({ mode: "edit", event: e });
+                    }
+                  }}
+                  className="w-full flex items-start gap-3 py-3 border-b border-white/5 text-left hover:bg-white/[0.02] transition cursor-pointer"
+                >
+                  <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: EVENT_COLOR[e.event_type] ?? "#60a5fa" }} />
+                  <div className="flex-1 min-w-0">
+                    {timeLabel && (
+                      <p className="text-[0.65rem] text-white/35 mb-0.5">{timeLabel}</p>
+                    )}
+                    <p className="text-[16px] font-medium text-white/85 leading-snug">{e.title}</p>
+                    {e.description && <p className="text-sm text-white/40 mt-0.5">{e.description}</p>}
+                  </div>
+                  <span className="text-[0.55rem] text-white/20 shrink-0 mt-0.5 uppercase tracking-wide">
+                    {e.event_type.replace("_", " ")}
+                  </span>
+                </div>
+              </SwipeToDelete>
+            );
+          })}
+
           {dayTasks.map((t) => (
             <div key={t.id} className="flex items-center gap-3 py-3 border-b border-white/5">
               <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLOR[t.priority] ?? "#555" }} />
@@ -300,10 +468,30 @@ export function CalendarTab() {
             </div>
           ))}
 
-          {/* Empty state */}
-          {dayEvents.length === 0 && dayTasks.length === 0 && (
+          {dayEvents.length === 0 && dayTasks.length === 0 && !sheet && (
             <p className="text-white/20 text-xs text-center py-6">Nothing scheduled</p>
           )}
+
+          {!sheet && (
+            <button
+              onClick={() => setSheet({ mode: "create" })}
+              className="flex items-center gap-2 mt-3 text-[0.65rem] text-white/20 hover:text-white/45 transition"
+            >
+              <Plus className="h-3 w-3" strokeWidth={1.5} />
+              Add event
+            </button>
+          )}
+
+          <EventDetailSheet
+            key={sheetKey}
+            open={sheet !== null}
+            mode={sheet?.mode ?? "create"}
+            defaultDate={selectedDate}
+            initial={sheet?.mode === "edit" ? sheet.event : undefined}
+            onSave={saveEvent}
+            onDelete={sheet?.mode === "edit" ? () => deleteEvent(sheet.event.id) : undefined}
+            onClose={() => setSheet(null)}
+          />
         </motion.div>
       </AnimatePresence>
     </div>

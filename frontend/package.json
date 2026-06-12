@@ -30,6 +30,8 @@
     "test:quick-access:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-quick-access-grocery.mjs",
     "test:quick-access:sync": "node scripts/test-quick-access-sync.mjs",
     "test:quick-access:sync:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-quick-access-sync.mjs",
+    "test:calendar": "node scripts/test-calendar-crud.mjs",
+    "test:calendar:local": "TEST_BASE_URL=http://localhost:3456 node scripts/test-calendar-crud.mjs",
     "test:ambient": "node scripts/test-ambient-smoke.mjs",
     "test:ambient:local": "node scripts/test-ambient-smoke.mjs --local",
     "test:ambient:device-qa": "node scripts/ambient-device-qa-checklist.mjs",

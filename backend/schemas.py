@@ -66,6 +66,12 @@ class EventReq(BaseModel):
     event_type: Optional[str] = "event"
     reminder_minutes: Optional[int] = 30
 
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    description: Optional[str] = None
+
 
 # ── Goals ─────────────────────────────────────────────────────────────────────
 

@@ -10,7 +10,16 @@ import { chromium } from "playwright";
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3456";
 const SESSION_ID = "qa-quick-access-sync";
 const EVENT_TITLE = "Dentist QA";
-const EVENT_DATE = new Date().toISOString().split("T")[0];
+
+/** Match calendar-tab `localDateStr` — do not use UTC `toISOString().slice(0, 10)`. */
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const EVENT_DATE = localDateStr();
 
 const PWA_MIGRATION_KEYS = [
   "orryon_floating_buddy_removed_v1",
@@ -55,6 +64,7 @@ function sseBody(events) {
 
 function createApiRouter(state) {
   return async (route) => {
+    state.hits = (state.hits || 0) + 1;
     const url = route.request().url();
     const method = route.request().method();
     const path = new URL(url).pathname;
@@ -131,7 +141,24 @@ function createApiRouter(state) {
     }
 
     if (url.includes("/api/events")) {
-      await route.fulfill({ status: 200, json: state.events });
+      const params = new URL(url).searchParams;
+      const from = params.get("from_date");
+      const to = params.get("to_date");
+      let rows = state.events;
+      if (from && to) {
+        rows = state.events.filter((e) => {
+          const ds = e.event_date.slice(0, 10);
+          return ds >= from && ds <= to;
+        });
+      }
+      state.getLog.push({
+        from,
+        to,
+        stored: state.events.length,
+        returned: rows.length,
+        titles: rows.map((r) => r.title),
+      });
+      await route.fulfill({ status: 200, json: rows });
       return;
     }
 
@@ -167,6 +194,7 @@ function createApiRouter(state) {
 async function primeAuth(page) {
   await page.addInitScript((migrationKeys) => {
     localStorage.removeItem("orryon_demo");
+    localStorage.setItem("orryon_life_onboarding_dismissed", "1");
     for (const key of migrationKeys) localStorage.setItem(key, "1");
     sessionStorage.removeItem("orryon_cache_bust_in_progress");
     document.cookie = "orryon_auth=1; path=/";
@@ -180,31 +208,50 @@ async function openQuickAccess(page) {
 }
 
 async function runCalendarSyncFlow() {
-  const state = { events: [] };
+  const state = { events: [], getLog: [], hits: 0 };
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  await context.route("**/api/**", createApiRouter(state));
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    serviceWorkers: "block",
+  });
   const page = await context.newPage();
+  await page.route("**/api/**", createApiRouter(state));
 
   try {
     await primeAuth(page);
     await page.goto(`${BASE}/home`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("main", { timeout: 20_000 });
+    await page.waitForResponse(
+      (r) => r.url().includes("/api/events") && r.status() === 200,
+      { timeout: 20_000 },
+    ).catch(() => {});
+
+    const eventsAfterReload = page.waitForResponse(
+      (r) => r.url().includes("/api/events") && r.status() === 200,
+    );
 
     const input = page.getByPlaceholder("Ask me anything…");
     await input.fill(`Add ${EVENT_TITLE} to my calendar today`);
     await page.getByRole("button", { name: "Send message" }).click();
 
     await page.getByText(`Added ${EVENT_TITLE} to your calendar.`).waitFor({ timeout: 15_000 });
+    assert(state.events.length === 1, `chat mock should add event (got ${state.events.length})`);
+    await eventsAfterReload.catch(() => {});
+    await page.waitForTimeout(500);
 
     await openQuickAccess(page);
     await page.getByRole("button", { name: "Calendar" }).click();
+    await page.getByRole("button", { name: "Add event" }).waitFor({ state: "attached", timeout: 15_000 });
+    await page.waitForResponse(
+      (r) => r.url().includes("/api/events") && r.status() === 200,
+      { timeout: 10_000 },
+    ).catch(() => {});
 
-    const event = page
-      .locator("p.text-sm.font-medium")
-      .filter({ hasText: EVENT_TITLE });
-    await event.waitFor({ state: "visible", timeout: 10_000 });
-    assert(await event.isVisible(), "calendar should show event after chat add");
+    const eventCount = await page.locator("[data-scroll-container] > div:not(.hidden)").getByText(EVENT_TITLE, { exact: true }).count();
+    assert(
+      eventCount > 0,
+      `calendar should show event after chat add (found ${eventCount}); hits: ${state.hits}; fetches: ${JSON.stringify(state.getLog)}`,
+    );
   } finally {
     await browser.close();
   }
