@@ -303,3 +303,35 @@ def test_action_label_reservation_unknown_platform_falls_back():
 def test_action_label_non_reservation_unaffected():
     assert action_label_for_type("ride") == "Open Uber"
     assert action_label_for_type("delivery") == "Order on DoorDash"
+
+
+# ── 'direct' platform (own website / unsupported system) ─────────────────────
+
+def test_action_label_reservation_direct():
+    assert action_label_for_type("reservation", platform="direct") == "Make a Reservation"
+
+
+def test_build_action_url_reservation_direct_with_partner_url():
+    url = build_action_url("reservation", {
+        "reservation_platform": "direct",
+        "partner_url": "https://shizen-sf.com/reservations",
+    })
+    assert url == "https://shizen-sf.com/reservations"
+
+
+def test_build_action_url_reservation_direct_fallback_to_search():
+    url = build_action_url("reservation", {
+        "reservation_platform": "direct",
+        "restaurant_name": "Shizen San Francisco",
+    })
+    assert "google.com/search" in url
+    assert "Shizen" in url
+    assert "reservations" in url
+
+
+def test_build_action_url_reservation_direct_no_name_no_url():
+    url = build_action_url("reservation", {
+        "reservation_platform": "direct",
+    })
+    assert "google.com/search" in url
+    assert "restaurant+reservations" in url or "restaurant reservations" in url

@@ -278,6 +278,7 @@ _RESERVATION_PLATFORM_LABELS: dict[str, str] = {
     "resy": "Book on Resy",
     "yelp": "Book on Yelp",
     "tock": "Book on Tock",
+    "direct": "Make a Reservation",
 }
 
 
@@ -354,6 +355,14 @@ def build_action_url(handoff_type: str, payload: dict[str, Any], *, uber_client_
                 time=time_,
                 size=covers,
             )
+        if platform == "direct":
+            if partner_url and partner_url.startswith("http"):
+                return partner_url
+            restaurant_name = str(payload.get("restaurant_name") or payload.get("title") or "")
+            if restaurant_name:
+                q = urllib.parse.quote_plus(f"{restaurant_name.strip()} reservations")
+                return f"https://www.google.com/search?q={q}"
+            return "https://www.google.com/search?q=restaurant+reservations"
         return build_opentable_link(
             partner_url=partner_url,
             query=str(payload.get("restaurant_name") or payload.get("title") or ""),

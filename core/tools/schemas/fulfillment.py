@@ -58,10 +58,13 @@ SCHEMAS: list[dict] = [{
                             },
                             "reservation_platform": {
                                 "type": "string",
-                                "enum": ["opentable", "resy", "yelp", "tock"],
+                                "enum": ["opentable", "resy", "yelp", "tock", "direct"],
                                 "description": (
-                                    "Booking platform for reservation type. "
-                                    "Determines which deeplink builder and action label to use."
+                                    "Booking platform confirmed via web_search. REQUIRED for "
+                                    "reservation type — never omit or assume. Use 'direct' when "
+                                    "the restaurant uses its own website, SevenRooms, Rezdiary, "
+                                    "or any platform not in the other four options; pass the "
+                                    "booking URL as partner_url."
                                 ),
                             },
                             "reservation_date": {
