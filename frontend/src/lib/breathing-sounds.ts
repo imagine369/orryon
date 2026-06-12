@@ -134,15 +134,14 @@ function noiseSource(ctx: AudioContext): AudioBufferSourceNode {
 
 // ── Soundscape synthesizers ───────────────────────────────────────────────────
 
-// All synth functions output at a normalised ~0.25 level into the master gain.
-// The master itself is then set to BACKGROUND_SOUND_VOLUME so the result is
-// genuinely faint — felt more than heard, never competing with breath focus.
+// Synth functions output at a normalised ~0.25 level into the master gain.
+// Master gain scales the bed so it stays present but below brief UI/ambient SFX peaks.
 
-/** Master gain for session ambience — intentionally very low. */
-export const BACKGROUND_SOUND_VOLUME = 0.06;
+/** Master gain for session ambience — calm background bed, clearly audible. */
+export const BACKGROUND_SOUND_VOLUME = 0.32;
 
-/** Breath phase tones — separate channel, also kept faint. */
-export const BREATH_TONE_VOLUME = 0.035;
+/** Breath phase tones — separate channel, soft but noticeable. */
+export const BREATH_TONE_VOLUME = 0.14;
 
 export type BreathPhaseKind = "inhale" | "hold-in" | "exhale" | "hold-out";
 
@@ -175,7 +174,7 @@ function synthPinkNoise(ctx: AudioContext, gain: GainNode): () => void {
   hp.gain.value = -18;      // was -14 — more high-end rolloff
 
   const lvl = ctx.createGain();
-  lvl.gain.value = 0.22;    // normalise output level
+  lvl.gain.value = 0.30;
 
   src.connect(lp);
   lp.connect(hp);
@@ -194,7 +193,7 @@ function synthBrownNoise(ctx: AudioContext, gain: GainNode): () => void {
   lp.Q.value = 0.5;
 
   const lvl = ctx.createGain();
-  lvl.gain.value = 0.28;    // was 3.5× — brought right down
+  lvl.gain.value = 0.40;
 
   src.connect(lp);
   lp.connect(lvl);
@@ -212,7 +211,7 @@ function synthGentleRain(ctx: AudioContext, gain: GainNode): () => void {
   hissFilter.frequency.value = 2800;
   hissFilter.Q.value = 0.6;
   const hissGain = ctx.createGain();
-  hissGain.gain.value = 0.18;  // was 0.55
+  hissGain.gain.value = 0.40;
 
   const rumble = noiseSource(ctx);
   const rumbleFilter = ctx.createBiquadFilter();
@@ -220,14 +219,14 @@ function synthGentleRain(ctx: AudioContext, gain: GainNode): () => void {
   rumbleFilter.frequency.value = 320;
   rumbleFilter.Q.value = 0.4;
   const rumbleGain = ctx.createGain();
-  rumbleGain.gain.value = 0.12;  // was 0.45
+  rumbleGain.gain.value = 0.32;
 
   // Subtle flutter ~0.8Hz
   const lfo = ctx.createOscillator();
   lfo.frequency.value = 0.8;
   lfo.type = "sine";
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 0.03;  // was 0.08
+  lfoGain.gain.value = 0.06;
 
   lfo.connect(lfoGain);
   lfoGain.connect(hissGain.gain);
@@ -260,7 +259,7 @@ function synthForest(ctx: AudioContext, gain: GainNode): () => void {
   airFilter.frequency.value = 1800;
   airFilter.Q.value = 0.4;
   const airGain = ctx.createGain();
-  airGain.gain.value = 0.18;  // was 0.5
+  airGain.gain.value = 0.36;
 
   const rustle = noiseSource(ctx);
   const rustleFilter = ctx.createBiquadFilter();
@@ -268,14 +267,14 @@ function synthForest(ctx: AudioContext, gain: GainNode): () => void {
   rustleFilter.frequency.value = 600;
   rustleFilter.Q.value = 0.5;
   const rustleGain = ctx.createGain();
-  rustleGain.gain.value = 0.10;  // was 0.35
+  rustleGain.gain.value = 0.25;
 
   // Very slow swell ~0.15Hz
   const lfo = ctx.createOscillator();
   lfo.frequency.value = 0.15;
   lfo.type = "sine";
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 0.04;  // was 0.12
+  lfoGain.gain.value = 0.09;
 
   lfo.connect(lfoGain);
   lfoGain.connect(airGain.gain);
@@ -308,17 +307,17 @@ function synthOcean(ctx: AudioContext, gain: GainNode): () => void {
   surfFilter.frequency.value = 900;  // was 1200 — less harsh
   surfFilter.Q.value = 0.7;
   const surfGain = ctx.createGain();
-  surfGain.gain.value = 0.20;  // was 0.7
+  surfGain.gain.value = 0.50;
 
   // ~0.1Hz wave LFO — one swell every ~10 seconds
   const waveLfo = ctx.createOscillator();
   waveLfo.frequency.value = 0.1;
   waveLfo.type = "sine";
   const waveLfoGain = ctx.createGain();
-  waveLfoGain.gain.value = 0.08;  // was 0.3 — gentler swell
+  waveLfoGain.gain.value = 0.22;
 
   const waveOffset = ctx.createConstantSource();
-  waveOffset.offset.value = 0.20;  // keep base level consistent
+  waveOffset.offset.value = 0.28;
 
   waveLfo.connect(waveLfoGain);
   waveLfoGain.connect(surfGain.gain);
@@ -462,7 +461,7 @@ export function playBackgroundSound(
     masterGain.gain.setValueAtTime(0, ctx.currentTime);
     masterGain.gain.linearRampToValueAtTime(
       Math.max(0, Math.min(1, volume)),
-      ctx.currentTime + 2.4,
+      ctx.currentTime + 0.8,
     );
     masterGain.connect(ctx.destination);
     _masterGain = masterGain;
