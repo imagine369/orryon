@@ -27,8 +27,10 @@ interface EventDetailSheetProps {
 }
 
 function parseEventDate(eventDate: string): { date: string; time: string; allDay: boolean } {
-  const date = eventDate.slice(0, 10);
-  const time = eventDate.length > 10 ? eventDate.slice(11, 16) : "";
+  const normalized = eventDate.trim().replace("T", " ");
+  const date = normalized.slice(0, 10);
+  const timePart = normalized.length > 10 ? normalized.slice(11, 16) : "";
+  const time = /^\d{2}:\d{2}$/.test(timePart) ? timePart : "";
   return { date, time, allDay: !time };
 }
 

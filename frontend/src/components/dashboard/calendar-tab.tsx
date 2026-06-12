@@ -1,14 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, Check, Loader2, X, Plus, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, getApiBase } from "@/lib/api";
 import { localDateStr } from "@/lib/utils";
 import { isDemo, DEMO_EVENTS, DEMO_TASKS } from "./demo-data";
 import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
-import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { EventDetailSheet, fmtEventTime, type EventFormData } from "./event-detail-sheet";
 import { eventsInMonth, monthRange, mergeEventsWithPendingOptimistic } from "./calendar-tab-helpers";
 
@@ -408,36 +407,31 @@ export function CalendarTab() {
           {dayEvents.map((e) => {
             const timeLabel = fmtEventTime(e.event_date);
             return (
-              <SwipeToDelete
+              <button
                 key={e.id}
-                deleteAriaLabel="Swipe to delete event"
-                onDelete={() => deleteEvent(e.id)}
+                type="button"
+                aria-label={`Edit ${e.title}`}
+                onClick={() => setSheet({ mode: "edit", event: e })}
+                className="w-full flex items-start gap-3 py-3 border-b border-white/5 text-left hover:bg-white/[0.02] active:bg-white/[0.04] transition"
               >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSheet({ mode: "edit", event: e })}
-                  onKeyDown={(ev) => {
-                    if (ev.key === "Enter" || ev.key === " ") {
-                      ev.preventDefault();
-                      setSheet({ mode: "edit", event: e });
-                    }
-                  }}
-                  className="w-full flex items-start gap-3 py-3 border-b border-white/5 text-left hover:bg-white/[0.02] transition cursor-pointer"
-                >
-                  <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: EVENT_COLOR[e.event_type] ?? "#60a5fa" }} />
-                  <div className="flex-1 min-w-0">
-                    {timeLabel && (
-                      <p className="text-[0.65rem] text-white/35 mb-0.5">{timeLabel}</p>
-                    )}
-                    <p className="text-[16px] font-medium text-white/85 leading-snug">{e.title}</p>
-                    {e.description && <p className="text-sm text-white/40 mt-0.5">{e.description}</p>}
-                  </div>
-                  <span className="text-[0.55rem] text-white/20 shrink-0 mt-0.5 uppercase tracking-wide">
+                <div className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: EVENT_COLOR[e.event_type] ?? "#60a5fa" }} />
+                <div className="flex-1 min-w-0">
+                  {timeLabel && (
+                    <p className="text-[0.65rem] text-white/35 mb-0.5">{timeLabel}</p>
+                  )}
+                  <p className="text-[16px] font-medium text-white/85 leading-snug">{e.title}</p>
+                  {e.description && <p className="text-sm text-white/40 mt-0.5 line-clamp-2">{e.description}</p>}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                  <span className="text-[0.55rem] text-white/20 uppercase tracking-wide">
                     {e.event_type.replace("_", " ")}
                   </span>
+                  <span className="flex items-center gap-1 text-[0.6rem] text-white/30">
+                    <Pencil className="h-3 w-3" strokeWidth={1.5} aria-hidden="true" />
+                    Edit
+                  </span>
                 </div>
-              </SwipeToDelete>
+              </button>
             );
           })}
 
@@ -460,6 +454,7 @@ export function CalendarTab() {
 
           {!sheet && (
             <button
+              type="button"
               onClick={() => setSheet({ mode: "create" })}
               className="flex items-center gap-2 mt-3 text-[0.65rem] text-white/20 hover:text-white/45 transition"
             >
@@ -467,19 +462,19 @@ export function CalendarTab() {
               Add event
             </button>
           )}
-
-          <EventDetailSheet
-            key={sheetKey}
-            open={sheet !== null}
-            mode={sheet?.mode ?? "create"}
-            defaultDate={selectedDate}
-            initial={sheet?.mode === "edit" ? sheet.event : undefined}
-            onSave={saveEvent}
-            onDelete={sheet?.mode === "edit" ? () => deleteEvent(sheet.event.id) : undefined}
-            onClose={() => setSheet(null)}
-          />
         </motion.div>
       </AnimatePresence>
+
+      <EventDetailSheet
+        key={sheetKey}
+        open={sheet !== null}
+        mode={sheet?.mode ?? "create"}
+        defaultDate={selectedDate}
+        initial={sheet?.mode === "edit" ? sheet.event : undefined}
+        onSave={saveEvent}
+        onDelete={sheet?.mode === "edit" ? () => deleteEvent(sheet.event.id) : undefined}
+        onClose={() => setSheet(null)}
+      />
     </div>
   );
 }
