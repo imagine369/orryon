@@ -15,8 +15,9 @@
  * Shared date utilities are imported from use-sleep-logs to avoid duplication.
  */
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 import { api, isDemoMode } from "@/lib/api";
 import { buildDateRange, toLocalDate, toDateLabel } from "@/lib/use-sleep-logs";
 
@@ -92,15 +93,15 @@ export function useMoodLogs() {
     weekAvg: null,
     weekBest: null,
   });
-  const fetchedRef = useRef(false);
+  const activeRef = useRef(false);
 
-  useQueuedEffect(() => {
+  const reload = useCallback(() => {
     if (isDemoMode()) {
       setLoading(false);
       return;
     }
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
+    if (activeRef.current) return;
+    activeRef.current = true;
 
     // limit=200 covers ~6 months of daily logs comfortably
     api
@@ -137,8 +138,14 @@ export function useMoodLogs() {
         setSummary({ today, weekAvg, weekBest });
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        activeRef.current = false;
+      });
   }, []);
+
+  useQueuedEffect(() => { reload(); }, [reload]);
+  useDataRefresh(["health"], reload);
 
   return { byDate, loading, summary };
 }

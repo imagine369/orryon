@@ -12,8 +12,9 @@
  * builds the chart dataset client-side from byDate — no re-fetches on nav.
  */
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 import { api, isDemoMode } from "@/lib/api";
 
 export interface SleepDataPoint {
@@ -122,15 +123,15 @@ export function useSleepLogs() {
     weekAvg: null,
     weekBest: null,
   });
-  const fetchedRef = useRef(false);
+  const activeRef = useRef(false);
 
-  useQueuedEffect(() => {
+  const reload = useCallback(() => {
     if (isDemoMode()) {
       setLoading(false);
       return;
     }
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
+    if (activeRef.current) return;
+    activeRef.current = true;
 
     // limit=200 covers ~6 months of daily logs comfortably
     api
@@ -167,8 +168,14 @@ export function useSleepLogs() {
         setSummary({ lastNight, weekAvg, weekBest });
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        activeRef.current = false;
+      });
   }, []);
+
+  useQueuedEffect(() => { reload(); }, [reload]);
+  useDataRefresh(["health"], reload);
 
   return { byDate, loading, summary };
 }

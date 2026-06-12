@@ -79,7 +79,7 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     "get_wellness_history": {"impl": h._get_wellness_history, "tabs": []},
     "compare_periods": {"impl": h._compare_periods, "tabs": []},
     "cross_feature_search": {"impl": h._cross_feature_search, "tabs": []},
-    "log_health_vital": {"impl": h._log_health_vital, "tabs": []},
+    "log_health_vital": {"impl": h._log_health_vital, "tabs": ["health"]},
     "get_health_vitals": {"impl": h._get_health_vitals, "tabs": []},
     "log_medication": {"impl": h._log_medication, "tabs": []},
     "get_medications": {"impl": h._get_medications, "tabs": []},
