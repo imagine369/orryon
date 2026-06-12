@@ -9,14 +9,21 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from pydantic import BaseModel, Field
+
 from backend.deps import ENABLE_DEMO, IS_PRODUCTION, require_active_plan
 from backend.auth import get_current_user
 from config import FULFILLMENT_ENABLED
 from core.integrations.fulfillment.demo_seed import seed_marketing_handoffs
-from core.integrations.fulfillment.handoff import dismiss_handoff, get_pending_handoffs
+from core.integrations.fulfillment.handoff import create_handoffs, dismiss_handoff, get_pending_handoffs
 
 router = APIRouter(tags=["fulfillment"], dependencies=[Depends(require_active_plan)])
 logger = logging.getLogger(__name__)
+
+
+class CreateHandoffReq(BaseModel):
+    title: str = Field(min_length=1)
+    type: str = "grocery"
 
 
 @router.get("/api/fulfillment/handoffs")
@@ -30,6 +37,23 @@ async def list_handoffs(user: dict = Depends(get_current_user)):
         logger.exception("list_handoffs failed for user %s", uid)
         raise HTTPException(status_code=500, detail="Could not load handoffs")
     return {"enabled": True, "handoffs": handoffs}
+
+
+@router.post("/api/fulfillment/handoffs")
+async def create_handoff(body: CreateHandoffReq, user: dict = Depends(get_current_user)):
+    if not FULFILLMENT_ENABLED:
+        raise HTTPException(status_code=404, detail="Fulfillment not enabled")
+    batch = create_handoffs(
+        user["user_id"],
+        [{"type": body.type.strip().lower(), "title": body.title.strip()}],
+    )
+    created = batch["handoffs"]
+    if not created:
+        detail = "Could not create handoff"
+        if batch.get("skipped"):
+            detail = batch["skipped"][0].get("reason", detail)
+        raise HTTPException(status_code=400, detail=detail)
+    return {"handoff": created[0]}
 
 
 @router.post("/api/fulfillment/demo/seed")
