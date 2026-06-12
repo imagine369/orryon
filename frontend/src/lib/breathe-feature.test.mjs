@@ -1,7 +1,14 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-import { isRhythmStep, getBreathPhaseInfo } from "./breath-phase.ts";
+import {
+  isRhythmStep,
+  getBreathPhaseInfo,
+  inferBreathPhaseFromStep,
+  getBreathPatternCycleIndex,
+  buildBreathPhaseCueKey,
+  shouldPlayBreathPhaseTone,
+} from "./breath-phase.ts";
 import { getHapticPatternForStep } from "./breathing-sounds.ts";
 import { buildCustomLoopAnchor, DEFAULT_CUSTOM_LOOP, resolveStartAnchor, CUSTOM_LOOP_ANCHOR_ID } from "./custom-breath-loop.ts";
 import { getAnchorMoodInsight, formatMoodDelta } from "./reset-mood-insights.ts";
@@ -10,16 +17,19 @@ import {
   getInstantAnchors,
   getSessionAnchors,
   resolvedDuration,
+  RESET_ANCHORS,
 } from "./reset-scripts.ts";
 
 describe("breath-phase", () => {
-  it("isRhythmStep is true only when breathPattern exists", () => {
+  it("isRhythmStep is true only for pattern steps without guided copy", () => {
     const clarity = getAnchorById("clarity-breath-2min");
     assert.ok(clarity);
-    const doubleInhaleStep = clarity.steps[1]; // orb-double, no pattern
-    const boxStep = clarity.steps[2]; // orb with pattern
+    const doubleInhaleStep = clarity.steps[1]; // orb-double + pattern + text
+    const boxStep = clarity.steps[2]; // orb with pattern + text
+    const customLoop = buildCustomLoopAnchor(DEFAULT_CUSTOM_LOOP).steps[1];
     assert.equal(isRhythmStep(doubleInhaleStep), false);
-    assert.equal(isRhythmStep(boxStep), true);
+    assert.equal(isRhythmStep(boxStep), false);
+    assert.equal(isRhythmStep(customLoop), true);
   });
 
   it("getBreathPhaseInfo returns labels for patterned steps only", () => {
@@ -29,10 +39,64 @@ describe("breath-phase", () => {
     assert.equal(info.phase, "inhale");
     assert.match(info.label, /Inhale · 4s/);
 
-    const guidedStep = clarity.steps[1];
+    const guidedStep = clarity.steps[0];
     const guidedInfo = getBreathPhaseInfo(guidedStep, 20, 15);
     assert.equal(guidedInfo.phase, null);
     assert.equal(guidedInfo.label, null);
+  });
+
+  it("quick box uses a repeating box-breath pattern with phase tones", () => {
+    const box = getAnchorById("quick-box-reset");
+    assert.ok(box);
+    const breathStep = box.steps[1];
+    assert.ok(breathStep.breathPattern);
+    assert.equal(breathStep.breathPattern.inSecs, 4);
+    assert.equal(breathStep.breathPattern.holdInSecs, 4);
+    assert.equal(breathStep.breathPattern.outSecs, 4);
+    assert.equal(breathStep.breathPattern.holdOutSecs, 4);
+    assert.equal(shouldPlayBreathPhaseTone(breathStep), true);
+  });
+
+  it("infers breath phases for double-inhale sigh steps", () => {
+    const sigh = getAnchorById("double-inhale-destress");
+    assert.ok(sigh);
+    assert.equal(inferBreathPhaseFromStep(sigh.steps[1]), "inhale");
+    assert.equal(inferBreathPhaseFromStep(sigh.steps[2]), "hold-in");
+    assert.equal(inferBreathPhaseFromStep(sigh.steps[3]), "exhale");
+  });
+
+  it("builds unique cue keys for each breath cycle in grounding", () => {
+    const grounding = getAnchorById("grounding-anchor-3min");
+    assert.ok(grounding);
+    const breathStep = grounding.steps[0];
+    assert.equal(getBreathPatternCycleIndex(breathStep, 0, 0), 0);
+    assert.equal(getBreathPatternCycleIndex(breathStep, 10, 0), 1);
+    assert.equal(getBreathPatternCycleIndex(breathStep, 20, 0), 2);
+
+    const cycle0Inhale = buildBreathPhaseCueKey({
+      stepIdx: 0,
+      phase: "inhale",
+      step: breathStep,
+      elapsed: 0,
+      stepStartSec: 0,
+    });
+    const cycle1Inhale = buildBreathPhaseCueKey({
+      stepIdx: 0,
+      phase: "inhale",
+      step: breathStep,
+      elapsed: 10,
+      stepStartSec: 0,
+    });
+    assert.notEqual(cycle0Inhale, cycle1Inhale);
+  });
+
+  it("every breathing exercise except Do Nothing exposes phase cues", () => {
+    const noBreathCues = new Set(["do-nothing"]);
+    for (const anchor of RESET_ANCHORS) {
+      if (noBreathCues.has(anchor.id)) continue;
+      const hasCues = anchor.steps.some((step) => shouldPlayBreathPhaseTone(step));
+      assert.ok(hasCues, `${anchor.id} should include breath phase cues`);
+    }
   });
 });
 

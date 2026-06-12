@@ -101,7 +101,7 @@ let _stopFn: (() => void) | null = null;
 let _stopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let _generation = 0; // incremented each time we start a new sound; stops are self-invalidating
 let _toneGain: GainNode | null = null;
-let _lastTonePhase: BreathPhaseKind | null = null;
+let _lastToneCueKey: string | null = null;
 
 function getCtx(): AudioContext {
   if (!_ctx || _ctx.state === "closed") {
@@ -357,10 +357,15 @@ function ensureToneGain(ctx: AudioContext): GainNode {
 }
 
 /** Soft sine ping at each breath phase transition — eyes-closed rhythm cue. */
-export function playBreathPhaseTone(phase: BreathPhaseKind, muted = false): void {
+export function playBreathPhaseTone(
+  phase: BreathPhaseKind,
+  muted = false,
+  cueKey?: string,
+): void {
   if (muted || typeof window === "undefined") return;
-  if (_lastTonePhase === phase) return;
-  _lastTonePhase = phase;
+  const key = cueKey ?? phase;
+  if (_lastToneCueKey === key) return;
+  _lastToneCueKey = key;
 
   try {
     const ctx = getCtx();
@@ -385,11 +390,11 @@ export function playBreathPhaseTone(phase: BreathPhaseKind, muted = false): void
 }
 
 export function resetBreathPhaseToneTracking(): void {
-  _lastTonePhase = null;
+  _lastToneCueKey = null;
 }
 
 export function stopBreathTones(): void {
-  _lastTonePhase = null;
+  _lastToneCueKey = null;
   if (_toneGain) {
     try { _toneGain.disconnect(); } catch { /* ignore */ }
     _toneGain = null;

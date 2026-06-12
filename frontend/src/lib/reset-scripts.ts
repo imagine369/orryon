@@ -60,26 +60,11 @@ const QUICK_BOX: ResetAnchor = {
       text: "Settle in.",
       animation: "none",
     },
-    // Cycle steps — repeated to fill selected duration.
     {
-      duration: 4,
-      text: "Breathe in.",
+      duration: 16,
+      text: "Follow the tones — in, hold, out, rest.",
       animation: "orb",
-    },
-    {
-      duration: 4,
-      text: "Hold.",
-      animation: "orb",
-    },
-    {
-      duration: 4,
-      text: "Release.",
-      animation: "orb",
-    },
-    {
-      duration: 4,
-      text: "Rest.",
-      animation: "orb",
+      breathPattern: { inSecs: 4, holdInSecs: 4, outSecs: 4, holdOutSecs: 4 },
     },
     {
       duration: 5,
@@ -252,6 +237,7 @@ const FOCUS_4MIN: ResetAnchor = {
       duration: 40,
       text: "Double inhale: a full breath in through your nose, then a short sniff on top. Long exhale through your mouth, all the way out. Three times. Take your time.",
       animation: "orb-double",
+      breathPattern: { inSecs: 4, holdInSecs: 1, outSecs: 8 },
     },
     {
       duration: 60,
@@ -296,6 +282,7 @@ const CLARITY_2MIN: ResetAnchor = {
       duration: 45,
       text: "Double inhale through your nose — short sniff on top. Long exhale through your mouth. Twice. Slow.",
       animation: "orb-double",
+      breathPattern: { inSecs: 5, holdInSecs: 1, outSecs: 16 },
     },
     {
       duration: 45,

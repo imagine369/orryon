@@ -20,7 +20,7 @@ import {
   setBreatheMuted,
   setSoundscapeOverride,
 } from "@/lib/breathing-preferences";
-import { getBreathPhaseInfo, isRhythmStep } from "@/lib/breath-phase";
+import { buildBreathPhaseCueKey, getBreathPhaseInfo, getVariableLoopCycleIndex, inferBreathPhaseFromStep, isRhythmStep } from "@/lib/breath-phase";
 import { useSessionWakeLock } from "@/lib/use-session-wake-lock";
 import { MUTED_TEXT, FONT } from "@/components/reset-anchor/tokens";
 import { BreathingOrb } from "@/components/reset-anchor/breathing-orb";
@@ -175,12 +175,27 @@ export function SessionScreen({
   const phaseInfo = getBreathPhaseInfo(step, elapsed, stepStartSec);
 
   useEffect(() => {
-    if (done || !mounted || muted || !rhythmStep || !phaseInfo.phase) return;
-    const key = `${stepIdx}:${phaseInfo.phase}`;
-    if (lastTonePhaseRef.current === key) return;
-    lastTonePhaseRef.current = key;
-    playBreathPhaseTone(phaseInfo.phase, muted);
-  }, [done, mounted, muted, rhythmStep, phaseInfo.phase, stepIdx]);
+    if (done || !mounted || muted) return;
+
+    const phase = step.breathPattern
+      ? phaseInfo.phase
+      : inferBreathPhaseFromStep(step);
+    if (!phase) return;
+
+    const cueKey = buildBreathPhaseCueKey({
+      stepIdx,
+      phase,
+      step,
+      elapsed,
+      stepStartSec,
+      repeatCycleIndex: isVariable
+        ? getVariableLoopCycleIndex(anchor, elapsed, durationSecs, stepIdx)
+        : 0,
+    });
+    if (lastTonePhaseRef.current === cueKey) return;
+    lastTonePhaseRef.current = cueKey;
+    playBreathPhaseTone(phase, muted, cueKey);
+  }, [done, mounted, muted, step.breathPattern, phaseInfo.phase, stepIdx, step, elapsed, stepStartSec, isVariable, anchor, durationSecs]);
 
   const stepText = step.text && !isLastStep && !rhythmStep
     ? step.text.replace(/[.!?]$/, "") + " \u2026"
