@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/platform.test.mjs src/lib/ios-install.test.mjs src/lib/desktop-download-api.test.mjs src/lib/chat-session-api.test.mjs src/lib/chat-message-links.test.mjs src/lib/remark-chat-autolink.test.mjs src/lib/chat-message-content.test.mjs src/lib/chat-contact-blocks.test.mjs src/lib/list-item-label.test.mjs src/lib/use-data-refresh.test.mjs src/components/settings/settings-views.test.mjs src/lib/personalized-starter-prompts.test.mjs src/lib/ambient-orryon-service.test.mjs src/lib/ambient-alive-state.test.mjs src/lib/ambient-motion-permission.test.mjs src/lib/sensor-fusion.test.mjs src/lib/ambient-greeting.test.mjs src/lib/microphone-access.test.mjs src/lib/register-service-worker.test.mjs src/lib/sw-build-sync-helpers.test.mjs",
+    "test": "tsx --test src/lib/platform.test.mjs src/lib/ios-install.test.mjs src/lib/desktop-download-api.test.mjs src/lib/chat-session-api.test.mjs src/lib/chat-message-links.test.mjs src/lib/remark-chat-autolink.test.mjs src/lib/chat-message-content.test.mjs src/lib/chat-contact-blocks.test.mjs src/lib/list-item-label.test.mjs src/lib/use-data-refresh.test.mjs src/components/settings/settings-views.test.mjs src/lib/personalized-starter-prompts.test.mjs src/lib/ambient-orryon-service.test.mjs src/lib/ambient-alive-state.test.mjs src/lib/ambient-motion-permission.test.mjs src/lib/sensor-fusion.test.mjs src/lib/ambient-greeting.test.mjs src/lib/microphone-access.test.mjs src/lib/register-service-worker.test.mjs src/lib/sw-build-sync-helpers.test.mjs src/lib/breathe-feature.test.mjs",
     "test:platform": "node --test src/lib/platform.test.mjs",
     "test:download": "node --test scripts/test-download-flow.mjs",
     "test:download:local": "TEST_BASE_URL=http://127.0.0.1:3456 node --test scripts/test-download-flow.mjs",
@@ -33,6 +33,8 @@
     "test:ambient": "node scripts/test-ambient-smoke.mjs",
     "test:ambient:local": "node scripts/test-ambient-smoke.mjs --local",
     "test:ambient:device-qa": "node scripts/ambient-device-qa-checklist.mjs",
+    "test:breathe": "node scripts/test-breathe-e2e.mjs",
+    "test:breathe:local": "TEST_BASE_URL=http://127.0.0.1:3456 node scripts/test-breathe-e2e.mjs",
     "cap:ios": "npx cap sync && npx cap open ios",
     "cap:android": "npx cap sync && npx cap open android",
     "cap:sync": "npx cap sync"

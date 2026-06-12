@@ -437,10 +437,82 @@ export const RESET_ANCHORS: ResetAnchor[] = [
   DO_NOTHING,
 ];
 
+/** ~30–120 second acute resets — one tap, no preamble. */
+export const INSTANT_ANCHOR_IDS = [
+  "double-inhale-destress",
+  "clarity-breath-2min",
+] as const;
+
+/** Full guided sessions (3–9 min). */
+export const SESSION_ANCHOR_IDS = [
+  "quick-box-reset",
+  "grounding-anchor-3min",
+  "focus-return-4min",
+  "midday-reset-5min",
+  "evening-release-7min",
+  "sleep-descent",
+  "do-nothing",
+] as const;
+
+export type ResetIntent = "stressed" | "scattered" | "winding-down" | "overwhelmed";
+
+export const RESET_INTENTS: { id: ResetIntent; label: string }[] = [
+  { id: "stressed", label: "Stressed" },
+  { id: "scattered", label: "Scattered" },
+  { id: "winding-down", label: "Winding down" },
+  { id: "overwhelmed", label: "Overwhelmed" },
+];
+
+const INTENT_ANCHOR_IDS: Record<ResetIntent, string[]> = {
+  stressed: ["double-inhale-destress", "quick-box-reset"],
+  scattered: ["focus-return-4min", "clarity-breath-2min"],
+  "winding-down": ["evening-release-7min", "sleep-descent"],
+  overwhelmed: ["grounding-anchor-3min", "do-nothing"],
+};
+
+export function getAnchorById(id: string): ResetAnchor | undefined {
+  return RESET_ANCHORS.find((a) => a.id === id);
+}
+
+export function getInstantAnchors(): ResetAnchor[] {
+  return INSTANT_ANCHOR_IDS.map((id) => getAnchorById(id)).filter(Boolean) as ResetAnchor[];
+}
+
+export function getSessionAnchors(): ResetAnchor[] {
+  return SESSION_ANCHOR_IDS.map((id) => getAnchorById(id)).filter(Boolean) as ResetAnchor[];
+}
+
+export function getAnchorsForIntent(intent: ResetIntent): ResetAnchor[] {
+  return INTENT_ANCHOR_IDS[intent]
+    .map((id) => getAnchorById(id))
+    .filter(Boolean) as ResetAnchor[];
+}
+
+export type ContextualTrigger = "time-of-day" | "late-evening" | "midday" | "acute-stress";
+
+export function getContextualAnchor(options?: {
+  lastUsedId?: string;
+  trigger?: ContextualTrigger;
+}): ResetAnchor {
+  const trigger = options?.trigger;
+  if (trigger === "acute-stress") return DOUBLE_INHALE;
+  if (trigger === "late-evening") return SLEEP_DESCENT;
+  if (trigger === "midday") return MIDDAY_5MIN;
+  return getRecommendedAnchor(options?.lastUsedId);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Returns the anchor most appropriate for the current time of day. */
-export function getRecommendedAnchor(lastUsedId?: string): ResetAnchor {
+export function getRecommendedAnchor(
+  lastUsedId?: string,
+  intent?: ResetIntent,
+): ResetAnchor {
+  if (intent) {
+    const matches = getAnchorsForIntent(intent);
+    if (matches.length > 0) return matches[0];
+  }
+
   const hour = new Date().getHours();
   if (hour >= 21) return SLEEP_DESCENT;
   if (hour >= 19) return EVENING_7MIN;
