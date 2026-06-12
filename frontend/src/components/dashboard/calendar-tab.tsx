@@ -10,6 +10,7 @@ import { scheduleDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { SwipeToDelete } from "@/components/swipe-to-delete";
 import { EventDetailSheet, fmtEventTime, type EventFormData } from "./event-detail-sheet";
+import { eventsInMonth, monthRange, mergeEventsWithPendingOptimistic } from "./calendar-tab-helpers";
 
 interface CalEvent {
   id: string;
@@ -65,23 +66,6 @@ function fmtDayLabel(dateStr: string, today: string) {
 }
 
 type ImportStatus = "idle" | "loading" | "success" | "error";
-
-function monthRange(year: number, month: number) {
-  const m = String(month + 1).padStart(2, "0");
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  return {
-    from: `${year}-${m}-01`,
-    to: `${year}-${m}-${String(lastDay).padStart(2, "0")}`,
-  };
-}
-
-function eventsInMonth(events: CalEvent[], year: number, month: number) {
-  const { from, to } = monthRange(year, month);
-  return events.filter((e) => {
-    const ds = e.event_date.slice(0, 10);
-    return ds >= from && ds <= to;
-  });
-}
 
 export function CalendarTab() {
   const [events, setEvents]   = useState<CalEvent[]>([]);
@@ -142,16 +126,9 @@ export function CalendarTab() {
       api.get<CalTask[]>("/api/tasks?status=open"),
     ])
       .then(([e, t]) => {
-        setEvents((prev) => {
-          const fromApi = Array.isArray(e) ? e : [];
-          const pending = prev.filter((row) => row.id.startsWith("tmp-"));
-          if (pending.length === 0) return fromApi;
-          const merged = [...fromApi];
-          for (const row of pending) {
-            if (!merged.some((r) => r.id === row.id)) merged.push(row);
-          }
-          return merged;
-        });
+        setEvents((prev) =>
+          mergeEventsWithPendingOptimistic(Array.isArray(e) ? e : [], prev),
+        );
         setTasks(Array.isArray(t) ? t : []);
       })
       .catch(() => showCrudError("Couldn't load calendar. Please try again."))
