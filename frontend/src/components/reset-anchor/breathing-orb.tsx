@@ -1,12 +1,23 @@
 "use client";
 
 import { useId, useState } from "react";
+import { motion } from "framer-motion";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
 import type { ResetAnimation } from "@/lib/reset-scripts";
-import { ORB_FILL } from "./tokens";
 
-/** One square size token so width/height can never diverge in flex layouts. */
+/** Square bounds — width and height always match. */
 const ORB_SIZE = "min(max(200px, min(62vw, 42vh)), 320px)";
+
+/** Centered fill reads as a sphere; offset fill can look egg-shaped on mobile. */
+const BREATHE_ORB_FILL =
+  "radial-gradient(circle at 50% 50%, #e0a8c8 0%, #cca0d8 16%, #a890d0 32%, #90a0d8 48%, #68b8d8 62%, #3ecfbe 76%, #1ab8a0 92%, #14b098 100%)";
+
+const ORB_SCALE = {
+  expanded: 1.12,
+  contracted: 0.92,
+  idleExpanded: 1.04,
+  idleContracted: 0.96,
+} as const;
 
 export function BreathingOrb({
   animation,
@@ -34,9 +45,10 @@ export function BreathingOrb({
   }, [animation]);
 
   const scale = (() => {
-    if (animation === "none") return idleExpanded ? 1.04 : 0.94;
-    if (animation === "orb-double") return expanded ? 1.18 : 0.9;
-    return expanded ? 1.2 : 1.0;
+    if (animation === "none") {
+      return idleExpanded ? ORB_SCALE.idleExpanded : ORB_SCALE.idleContracted;
+    }
+    return expanded ? ORB_SCALE.expanded : ORB_SCALE.contracted;
   })();
 
   const transitionDuration = animation === "none" ? 3.2 : transitionSecs;
@@ -47,21 +59,37 @@ export function BreathingOrb({
       style={{
         position: "relative",
         width: ORB_SIZE,
-        aspectRatio: "1",
+        height: ORB_SIZE,
+        minWidth: ORB_SIZE,
+        minHeight: ORB_SIZE,
         flexShrink: 0,
+        display: "grid",
+        placeItems: "center",
+        overflow: "visible",
       }}
     >
-      <div
+      <motion.div
+        initial={false}
+        animate={{ scale }}
+        transition={{
+          duration: transitionDuration,
+          ease: "easeInOut",
+        }}
         style={{
-          position: "absolute",
-          inset: 0,
+          width: ORB_SIZE,
+          height: ORB_SIZE,
+          minWidth: ORB_SIZE,
+          minHeight: ORB_SIZE,
+          maxWidth: ORB_SIZE,
+          maxHeight: ORB_SIZE,
           borderRadius: "50%",
           overflow: "hidden",
-          transform: `scale(${scale})`,
-          transformOrigin: "center center",
-          transition: `transform ${transitionDuration}s ease-in-out`,
-          willChange: "transform",
           opacity: 0.72,
+          transformOrigin: "center center",
+          willChange: "transform",
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
+          clipPath: "circle(50% at 50% 50%)",
         }}
       >
         <svg
@@ -90,6 +118,7 @@ export function BreathingOrb({
             stroke={`url(#${ringGradientId})`}
             strokeWidth="1.4"
             strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
           />
         </svg>
 
@@ -98,10 +127,10 @@ export function BreathingOrb({
             position: "absolute",
             inset: 0,
             borderRadius: "50%",
-            background: ORB_FILL,
+            background: BREATHE_ORB_FILL,
           }}
         />
-      </div>
+      </motion.div>
     </div>
   );
 }

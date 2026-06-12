@@ -8,6 +8,7 @@ import {
   getBreathPatternCycleIndex,
   buildBreathPhaseCueKey,
   shouldPlayBreathPhaseTone,
+  getOrbBreathState,
 } from "./breath-phase.ts";
 import { getHapticPatternForStep } from "./breathing-sounds.ts";
 import { buildCustomLoopAnchor, DEFAULT_CUSTOM_LOOP, resolveStartAnchor, CUSTOM_LOOP_ANCHOR_ID } from "./custom-breath-loop.ts";
@@ -97,6 +98,33 @@ describe("breath-phase", () => {
       const hasCues = anchor.steps.some((step) => shouldPlayBreathPhaseTone(step));
       assert.ok(hasCues, `${anchor.id} should include breath phase cues`);
     }
+  });
+
+  it("getOrbBreathState uses step duration for discrete double-inhale steps", () => {
+    const sigh = getAnchorById("double-inhale-destress");
+    assert.ok(sigh);
+    const exhaleStep = sigh.steps[3];
+    const orb = getOrbBreathState(exhaleStep, 12, 11);
+    assert.equal(orb.expanded, false);
+    assert.equal(orb.transitionSecs, 8);
+
+    const sniffStep = sigh.steps[2];
+    const sniffOrb = getOrbBreathState(sniffStep, 7, 6);
+    assert.equal(sniffOrb.expanded, true);
+    assert.equal(sniffOrb.transitionSecs, 1);
+  });
+
+  it("getOrbBreathState uses phase length for patterned box breathing", () => {
+    const box = getAnchorById("quick-box-reset");
+    assert.ok(box);
+    const breathStep = box.steps[1];
+    const inhale = getOrbBreathState(breathStep, 2, 0);
+    assert.equal(inhale.expanded, true);
+    assert.equal(inhale.transitionSecs, 4);
+
+    const exhale = getOrbBreathState(breathStep, 10, 0);
+    assert.equal(exhale.expanded, false);
+    assert.equal(exhale.transitionSecs, 4);
   });
 });
 
