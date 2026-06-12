@@ -6,7 +6,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from backend.event_dates import format_event_date, split_event_date
+from core.event_dates import format_event_date, split_event_date
 from db import (
     delete_row,
     fetch_rows,

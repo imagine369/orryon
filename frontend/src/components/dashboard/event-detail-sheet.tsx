@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Trash2 } from "lucide-react";
+import { useQueuedEffect } from "@/lib/use-queued-effect";
 import { parseEventDate } from "./calendar-tab-helpers";
 
 export interface EventFormData {
@@ -44,6 +46,20 @@ export function EventDetailSheet({
   const [allDay, setAllDay] = useState(parsed.allDay);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useQueuedEffect(() => {
+    setContainer(document.body);
+  }, []);
+
+  useQueuedEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const canSave = title.trim().length > 0 && (allDay || time.length > 0);
   const heading = mode === "create" ? "New event" : "Edit event";
@@ -67,7 +83,9 @@ export function EventDetailSheet({
     onDelete?.();
   };
 
-  return (
+  if (!container) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -75,7 +93,7 @@ export function EventDetailSheet({
           animate={{ x: 0 }}
           exit={{ x: "100%" }}
           transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed inset-0 z-[60] bg-[#0d0d0d] flex flex-col"
+          className="fixed inset-0 z-[200] bg-[#0d0d0d] flex flex-col isolate touch-manipulation"
           style={{
             paddingTop: "env(safe-area-inset-top)",
             paddingBottom: "env(safe-area-inset-bottom)",
@@ -202,6 +220,7 @@ export function EventDetailSheet({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    container,
   );
 }

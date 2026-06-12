@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth import get_current_user
 from backend.deps import require_active_plan
-from backend.event_dates import format_event_date, split_event_date
+from core.event_dates import format_event_date, split_event_date
 from backend.schemas import EventReq, EventUpdate
 from db import (
     delete_row,
