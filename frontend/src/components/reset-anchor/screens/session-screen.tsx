@@ -20,7 +20,7 @@ import {
   setBreatheMuted,
   setSoundscapeOverride,
 } from "@/lib/breathing-preferences";
-import { buildBreathPhaseCueKey, getBreathPhaseInfo, getVariableLoopCycleIndex, inferBreathPhaseFromStep, isRhythmStep } from "@/lib/breath-phase";
+import { buildBreathPhaseCueKey, getBreathPhaseInfo, getOrbBreathState, getVariableLoopCycleIndex, inferBreathPhaseFromStep, isRhythmStep } from "@/lib/breath-phase";
 import { useSessionWakeLock } from "@/lib/use-session-wake-lock";
 import { MUTED_TEXT, FONT } from "@/components/reset-anchor/tokens";
 import { BreathingOrb } from "@/components/reset-anchor/breathing-orb";
@@ -49,6 +49,7 @@ export function SessionScreen({
   onBack: () => void;
 }) {
   const [elapsed, setElapsed] = useState(0);
+  const [animElapsed, setAnimElapsed] = useState(0);
   const [done, setDone] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
@@ -102,7 +103,12 @@ export function SessionScreen({
 
   useEffect(() => {
     if (done) return;
-    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    const start = performance.now();
+    const id = setInterval(() => {
+      const secs = (performance.now() - start) / 1000;
+      setAnimElapsed(secs);
+      setElapsed(Math.floor(secs));
+    }, 100);
     return () => clearInterval(id);
   }, [done]);
 
@@ -141,14 +147,14 @@ export function SessionScreen({
       setStepIdx((prev) => {
         if (prev !== idx) {
           setFadeKey((k) => k + 1);
-          setStepStartSec(elapsed);
+          setStepStartSec(animElapsed);
           resetBreathPhaseToneTracking();
           lastTonePhaseRef.current = null;
         }
         return idx;
       });
     });
-  }, [elapsed, steps, durationSecs, isVariable, mounted]);
+  }, [elapsed, animElapsed, steps, durationSecs, isVariable, mounted]);
 
   useEffect(() => {
     if (elapsed < durationSecs || completionScheduledRef.current) return;
@@ -172,7 +178,8 @@ export function SessionScreen({
   const step = steps[stepIdx] ?? steps[steps.length - 1];
   const isLastStep = stepIdx >= steps.length - 1;
   const rhythmStep = isRhythmStep(step);
-  const phaseInfo = getBreathPhaseInfo(step, elapsed, stepStartSec);
+  const phaseInfo = getBreathPhaseInfo(step, animElapsed, stepStartSec);
+  const orbState = getOrbBreathState(step, animElapsed, stepStartSec);
 
   useEffect(() => {
     if (done || !mounted || muted) return;
@@ -186,7 +193,7 @@ export function SessionScreen({
       stepIdx,
       phase,
       step,
-      elapsed,
+      elapsed: animElapsed,
       stepStartSec,
       repeatCycleIndex: isVariable
         ? getVariableLoopCycleIndex(anchor, elapsed, durationSecs, stepIdx)
@@ -195,31 +202,13 @@ export function SessionScreen({
     if (lastTonePhaseRef.current === cueKey) return;
     lastTonePhaseRef.current = cueKey;
     playBreathPhaseTone(phase, muted, cueKey);
-  }, [done, mounted, muted, step.breathPattern, phaseInfo.phase, stepIdx, step, elapsed, stepStartSec, isVariable, anchor, durationSecs]);
+  }, [done, mounted, muted, step.breathPattern, phaseInfo.phase, stepIdx, step, animElapsed, stepStartSec, isVariable, anchor, durationSecs]);
 
   const stepText = step.text && !isLastStep && !rhythmStep
     ? step.text.replace(/[.!?]$/, "") + " \u2026"
     : step.text;
 
-  const { expanded, transitionSecs } = (() => {
-    if (step.animation !== "orb" && step.animation !== "orb-double") {
-      return { expanded: false, transitionSecs: 4 };
-    }
-
-    const pattern = step.breathPattern;
-    if (pattern) {
-      const { inSecs, outSecs, holdInSecs = 0, holdOutSecs = 0 } = pattern;
-      const cycleLen = inSecs + holdInSecs + outSecs + holdOutSecs;
-      if (cycleLen <= 0) return { expanded: false, transitionSecs: 4 };
-      const t = (elapsed - stepStartSec) % cycleLen;
-      const isExpanded = t < inSecs + holdInSecs;
-      const phaseSecs = isExpanded ? inSecs : outSecs;
-      return { expanded: isExpanded, transitionSecs: phaseSecs };
-    }
-
-    const isExpanded = stepIdx % 4 === 1 || stepIdx % 4 === 2;
-    return { expanded: isExpanded, transitionSecs: 4 };
-  })();
+  const { expanded, transitionSecs } = orbState;
 
   const showChrome = !zenMode || tapRevealActive;
   const contentFaded = zenMode && !tapRevealActive;

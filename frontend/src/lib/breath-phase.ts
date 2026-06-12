@@ -132,3 +132,43 @@ export function getBreathPhaseInfo(
   }
   return { phase: "hold-out", label: `Hold · ${holdOutSecs}s`, phaseSecs: holdOutSecs };
 }
+
+export interface OrbBreathState {
+  expanded: boolean;
+  /** Seconds for the current inhale/exhale transition. */
+  transitionSecs: number;
+}
+
+/** Orb expand/contract state — shared by every breathe exercise. */
+export function getOrbBreathState(
+  step: ResetStep,
+  animElapsed: number,
+  stepStartSec: number,
+): OrbBreathState {
+  if (step.animation !== "orb" && step.animation !== "orb-double") {
+    return { expanded: false, transitionSecs: 3.2 };
+  }
+
+  if (step.breathPattern) {
+    const phaseInfo = getBreathPhaseInfo(step, animElapsed, stepStartSec);
+    if (!phaseInfo.phase) {
+      return { expanded: false, transitionSecs: 4 };
+    }
+    const expanded = phaseInfo.phase === "inhale" || phaseInfo.phase === "hold-in";
+    return {
+      expanded,
+      transitionSecs: Math.max(0.35, phaseInfo.phaseSecs),
+    };
+  }
+
+  const discretePhase = inferBreathPhaseFromStep(step);
+  if (discretePhase) {
+    const expanded = discretePhase === "inhale" || discretePhase === "hold-in";
+    return {
+      expanded,
+      transitionSecs: Math.max(0.35, step.duration),
+    };
+  }
+
+  return { expanded: false, transitionSecs: 4 };
+}
