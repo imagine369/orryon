@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Clock, SquarePen, Volume2, VolumeX } from "lucide-react";
+import { getContextualAnchor } from "@/lib/reset-scripts";
 
 interface ChatHeaderActionsProps {
   showSpeakToggle: boolean;
@@ -13,6 +16,11 @@ interface ChatHeaderActionsProps {
   variant?: "empty" | "chat";
 }
 
+function contextualBreatheHref(trigger?: "late-evening" | "midday" | "acute-stress") {
+  const anchor = getContextualAnchor({ trigger });
+  return `/breathe?start=${anchor.id}`;
+}
+
 export function ChatHeaderActions({
   showSpeakToggle,
   voiceOverlayOn,
@@ -23,6 +31,18 @@ export function ChatHeaderActions({
   plan,
   variant = "empty",
 }: ChatHeaderActionsProps) {
+  const hour = new Date().getHours();
+  const contextualHref =
+    hour >= 21
+      ? contextualBreatheHref("late-evening")
+      : hour >= 12 && hour < 17
+      ? contextualBreatheHref("midday")
+      : contextualBreatheHref();
+
+  const contextualAnchor = getContextualAnchor({
+    trigger: hour >= 21 ? "late-evening" : hour >= 12 && hour < 17 ? "midday" : undefined,
+  });
+
   const speakBtn = showSpeakToggle ? (
     <button
       onClick={onToggleVoiceOverlay}
@@ -74,7 +94,7 @@ export function ChatHeaderActions({
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-2 px-4 py-2">
         {plan === "starter" && (
           <Link
-            href="/breathe"
+            href={contextualHref}
             className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-2 text-left hover:bg-white/[0.06] active:scale-[0.985] transition-all"
           >
             <div
@@ -88,10 +108,10 @@ export function ChatHeaderActions({
             />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white/70 leading-none mb-0.5">
-                Take a breath
+                {contextualAnchor.shortTitle}
               </p>
               <p className="text-[0.7rem] text-white/40 leading-none">
-                Breathe, reset, or just be still
+                {contextualAnchor.displayDuration} reset
               </p>
             </div>
           </Link>
@@ -108,10 +128,25 @@ export function ChatHeaderActions({
 }
 
 export function BreathePromoEmpty() {
+  const hour = new Date().getHours();
+  const trigger =
+    hour >= 21 ? "late-evening" as const
+    : hour >= 12 && hour < 17 ? "midday" as const
+    : undefined;
+
+  const anchor = getContextualAnchor({ trigger });
+  const href = `/breathe?start=${anchor.id}`;
+  const subline =
+    trigger === "late-evening"
+      ? "Wind down before sleep"
+      : trigger === "midday"
+      ? "Bridge morning and afternoon"
+      : "Breathe, reset, or just be still";
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 mt-4 w-full">
       <Link
-        href="/breathe"
+        href={href}
         className="w-full flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-4 mb-2 text-left hover:bg-white/[0.06] active:scale-[0.98] transition-all"
       >
         <motion.div
@@ -133,10 +168,8 @@ export function BreathePromoEmpty() {
           transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white/70 mb-0.5">Take a breath</p>
-          <p className="text-[0.72rem] text-white/38 leading-snug">
-            Breathe, reset, or just be still
-          </p>
+          <p className="text-sm font-semibold text-white/70 mb-0.5">{anchor.shortTitle}</p>
+          <p className="text-[0.72rem] text-white/38 leading-snug">{subline}</p>
         </div>
         <svg
           className="w-4 h-4 text-white/25 shrink-0"

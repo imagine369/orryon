@@ -8,14 +8,14 @@ import { X } from "lucide-react";
 import type { ResetAnchor } from "@/lib/reset-scripts";
 import { resolvedDuration } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
-import { stopBackgroundSound } from "@/lib/breathing-sounds";
+import { stopBackgroundSound, primeAudioContext } from "@/lib/breathing-sounds";
 import { SESSION_BG, FONT } from "@/components/reset-anchor/tokens";
+import { PreMoodScreen } from "@/components/reset-anchor/screens/pre-mood-screen";
 import { SessionScreen } from "@/components/reset-anchor/screens/session-screen";
 import { PostMoodScreen } from "@/components/reset-anchor/screens/post-mood-screen";
 import { CompletionScreen } from "@/components/reset-anchor/screens/completion-screen";
 
 type Screen = "pre-mood" | "session" | "post-mood" | "completion";
-
 
 export interface ResetAnchorSessionProps {
   anchor: ResetAnchor;
@@ -36,29 +36,35 @@ export function ResetAnchorSession({
   onUpdateCompletion,
   onMarkStreak,
 }: ResetAnchorSessionProps) {
-  const [screen,          setScreen]          = useState<Screen>("session");
-  const [completionId,    setCompletionId]    = useState<string | null>(null);
-  const [sessionSecs,     setSessionSecs]     = useState(0);
-  const [durationOptIdx,  setDurationOptIdx]  = useState(anchor.defaultDurationIndex ?? 0);
-  const [markedStreak,    setMarkedStreak]    = useState(false);
-  const [container,       setContainer]       = useState<HTMLElement | null>(null);
+  const [screen, setScreen] = useState<Screen>("pre-mood");
+  const [preMood, setPreMood] = useState<MoodState | undefined>(undefined);
+  const [completionId, setCompletionId] = useState<string | null>(null);
+  const [postMood, setPostMood] = useState<MoodState | undefined>(undefined);
+  const [durationOptIdx, setDurationOptIdx] = useState(anchor.defaultDurationIndex ?? 0);
+  const [markedStreak, setMarkedStreak] = useState(false);
+  const [container, setContainer] = useState<HTMLElement | null>(null);
 
   useQueuedEffect(() => { setContainer(document.body); }, []);
 
-  // Ensure any prior session ambience is stopped when the overlay closes.
   useEffect(() => () => stopBackgroundSound(), []);
 
   const durationSecs = resolvedDuration(anchor, durationOptIdx);
 
+  const handlePreMoodContinue = useCallback((mood?: MoodState) => {
+    primeAudioContext();
+    setPreMood(mood);
+    setScreen("session");
+  }, []);
+
   const handleSessionComplete = useCallback((elapsed: number) => {
-    setSessionSecs(elapsed);
-    const id = onAddCompletion(anchor.id, elapsed, undefined);
+    const id = onAddCompletion(anchor.id, elapsed, preMood);
     setCompletionId(id);
     setScreen("post-mood");
-  }, [anchor.id, onAddCompletion]);
+  }, [anchor.id, onAddCompletion, preMood]);
 
   const handlePostMoodDone = useCallback(
     (params: { postMood?: MoodState; note?: string; markStreak: boolean }) => {
+      setPostMood(params.postMood);
       if (completionId) {
         onUpdateCompletion(completionId, params.postMood, params.note);
         if (params.markStreak) {
@@ -68,7 +74,7 @@ export function ResetAnchorSession({
       }
       setScreen("completion");
     },
-    [completionId, onUpdateCompletion, onMarkStreak]
+    [completionId, onUpdateCompletion, onMarkStreak],
   );
 
   const overlay = (
@@ -92,15 +98,18 @@ export function ResetAnchorSession({
           paddingRight: "env(safe-area-inset-right, 0px)",
         }}
       >
-        {/* Header — close */}
         <div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",
           padding: "14px 20px",
+          flexShrink: 0,
+          opacity: screen === "session" ? 0.38 : 1,
+          transition: "opacity 0.3s",
         }}>
           <button
             onClick={onClose}
+            aria-label="Close session"
             style={{
               display: "flex",
               alignItems: "center",
@@ -108,7 +117,9 @@ export function ResetAnchorSession({
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "rgba(255,255,255,0.22)",
+              color: screen === "session"
+                ? "rgba(255,255,255,0.28)"
+                : "rgba(255,255,255,0.22)",
               padding: 8,
               WebkitTapHighlightColor: "transparent",
             }}
@@ -117,8 +128,26 @@ export function ResetAnchorSession({
           </button>
         </div>
 
-        {/* Screen content */}
         <AnimatePresence mode="wait">
+          {screen === "pre-mood" && (
+            <motion.div
+              key="pre-mood"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              style={{ display: "flex", flex: 1, minHeight: 0 }}
+            >
+              <PreMoodScreen
+                anchor={anchor}
+                durationOptIdx={durationOptIdx}
+                onDurationSelect={setDurationOptIdx}
+                onSkip={() => handlePreMoodContinue(undefined)}
+                onContinue={handlePreMoodContinue}
+              />
+            </motion.div>
+          )}
+
           {screen === "session" && (
             <motion.div
               key="session"
@@ -129,10 +158,9 @@ export function ResetAnchorSession({
               style={{ display: "flex", flex: 1, minHeight: 0 }}
             >
               <SessionScreen
+                key={`${anchor.id}-${durationSecs}`}
                 anchor={anchor}
                 durationSecs={durationSecs}
-                durationOptIdx={durationOptIdx}
-                onDurationSelect={setDurationOptIdx}
                 onComplete={handleSessionComplete}
                 onBack={onClose}
               />
@@ -169,6 +197,8 @@ export function ResetAnchorSession({
                 anchor={anchor}
                 streakCount={streakCount + (markedStreak ? 1 : 0)}
                 markedStreak={markedStreak}
+                preMood={preMood}
+                postMood={postMood}
                 onClose={onClose}
               />
             </motion.div>

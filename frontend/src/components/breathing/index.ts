@@ -2,5 +2,6 @@
  * Breathing module — public surface.
  *
  * Breathing exercises live at /breathe (app/breathe/page.tsx).
- * This module is kept for any shared breathing utilities.
+ * Shared browse UI: components/reset-anchor/reset-anchor-browse.tsx
  */
+export { ResetAnchorBrowse } from "@/components/reset-anchor/reset-anchor-browse";

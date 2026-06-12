@@ -1,52 +1,83 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Volume2, VolumeX } from "lucide-react";
 import type { ResetAnchor } from "@/lib/reset-scripts";
-import { getHapticPatternForStep, triggerHaptics } from "@/lib/breathing-sounds";
+import {
+  getActiveSoundscape,
+  getHapticPatternForStep,
+  getNextSoundscape,
+  playBackgroundSound,
+  playBreathPhaseTone,
+  resetBreathPhaseToneTracking,
+  stopBackgroundSound,
+  triggerHaptics,
+  type Soundscape,
+} from "@/lib/breathing-sounds";
+import {
+  loadBreathePreferences,
+  setBreatheMuted,
+  setSoundscapeOverride,
+} from "@/lib/breathing-preferences";
+import { getBreathPhaseInfo, isRhythmStep } from "@/lib/breath-phase";
+import { useSessionWakeLock } from "@/lib/use-session-wake-lock";
 import { MUTED_TEXT, FONT } from "@/components/reset-anchor/tokens";
 import { BreathingOrb } from "@/components/reset-anchor/breathing-orb";
-import { DurationPicker } from "./duration-picker";
 
+const ZEN_DELAY_MS = 10_000;
+const CONTROLS_VISIBLE_MS = 4_000;
+
+const SOUNDSCAPE_LABEL: Record<Soundscape, string> = {
+  "pink-noise": "Pink",
+  "brown-noise": "Brown",
+  "gentle-rain": "Rain",
+  forest: "Forest",
+  ocean: "Ocean",
+  silence: "Silent",
+};
 
 export function SessionScreen({
   anchor,
   durationSecs,
-  durationOptIdx,
-  onDurationSelect,
   onComplete,
   onBack,
 }: {
   anchor: ResetAnchor;
   durationSecs: number;
-  durationOptIdx?: number;
-  onDurationSelect?: (idx: number) => void;
   onComplete: (elapsed: number) => void;
   onBack: () => void;
 }) {
-  const [elapsed,      setElapsed]     = useState(0);
-  const [done,         setDone]        = useState(false);
-  const [mounted,      setMounted]     = useState(false);
-  const [stepIdx,      setStepIdx]     = useState(0);
-  const [fadeKey,      setFadeKey]     = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [done, setDone] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [stepIdx, setStepIdx] = useState(0);
+  const [fadeKey, setFadeKey] = useState(0);
   const [stepStartSec, setStepStartSec] = useState(0);
+  const [zenMode, setZenMode] = useState(false);
+  const [tapRevealActive, setTapRevealActive] = useState(false);
+  const [muted, setMuted] = useState(() => loadBreathePreferences().muted);
+  const [soundscape, setSoundscape] = useState<Soundscape>(() =>
+    getActiveSoundscape(anchor.id),
+  );
+
   const lastHapticStepRef = useRef<number>(-999);
+  const lastTonePhaseRef = useRef<string | null>(null);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionScheduledRef = useRef(false);
 
   const steps = anchor.steps;
-
   const isVariable = !!anchor.durationOptions;
 
-  // Haptics on step changes — short phase-specific pulse at each transition.
-  // Uses Navigator.vibrate (sticky user activation after the user taps to start).
-  // Ref avoids double-fire in React Strict Mode for the same stepIdx.
+  useSessionWakeLock(mounted && !done);
+
   useEffect(() => {
     if (done || !mounted) return;
     if (lastHapticStepRef.current === stepIdx) return;
     lastHapticStepRef.current = stepIdx;
     const text = steps[stepIdx]?.text ?? "";
-    const pattern = getHapticPatternForStep(anchor.id, stepIdx, text);
-    triggerHaptics(pattern);
+    triggerHaptics(getHapticPatternForStep(anchor.id, stepIdx, text));
   }, [stepIdx, anchor.id, done, mounted, steps]);
 
   useEffect(() => {
@@ -55,19 +86,32 @@ export function SessionScreen({
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
+    playBackgroundSound(anchor.id, { muted, soundscape });
+    return () => stopBackgroundSound();
+  }, [anchor.id, mounted, muted, soundscape]);
+
+  useEffect(() => {
+    if (!mounted || done) return;
+    const t = setTimeout(() => {
+      setZenMode(true);
+      setTapRevealActive(false);
+    }, ZEN_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [mounted, done]);
+
+  useEffect(() => {
     if (done) return;
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
   }, [done]);
 
-  // Compute current step index from elapsed time
   useEffect(() => {
     if (!mounted) return;
     let cum = 0;
     let idx = 0;
 
     if (isVariable) {
-      // Entry step (index 0), then repeating box cycle (indices 1-4), then close (last)
       const entry = steps[0];
       const close = steps[steps.length - 1];
       const cycleSteps = steps.slice(1, steps.length - 1);
@@ -98,6 +142,8 @@ export function SessionScreen({
         if (prev !== idx) {
           setFadeKey((k) => k + 1);
           setStepStartSec(elapsed);
+          resetBreathPhaseToneTracking();
+          lastTonePhaseRef.current = null;
         }
         return idx;
       });
@@ -105,28 +151,43 @@ export function SessionScreen({
   }, [elapsed, steps, durationSecs, isVariable, mounted]);
 
   useEffect(() => {
-    if (!done && elapsed >= durationSecs) {
-      queueMicrotask(() => setDone(true));
-      setTimeout(() => onComplete(elapsed), 600);
+    if (elapsed < durationSecs || completionScheduledRef.current) return;
+
+    completionScheduledRef.current = true;
+    queueMicrotask(() => setDone(true));
+    completeTimerRef.current = setTimeout(() => {
+      completeTimerRef.current = null;
+      onComplete(elapsed);
+    }, 600);
+  }, [elapsed, durationSecs, onComplete]);
+
+  useEffect(() => () => {
+    if (completeTimerRef.current !== null) {
+      clearTimeout(completeTimerRef.current);
+      completeTimerRef.current = null;
     }
-  }, [elapsed, done, durationSecs, onComplete]);
+  }, []);
 
-  const remaining   = Math.max(0, durationSecs - elapsed);
-  const progress    = Math.min(1, elapsed / durationSecs);
-  const step        = steps[stepIdx] ?? steps[steps.length - 1];
-  const isLastStep  = stepIdx >= steps.length - 1;
+  const progress = Math.min(1, elapsed / durationSecs);
+  const step = steps[stepIdx] ?? steps[steps.length - 1];
+  const isLastStep = stepIdx >= steps.length - 1;
+  const rhythmStep = isRhythmStep(step);
+  const phaseInfo = getBreathPhaseInfo(step, elapsed, stepStartSec);
 
-  // Append a typographic ellipsis to non-final steps so the user knows
-  // more is coming. Strip any trailing sentence punctuation first so we
-  // don't end up with "Settle in.…".
-  const stepText = step.text && !isLastStep
+  useEffect(() => {
+    if (done || !mounted || muted || !rhythmStep || !phaseInfo.phase) return;
+    const key = `${stepIdx}:${phaseInfo.phase}`;
+    if (lastTonePhaseRef.current === key) return;
+    lastTonePhaseRef.current = key;
+    playBreathPhaseTone(phaseInfo.phase, muted);
+  }, [done, mounted, muted, rhythmStep, phaseInfo.phase, stepIdx]);
+
+  const stepText = step.text && !isLastStep && !rhythmStep
     ? step.text.replace(/[.!?]$/, "") + " \u2026"
     : step.text;
 
-  // Decide whether the orb is expanded this tick and how long the scale
-  // transition should take so movement matches the actual breath pace.
   const { expanded, transitionSecs } = (() => {
-    if (step.animation !== "orb") {
+    if (step.animation !== "orb" && step.animation !== "orb-double") {
       return { expanded: false, transitionSecs: 4 };
     }
 
@@ -134,28 +195,58 @@ export function SessionScreen({
     if (pattern) {
       const { inSecs, outSecs, holdInSecs = 0, holdOutSecs = 0 } = pattern;
       const cycleLen = inSecs + holdInSecs + outSecs + holdOutSecs;
-      if (cycleLen <= 0) {
-        return { expanded: false, transitionSecs: 4 };
-      }
+      if (cycleLen <= 0) return { expanded: false, transitionSecs: 4 };
       const t = (elapsed - stepStartSec) % cycleLen;
-      // Expanded during inhale AND the post-inhale hold (orb at the top).
       const isExpanded = t < inSecs + holdInSecs;
-      // Match transition to the actual phase the orb is entering.
-      // Rising: use inSecs. Falling: use outSecs.
       const phaseSecs = isExpanded ? inSecs : outSecs;
       return { expanded: isExpanded, transitionSecs: phaseSecs };
     }
 
-    // Box-breathing fallback: odd-phase steps = top of breath.
     const isExpanded = stepIdx % 4 === 1 || stepIdx % 4 === 2;
     return { expanded: isExpanded, transitionSecs: 4 };
   })();
 
-  const mins = Math.floor(remaining / 60);
-  const secs = String(remaining % 60).padStart(2, "0");
+  const showChrome = !zenMode || tapRevealActive;
+  const contentFaded = zenMode && !tapRevealActive;
+  const showGuidedCopy = !rhythmStep && stepText;
+  const showPhaseLabel = rhythmStep && phaseInfo.label;
+
+  const revealControls = useCallback(() => {
+    if (!zenMode) return;
+    setTapRevealActive(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => {
+      setTapRevealActive(false);
+    }, CONTROLS_VISIBLE_MS);
+  }, [zenMode]);
+
+  useEffect(() => () => {
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+  }, []);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setBreatheMuted(next);
+    if (next) {
+      stopBackgroundSound();
+    } else {
+      playBackgroundSound(anchor.id, { muted: false, soundscape });
+    }
+  };
+
+  const cycleSoundscape = () => {
+    const next = getNextSoundscape(anchor.id, soundscape);
+    setSoundscape(next);
+    setSoundscapeOverride(anchor.id, next);
+    if (!muted) {
+      playBackgroundSound(anchor.id, { muted: false, soundscape: next });
+    }
+  };
 
   return (
     <div
+      onClick={revealControls}
       style={{
         flex: 1,
         display: "flex",
@@ -167,7 +258,6 @@ export function SessionScreen({
         minHeight: 0,
       }}
     >
-      {/* Orb + step text — flex-shrink so they compress on short screens */}
       <div
         style={{
           display: "flex",
@@ -182,56 +272,88 @@ export function SessionScreen({
       >
         <BreathingOrb animation={step.animation} expanded={expanded} transitionSecs={transitionSecs} />
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={fadeKey}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.35 }}
-            style={{ textAlign: "center", maxWidth: 300, padding: "0 8px" }}
+        {showPhaseLabel && (
+          <motion.p
+            key={phaseInfo.label}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: contentFaded ? 0.55 : 0.38 }}
+            style={{
+              fontSize: "clamp(0.625rem, 2.8vw, 0.75rem)",
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.38)",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              margin: "-24px 0 0",
+            }}
           >
-            <p
-              style={{
-                fontSize: "clamp(15px, 4vw, 18px)",
-                fontWeight: 500,
-                color: "rgba(255,255,255,0.29)",
-                lineHeight: 1.5,
-                letterSpacing: "-0.01em",
-                margin: 0,
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
-              }}
+            {phaseInfo.label}
+          </motion.p>
+        )}
+
+        <AnimatePresence mode="wait">
+          {showGuidedCopy && (
+            <motion.div
+              key={fadeKey}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: contentFaded ? 0 : 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35 }}
+              style={{ textAlign: "center", maxWidth: 300, padding: "0 8px" }}
             >
-              {stepText}
-            </p>
-          </motion.div>
+              <p
+                style={{
+                  fontSize: "clamp(15px, 4vw, 18px)",
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.29)",
+                  lineHeight: 1.5,
+                  letterSpacing: "-0.01em",
+                  margin: 0,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {stepText}
+              </p>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
-      {/* Progress + bottom bar */}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0, marginTop: 50 }}>
-        {/* Progress bar */}
-        <div
-          style={{
-            width: "100%",
-            height: 2,
-            borderRadius: 2,
-            background: "rgba(255,255,255,0.10)",
-            overflow: "hidden",
-          }}
-        >
-          <motion.div
-            style={{ height: "100%", background: "rgba(255,255,255,0.19)", borderRadius: 2 }}
-            animate={{ width: `${progress * 100}%` }}
-            transition={{ duration: 0.8, ease: "linear" }}
-          />
-        </div>
+      <motion.div
+        animate={{ opacity: showChrome ? 1 : 0 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          flexShrink: 0,
+          marginTop: 50,
+          pointerEvents: showChrome ? "auto" : "none",
+        }}
+      >
+        {!rhythmStep && (
+          <div
+            style={{
+              width: "100%",
+              height: 2,
+              borderRadius: 2,
+              background: "rgba(255,255,255,0.10)",
+              overflow: "hidden",
+            }}
+          >
+            <motion.div
+              style={{ height: "100%", background: "rgba(255,255,255,0.19)", borderRadius: 2 }}
+              animate={{ width: `${progress * 100}%` }}
+              transition={{ duration: 0.8, ease: "linear" }}
+            />
+          </div>
+        )}
 
-        {/* Row 1: Back ←→ Title + mute */}
         <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button
-            onClick={onBack}
+            onClick={(e) => { e.stopPropagation(); onBack(); }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -251,6 +373,46 @@ export function SessionScreen({
             Back
           </button>
 
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); cycleSoundscape(); }}
+              style={{
+                color: "rgba(255,255,255,0.28)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 10,
+                fontFamily: FONT,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "6px 4px",
+              }}
+              title="Cycle soundscape"
+            >
+              {SOUNDSCAPE_LABEL[soundscape]}
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: muted ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.32)",
+                padding: 4,
+              }}
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? <VolumeX size={15} strokeWidth={1.5} /> : <Volume2 size={15} strokeWidth={1.5} />}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <span
             style={{
               fontSize: "clamp(0.75rem, 3.2vw, 0.8125rem)",
@@ -260,25 +422,14 @@ export function SessionScreen({
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              maxWidth: "50vw",
+              maxWidth: "70vw",
+              textAlign: "center",
             }}
           >
             {anchor.title}
           </span>
         </div>
-
-        {/* Row 2: Duration picker on its own line so pills never overflow */}
-        {anchor.durationOptions && durationOptIdx !== undefined && onDurationSelect && (
-          <div style={{ width: "100%", display: "flex", justifyContent: "flex-end" }}>
-            <DurationPicker
-              options={anchor.durationOptions}
-              selectedIdx={durationOptIdx}
-              onSelect={onDurationSelect}
-            />
-          </div>
-        )}
-      </div>
+      </motion.div>
     </div>
   );
 }
-

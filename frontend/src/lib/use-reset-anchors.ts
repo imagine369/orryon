@@ -151,10 +151,16 @@ export function useResetAnchors() {
     }
   }, [streaks, createStreak]);
 
-  const save = useCallback((next: ResetCompletion[]) => {
-    setCompletions(next);
-    persistCompletionsLocal(next);
-  }, []);
+  const save = useCallback(
+    (update: ResetCompletion[] | ((prev: ResetCompletion[]) => ResetCompletion[])) => {
+      setCompletions((prev) => {
+        const next = typeof update === "function" ? update(prev) : update;
+        persistCompletionsLocal(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const addCompletion = useCallback(
     (params: {
@@ -170,7 +176,7 @@ export function useResetAnchors() {
         preMood: params.preMood,
         markedForStreak: false,
       };
-      save([...completions, entry]);
+      save((prev) => [...prev, entry]);
 
       window.localStorage.setItem(LAST_USED_KEY, params.anchorId);
       setLastUsedId(params.anchorId);
@@ -189,13 +195,12 @@ export function useResetAnchors() {
 
       return entry;
     },
-    [completions, save]
+    [save],
   );
 
   const updateCompletion = useCallback(
     (id: string, patch: Partial<Pick<ResetCompletion, "postMood" | "note" | "markedForStreak">>) => {
-      const next = completions.map((c) => (c.id === id ? { ...c, ...patch } : c));
-      save(next);
+      save((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
 
       if (!isDemoMode()) {
         const apiPatch: Record<string, unknown> = {};
@@ -208,17 +213,22 @@ export function useResetAnchors() {
         }
       }
     },
-    [completions, save]
+    [save],
   );
 
   const markStreakForCompletion = useCallback(
     (completionId: string) => {
-      const comp = completions.find((c) => c.id === completionId);
-      if (!comp || comp.duration < MIN_DURATION_SECS) return;
+      let eligible = false;
+      save((prev) => {
+        const comp = prev.find((c) => c.id === completionId);
+        eligible = !!(comp && comp.duration >= MIN_DURATION_SECS);
+        return prev;
+      });
+      if (!eligible) return;
       updateCompletion(completionId, { markedForStreak: true });
       toggleDay(STREAK_ID, todayKey());
     },
-    [completions, updateCompletion, toggleDay]
+    [save, updateCompletion, toggleDay],
   );
 
   const markedToday = (() => {

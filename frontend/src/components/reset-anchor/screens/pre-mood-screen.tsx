@@ -5,18 +5,34 @@ import type { ResetAnchor } from "@/lib/reset-scripts";
 import type { MoodState } from "@/lib/use-reset-anchors";
 import { ACCENT_TEXT, MUTED_TEXT, FONT } from "@/components/reset-anchor/tokens";
 import { MoodPicker } from "./mood-picker";
+import { DurationPicker } from "./duration-picker";
 
+function formatDurationSecs(secs: number): string {
+  return secs < 60 ? `${secs}s` : `${secs / 60} min`;
+}
 
 export function PreMoodScreen({
   anchor,
+  durationOptIdx,
+  onDurationSelect,
   onSkip,
   onContinue,
 }: {
   anchor: ResetAnchor;
+  durationOptIdx?: number;
+  onDurationSelect?: (idx: number) => void;
   onSkip: () => void;
   onContinue: (mood?: MoodState) => void;
 }) {
   const [mood, setMood] = useState<MoodState | undefined>(undefined);
+
+  const durationLabel =
+    anchor.durationOptions && durationOptIdx !== undefined
+      ? formatDurationSecs(
+          anchor.durationOptions[durationOptIdx] ??
+            anchor.durationOptions[anchor.defaultDurationIndex ?? 0],
+        )
+      : anchor.displayDuration;
 
   return (
     <div
@@ -32,7 +48,7 @@ export function PreMoodScreen({
       }}
     >
       <p style={{ fontSize: 11, color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>
-        Before you begin
+        {anchor.shortTitle} · {durationLabel}
       </p>
       <p style={{ fontSize: 22, fontWeight: 700, color: ACCENT_TEXT, marginBottom: 6, textAlign: "center", letterSpacing: "-0.02em" }}>
         How are you feeling?
@@ -42,6 +58,19 @@ export function PreMoodScreen({
       </p>
 
       <MoodPicker selected={mood} onSelect={setMood} />
+
+      {anchor.durationOptions && durationOptIdx !== undefined && onDurationSelect && (
+        <div style={{ marginTop: 28, width: "100%", maxWidth: 320 }}>
+          <p style={{ fontSize: 11, color: MUTED_TEXT, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10, textAlign: "center" }}>
+            Duration
+          </p>
+          <DurationPicker
+            options={anchor.durationOptions}
+            selectedIdx={durationOptIdx}
+            onSelect={onDurationSelect}
+          />
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 36, width: "100%", maxWidth: 320 }}>
         <button

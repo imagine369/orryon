@@ -35,7 +35,7 @@ export function PostMoodScreen({
       }}
     >
       <p style={{ fontSize: "clamp(0.625rem, 2.8vw, 0.6875rem)", color: MUTED_TEXT, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>
-        Reset complete
+        {anchor.shortTitle} · Reset complete
       </p>
       <p
         style={{

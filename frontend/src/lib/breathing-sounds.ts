@@ -13,6 +13,8 @@
  *   silence      — nothing
  */
 
+import { getSoundscapeOverride, loadBreathePreferences } from "@/lib/breathing-preferences";
+
 export type Soundscape =
   | "pink-noise"
   | "gentle-rain"
@@ -35,7 +37,7 @@ export const ANCHOR_SOUNDS: Record<string, SoundConfig> = {
     description: "Pink noise for cognitive clarity",
     scientificBasis: "Pink noise reduces intrusive thoughts and enhances focus (Nature Communications, 2026)",
   },
-  "double-inhale": {
+  "double-inhale-destress": {
     default: "gentle-rain",
     alternatives: ["ocean", "silence"],
     description: "Gentle rain for rapid nervous system reset",
@@ -71,6 +73,18 @@ export const ANCHOR_SOUNDS: Record<string, SoundConfig> = {
     description: "Gentle rain for sleep onset",
     scientificBasis: "Rain is most effective for sleep onset (sleep research, 2026)",
   },
+  "clarity-breath-2min": {
+    default: "pink-noise",
+    alternatives: ["brown-noise", "silence"],
+    description: "Pink noise for a quick clarity shift",
+    scientificBasis: "Pink noise supports brief HRV coherence shifts during paced breathing",
+  },
+  "custom-loop": {
+    default: "pink-noise",
+    alternatives: ["brown-noise", "gentle-rain", "silence"],
+    description: "Pink noise for your personal rhythm",
+    scientificBasis: "Consistent ambient bed supports self-paced breath regulation",
+  },
   "do-nothing": {
     default: "silence",
     alternatives: ["pink-noise"],
@@ -84,9 +98,10 @@ export const ANCHOR_SOUNDS: Record<string, SoundConfig> = {
 let _ctx: AudioContext | null = null;
 let _masterGain: GainNode | null = null;
 let _stopFn: (() => void) | null = null;
-let _currentSoundscape: Soundscape | null = null;
 let _stopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let _generation = 0; // incremented each time we start a new sound; stops are self-invalidating
+let _toneGain: GainNode | null = null;
+let _lastTonePhase: BreathPhaseKind | null = null;
 
 function getCtx(): AudioContext {
   if (!_ctx || _ctx.state === "closed") {
@@ -120,8 +135,31 @@ function noiseSource(ctx: AudioContext): AudioBufferSourceNode {
 // ── Soundscape synthesizers ───────────────────────────────────────────────────
 
 // All synth functions output at a normalised ~0.25 level into the master gain.
-// The master itself is then set to 0.12 so the result is genuinely background-
-// level — present but never distracting.
+// The master itself is then set to BACKGROUND_SOUND_VOLUME so the result is
+// genuinely faint — felt more than heard, never competing with breath focus.
+
+/** Master gain for session ambience — intentionally very low. */
+export const BACKGROUND_SOUND_VOLUME = 0.06;
+
+/** Breath phase tones — separate channel, also kept faint. */
+export const BREATH_TONE_VOLUME = 0.035;
+
+export type BreathPhaseKind = "inhale" | "hold-in" | "exhale" | "hold-out";
+
+function startSoundscapeNodes(
+  ctx: AudioContext,
+  masterGain: GainNode,
+  soundscape: Soundscape,
+): () => void {
+  switch (soundscape) {
+    case "pink-noise":  return synthPinkNoise(ctx, masterGain);
+    case "brown-noise": return synthBrownNoise(ctx, masterGain);
+    case "gentle-rain": return synthGentleRain(ctx, masterGain);
+    case "forest":      return synthForest(ctx, masterGain);
+    case "ocean":       return synthOcean(ctx, masterGain);
+    default:            return synthPinkNoise(ctx, masterGain);
+  }
+}
 
 function synthPinkNoise(ctx: AudioContext, gain: GainNode): () => void {
   const src = noiseSource(ctx);
@@ -301,7 +339,63 @@ function synthOcean(ctx: AudioContext, gain: GainNode): () => void {
   };
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Breath phase tones ────────────────────────────────────────────────────────
+
+const PHASE_TONE_HZ: Record<BreathPhaseKind, number> = {
+  inhale: 220,
+  "hold-in": 247,
+  exhale: 185,
+  "hold-out": 165,
+};
+
+function ensureToneGain(ctx: AudioContext): GainNode {
+  if (!_toneGain) {
+    _toneGain = ctx.createGain();
+    _toneGain.gain.value = BREATH_TONE_VOLUME;
+    _toneGain.connect(ctx.destination);
+  }
+  return _toneGain;
+}
+
+/** Soft sine ping at each breath phase transition — eyes-closed rhythm cue. */
+export function playBreathPhaseTone(phase: BreathPhaseKind, muted = false): void {
+  if (muted || typeof window === "undefined") return;
+  if (_lastTonePhase === phase) return;
+  _lastTonePhase = phase;
+
+  try {
+    const ctx = getCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = PHASE_TONE_HZ[phase];
+
+    const env = ctx.createGain();
+    const now = ctx.currentTime;
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(1, now + 0.06);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+    const toneGain = ensureToneGain(ctx);
+    osc.connect(env);
+    env.connect(toneGain);
+    osc.start(now);
+    osc.stop(now + 0.35);
+  } catch { /* ignore */ }
+}
+
+export function resetBreathPhaseToneTracking(): void {
+  _lastTonePhase = null;
+}
+
+export function stopBreathTones(): void {
+  _lastTonePhase = null;
+  if (_toneGain) {
+    try { _toneGain.disconnect(); } catch { /* ignore */ }
+    _toneGain = null;
+  }
+}
 
 export function getSoundForAnchor(anchorId: string): SoundConfig {
   return ANCHOR_SOUNDS[anchorId] || ANCHOR_SOUNDS["quick-box-reset"];
@@ -322,51 +416,66 @@ export function primeAudioContext(): void {
   } catch { /* ignore */ }
 }
 
-export function playBackgroundSound(anchorId: string, volume: number = 0.12): void {
-  // Cancel any pending deferred stop from a previous fade-out
+export function getSoundscapeOptions(anchorId: string): Soundscape[] {
+  const config = getSoundForAnchor(anchorId);
+  return [config.default, ...(config.alternatives ?? [])];
+}
+
+export function getNextSoundscape(anchorId: string, current: Soundscape): Soundscape {
+  const options = getSoundscapeOptions(anchorId);
+  const idx = options.indexOf(current);
+  return options[(idx + 1) % options.length];
+}
+
+export function getActiveSoundscape(anchorId: string): Soundscape {
+  const config = getSoundForAnchor(anchorId);
+  return getSoundscapeOverride(anchorId) ?? config.default;
+}
+
+export function playBackgroundSound(
+  anchorId: string,
+  options?: { volume?: number; soundscape?: Soundscape; muted?: boolean },
+): void {
   stopBackgroundSound();
 
   if (typeof window === "undefined") return;
 
+  const prefs = loadBreathePreferences();
+  const muted = options?.muted ?? prefs.muted;
+  if (muted) return;
+
   const config = getSoundForAnchor(anchorId);
-  if (config.default === "silence") {
-    _currentSoundscape = "silence";
-    return;
-  }
+  const soundscape =
+    options?.soundscape ??
+    getSoundscapeOverride(anchorId) ??
+    config.default;
+
+  if (soundscape === "silence") return;
+
+  const volume = options?.volume ?? BACKGROUND_SOUND_VOLUME;
 
   try {
     const ctx = getCtx();
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
     const masterGain = ctx.createGain();
-    // Fade in over 1.2s — never jarring
     masterGain.gain.setValueAtTime(0, ctx.currentTime);
     masterGain.gain.linearRampToValueAtTime(
       Math.max(0, Math.min(1, volume)),
-      ctx.currentTime + 1.2,
+      ctx.currentTime + 2.4,
     );
     masterGain.connect(ctx.destination);
     _masterGain = masterGain;
     _generation++;
 
-    let stopNodes: () => void;
-    switch (config.default) {
-      case "pink-noise":  stopNodes = synthPinkNoise(ctx, masterGain);  break;
-      case "brown-noise": stopNodes = synthBrownNoise(ctx, masterGain); break;
-      case "gentle-rain": stopNodes = synthGentleRain(ctx, masterGain); break;
-      case "forest":      stopNodes = synthForest(ctx, masterGain);     break;
-      case "ocean":       stopNodes = synthOcean(ctx, masterGain);      break;
-      default:            stopNodes = synthPinkNoise(ctx, masterGain);
-    }
-
-    _stopFn = stopNodes;
-    _currentSoundscape = config.default;
+    _stopFn = startSoundscapeNodes(ctx, masterGain, soundscape);
   } catch (e) {
     console.warn("Could not start background sound:", e);
   }
 }
 
 export function stopBackgroundSound(): void {
+  stopBreathTones();
   // Cancel any previously scheduled deferred stop so nodes don't stack
   if (_stopTimeoutId !== null) {
     clearTimeout(_stopTimeoutId);
@@ -392,11 +501,6 @@ export function stopBackgroundSound(): void {
 
   _stopFn = null;
   _masterGain = null;
-  _currentSoundscape = null;
-}
-
-export function isSoundPlaying(): boolean {
-  return _masterGain !== null;
 }
 
 // ── Haptics ───────────────────────────────────────────────────────────────────
@@ -434,7 +538,7 @@ export function getHapticPatternForStep(
   stepText: string,
 ): number[] {
   const lower = stepText.toLowerCase();
-  if (/\bin\b|inhale|breathe in/.test(lower))   return [60, 40, 60];
+  if (/inhale|breathe in|breath in/.test(lower))   return [60, 40, 60];
   if (/hold|pause|stay/.test(lower))             return [90];
   if (/out\b|exhale|release|let go/.test(lower)) return [140];
   return [40];

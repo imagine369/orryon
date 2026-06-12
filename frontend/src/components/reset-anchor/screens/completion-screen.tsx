@@ -1,20 +1,27 @@
 "use client";
 
 import type { ResetAnchor } from "@/lib/reset-scripts";
+import type { MoodState } from "@/lib/use-reset-anchors";
+import { formatMoodDelta } from "@/lib/reset-mood-insights";
 import { ACCENT_TEXT, MUTED_TEXT, FONT } from "@/components/reset-anchor/tokens";
-
 
 export function CompletionScreen({
   anchor,
   streakCount,
   markedStreak,
+  preMood,
+  postMood,
   onClose,
 }: {
   anchor: ResetAnchor;
   streakCount: number;
   markedStreak: boolean;
+  preMood?: MoodState;
+  postMood?: MoodState;
   onClose: () => void;
 }) {
+  const moodDelta = formatMoodDelta(preMood, postMood);
+
   return (
     <div
       style={{
@@ -52,6 +59,13 @@ export function CompletionScreen({
           ? "You're clear. Begin."
           : "Your system has reset."}
       </p>
+
+      {moodDelta && (
+        <p style={{ fontSize: "clamp(0.8125rem, 3.5vw, 0.875rem)", color: "rgba(255,255,255,0.42)", marginBottom: 10 }}>
+          {moodDelta}
+        </p>
+      )}
+
       <p style={{ fontSize: "clamp(0.8125rem, 3.5vw, 0.875rem)", color: MUTED_TEXT, maxWidth: "min(100%, 260px)", lineHeight: 1.6, marginBottom: "clamp(2rem, 8vw, 3rem)", wordBreak: "break-word" }}>
         {anchor.tagline}
       </p>
@@ -61,7 +75,7 @@ export function CompletionScreen({
         style={{
           padding: "13px clamp(1.5rem, 8vw, 2.5rem)",
           borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.14)",
+          border: "1px solid rgba(255,255,255,0.14)",
           background: "transparent",
           color: "rgba(255,255,255,0.45)",
           fontSize: 13,
@@ -74,4 +88,3 @@ export function CompletionScreen({
     </div>
   );
 }
-
