@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
   try {
     upstream = await fetch(url, {
       method: "GET",
-      headers: { Authorization: `Bearer ${jwt}` },
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Origin: req.nextUrl.origin,
+      },
       redirect: "manual",
       cache: "no-store",
     });

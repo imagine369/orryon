@@ -29,9 +29,44 @@ router = APIRouter(tags=["calendar"])
 logger = logging.getLogger(__name__)
 
 APP_URL = CONFIG_APP_URL or os.getenv("APP_URL", "http://localhost:3000")
-GOOGLE_REDIRECT_URI = f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
 _OAUTH_STATE_TTL = 600
 _OAUTH_IN_SCHEMA = GOOGLE_CALENDAR_OAUTH_ENABLED
+
+
+def _allowed_oauth_origins() -> set[str]:
+    """Origins we may use as the OAuth redirect base (must match Google Console)."""
+    origins: set[str] = set()
+    for env_key in ("FRONTEND_URL", "APP_URL"):
+        for part in os.getenv(env_key, "").split(","):
+            origin = part.strip().rstrip("/")
+            if origin:
+                origins.add(origin)
+    origins.update({
+        "https://www.orryon.com",
+        "https://orryon.com",
+        "http://localhost:3000",
+    })
+    return origins
+
+
+def _google_redirect_uri(request: Request) -> str:
+    """Resolve redirect URI — must exactly match a URI registered in Google Cloud Console."""
+    override = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
+    if override:
+        return override.rstrip("/")
+
+    allowed = _allowed_oauth_origins()
+    origin = (request.headers.get("origin") or "").rstrip("/")
+    if origin in allowed:
+        return f"{origin}/api/calendar/google/callback"
+
+    for env_key in ("FRONTEND_URL", "APP_URL"):
+        for part in os.getenv(env_key, "").split(","):
+            base = part.strip().rstrip("/")
+            if base:
+                return f"{base}/api/calendar/google/callback"
+
+    return f"{APP_URL.rstrip('/')}/api/calendar/google/callback"
 
 
 def _require_google_oauth() -> None:
@@ -90,9 +125,11 @@ def _verify_oauth_state(state: str) -> str:
 
 
 @router.get("/api/calendar/google/auth", include_in_schema=_OAUTH_IN_SCHEMA)
-async def google_auth(user: dict = Depends(get_current_user)):
+async def google_auth(request: Request, user: dict = Depends(get_current_user)):
     _require_google_oauth()
     uid = user["user_id"]
+    redirect_uri = _google_redirect_uri(request)
+    logger.info("Google OAuth auth redirect_uri=%s", redirect_uri)
 
     try:
         from google_auth_oauthlib.flow import Flow
@@ -106,11 +143,11 @@ async def google_auth(user: dict = Depends(get_current_user)):
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [GOOGLE_REDIRECT_URI],
+                "redirect_uris": [redirect_uri],
             }
         },
         scopes=GOOGLE_SCOPES,
-        redirect_uri=GOOGLE_REDIRECT_URI,
+        redirect_uri=redirect_uri,
     )
     signed_state = _sign_oauth_state(uid)
     auth_url, _ = flow.authorization_url(
@@ -132,6 +169,8 @@ async def google_callback(code: str, state: str, request: Request):
         raise HTTPException(status_code=500, detail="Google auth library not available.")
 
     uid = _verify_oauth_state(state)
+    redirect_uri = _google_redirect_uri(request)
+    logger.info("Google OAuth callback redirect_uri=%s", redirect_uri)
 
     flow = Flow.from_client_config(
         {
@@ -140,11 +179,11 @@ async def google_callback(code: str, state: str, request: Request):
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [GOOGLE_REDIRECT_URI],
+                "redirect_uris": [redirect_uri],
             }
         },
         scopes=GOOGLE_SCOPES,
-        redirect_uri=GOOGLE_REDIRECT_URI,
+        redirect_uri=redirect_uri,
         state=state,
     )
     flow.fetch_token(code=code)

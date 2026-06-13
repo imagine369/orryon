@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     upstream = await fetch(url, {
       method: "GET",
+      headers: { Origin: req.nextUrl.origin },
       redirect: "manual",
       cache: "no-store",
     });

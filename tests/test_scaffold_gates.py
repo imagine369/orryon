@@ -5,8 +5,13 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from backend.routers import approvals, calendar_google, connections
+
+
+def _google_request() -> Request:
+    return Request({"type": "http", "method": "GET", "path": "/", "headers": []})
 
 
 def test_plaid_stub_routes_removed():
@@ -37,7 +42,10 @@ async def test_approvals_pending_hidden_when_hitl_disabled():
 async def test_google_oauth_auth_hidden_when_disabled():
     with patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
         with pytest.raises(HTTPException) as exc:
-            await calendar_google.google_auth(user={"user_id": "u1", "email": "a@b.c", "jti": "x", "iat": 0})
+            await calendar_google.google_auth(
+                _google_request(),
+                user={"user_id": "u1", "email": "a@b.c", "jti": "x", "iat": 0},
+            )
         assert exc.value.status_code == 404
 
 
