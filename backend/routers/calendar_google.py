@@ -90,18 +90,9 @@ def _verify_oauth_state(state: str) -> str:
 
 
 @router.get("/api/calendar/google/auth", include_in_schema=_OAUTH_IN_SCHEMA)
-async def google_auth(request: Request, token: str = ""):
+async def google_auth(user: dict = Depends(get_current_user)):
     _require_google_oauth()
-
-    import jwt as pyjwt
-    jwt_secret = os.getenv("JWT_SECRET", "")
-    if not token or not jwt_secret:
-        raise HTTPException(status_code=401, detail="Missing or invalid token.")
-    try:
-        payload = pyjwt.decode(token, jwt_secret, algorithms=["HS256"])
-        uid = payload.get("user_id") or payload.get("sub", "")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token.")
+    uid = user["user_id"]
 
     try:
         from google_auth_oauthlib.flow import Flow

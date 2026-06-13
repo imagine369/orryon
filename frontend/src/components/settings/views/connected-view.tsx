@@ -67,8 +67,8 @@ export function ConnectedView({ panel }: { panel: SettingsPanel }) {
   }, []);
 
   function connectGoogle() {
-    const token = localStorage.getItem("orryon_token") ?? "";
-    window.location.href = `${getApiBase()}/api/calendar/google/auth?token=${token}`;
+    // Session JWT lives in the HttpOnly cookie; the /api proxy forwards it as Bearer.
+    window.location.href = `${getApiBase()}/api/calendar/google/auth`;
   }
 
   return (
