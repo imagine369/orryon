@@ -10,7 +10,11 @@ import { AppTourDemo } from "@/components/landing/app-tour-demo";
 import { FeatureSection } from "@/components/landing/feature-section";
 import { FooterRevealSection } from "@/components/landing/footer-reveal-section";
 import { OrbitSection } from "@/components/landing/orbit-section";
-import { LIFE_OS_HERO_MECHANIC, LIFE_OS_TOUR_LABEL } from "@/lib/life-os-copy";
+import {
+  LIFE_OS_HERO_MECHANIC,
+  LIFE_OS_PRIVACY_LINE,
+  LIFE_OS_TOUR_LABEL,
+} from "@/lib/life-os-copy";
 
 const HERO_ASK_TEXT = "Ask me anything.";
 const HERO_ASK_TYPE_MS = 32;
@@ -134,8 +138,8 @@ export default function LandingPage() {
               <AppTourDemo />
             </div>
 
-            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/60 mt-[15px]">
-              Orryon doesn&rsquo;t connect to your bank.<br />That&rsquo;s the point. Your data stays yours.
+            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/60 mt-[15px] max-w-[22rem] leading-relaxed">
+              {LIFE_OS_PRIVACY_LINE}
             </p>
           </div>
         </div>

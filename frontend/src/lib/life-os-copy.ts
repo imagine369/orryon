@@ -13,6 +13,10 @@ export const LIFE_OS_HERO_MECHANIC =
 /** Quiet label above the landing app tour. */
 export const LIFE_OS_TOUR_LABEL = "How Orryon does it";
 
+/** Trust / privacy line under the tour and in the footer reveal. */
+export const LIFE_OS_PRIVACY_LINE =
+  "Private by design. We make money from memberships, not from your data.";
+
 /** Shown on Pro tier — upgrade path to Premium voice */
 export const PRO_TEXT_ONLY_HINT =
   "Pro is text chat. Upgrade to Premium to speak to Orryon, or Premium Plus to hear replies aloud.";

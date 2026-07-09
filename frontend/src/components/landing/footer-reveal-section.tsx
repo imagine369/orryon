@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { ORB_FILL } from "@/components/reset-anchor/tokens";
 import { PillLink } from "@/components/pill-cta";
+import { LIFE_OS_PRIVACY_LINE } from "@/lib/life-os-copy";
 
 /* ── Customise timing / sizing here ── */
 const ORB_SIZE_MOBILE = 128;
@@ -248,7 +249,7 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
             Less noise. More you.
           </h2>
           <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/55 max-w-[420px] mb-[100px]">
-            Private by design. Your data stays yours.
+            {LIFE_OS_PRIVACY_LINE}
           </p>
 
           <div className="relative flex flex-col items-center">
