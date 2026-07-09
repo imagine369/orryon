@@ -10,6 +10,7 @@ import { AppTourDemo } from "@/components/landing/app-tour-demo";
 import { FeatureSection } from "@/components/landing/feature-section";
 import { FooterRevealSection } from "@/components/landing/footer-reveal-section";
 import { OrbitSection } from "@/components/landing/orbit-section";
+import { LIFE_OS_HERO_MECHANIC, LIFE_OS_TOUR_LABEL } from "@/lib/life-os-copy";
 
 const HERO_ASK_TEXT = "Ask me anything.";
 const HERO_ASK_TYPE_MS = 32;
@@ -105,18 +106,31 @@ export default function LandingPage() {
             Your Life OS
           </p>
           <HeroAskTyping />
-          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-[59px] sm:mb-[67px] lg:mb-[75px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
+          <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-[20px] sm:mb-[24px] lg:mb-[28px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
             Your guide to organized life
             <span className="hidden sm:inline"><br /></span>and calmer days.
           </h1>
+          <p
+            className="text-[0.95rem] sm:text-[1.05rem] lg:text-[1.2rem] text-white/70 mb-[48px] sm:mb-[56px] lg:mb-[64px] max-w-[34rem] leading-snug"
+            style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
+          >
+            {LIFE_OS_HERO_MECHANIC}
+          </p>
 
           {/* See it in action — app tour */}
-          <div className="w-full flex flex-col items-center">
+          <div id="how-it-works" className="w-full flex flex-col items-center scroll-mt-24">
             <div className="w-full max-w-lg px-4 sm:px-6 flex flex-col items-center gap-3 mb-[48px] sm:mb-[60px] mt-0">
               {heroCta}
             </div>
 
-            <div className="mt-[40px] sm:mt-[50px] w-full flex justify-center text-left">
+            <p
+              className="text-[0.72rem] sm:text-xs lg:text-sm uppercase tracking-[2px] text-white/50 mb-4 sm:mb-5"
+              style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
+            >
+              {LIFE_OS_TOUR_LABEL}
+            </p>
+
+            <div className="mt-0 w-full flex justify-center text-left">
               <AppTourDemo />
             </div>
 

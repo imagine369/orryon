@@ -6,19 +6,21 @@ import {
   BarChart2,
   BookOpen,
   Calendar,
-  Check,
-  Map,
+  MapPin,
+  ShoppingBasket,
+  Sparkles,
   Wind,
 } from "lucide-react";
 import { AnimatedHeroAvatar } from "@/components/animated-hero-avatar";
 
 const ORBIT_ITEMS = [
-  { label: "Money",     sub: "Budgets, bills & goals",   Icon: BarChart2, color: "#60a5fa", glow: "rgba(96,165,250,0.20)"  },
-  { label: "Tasks",     sub: "To-dos, lists & errands",  Icon: Check,     color: "#4ade80", glow: "rgba(74,222,128,0.20)"  },
-  { label: "Calendar",  sub: "Events & reminders",       Icon: Calendar,  color: "#fb923c", glow: "rgba(251,146,60,0.20)"  },
-  { label: "Plans",     sub: "Trips, dinners & pickups", Icon: Map,       color: "#fbbf24", glow: "rgba(251,191,36,0.20)"  },
-  { label: "Journal",   sub: "Reflection & capture",     Icon: BookOpen,  color: "#c084fc", glow: "rgba(192,132,252,0.20)" },
-  { label: "Wellbeing", sub: "Breathing & clarity",      Icon: Wind,      color: "#2dd4bf", glow: "rgba(45,212,191,0.20)"  },
+  { label: "Money",     sub: "Budgets, bills & goals",              Icon: BarChart2,      color: "#60a5fa", glow: "rgba(96,165,250,0.20)"  },
+  { label: "Ask",       sub: "Universe to everyday life",           Icon: Sparkles,       color: "#e879f9", glow: "rgba(232,121,249,0.20)" },
+  { label: "Errands",   sub: "Lists, groceries & handoffs",         Icon: ShoppingBasket, color: "#4ade80", glow: "rgba(74,222,128,0.20)"  },
+  { label: "Calendar",  sub: "Events & reminders",                  Icon: Calendar,       color: "#fb923c", glow: "rgba(251,146,60,0.20)"  },
+  { label: "Places",    sub: "Restaurants, trips & nearby",         Icon: MapPin,         color: "#fbbf24", glow: "rgba(251,191,36,0.20)"  },
+  { label: "Journal",   sub: "Reflection & capture",                Icon: BookOpen,       color: "#c084fc", glow: "rgba(192,132,252,0.20)" },
+  { label: "Wellbeing", sub: "Breathing & clarity",                 Icon: Wind,           color: "#2dd4bf", glow: "rgba(45,212,191,0.20)"  },
 ];
 
 const ORBIT_R = 220;
@@ -28,9 +30,11 @@ const CYCLE_MS = 704;
 const TRANS_MS = 0.16;
 const LINE_DRAW_MS = 0.16;
 const ACTIVE_LINE_LEN = ORBIT_R - AVATAR_R - CIRCLE_R_ACTIVE;
-const CON_W = 660, CON_H = 580;
+const CON_W = 680, CON_H = 600;
 const OCX = CON_W / 2, OCY = CON_H / 2;
-const ORBIT_DATA = [-90, -30, 30, 90, 150, 210].map((deg) => {
+const ORBIT_STEP = 360 / ORBIT_ITEMS.length;
+const ORBIT_DATA = ORBIT_ITEMS.map((_, i) => {
+  const deg = -90 + i * ORBIT_STEP;
   const a = (deg * Math.PI) / 180;
   const ux = Math.cos(a), uy = Math.sin(a);
   return { x: OCX + ORBIT_R * ux, y: OCY + ORBIT_R * uy, ux, uy };
@@ -48,8 +52,9 @@ export function OrbitSection() {
     <section className="border-b border-white/5">
       <div className="text-center px-4 sm:px-6 pt-[80px] sm:pt-[100px] lg:pt-[122px] pb-8 sm:pb-10">
         <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
-          Everything you need to run your day —<br />
-          <em>nothing you don&rsquo;t.</em>
+          From your day to the big questions.
+          <br />
+          <em>Orryon sits at the center.</em>
         </h2>
       </div>
 
@@ -57,7 +62,7 @@ export function OrbitSection() {
       <div className="hidden sm:flex justify-center pb-16 overflow-x-hidden">
         <div className="relative scale-[0.72] sm:scale-[0.82] lg:scale-100 origin-top" style={{ width: CON_W, height: CON_H, overflow: "visible" }}>
 
-          {/* Connecting lines — from avatar edge to circle edge */}
+          {/* Connecting lines from avatar edge to circle edge */}
           <svg className="absolute inset-0" width={CON_W} height={CON_H} style={{ pointerEvents: "none" }}>
             {ORBIT_DATA.map((d, i) => {
               if (active !== i) return null;
@@ -131,10 +136,11 @@ export function OrbitSection() {
           {ORBIT_ITEMS.map((item, i) => {
             const isActive = active === i;
             const Icon = item.Icon;
+            const isLastOdd = i === ORBIT_ITEMS.length - 1 && ORBIT_ITEMS.length % 2 === 1;
             return (
               <div
                 key={item.label}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-[160ms]"
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-[160ms]${isLastOdd ? " col-span-2 max-w-[calc(50%-0.375rem)] justify-self-center w-full" : ""}`}
                 style={{
                   borderColor: isActive ? item.color : "rgba(255,255,255,0.08)",
                   background: "rgba(255,255,255,0.02)",

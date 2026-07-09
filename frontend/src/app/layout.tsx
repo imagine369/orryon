@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"] });
 
 const META_DESCRIPTION =
-  "Orryon is your Life OS — ask almost anything in chat; when it's about your money, schedule, and notes, Orryon actually does something.";
+  "Orryon is your Life OS. Ask about anything, from big questions about the universe to your everyday life.";
 
 export const metadata: Metadata = {
   title: "orryon",

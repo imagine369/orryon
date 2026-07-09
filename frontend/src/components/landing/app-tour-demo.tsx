@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
-import { ArrowUp, Bell, LayoutGrid, Mic, Search, Settings } from "lucide-react";
+import { ArrowUp, Bell, Calendar, LayoutGrid, MapPin, Mic, Search, Settings, Wallet } from "lucide-react";
 import {
   CHAT_ASSISTANT_BUBBLE_CLASS,
   CHAT_USER_BUBBLE_CLASS,
@@ -21,17 +21,59 @@ function getDemoGreeting() {
 
 type TourPhase =
   | "home" | "typing" | "sending" | "chat-bubble"
-  | "thinking" | "responding" | "next-chat" | "clearing" | "reset";
+  | "thinking" | "responding" | "surface" | "next-chat" | "clearing" | "reset";
 
-const TOUR_CHATS = [
-  { prompt: "Log a purchase from this morning",      response: "Done — logged and categorized automatically." },
-  { prompt: "Help me set a savings goal",            response: "Goal created. I'll track your progress and keep you on course." },
-  { prompt: "How did my spending look this month?",  response: "You stayed within budget overall. A couple of categories worth keeping an eye on." },
-  { prompt: "Remind me about something next week",   response: "Got it — I'll remind you in advance." },
-  { prompt: "Am I on track with my savings goal?",   response: "You're making steady progress. Keep it up and you'll hit it on time." },
+type TourSurface = {
+  label: string;
+  detail: string;
+  Icon: React.FC<{ className?: string; strokeWidth?: number }>;
+};
+
+type TourChat = {
+  prompt: string;
+  response: string;
+  surface: TourSurface;
+  voice?: boolean;
+};
+
+const TOUR_CHATS: TourChat[] = [
+  {
+    prompt: "Sushi was $45 last night",
+    response: "Done — logged under Dining.",
+    surface: { label: "Budget", detail: "Sushi · $45 · Dining", Icon: Wallet },
+  },
+  {
+    prompt: "Find a good Italian spot near me for tonight",
+    response: "Found a few nearby. Osteria looks right — I can hold a table.",
+    surface: { label: "Places", detail: "Osteria · 7:30 · 2 seats", Icon: MapPin },
+  },
+  {
+    prompt: "Remind me to call Mum on Thursday",
+    response: "Got it — I'll remind you in advance.",
+    surface: { label: "Schedule", detail: "Thu · Call Mum", Icon: Calendar },
+    voice: true,
+  },
 ];
 
-
+function SurfaceCard({ surface }: { surface: TourSurface }) {
+  const { Icon } = surface;
+  return (
+    <div
+      className="mx-auto w-full max-w-[260px] rounded-2xl border border-white/12 bg-white/[0.06] px-3.5 py-3 backdrop-blur-md"
+      style={{ animation: "msgIn 0.28s ease-out both" }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.08] ring-1 ring-white/10">
+          <Icon className="h-4 w-4 text-white/70" strokeWidth={1.5} />
+        </div>
+        <div className="min-w-0 text-left">
+          <p className="text-[0.6rem] uppercase tracking-[1.5px] text-white/40">{surface.label}</p>
+          <p className="truncate text-[0.8rem] text-white/80 leading-snug">{surface.detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AppTourDemo() {
   const [phase, setPhase]               = useState<TourPhase>("home");
@@ -40,6 +82,7 @@ export function AppTourDemo() {
   const [sending, setSending]           = useState(false);
   const [currentBubble, setCurrentBubble] = useState("");
   const [currentResponse, setCurrentResponse] = useState("");
+  const [showSurface, setShowSurface]   = useState(false);
   const [thinking, setThinking]         = useState(false);
   const [micActive, setMicActive]       = useState(false);
   const [visible, setVisible]           = useState(true);
@@ -55,13 +98,12 @@ export function AppTourDemo() {
 
     if (phase === "home") {
       setInputText(""); setCurrentBubble(""); setCurrentResponse(""); setThinking(false);
-      setSending(false); setMicActive(false);
+      setSending(false); setMicActive(false); setShowSurface(false);
       setChatIdx(0); setVisible(true);
       go("typing", 900);
     }
     if (phase === "typing") {
-      // Every 3rd chat uses voice input — mic pulses, then text appears all at once
-      if (chatIdx % 3 === 2) {
+      if (chat.voice) {
         setMicActive(true);
         tmr.current = setTimeout(() => {
           setInputText(chat.prompt);
@@ -88,12 +130,16 @@ export function AppTourDemo() {
       let i = 0;
       const type = () => {
         if (i <= chat.response.length) { setCurrentResponse(chat.response.slice(0, i)); i++; tmr.current = setTimeout(type, 22); }
-        else go("next-chat", 900);
+        else go("surface", 450);
       };
       tmr.current = setTimeout(type, 50);
     }
+    if (phase === "surface") {
+      setShowSurface(true);
+      go("next-chat", 1400);
+    }
     if (phase === "next-chat") {
-      setCurrentBubble(""); setCurrentResponse("");
+      setCurrentBubble(""); setCurrentResponse(""); setShowSurface(false);
       if (chatIdx < TOUR_CHATS.length - 1) {
         setPhase("clearing");
         setChatIdx(c => c + 1);
@@ -112,11 +158,12 @@ export function AppTourDemo() {
   useEffect(() => {
     const el = chatScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [currentBubble, currentResponse, thinking]);
+  }, [currentBubble, currentResponse, thinking, showSurface]);
 
   const hasInput      = inputText.length > 0;
   const isChatMode    = chatIdx > 0 || !["home", "typing", "sending"].includes(phase);
   const isTypingPhase = phase === "typing";
+  const activeSurface = TOUR_CHATS[chatIdx]?.surface;
 
   return (
     <div className="w-full max-w-[320px] sm:max-w-[360px] mx-auto" style={{ transition: "opacity 0.5s", opacity: visible ? 1 : 0 }}>
@@ -208,6 +255,11 @@ export function AppTourDemo() {
                         {phase === "responding" && <span className="ml-0.5 inline-block h-[0.8em] w-px animate-pulse bg-white/40 align-middle" />}
                       </div>
                     </div>
+                  </div>
+                )}
+                {showSurface && activeSurface && (
+                  <div className="pt-1">
+                    <SurfaceCard surface={activeSurface} />
                   </div>
                 )}
               </div>

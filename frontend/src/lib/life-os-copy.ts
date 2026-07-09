@@ -1,10 +1,17 @@
 /** Shared Life OS positioning copy (keep in sync with marketing + system prompt). */
 
 export const LIFE_OS_TAGLINE =
-  "Your Life OS — ask almost anything; when it's about your life, Orryon does something.";
+  "Your Life OS. Ask about anything, from big questions about the universe to your everyday life.";
 
 export const LIFE_OS_SHORT =
-  "Ask almost anything. Your money, schedule, and notes actually update when you ask.";
+  "Ask about anything, from big questions about the universe to your everyday life.";
+
+/** Hero line under the H1. */
+export const LIFE_OS_HERO_MECHANIC =
+  "Ask about anything, from big questions about the universe to your everyday life.";
+
+/** Quiet label above the landing app tour. */
+export const LIFE_OS_TOUR_LABEL = "How Orryon does it";
 
 /** Shown on Pro tier — upgrade path to Premium voice */
 export const PRO_TEXT_ONLY_HINT =
