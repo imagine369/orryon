@@ -170,6 +170,20 @@ def _frontend_home(query: str = "") -> str:
     return f"{base}/home{query}"
 
 
+def _oauth_error_reason(exc: BaseException) -> str:
+    """Map token-exchange failures to a short, URL-safe reason for the UI banner."""
+    text = str(exc).lower()
+    if "invalid_client" in text or "unauthorized" in text:
+        return "invalid_client"
+    if "redirect_uri" in text:
+        return "redirect_uri"
+    if "invalid_grant" in text:
+        return "invalid_grant"
+    if "scope" in text:
+        return "scope"
+    return "unknown"
+
+
 @router.get("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_callback(code: str, state: str, request: Request):
     _require_google_oauth()
@@ -205,13 +219,15 @@ async def google_callback(code: str, state: str, request: Request):
         flow.fetch_token(code=code)
     except Exception as exc:
         # Common causes: client_id/secret mismatch, redirect_uri mismatch, reused code.
+        reason = _oauth_error_reason(exc)
         logger.exception(
-            "Google OAuth token exchange failed (redirect_uri=%s client_id_prefix=%s): %s",
+            "Google OAuth token exchange failed (redirect_uri=%s client_id_prefix=%s reason=%s): %s",
             redirect_uri,
             (GOOGLE_CLIENT_ID or "")[:24],
+            reason,
             exc,
         )
-        return RedirectResponse(_frontend_home("?calendar_error=token_exchange"))
+        return RedirectResponse(_frontend_home(f"?calendar_error=token_exchange&oauth_reason={reason}"))
 
     creds = flow.credentials
     granted = list(creds.scopes or GOOGLE_SCOPES)

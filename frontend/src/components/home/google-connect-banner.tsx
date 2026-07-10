@@ -11,6 +11,17 @@ const ERROR_COPY: Record<string, string> = {
   invalid_state: "Google connect expired or was interrupted. Open Settings and click Connect again.",
 };
 
+const REASON_COPY: Record<string, string> = {
+  invalid_client:
+    "Google rejected the app credentials (invalid_client). On Railway, GOOGLE_CLIENT_ID must be copied from the Orryon Jun 10 Web client Client ID field — not a service-account email with .apps.googleusercontent.com added. Secret must be from that same client.",
+  redirect_uri:
+    "Google rejected the redirect URI. GOOGLE_OAUTH_REDIRECT_URI must exactly match an Authorized redirect URI on the Orryon Jun 10 client.",
+  invalid_grant:
+    "Google rejected the login code (expired or already used). Click Connect again and finish Allow in one try.",
+  scope: "Google returned different permissions than expected. Try Connect again.",
+  unknown: "Google token exchange failed for an unknown reason. Check Railway backend logs for details.",
+};
+
 export function GoogleConnectBanner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -19,16 +30,20 @@ export function GoogleConnectBanner() {
 
   const connected = searchParams.get("calendar_connected") === "1";
   const error = searchParams.get("calendar_error");
+  const reason = searchParams.get("oauth_reason");
 
   const message = useMemo(() => {
     if (connected) {
       return "Google Calendar & Gmail connected. You can ask Orryon to check your email.";
     }
+    if (error === "token_exchange" && reason && REASON_COPY[reason]) {
+      return REASON_COPY[reason];
+    }
     if (error) {
       return ERROR_COPY[error] ?? `Google connect failed (${error}). Try again from Settings → Connected Accounts.`;
     }
     return null;
-  }, [connected, error]);
+  }, [connected, error, reason]);
 
   useEffect(() => {
     if (!message) return;
