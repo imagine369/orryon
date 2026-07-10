@@ -204,10 +204,17 @@ async def google_callback(code: str, state: str, request: Request):
     try:
         flow.fetch_token(code=code)
     except Exception as exc:
-        logger.exception("Google OAuth token exchange failed: %s", exc)
+        # Common causes: client_id/secret mismatch, redirect_uri mismatch, reused code.
+        logger.exception(
+            "Google OAuth token exchange failed (redirect_uri=%s client_id_prefix=%s): %s",
+            redirect_uri,
+            (GOOGLE_CLIENT_ID or "")[:24],
+            exc,
+        )
         return RedirectResponse(_frontend_home("?calendar_error=token_exchange"))
 
     creds = flow.credentials
+    granted = list(creds.scopes or GOOGLE_SCOPES)
     try:
         store_google_tokens(uid, {
             "token": creds.token,
@@ -215,13 +222,25 @@ async def google_callback(code: str, state: str, request: Request):
             "token_uri": creds.token_uri,
             "client_id": creds.client_id,
             "client_secret": creds.client_secret,
-            "scopes": list(creds.scopes or GOOGLE_SCOPES),
+            "scopes": granted,
         })
-        pull_google_events(uid)
     except Exception as exc:
-        logger.exception("Google OAuth post-token setup failed for user %s: %s", uid, exc)
+        logger.exception("Google OAuth token store failed for user %s: %s", uid, exc)
         return RedirectResponse(_frontend_home("?calendar_error=store_failed"))
 
+    # Calendar pull is best-effort — a sync failure must not undo a successful connect.
+    try:
+        pull_google_events(uid)
+    except Exception as exc:
+        logger.warning("Google Calendar pull after OAuth failed for user %s: %s", uid, exc)
+
+    has_gmail = any("gmail" in s for s in granted)
+    logger.info(
+        "Google OAuth connected user=%s scopes=%s gmail=%s",
+        uid[:8],
+        granted,
+        has_gmail,
+    )
     return RedirectResponse(_frontend_home("?calendar_connected=1"))
 
 

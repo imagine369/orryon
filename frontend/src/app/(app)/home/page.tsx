@@ -19,13 +19,14 @@ import { ChatActivationScreen } from "@/components/home/chat-activation-screen";
 import { ChatEmptyState } from "@/components/home/chat-empty-state";
 import { ChatActiveView } from "@/components/home/chat-active-view";
 import { HomeChatModals } from "@/components/home/home-chat-modals";
+import { GoogleConnectBanner } from "@/components/home/google-connect-banner";
 import { useChatTransport } from "@/lib/use-chat-transport";
 import { usePostCheckout } from "@/lib/use-post-checkout";
 import { usePlanLimitModal } from "@/lib/use-plan-limit-modal";
 import { useVoiceChat } from "@/lib/use-voice-chat";
 import { useHomeChat, useChatSessions } from "@/lib/use-home-chat";
 import { useHomeTasksDueToday } from "@/lib/use-home-tasks";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { MessageSource, VoiceStatus } from "@/components/chat-input";
 
 export default function HomePage() {
@@ -188,6 +189,10 @@ export default function HomePage() {
           />
         )}
       </AnimatePresence>
+
+      <Suspense fallback={null}>
+        <GoogleConnectBanner />
+      </Suspense>
 
       {chat.messages.length === 0 ? (
         <ChatEmptyState

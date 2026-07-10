@@ -8,11 +8,12 @@ import { getApiBase, api } from "@/lib/api";
 import { isNativePlatform, requestContactsPermission, getContactsPermissionStatus } from "@/lib/device-contacts";
 
 function calendarStatusLine(panel: SettingsPanel): string {
-  const { calOAuthAvailable, calConnected, calSyncPaused, calSynced } = panel;
+  const { calOAuthAvailable, calConnected, calSyncPaused, calSynced, gmailConnected } = panel;
 
   if (calOAuthAvailable) {
     if (calConnected) {
-      return `Connected · calendar & inbox access · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`;
+      const inbox = gmailConnected ? "calendar & inbox access" : "calendar access (inbox not granted — reconnect)";
+      return `Connected · ${inbox} · ${calSynced} event${calSynced !== 1 ? "s" : ""} synced`;
     }
     return "Sync your calendar and read your inbox";
   }
