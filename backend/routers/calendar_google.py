@@ -286,7 +286,7 @@ async def google_disconnect(user: dict = Depends(get_current_user)):
 
 
 @router.get("/api/calendar/google/status")
-async def google_status(user: dict = Depends(get_current_user)):
+async def google_status(request: Request, user: dict = Depends(get_current_user)):
     """Always available so the settings UI can show ICS-only vs OAuth state."""
     uid = user["user_id"]
     tokens = get_google_tokens(uid)
@@ -297,10 +297,23 @@ async def google_status(user: dict = Depends(get_current_user)):
     imported_count = row["cnt"] if isinstance(row, dict) else (row[0] if row else 0)
     oauth_on = GOOGLE_CALENDAR_OAUTH_ENABLED
     has_tokens = tokens is not None
+    cid = (GOOGLE_CLIENT_ID or "").strip()
+    secret = (GOOGLE_CLIENT_SECRET or "").strip()
+    redirect_uri = _google_redirect_uri(request) if oauth_on else ""
     return {
         "oauth_available": oauth_on,
         "connected": oauth_on and has_tokens,
         "sync_paused": not oauth_on and has_tokens,
         "synced_count": imported_count,
         "bidirectional": oauth_on,
+        # Non-secret diagnostics for Connect failures (no full client id/secret).
+        "oauth_debug": {
+            "client_id_set": bool(cid),
+            "client_id_looks_web": cid.endswith(".apps.googleusercontent.com"),
+            "client_id_suffix": cid[-28:] if len(cid) >= 28 else cid,
+            "client_secret_set": bool(secret),
+            "client_secret_looks_gocspx": secret.startswith("GOCSPX-"),
+            "redirect_uri": redirect_uri,
+            "scopes": list(GOOGLE_SCOPES),
+        },
     }
