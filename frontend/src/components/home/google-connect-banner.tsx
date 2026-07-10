@@ -17,7 +17,7 @@ const REASON_COPY: Record<string, string> = {
   redirect_uri:
     "Google rejected the redirect URI. GOOGLE_OAUTH_REDIRECT_URI must exactly match an Authorized redirect URI on the Orryon Jun 10 client.",
   invalid_grant:
-    "Google rejected the login code (expired or already used). Click Connect again and finish Allow in one try.",
+    "Google rejected the OAuth code after Allow (usually a redirect URI mismatch or Client ID/secret mismatch — not the phone SMS code). Confirm Railway GOOGLE_OAUTH_REDIRECT_URI is only the URL, then Connect once more.",
   scope: "Google returned different permissions than expected. Try Connect again.",
   unknown: "Google token exchange failed for an unknown reason. Check Railway backend logs for details.",
 };

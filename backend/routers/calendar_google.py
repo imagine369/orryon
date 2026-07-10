@@ -53,11 +53,24 @@ def _allowed_oauth_origins() -> set[str]:
     return origins
 
 
+def _sanitize_redirect_uri(raw: str) -> str:
+    """Normalize a redirect URI from env/headers (strip accidental KEY= prefixes)."""
+    value = (raw or "").strip().strip('"').strip("'")
+    # Railway Raw Editor pastes sometimes include the variable name in the value.
+    for prefix in (
+        "GOOGLE_OAUTH_REDIRECT_URI=",
+        "redirect_uri=",
+    ):
+        if value.startswith(prefix):
+            value = value[len(prefix):].strip()
+    return value.rstrip("/")
+
+
 def _google_redirect_uri(request: Request) -> str:
     """Resolve redirect URI — must exactly match a URI registered in Google Cloud Console."""
-    override = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
+    override = _sanitize_redirect_uri(os.getenv("GOOGLE_OAUTH_REDIRECT_URI", ""))
     if override:
-        return override.rstrip("/")
+        return override
 
     allowed = _allowed_oauth_origins()
     origin = (request.headers.get("origin") or "").rstrip("/")
@@ -86,15 +99,21 @@ def _oauth_state_secret() -> bytes:
     return secret.encode("utf-8")
 
 
-def _sign_oauth_state(uid: str) -> str:
-    payload = {"uid": uid, "nonce": _secrets.token_urlsafe(16), "iat": int(time.time())}
+def _sign_oauth_state(uid: str, redirect_uri: str) -> str:
+    payload = {
+        "uid": uid,
+        "redirect_uri": redirect_uri,
+        "nonce": _secrets.token_urlsafe(16),
+        "iat": int(time.time()),
+    }
     body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
     sig = hmac.new(_oauth_state_secret(), body, hashlib.sha256).digest()
     sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b"=")
     return f"{body.decode()}.{sig_b64.decode()}"
 
 
-def _verify_oauth_state(state: str) -> str:
+def _verify_oauth_state(state: str) -> tuple[str, str | None]:
+    """Return (user_id, redirect_uri_from_auth). redirect_uri may be None for legacy states."""
     try:
         body_s, sig_s = state.split(".", 1)
     except ValueError:
@@ -125,7 +144,10 @@ def _verify_oauth_state(state: str) -> str:
     uid = payload.get("uid", "")
     if not uid:
         raise HTTPException(status_code=400, detail="State is missing user id.")
-    return uid
+    redirect_uri = payload.get("redirect_uri") or None
+    if isinstance(redirect_uri, str):
+        redirect_uri = _sanitize_redirect_uri(redirect_uri) or None
+    return uid, redirect_uri
 
 
 @router.get("/api/calendar/google/auth", include_in_schema=_OAUTH_IN_SCHEMA)
@@ -153,7 +175,7 @@ async def google_auth(request: Request, user: dict = Depends(get_current_user)):
         scopes=GOOGLE_SCOPES,
         redirect_uri=redirect_uri,
     )
-    signed_state = _sign_oauth_state(uid)
+    signed_state = _sign_oauth_state(uid, redirect_uri)
     # Do not set include_granted_scopes — Google can return Error 400 invalid_request
     # ("doesn't comply with OAuth 2.0 policy") for some web clients with that flag.
     auth_url, _ = flow.authorization_url(
@@ -195,11 +217,12 @@ async def google_callback(code: str, state: str, request: Request):
         raise HTTPException(status_code=500, detail="Google auth library not available.")
 
     try:
-        uid = _verify_oauth_state(state)
+        uid, state_redirect_uri = _verify_oauth_state(state)
     except HTTPException:
         return RedirectResponse(_frontend_home("?calendar_error=invalid_state"))
 
-    redirect_uri = _google_redirect_uri(request)
+    # Must reuse the exact redirect_uri from the auth request or Google returns invalid_grant.
+    redirect_uri = state_redirect_uri or _google_redirect_uri(request)
     logger.info("Google OAuth callback redirect_uri=%s", redirect_uri)
 
     flow = Flow.from_client_config(
@@ -214,7 +237,6 @@ async def google_callback(code: str, state: str, request: Request):
         },
         scopes=GOOGLE_SCOPES,
         redirect_uri=redirect_uri,
-        state=state,
     )
     try:
         flow.fetch_token(code=code)

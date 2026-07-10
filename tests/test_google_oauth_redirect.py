@@ -65,3 +65,20 @@ def test_frontend_home_uses_first_csv_origin():
 
 def test_oauthlib_relax_token_scope_enabled():
     assert os.environ.get("OAUTHLIB_RELAX_TOKEN_SCOPE") == "1"
+
+
+def test_sanitize_strips_accidental_env_key_prefix():
+    raw = "GOOGLE_OAUTH_REDIRECT_URI=https://www.orryon.com/api/calendar/google/callback"
+    assert calendar_google._sanitize_redirect_uri(raw) == (
+        "https://www.orryon.com/api/calendar/google/callback"
+    )
+
+
+def test_oauth_state_round_trip_includes_redirect_uri():
+    state = calendar_google._sign_oauth_state(
+        "user-1",
+        "https://www.orryon.com/api/calendar/google/callback",
+    )
+    uid, redirect_uri = calendar_google._verify_oauth_state(state)
+    assert uid == "user-1"
+    assert redirect_uri == "https://www.orryon.com/api/calendar/google/callback"
