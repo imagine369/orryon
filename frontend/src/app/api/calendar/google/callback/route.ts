@@ -12,23 +12,50 @@ function backendBase(): string {
 /**
  * GET /api/calendar/google/callback — Google OAuth redirect target.
  *
- * Forwards the authorization code to the backend and passes the final redirect
- * (e.g. /home?calendar_connected=1) back to the browser.
+ * Google always redirects here with ?code=&state=. We POST those once to the
+ * backend so the one-time authorization code is not consumed by a duplicated
+ * GET proxy hop (which surfaces as invalid_grant).
  */
 export async function GET(req: NextRequest) {
-  const search = req.nextUrl.search;
-  const url = `${backendBase()}/api/calendar/google/callback${search}`;
+  const code = req.nextUrl.searchParams.get("code") ?? "";
+  const state = req.nextUrl.searchParams.get("state") ?? "";
+  if (!code || !state) {
+    return NextResponse.json(
+      { detail: "Missing code or state from Google." },
+      { status: 400 },
+    );
+  }
+
+  const url = `${backendBase()}/api/calendar/google/callback`;
 
   let upstream: Response;
   try {
     upstream = await fetch(url, {
-      method: "GET",
-      headers: { Origin: req.nextUrl.origin },
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Origin: req.nextUrl.origin,
+      },
+      body: JSON.stringify({ code, state }),
       redirect: "manual",
       cache: "no-store",
     });
   } catch {
     return NextResponse.json({ detail: "Backend unreachable." }, { status: 502 });
+  }
+
+  // Preferred: JSON { redirect: "https://.../home?..." }
+  const contentType = upstream.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      const data = (await upstream.json()) as { redirect?: string; detail?: string };
+      if (data.redirect) {
+        return NextResponse.redirect(data.redirect, 302);
+      }
+      return NextResponse.json(data, { status: upstream.status });
+    } catch {
+      return NextResponse.json({ detail: "Invalid backend response." }, { status: 502 });
+    }
   }
 
   const location = upstream.headers.get("location");
@@ -40,7 +67,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(body, {
     status: upstream.status,
     headers: {
-      "content-type": upstream.headers.get("content-type") ?? "application/json",
+      "content-type": contentType || "application/json",
     },
   });
 }

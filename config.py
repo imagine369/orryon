@@ -64,8 +64,17 @@ PLAID_LINK_ENABLED: bool = (
 )
 
 # Google OAuth — one app covers both Calendar and Gmail.
-GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+def _clean_env(name: str) -> str:
+    """Strip whitespace/quotes and accidental `NAME=` prefixes from Railway pastes."""
+    value = (os.getenv(name, "") or "").strip().strip('"').strip("'")
+    prefix = f"{name}="
+    if value.startswith(prefix):
+        value = value[len(prefix):].strip()
+    return value
+
+
+GOOGLE_CLIENT_ID: str = _clean_env("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET: str = _clean_env("GOOGLE_CLIENT_SECRET")
 _google_oauth_creds: bool = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 GOOGLE_CALENDAR_OAUTH_ENABLED: bool = (
     os.getenv("GOOGLE_CALENDAR_OAUTH_ENABLED", "").lower() in ("1", "true", "yes")

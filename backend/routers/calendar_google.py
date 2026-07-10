@@ -207,10 +207,12 @@ def _oauth_error_reason(exc: BaseException) -> str:
     return "unknown"
 
 
-@router.get("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
-async def google_callback(code: str, state: str, request: Request):
-    _require_google_oauth()
+def _complete_google_oauth(code: str, state: str, request: Request) -> str:
+    """
+    Exchange the authorization code and store tokens.
 
+    Returns a frontend /home URL (success or error query).
+    """
     try:
         from google_auth_oauthlib.flow import Flow
     except ImportError:
@@ -219,7 +221,7 @@ async def google_callback(code: str, state: str, request: Request):
     try:
         uid, state_redirect_uri = _verify_oauth_state(state)
     except HTTPException:
-        return RedirectResponse(_frontend_home("?calendar_error=invalid_state"))
+        return _frontend_home("?calendar_error=invalid_state")
 
     # Must reuse the exact redirect_uri from the auth request or Google returns invalid_grant.
     redirect_uri = state_redirect_uri or _google_redirect_uri(request)
@@ -250,7 +252,7 @@ async def google_callback(code: str, state: str, request: Request):
             reason,
             exc,
         )
-        return RedirectResponse(_frontend_home(f"?calendar_error=token_exchange&oauth_reason={reason}"))
+        return _frontend_home(f"?calendar_error=token_exchange&oauth_reason={reason}")
 
     creds = flow.credentials
     granted = list(creds.scopes or GOOGLE_SCOPES)
@@ -265,7 +267,7 @@ async def google_callback(code: str, state: str, request: Request):
         })
     except Exception as exc:
         logger.exception("Google OAuth token store failed for user %s: %s", uid, exc)
-        return RedirectResponse(_frontend_home("?calendar_error=store_failed"))
+        return _frontend_home("?calendar_error=store_failed")
 
     # Calendar pull is best-effort — a sync failure must not undo a successful connect.
     try:
@@ -280,7 +282,34 @@ async def google_callback(code: str, state: str, request: Request):
         granted,
         has_gmail,
     )
-    return RedirectResponse(_frontend_home("?calendar_connected=1"))
+    return _frontend_home("?calendar_connected=1")
+
+
+@router.get("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
+async def google_callback(code: str, state: str, request: Request):
+    """Google browser redirect target (also used if the frontend proxy falls back to GET)."""
+    _require_google_oauth()
+    return RedirectResponse(_complete_google_oauth(code, state, request))
+
+
+@router.post("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
+async def google_callback_post(request: Request):
+    """
+    Preferred token exchange path.
+
+    The Next.js callback should POST {code, state} once so the one-time Google
+    authorization code is not consumed by a duplicated GET proxy hop.
+    """
+    _require_google_oauth()
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Expected JSON body with code and state.")
+    code = (body.get("code") or "").strip()
+    state = (body.get("state") or "").strip()
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state.")
+    return {"redirect": _complete_google_oauth(code, state, request)}
 
 
 @router.post("/api/calendar/google/sync", include_in_schema=_OAUTH_IN_SCHEMA)

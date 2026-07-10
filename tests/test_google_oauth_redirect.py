@@ -82,3 +82,13 @@ def test_oauth_state_round_trip_includes_redirect_uri():
     uid, redirect_uri = calendar_google._verify_oauth_state(state)
     assert uid == "user-1"
     assert redirect_uri == "https://www.orryon.com/api/calendar/google/callback"
+
+
+def test_clean_env_strips_key_prefix_and_whitespace(monkeypatch):
+    from config import _clean_env
+
+    monkeypatch.setenv(
+        "GOOGLE_CLIENT_ID",
+        " GOOGLE_CLIENT_ID=abc.apps.googleusercontent.com ",
+    )
+    assert _clean_env("GOOGLE_CLIENT_ID") == "abc.apps.googleusercontent.com"
