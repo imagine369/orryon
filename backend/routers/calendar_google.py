@@ -196,7 +196,7 @@ def _frontend_home(query: str = "") -> str:
 def _oauth_error_reason(exc: BaseException) -> str:
     """Map token-exchange failures to a short, URL-safe reason for the UI banner."""
     text = str(exc).lower()
-    if "invalid_client" in text or "unauthorized" in text:
+    if "invalid_client" in text or "unauthorized_client" in text:
         return "invalid_client"
     if "redirect_uri" in text:
         return "redirect_uri"
@@ -205,6 +205,26 @@ def _oauth_error_reason(exc: BaseException) -> str:
     if "scope" in text:
         return "scope"
     return "unknown"
+
+
+def _oauth_error_detail(exc: BaseException) -> str:
+    """Extract a short Google error description for logs/UI (no secrets)."""
+    import re
+    from urllib.parse import quote
+
+    text = " ".join(str(exc).split())
+    # Prefer oauthlib / Google error fragments when present.
+    for pattern in (
+        r"invalid_grant[:\s]*([^.\n]{0,80})",
+        r"error_description['\"]?:\s*['\"]([^'\"]+)['\"]",
+        r"\(([^)]{0,80})\)",
+    ):
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            detail = m.group(1).strip()
+            if detail:
+                return quote(detail[:80], safe="")
+    return quote(text[:80], safe="")
 
 
 def _complete_google_oauth(code: str, state: str, request: Request) -> str:
@@ -245,6 +265,7 @@ def _complete_google_oauth(code: str, state: str, request: Request) -> str:
     except Exception as exc:
         # Common causes: client_id/secret mismatch, redirect_uri mismatch, reused code.
         reason = _oauth_error_reason(exc)
+        detail = _oauth_error_detail(exc)
         logger.exception(
             "Google OAuth token exchange failed (redirect_uri=%s client_id_prefix=%s reason=%s): %s",
             redirect_uri,
@@ -252,7 +273,9 @@ def _complete_google_oauth(code: str, state: str, request: Request) -> str:
             reason,
             exc,
         )
-        return _frontend_home(f"?calendar_error=token_exchange&oauth_reason={reason}")
+        return _frontend_home(
+            f"?calendar_error=token_exchange&oauth_reason={reason}&oauth_detail={detail}"
+        )
 
     creds = flow.credentials
     granted = list(creds.scopes or GOOGLE_SCOPES)

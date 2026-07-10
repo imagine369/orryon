@@ -17,7 +17,7 @@ const REASON_COPY: Record<string, string> = {
   redirect_uri:
     "Google rejected the redirect URI. GOOGLE_OAUTH_REDIRECT_URI must exactly match an Authorized redirect URI on the Orryon Jun 10 client.",
   invalid_grant:
-    "Google rejected the OAuth code after Allow (usually a redirect URI mismatch or Client ID/secret mismatch — not the phone SMS code). Confirm Railway GOOGLE_OAUTH_REDIRECT_URI is only the URL, then Connect once more.",
+    "Google rejected the OAuth code after Allow. Most often GOOGLE_CLIENT_SECRET on Railway does not match the Orryon (Jun 10) Client ID — reset the secret in Google Cloud, paste the new GOCSPX value into Railway, redeploy, then Connect once.",
   scope: "Google returned different permissions than expected. Try Connect again.",
   unknown: "Google token exchange failed for an unknown reason. Check Railway backend logs for details.",
 };
@@ -31,19 +31,20 @@ export function GoogleConnectBanner() {
   const connected = searchParams.get("calendar_connected") === "1";
   const error = searchParams.get("calendar_error");
   const reason = searchParams.get("oauth_reason");
+  const detail = searchParams.get("oauth_detail");
 
   const message = useMemo(() => {
     if (connected) {
       return "Google Calendar & Gmail connected. You can ask Orryon to check your email.";
     }
     if (error === "token_exchange" && reason && REASON_COPY[reason]) {
-      return REASON_COPY[reason];
+      return detail ? `${REASON_COPY[reason]} Google said: ${detail}` : REASON_COPY[reason];
     }
     if (error) {
       return ERROR_COPY[error] ?? `Google connect failed (${error}). Try again from Settings → Connected Accounts.`;
     }
     return null;
-  }, [connected, error, reason]);
+  }, [connected, detail, error, reason]);
 
   useEffect(() => {
     if (!message) return;
