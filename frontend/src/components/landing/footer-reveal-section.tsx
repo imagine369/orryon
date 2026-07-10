@@ -31,7 +31,6 @@ const WORD_STAGGER = 0.13;
 const PAUSE_AFTER_LINE1 = 0.35;
 const PAUSE_AFTER_LINE2 = 0.55;
 const PAUSE_AFTER_LINE3 = 0.45;
-const PAUSE_AFTER_CTA = 0.4;
 
 const TEXT_MUTED = "#b4b4b4";
 const TEXT_DARK = "#1d1d1f";
@@ -79,16 +78,6 @@ function line3Delay(reducedMotion: boolean) {
 
 function line3WordDelay(reducedMotion: boolean, wordIndex: number) {
   return line3Delay(reducedMotion) + (reducedMotion ? 0 : wordIndex * WORD_STAGGER);
-}
-
-function closeDelay(reducedMotion: boolean) {
-  if (reducedMotion) return 0;
-  return (
-    line3Delay(false) +
-    LINE3_WORDS.length * WORD_STAGGER +
-    PAUSE_AFTER_LINE3 +
-    PAUSE_AFTER_CTA
-  );
 }
 
 function RevealWord({
@@ -248,7 +237,7 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
           <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/90 font-[family-name:var(--font-playfair)] leading-[1.25] mb-3 sm:mb-4">
             Less noise. More you.
           </h2>
-          <p className="text-[0.82rem] sm:text-sm lg:text-base text-white/55 max-w-[420px] mb-[100px]">
+          <p className="text-[0.9rem] sm:text-base lg:text-lg text-white/70 max-w-[420px] mb-[100px] leading-snug">
             {LIFE_OS_PRIVACY_LINE}
           </p>
 
@@ -438,11 +427,10 @@ export function FooterRevealSection({ loggedIn = false }: { loggedIn?: boolean }
                 onClick={handleClose}
                 aria-label="Close"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: showContent ? 1 : 0 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{
-                  duration: reducedMotion ? 0 : 0.4,
-                  delay: closeDelay(reducedMotion),
+                  duration: reducedMotion ? 0 : 0.2,
                 }}
                 className="fixed z-[102] top-5 right-5 sm:top-7 sm:right-7 w-10 h-10 flex items-center justify-center rounded-full text-black/35 hover:text-black/65 hover:bg-white/60 backdrop-blur-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
               >

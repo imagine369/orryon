@@ -7,32 +7,33 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IntegrityGate } from "@/components/integrity-gate";
 import { ScrollToTopOnNavigate } from "@/components/scroll-to-top-on-navigate";
 import { SwBuildSync } from "@/components/sw-build-sync";
+import { LIFE_OS_TAGLINE } from "@/lib/life-os-copy";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"] });
 
-const META_DESCRIPTION =
-  "Orryon is your Life OS. Ask about anything, from big questions about the universe to your everyday life.";
+const META_TITLE = "Orryon · Your Life OS";
+const META_DESCRIPTION = LIFE_OS_TAGLINE;
 
 export const metadata: Metadata = {
-  title: "orryon",
+  title: META_TITLE,
   description: META_DESCRIPTION,
   manifest: "/manifest.json",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://orryon.vercel.app"),
   openGraph: {
-    title: "orryon — Your Life OS",
+    title: META_TITLE,
     description: META_DESCRIPTION,
     url: "/",
     siteName: "orryon",
     locale: "en_US",
     type: "website",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "orryon — Your Life OS" }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: META_TITLE }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "orryon — Your Life OS",
+    title: META_TITLE,
     description: META_DESCRIPTION,
     images: ["/og-image.png"],
   },

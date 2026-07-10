@@ -15,7 +15,7 @@ import { AnimatedHeroAvatar } from "@/components/animated-hero-avatar";
 
 const ORBIT_ITEMS = [
   { label: "Money",     sub: "Budgets, bills & goals",              Icon: BarChart2,      color: "#60a5fa", glow: "rgba(96,165,250,0.20)"  },
-  { label: "Ask",       sub: "Universe to everyday life",           Icon: Sparkles,       color: "#e879f9", glow: "rgba(232,121,249,0.20)" },
+  { label: "Ask",       sub: "Your personalized concierge",         Icon: Sparkles,       color: "#e879f9", glow: "rgba(232,121,249,0.20)" },
   { label: "Errands",   sub: "Lists, groceries & handoffs",         Icon: ShoppingBasket, color: "#4ade80", glow: "rgba(74,222,128,0.20)"  },
   { label: "Calendar",  sub: "Events & reminders",                  Icon: Calendar,       color: "#fb923c", glow: "rgba(251,146,60,0.20)"  },
   { label: "Places",    sub: "Restaurants, trips & nearby",         Icon: MapPin,         color: "#fbbf24", glow: "rgba(251,191,36,0.20)"  },
@@ -52,9 +52,9 @@ export function OrbitSection() {
     <section className="border-b border-white/5">
       <div className="text-center px-4 sm:px-6 pt-[80px] sm:pt-[100px] lg:pt-[122px] pb-8 sm:pb-10">
         <h2 className="text-[1.75rem] sm:text-[2.25rem] lg:text-[3rem] font-extrabold text-white/85 font-[family-name:var(--font-playfair)] leading-[1.25]">
-          From your day to the big questions.
+          Every part of your day.
           <br />
-          <em>Orryon sits at the center.</em>
+          <em>Orryon at the center.</em>
         </h2>
       </div>
 

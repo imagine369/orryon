@@ -16,59 +16,6 @@ import {
   LIFE_OS_TOUR_LABEL,
 } from "@/lib/life-os-copy";
 
-const HERO_ASK_TEXT = "Ask me anything.";
-const HERO_ASK_TYPE_MS = 32;
-const HERO_ASK_START_MS = 400;
-
-function HeroAskTyping() {
-  const [text, setText] = useState("");
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReducedMotion(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      queueMicrotask(() => setText(HERO_ASK_TEXT));
-      return;
-    }
-
-    let i = 0;
-    let timer: ReturnType<typeof setTimeout>;
-
-    const type = () => {
-      if (i <= HERO_ASK_TEXT.length) {
-        setText(HERO_ASK_TEXT.slice(0, i));
-        i++;
-        timer = setTimeout(type, HERO_ASK_TYPE_MS);
-      }
-    };
-
-    timer = setTimeout(type, HERO_ASK_START_MS);
-    return () => clearTimeout(timer);
-  }, [reducedMotion]);
-
-  return (
-    <p
-      className="text-[0.9rem] sm:text-[1rem] lg:text-[1.15rem] text-white/65 mb-[28px] sm:mb-[36px] lg:mb-[48px] min-h-[1.5em]"
-      style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
-      aria-label={HERO_ASK_TEXT}
-    >
-      <span aria-hidden="true">
-        {text}
-        {!reducedMotion && (
-          <span className="inline-block w-[1.5px] h-[0.85em] bg-white/60 ml-px align-middle animate-pulse" />
-        )}
-      </span>
-    </p>
-  );
-}
-
 export default function LandingPage() {
   const [loggedIn, setLoggedIn] = useState(false);
 
@@ -109,10 +56,8 @@ export default function LandingPage() {
           <p className="text-[0.6rem] sm:text-[0.65rem] lg:text-[0.75rem] uppercase tracking-[2px] text-white/65 mb-[28px] sm:mb-[36px] lg:mb-[48px] -mt-[3px]">
             Your Life OS
           </p>
-          <HeroAskTyping />
           <h1 className="text-[1.85rem] sm:text-[2.75rem] lg:text-[3.25rem] font-extrabold text-white/85 mb-[20px] sm:mb-[24px] lg:mb-[28px] font-[family-name:var(--font-playfair)] leading-[1.25] w-full max-w-[95vw] sm:max-w-[560px] lg:max-w-[860px]">
-            Your guide to organized life
-            <span className="hidden sm:inline"><br /></span>and calmer days.
+            Your life, in one place.
           </h1>
           <p
             className="text-[0.95rem] sm:text-[1.05rem] lg:text-[1.2rem] text-white/70 mb-[48px] sm:mb-[56px] lg:mb-[64px] max-w-[34rem] leading-snug"
@@ -138,7 +83,10 @@ export default function LandingPage() {
               <AppTourDemo />
             </div>
 
-            <p className="text-[0.72rem] sm:text-xs lg:text-sm text-white/60 mt-[15px] max-w-[22rem] leading-relaxed">
+            <p
+              className="text-[0.85rem] sm:text-[0.95rem] lg:text-base text-white/75 mt-6 sm:mt-7 max-w-[26rem] leading-snug"
+              style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
+            >
               {LIFE_OS_PRIVACY_LINE}
             </p>
           </div>
