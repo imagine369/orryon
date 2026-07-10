@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useQueuedEffect } from "@/lib/use-queued-effect";
-import { ArrowUp, Bell, Calendar, LayoutGrid, MapPin, Mic, Search, Settings, Wallet } from "lucide-react";
+import { ArrowUp, Bell, Calendar, Car, LayoutGrid, MapPin, Mic, Search, Settings, ShoppingBasket, Wallet } from "lucide-react";
 import {
   CHAT_ASSISTANT_BUBBLE_CLASS,
   CHAT_USER_BUBBLE_CLASS,
@@ -43,14 +43,24 @@ const TOUR_CHATS: TourChat[] = [
     surface: { label: "Budget", detail: "Sushi · $45 · Dining", Icon: Wallet },
   },
   {
-    prompt: "Find a good Italian spot near me for tonight",
-    response: "Found a few nearby. Osteria looks right — I can hold a table.",
-    surface: { label: "Places", detail: "Osteria · 7:30 · 2 seats", Icon: MapPin },
+    prompt: "Book dinner for two tonight",
+    response: "Osteria looks right — I can hold a table for 7:30.",
+    surface: { label: "Dinner", detail: "Osteria · 7:30 · 2 seats", Icon: MapPin },
   },
   {
-    prompt: "Remind me to call Mum on Thursday",
+    prompt: "Order groceries for the week",
+    response: "Got it — opening Instacart with your list.",
+    surface: { label: "Groceries", detail: "Instacart · Weekly list", Icon: ShoppingBasket },
+  },
+  {
+    prompt: "Get me a ride to the airport",
+    response: "On it — Uber is ready when you are.",
+    surface: { label: "Ride", detail: "Uber · Airport", Icon: Car },
+  },
+  {
+    prompt: "Remind me to call Mom on Thursday",
     response: "Got it — I'll remind you in advance.",
-    surface: { label: "Schedule", detail: "Thu · Call Mum", Icon: Calendar },
+    surface: { label: "Schedule", detail: "Thu · Call Mom", Icon: Calendar },
     voice: true,
   },
 ];

@@ -1,17 +1,17 @@
 /** Shared Life OS positioning copy (keep in sync with marketing + system prompt). */
 
 export const LIFE_OS_TAGLINE =
-  "Your life, in one place. Your trusted personal concierge. Ask Orryon and it does the work for you.";
+  "Your life, in one place. Your trusted personal concierge. Ask me and I'll do the work for you.";
 
 export const LIFE_OS_SHORT =
-  "Your trusted personal concierge. Ask Orryon and it does the work for you.";
+  "Your trusted personal concierge. Ask me and I'll do the work for you.";
 
 /** Hero line under the H1. */
 export const LIFE_OS_HERO_MECHANIC =
-  "Your trusted personal concierge. Ask Orryon and it does the work for you.";
+  "Your trusted personal concierge. Ask me and I'll do the work for you.";
 
 /** Quiet label above the landing app tour. */
-export const LIFE_OS_TOUR_LABEL = "Ask once. Orryon gets it moving.";
+export const LIFE_OS_TOUR_LABEL = "See it in action.";
 
 /** Trust / privacy line under the tour and in the footer reveal. */
 export const LIFE_OS_PRIVACY_LINE =

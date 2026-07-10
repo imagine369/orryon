@@ -11,7 +11,6 @@ import { FeatureSection } from "@/components/landing/feature-section";
 import { FooterRevealSection } from "@/components/landing/footer-reveal-section";
 import { OrbitSection } from "@/components/landing/orbit-section";
 import {
-  LIFE_OS_HERO_MECHANIC,
   LIFE_OS_PRIVACY_LINE,
   LIFE_OS_TOUR_LABEL,
 } from "@/lib/life-os-copy";
@@ -63,7 +62,9 @@ export default function LandingPage() {
             className="text-[0.95rem] sm:text-[1.05rem] lg:text-[1.2rem] text-white/70 mb-[48px] sm:mb-[56px] lg:mb-[64px] max-w-[34rem] leading-snug"
             style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
           >
-            {LIFE_OS_HERO_MECHANIC}
+            Your trusted personal concierge.
+            <br />
+            Ask me and I&rsquo;ll do the work for you.
           </p>
 
           {/* See it in action — app tour */}
