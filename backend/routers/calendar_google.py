@@ -154,9 +154,10 @@ async def google_auth(request: Request, user: dict = Depends(get_current_user)):
         redirect_uri=redirect_uri,
     )
     signed_state = _sign_oauth_state(uid)
+    # Do not set include_granted_scopes — Google can return Error 400 invalid_request
+    # ("doesn't comply with OAuth 2.0 policy") for some web clients with that flag.
     auth_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
         state=signed_state,
     )
