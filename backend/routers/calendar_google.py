@@ -32,6 +32,10 @@ APP_URL = CONFIG_APP_URL or os.getenv("APP_URL", "http://localhost:3000")
 _OAUTH_STATE_TTL = 600
 _OAUTH_IN_SCHEMA = GOOGLE_CALENDAR_OAUTH_ENABLED
 
+# Google may return a slightly different scope set than requested; without this,
+# oauthlib raises and the OAuth callback returns a bare 500.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 
 def _allowed_oauth_origins() -> set[str]:
     """Origins we may use as the OAuth redirect base (must match Google Console)."""
@@ -159,6 +163,13 @@ async def google_auth(request: Request, user: dict = Depends(get_current_user)):
     return RedirectResponse(auth_url)
 
 
+def _frontend_home(query: str = "") -> str:
+    """Build a frontend /home URL (first origin if FRONTEND_URL is a CSV)."""
+    raw = (os.getenv("FRONTEND_URL") or APP_URL or "https://www.orryon.com").split(",")[0]
+    base = raw.strip().rstrip("/")
+    return f"{base}/home{query}"
+
+
 @router.get("/api/calendar/google/callback", include_in_schema=_OAUTH_IN_SCHEMA)
 async def google_callback(code: str, state: str, request: Request):
     _require_google_oauth()
@@ -168,7 +179,11 @@ async def google_callback(code: str, state: str, request: Request):
     except ImportError:
         raise HTTPException(status_code=500, detail="Google auth library not available.")
 
-    uid = _verify_oauth_state(state)
+    try:
+        uid = _verify_oauth_state(state)
+    except HTTPException:
+        return RedirectResponse(_frontend_home("?calendar_error=invalid_state"))
+
     redirect_uri = _google_redirect_uri(request)
     logger.info("Google OAuth callback redirect_uri=%s", redirect_uri)
 
@@ -186,20 +201,28 @@ async def google_callback(code: str, state: str, request: Request):
         redirect_uri=redirect_uri,
         state=state,
     )
-    flow.fetch_token(code=code)
-    creds = flow.credentials
-    store_google_tokens(uid, {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
-        "scopes": list(creds.scopes or GOOGLE_SCOPES),
-    })
-    pull_google_events(uid)
+    try:
+        flow.fetch_token(code=code)
+    except Exception as exc:
+        logger.exception("Google OAuth token exchange failed: %s", exc)
+        return RedirectResponse(_frontend_home("?calendar_error=token_exchange"))
 
-    frontend = os.getenv("FRONTEND_URL", APP_URL).rstrip("/")
-    return RedirectResponse(f"{frontend}/home?calendar_connected=1")
+    creds = flow.credentials
+    try:
+        store_google_tokens(uid, {
+            "token": creds.token,
+            "refresh_token": creds.refresh_token,
+            "token_uri": creds.token_uri,
+            "client_id": creds.client_id,
+            "client_secret": creds.client_secret,
+            "scopes": list(creds.scopes or GOOGLE_SCOPES),
+        })
+        pull_google_events(uid)
+    except Exception as exc:
+        logger.exception("Google OAuth post-token setup failed for user %s: %s", uid, exc)
+        return RedirectResponse(_frontend_home("?calendar_error=store_failed"))
+
+    return RedirectResponse(_frontend_home("?calendar_connected=1"))
 
 
 @router.post("/api/calendar/google/sync", include_in_schema=_OAUTH_IN_SCHEMA)
