@@ -1,9 +1,12 @@
-"""Per-user xAI (Grok) API keys — stored encrypted, never returned in full."""
+"""Per-user xAI (Grok) API keys — stored encrypted, never returned in full.
+
+Chat, voice, and vision use only the key the user pasted in Settings.
+The process env `XAI_API_KEY` is never used for user requests.
+"""
 from __future__ import annotations
 
 import logging
 
-from config import XAI_API_KEY, XAI_API_KEYS
 from db.connection import decrypt_value, encrypt_value, get_connection
 
 logger = logging.getLogger(__name__)
@@ -57,20 +60,9 @@ def set_user_xai_key(user_id: str, raw: str | None) -> None:
         conn.commit()
 
 
-def server_xai_keys() -> list[str]:
-    keys = [k for k in XAI_API_KEYS if k] if XAI_API_KEYS else []
-    if XAI_API_KEY:
-        keys = [XAI_API_KEY] + [k for k in keys if k != XAI_API_KEY]
-    return keys
-
-
 def resolve_api_key(user_id: str) -> str:
-    """Prefer the user's Grok key; fall back to server .env for self-host."""
-    user_key = get_user_xai_key(user_id)
-    if user_key:
-        return user_key
-    keys = server_xai_keys()
-    return keys[0] if keys else ""
+    """The user's Settings key only — never the server env key."""
+    return get_user_xai_key(user_id)
 
 
 def has_chat_api_key(user_id: str) -> bool:

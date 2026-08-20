@@ -13,7 +13,7 @@ export function GrokKeyGate() {
     api
       .get<Settings>("/api/settings")
       .then((s) => {
-        if (!s.ai_connected) setOpen(true);
+        if (!s.xai_key_set) setOpen(true);
       })
       .catch(() => {});
   }, []);

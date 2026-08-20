@@ -10,7 +10,8 @@ import re
 
 from core.agent_observability import AGENT_PATH_COMPLETIONS, capture_agent_failure
 from core.memory_constants import MEMORY_CAP
-from core.xai_client import call_grok_async, has_api_keys
+from core.user_xai import has_chat_api_key, resolve_api_key
+from core.xai_client import call_grok_async
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def schedule_memory_extraction(
     assistant_response: str,
     user_id: str,
 ) -> None:
-    if not has_api_keys() or len(user_message) < 15:
+    if not has_chat_api_key(user_id) or len(user_message) < 15:
         return
     try:
         loop = asyncio.get_running_loop()
@@ -65,7 +66,8 @@ async def extract_memories_async(
         if count_user_memory(user_id) >= MEMORY_CAP:
             return
 
-        result = await call_grok_async([
+        result = await call_grok_async(
+            [
             {
                 "role": "system",
                 "content": (
@@ -80,7 +82,9 @@ async def extract_memories_async(
                 "role": "user",
                 "content": f"User said: {user_message}\nAssistant responded: {assistant_response[:500]}",
             },
-        ])
+            ],
+            api_key=resolve_api_key(user_id),
+        )
 
         usage = result.get("usage") or {}
         pt = int(usage.get("prompt_tokens") or 0)

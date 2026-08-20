@@ -82,11 +82,19 @@ def main() -> int:
         _fail("JWT_SECRET missing or too short (need 32+ chars)")
         errors += 1
 
-    if XAI_API_KEY:
-        _ok("XAI_API_KEY is set")
+    if is_prod:
+        if XAI_API_KEY:
+            _fail(
+                "XAI_API_KEY must not be set in production — users bring their own Grok key. "
+                "Delete it from Railway so it cannot be billed."
+            )
+            errors += 1
+        else:
+            _ok("XAI_API_KEY is unset (BYOK)")
+    elif XAI_API_KEY:
+        _ok("XAI_API_KEY is set (ignored for user chat; local tooling only)")
     else:
-        _fail("XAI_API_KEY not set")
-        errors += 1
+        _ok("XAI_API_KEY unset — chat uses Settings → Grok keys")
 
     if is_prod:
         if os.getenv("ENABLE_DEMO", "").lower() not in ("1", "true", "yes"):

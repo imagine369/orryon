@@ -28,7 +28,6 @@ from core.user_xai import (
     get_user_xai_key,
     has_chat_api_key,
     mask_xai_key,
-    server_xai_keys,
     set_user_xai_key,
 )
 from db.preferences import (
@@ -80,9 +79,8 @@ async def get_settings(user: dict = Depends(get_current_user)):
         d["display_name"] = normalize_display_name(d["display_name"])
     d["smtp_enabled"] = SMTP_ENABLED
     d["ai_connected"] = has_chat_api_key(uid)
-    d["xai_key_set"] = bool(get_user_xai_key(uid))
+    d["xai_key_set"] = d["ai_connected"]
     d["xai_key_masked"] = mask_xai_key(get_user_xai_key(uid))
-    d["server_ai_configured"] = bool(server_xai_keys())
     d["billing_enabled"] = BILLING_ENABLED
     d["grok_model"] = GROK_MODEL
     return d

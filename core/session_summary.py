@@ -8,7 +8,8 @@ import logging
 
 from core.agent_shared import HISTORY_WINDOW
 from core.memory_constants import SESSION_SUMMARY_REFRESH_EVERY
-from core.xai_client import call_grok_async, has_api_keys
+from core.user_xai import has_chat_api_key, resolve_api_key
+from core.xai_client import call_grok_async
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def schedule_session_summary(
     session_id: str,
     chat_history: list[dict],
 ) -> None:
-    if not session_id or not has_api_keys():
+    if not session_id or not has_chat_api_key(user_id):
         return
     turns = conversation_turns(chat_history)
     if len(turns) <= HISTORY_WINDOW:
@@ -139,7 +140,8 @@ async def summarize_session_async(
             if existing_summary.strip()
             else ""
         )
-        result = await call_grok_async([
+        result = await call_grok_async(
+            [
             {
                 "role": "system",
                 "content": (
@@ -154,7 +156,9 @@ async def summarize_session_async(
                 "role": "user",
                 "content": f"{prior}\nNew transcript to incorporate:\n{transcript}",
             },
-        ])
+            ],
+            api_key=resolve_api_key(user_id),
+        )
 
         usage = result.get("usage") or {}
         pt = int(usage.get("prompt_tokens") or 0)

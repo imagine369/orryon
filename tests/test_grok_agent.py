@@ -220,7 +220,7 @@ async def test_extract_memories_async_mock_llm():
     plan_info = {"plan": plan}
 
     with (
-        patch("core.agent_memory.has_api_keys", return_value=True),
+        patch("core.agent_memory.has_chat_api_key", return_value=True),
         patch("core.agent_memory.call_grok_async", mock_grok),
         patch("core.plans.resolve_plan_for_user_id", return_value=plan_info),
         patch("core.plans.get_monthly_spend_cap", return_value=999),

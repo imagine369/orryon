@@ -167,36 +167,20 @@ async def _run_startup() -> None:
         await init_redis()
         init_db()
         start_scheduler()
-        logger.info("orryon backend started (AI: %s)", "enabled" if XAI_API_KEY else "disabled")
+        logger.info("orryon backend started (AI: per-user Grok keys in Settings)")
+        if XAI_API_KEY:
+            logger.error(
+                "XAI_API_KEY is set in the environment but is NOT used for chat. "
+                "Remove it from Railway/Vercel so no one can spend on that key. "
+                "Users must paste their own key in Settings → Grok."
+            )
         logger.info("Request signing mode: %s", get_signing_mode())
         _log_email_config_status()
 
-        # Mark ready before optional xAI prewarm so /api/ready and pytest are not
+        # Mark ready before optional work so /api/ready and pytest are not
         # blocked on external network (Railway healthchecks, CI).
         _startup_ready = True
         _startup_error = None
-
-        if XAI_API_KEY:
-            try:
-                from core.grok_agent import get_http_client
-                from core.xai_client import next_api_key
-                client = get_http_client()
-                prewarm = await client.get(
-                    "https://api.x.ai/v1/models",
-                    headers={"Authorization": f"Bearer {next_api_key()}"},
-                    timeout=5.0,
-                )
-                if prewarm.status_code in (401, 403) or (
-                    prewarm.status_code == 400 and "api key" in prewarm.text.lower()
-                ):
-                    logger.error(
-                        "xAI API key is invalid — chat and voice will fail until "
-                        "XAI_API_KEY is updated in Railway/env."
-                    )
-                else:
-                    logger.info("xAI connection prewarmed (status=%s)", prewarm.status_code)
-            except Exception:
-                pass
     except Exception as exc:
         _startup_error = str(exc)
         logger.critical(

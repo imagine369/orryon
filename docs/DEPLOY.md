@@ -7,7 +7,7 @@
 | `NODE_ENV` | `production` | |
 | `JWT_SECRET` | 64+ char random hex | Session + signing key derivation |
 | `REQUEST_SIGNING_MODE` | `enforce` | **Required** — boot fails otherwise |
-| `XAI_API_KEY` | your key | |
+| `XAI_API_KEY` | **unset** | Do not set. Users paste Grok keys in Settings. |
 | `DB_PATH` | `/data/finance.db` | SQLite on Railway volume mounted at `/data` only |
 | `FRONTEND_URL` / `APP_URL` | `https://www.orryon.com` | |
 

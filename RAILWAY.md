@@ -50,10 +50,10 @@ Build/deploy succeeded but **Network → Healthcheck** failed. Common causes: vo
 NODE_ENV=production
 JWT_SECRET=<random 64-char hex>
 REQUEST_SIGNING_MODE=enforce
-XAI_API_KEY=<your key>
 DB_PATH=/data/finance.db
 FRONTEND_URL=https://www.orryon.com
 APP_URL=https://www.orryon.com
+# Do not set XAI_API_KEY — users paste their own Grok key in Settings.
 ```
 
 **Unset** `DATABASE_URL` unless you have a working Postgres service on Railway.
@@ -92,7 +92,6 @@ Do **not** mount the volume at `/app`, `/srv/orryon`, or `/opt/orryon` — that 
 - `JWT_SECRET` (long random string)
 - `REQUEST_SIGNING_MODE=enforce`
 - `GROK_MODEL=grok-4.3`
-- `XAI_API_KEY`
 - `FRONTEND_URL` / `APP_URL` (single URL, e.g. `https://www.orryon.com`)
 - `REDIS_URL` (Upstash `rediss://...`, recommended)
 

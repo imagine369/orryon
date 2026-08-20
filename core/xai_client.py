@@ -49,9 +49,10 @@ async def close_http_client() -> None:
         _http_client = None
 
 
-async def call_grok_async(messages: list[dict]) -> dict:
-    """Single non-streaming async call to Grok Chat Completions."""
-    api_key = next_api_key()
+async def call_grok_async(messages: list[dict], *, api_key: str) -> dict:
+    """Single non-streaming async call to Grok Chat Completions using the given user key."""
+    if not api_key:
+        raise ValueError("api_key is required")
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json; charset=utf-8",

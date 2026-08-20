@@ -19,7 +19,6 @@ _PROD_BASE_ENV = {
     "APP_URL": "https://www.orryon.com",
     "DATABASE_URL": "postgres://example",
     "REDIS_URL": "redis://example",
-    "XAI_API_KEY": "test-xai-key",
     "RESEND_API_KEY": "re_test",
 }
 
@@ -70,6 +69,18 @@ def test_dev_mode_skips_strict_prod_checks():
         vp = _load_verify_prod()
         _prime_prod_module(vp, env)
         assert vp.main() == 0
+
+
+def test_prod_server_xai_key_fails(capsys):
+    env = {**_PROD_BASE_ENV, "XAI_API_KEY": "must-not-be-here"}
+    with patch.dict(os.environ, env, clear=False), patch(
+        "backend.deps.IS_PRODUCTION", True
+    ):
+        vp = _load_verify_prod()
+        _prime_prod_module(vp, env)
+        assert vp.main() == 1
+    out = capsys.readouterr().out
+    assert "XAI_API_KEY must not be set" in out
 
 
 def test_prod_valid_env_passes():

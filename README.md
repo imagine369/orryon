@@ -4,7 +4,7 @@ Your **Life OS** — ask almost anything in chat; when it's about your life here
 
 **Free and open source** ([MIT](LICENSE)). Hosted use and the desktop app are free; **you supply a Grok (xAI) API key**. Source: [github.com/imagine369/orryon](https://github.com/imagine369/orryon).
 
-> **Local / self-host** uses SQLite on disk (or Postgres). Chat needs `XAI_API_KEY` in `.env` **or** a key in Settings → Grok. Desktop downloaders paste the key in the app — do not edit installer files.
+> **Local / self-host** uses SQLite on disk (or Postgres). Chat needs a Grok key in **Settings → Grok**. Desktop downloaders paste the key in the app — do not put a key in Railway env.
 
 ---
 
@@ -47,7 +47,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 - **CSV Import** — upload bank CSVs with auto-detected column mapping (Chase, Amex, generic)
 - **Data Export** — download all your data as a ZIP (SQLite DB + JSON)
 - **Share Links** — generate read-only dashboard links
-- **Grok BYOK** — paste your xAI API key in Settings (or `XAI_API_KEY` when self-hosting)
+- **Grok BYOK** — paste your xAI API key in Settings. The server never uses a shared `XAI_API_KEY` for user chat.
 
 ---
 
@@ -76,7 +76,7 @@ cd frontend && npm install && cd ..
 
 ```bash
 cp .env.example .env
-# Edit .env → set XAI_API_KEY from https://console.x.ai (or add it later in Settings → Grok)
+# Add a Grok key later in Settings → Grok (https://console.x.ai)
 ```
 
 ### 3. Run (two terminals)
@@ -120,7 +120,7 @@ Orryon takes a **tiered approach to transaction import**, progressing from maxim
 
 1. Connect your repo to Railway
 2. Set the root directory to `.` (the Dockerfile copies from project root)
-3. Set environment variables: `XAI_API_KEY`, `JWT_SECRET`, `NODE_ENV=production`
+3. Set environment variables: `JWT_SECRET`, `NODE_ENV=production`. Do **not** set `XAI_API_KEY`.
 4. Deploy the frontend separately (Vercel, Railway static, etc.) with `NEXT_PUBLIC_API_URL` pointing to your Railway backend URL
 
 Uses `backend/railway.json` (Dockerfile builder) with health checks at `/api/health`.
@@ -142,7 +142,7 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 
 | Variable | Required | Description |
 |---|---|---|
-| `XAI_API_KEY` | For self-host | Server-wide Grok key. Desktop/web users can instead paste a key in Settings → Grok |
+| `XAI_API_KEY` | **Must be unset** on hosted prod | Ignored for user chat. Delete it from Railway. Users paste keys in Settings. |
 | `BILLING_ENABLED` | No | Set `1` only if you run Stripe subscriptions (off by default) |
 | `JWT_SECRET` | Prod | Secret for JWT signing (auto-generated in dev) |
 | `GROK_MODEL` | No | xAI model (default: `grok-4.3`) |
