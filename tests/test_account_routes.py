@@ -285,6 +285,9 @@ async def test_receipt_scan_mocked_xai_response(monkeypatch):
             return _MockResponse()
 
     monkeypatch.setattr("httpx.AsyncClient", _MockAsyncClient)
+    monkeypatch.setattr(
+        "backend.routers.receipts.resolve_api_key", lambda _uid: "xai-test-receipt-key"
+    )
 
     files = {"file": ("receipt.jpg", io.BytesIO(b"\xff\xd8\xff fake jpeg"), "image/jpeg")}
     transport = ASGITransport(app=app)

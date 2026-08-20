@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PillLink } from "@/components/pill-cta";
 import { GetAppInstallCta, GetAppNavLink } from "@/components/get-app-nav-link";
 import { GITHUB_REPO_URL } from "@/lib/github";
+import { siteChromePaddingX } from "@/lib/site-chrome";
 import { cn } from "@/lib/utils";
 
 export { GetAppInstallCta, GetAppNavLink };

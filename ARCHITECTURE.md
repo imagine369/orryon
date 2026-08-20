@@ -202,7 +202,7 @@ The `db/` package uses **raw SQL only** (no ORM — SQLAlchemy was considered an
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 cd frontend && npm install && cd ..
-cp .env.example .env  # add XAI_API_KEY
+cp .env.example .env  # then paste a Grok key in Settings to chat
 
 # 2. Run (two terminals)
 uvicorn backend.main:app --reload --port 8000     # Terminal 1
@@ -225,7 +225,6 @@ uvicorn backend.main:app --reload --port 8000
 ```bash
 docker build -f backend/Dockerfile -t orryon-backend .
 docker run -p 8000:8000 \
-  -e XAI_API_KEY=your_key \
   -e JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))") \
   -e NODE_ENV=production \
   -v orryon-data:/app \
@@ -248,7 +247,7 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com npm run build
 ### Render
 
 - `render.yaml` is pre-configured for Docker + FastAPI with persistent disk at `/data`
-- Set `FRONTEND_URL`, `XAI_API_KEY`, `JWT_SECRET` in the Render dashboard
+- Set `FRONTEND_URL` and `JWT_SECRET` in the Render dashboard. Users paste Grok keys in Settings.
 
 ---
 

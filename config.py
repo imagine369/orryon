@@ -5,7 +5,8 @@ All secrets are read from environment variables (loaded from .env).
 NEVER hardcode API keys here. Use .env.example as a template.
 
 LLM:
-  Grok (xAI) via direct HTTP (core/grok_agent.py). Set XAI_API_KEY in .env.
+  Grok (xAI) via direct HTTP (core/grok_agent.py). Users paste an xAI key
+  in Settings → Grok. Do not set XAI_API_KEY for hosted user traffic.
   OpenAI is intentionally not supported.
 
 Email OTP auth:

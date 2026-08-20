@@ -52,7 +52,9 @@ async def test_google_oauth_auth_hidden_when_disabled():
 @pytest.mark.asyncio
 async def test_google_status_reports_oauth_availability():
     with patch.object(calendar_google, "GOOGLE_CALENDAR_OAUTH_ENABLED", False):
-        result = await calendar_google.google_status(user={"user_id": "u1"})
+        result = await calendar_google.google_status(
+            _google_request(), user={"user_id": "u1"}
+        )
     assert result["oauth_available"] is False
     assert result["connected"] is False
     assert result["sync_paused"] is False
@@ -67,7 +69,9 @@ async def test_google_status_connected_only_when_oauth_on():
         patch.object(calendar_google, "get_connection") as mock_conn,
     ):
         mock_conn.return_value.execute.return_value.fetchone.return_value = (3,)
-        result = await calendar_google.google_status(user={"user_id": uid})
+        result = await calendar_google.google_status(
+            _google_request(), user={"user_id": uid}
+        )
     assert result["connected"] is True
     assert result["sync_paused"] is False
 
@@ -77,7 +81,9 @@ async def test_google_status_connected_only_when_oauth_on():
         patch.object(calendar_google, "get_connection") as mock_conn,
     ):
         mock_conn.return_value.execute.return_value.fetchone.return_value = (3,)
-        result = await calendar_google.google_status(user={"user_id": uid})
+        result = await calendar_google.google_status(
+            _google_request(), user={"user_id": uid}
+        )
     assert result["connected"] is False
     assert result["sync_paused"] is True
     assert result["synced_count"] == 3

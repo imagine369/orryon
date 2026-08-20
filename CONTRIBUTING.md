@@ -15,7 +15,7 @@ Thank you for helping improve Orryon. The project is MIT-licensed. This guide co
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements-dev.txt
 cd frontend && npm ci && cd ..
-cp .env.example .env   # add XAI_API_KEY for live chat tests
+cp .env.example .env   # JWT_SECRET for prod; paste a Grok key in Settings to chat
 
 # Terminal 1
 uvicorn backend.main:app --reload --port 8000
