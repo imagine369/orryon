@@ -162,8 +162,8 @@ export function DownloadPageClient() {
           {selected === "ios"
             ? "Install Orryon as a web app — same as using Cursor on iPhone and iPad."
             : isDesktopTab(selected)
-              ? "Download the desktop app, then open Orryon from your dock."
-              : "Install Orryon on your home screen, then sign in."}
+              ? "Free to use. After install, add your Grok (xAI) API key in Settings."
+              : "Install Orryon on your home screen, then sign in and add your Grok key."}
         </p>
 
         <div className="w-full max-w-sm">
@@ -178,6 +178,32 @@ export function DownloadPageClient() {
         </div>
 
         {footnote && <p className="mt-4 text-sm text-white/30">{footnote}</p>}
+
+        {isDesktopTab(selected) && (
+          <ol className="mt-12 w-full max-w-md text-left space-y-4 text-sm text-white/55">
+            <li>
+              <span className="text-white/80 font-medium">1. Get a Grok key. </span>
+              Create an API key at{" "}
+              <a
+                href="https://console.x.ai"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-white/80"
+              >
+                console.x.ai
+              </a>
+              . You pay xAI for what you use — Orryon does not charge.
+            </li>
+            <li>
+              <span className="text-white/80 font-medium">2. Download and open Orryon. </span>
+              Sign in with email. Do not edit any files on disk.
+            </li>
+            <li>
+              <span className="text-white/80 font-medium">3. Paste the key. </span>
+              Settings → Grok (xAI) → paste → Save. Chat uses that key. We never show it again.
+            </li>
+          </ol>
+        )}
 
         <nav
           className="mt-16 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-sm text-white/35"

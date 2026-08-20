@@ -182,6 +182,10 @@ def resolve_plan_for_user(user_id: str) -> dict:
 
 async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
     """FastAPI dependency — blocks requests if the user's subscription is inactive."""
+    from config import BILLING_ENABLED
+
+    if not BILLING_ENABLED:
+        return user
     info = resolve_plan_for_user(user["user_id"])
     if not info["is_active_pro"]:
         raise HTTPException(
@@ -192,12 +196,20 @@ async def require_active_plan(user: dict = Depends(get_current_user)) -> dict:
 
 
 def plan_allows_voice_input(plan: str) -> bool:
-    """STT / mic — Premium and Premium Plus only."""
+    """STT / mic — all plans when billing is off; otherwise Premium+."""
+    from config import BILLING_ENABLED
+
+    if not BILLING_ENABLED:
+        return True
     return plan in ("premium", "premium_plus")
 
 
 def plan_allows_voice_output(plan: str) -> bool:
-    """TTS — Premium Plus only."""
+    """TTS — all plans when billing is off; otherwise Premium Plus."""
+    from config import BILLING_ENABLED
+
+    if not BILLING_ENABLED:
+        return True
     return plan == "premium_plus"
 
 

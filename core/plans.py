@@ -117,12 +117,16 @@ def resolve_plan(user_row: dict) -> dict:
         except Exception:
             pass
 
+    from config import BILLING_ENABLED
+
+    paid = plan in ("trial", "pro", "premium", "premium_plus")
     return {
         "plan": plan,
         "trial_ends_at": trial_ends_at_str or None,
         "trial_days_remaining": trial_days_remaining,
-        "is_active_pro": plan in ("trial", "pro", "premium", "premium_plus"),
-        "is_free_tier": plan in ("free", "starter", "past_due"),
+        "is_active_pro": True if not BILLING_ENABLED else paid,
+        "is_free_tier": False if not BILLING_ENABLED else plan in ("free", "starter", "past_due"),
+        "billing_enabled": BILLING_ENABLED,
     }
 
 

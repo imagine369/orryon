@@ -102,14 +102,14 @@ async def test_grok_agent_generic_error_hides_exception_details():
         yield {"type": "token", "content": ""}  # pragma: no cover
 
     with (
-        patch("core.grok_agent.has_api_keys", return_value=True),
+        patch("core.grok_agent.has_chat_api_key", return_value=True),
         patch("core.xai_responses.run_orryon_stream_agent", side_effect=boom),
         patch("core.grok_agent.build_messages", return_value=[]),
         patch("core.grok_agent.get_user_memories", return_value=[]),
         patch("core.grok_agent.get_context_snapshot_text", new_callable=AsyncMock, return_value=""),
         patch("core.grok_agent.get_system_prompt", return_value="sys"),
         patch("core.grok_agent.filter_schemas_for_grok", return_value=[]),
-        patch("core.grok_agent.next_api_key", return_value="test-key"),
+        patch("core.grok_agent.resolve_api_key", return_value="test-key"),
     ):
         events = []
         async for event in run_orryon_stream("hi", "user-1"):

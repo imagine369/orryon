@@ -47,7 +47,27 @@ async def test_settings_with_auth(auth_headers):
     body = res.json()
     assert "email" in body
     assert "grok_model" in body
-    assert "smtp_enabled" in body
+    assert "billing_enabled" in body
+    assert "xai_key_set" in body
+
+
+@pytest.mark.asyncio
+async def test_xai_key_save_and_mask(auth_headers):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.post(
+            "/api/settings/xai-key",
+            headers=auth_headers,
+            json={"api_key": "xai-abcdefghijklmnopqrstuvwx"},
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["xai_key_set"] is True
+        assert body["xai_key_masked"].endswith("uvwx")
+        assert "abcdefghijklmnopqrstuvwx" not in body["xai_key_masked"]
+        settings = await client.get("/api/settings", headers=auth_headers)
+        assert settings.json()["xai_key_set"] is True
+        assert "abcdefghijklmnopqrstuvwx" not in settings.json().get("xai_key_masked", "")
 
 
 @pytest.mark.asyncio

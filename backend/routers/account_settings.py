@@ -22,8 +22,15 @@ from backend.schemas import (
     EmailChangeVerifyReq,
     SettingsUpdate,
 )
-from config import GROK_MODEL, SMTP_ENABLED, XAI_API_KEY
+from config import BILLING_ENABLED, GROK_MODEL, SMTP_ENABLED
 from core.display_name import normalize_display_name
+from core.user_xai import (
+    get_user_xai_key,
+    has_chat_api_key,
+    mask_xai_key,
+    server_xai_keys,
+    set_user_xai_key,
+)
 from db.preferences import (
     clamp_ambient_sensitivity,
     normalize_ambient_mode_enabled,
@@ -72,7 +79,11 @@ async def get_settings(user: dict = Depends(get_current_user)):
     if d.get("display_name"):
         d["display_name"] = normalize_display_name(d["display_name"])
     d["smtp_enabled"] = SMTP_ENABLED
-    d["ai_connected"] = bool(XAI_API_KEY)
+    d["ai_connected"] = has_chat_api_key(uid)
+    d["xai_key_set"] = bool(get_user_xai_key(uid))
+    d["xai_key_masked"] = mask_xai_key(get_user_xai_key(uid))
+    d["server_ai_configured"] = bool(server_xai_keys())
+    d["billing_enabled"] = BILLING_ENABLED
     d["grok_model"] = GROK_MODEL
     return d
 
@@ -110,6 +121,29 @@ async def update_settings(body: SettingsUpdate, user: dict = Depends(get_current
             raise HTTPException(400, "Display name cannot be empty")
     update_row("users", updates, {"id": uid})
     return {"updated": True}
+
+
+class XaiKeyReq(BaseModel):
+    api_key: str = ""
+
+
+@router.post("/api/settings/xai-key")
+async def put_xai_key(body: XaiKeyReq, user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    raw = (body.api_key or "").strip()
+    try:
+        if not raw:
+            set_user_xai_key(uid, None)
+            return {"updated": True, "xai_key_set": False, "xai_key_masked": ""}
+        set_user_xai_key(uid, raw)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    stored = get_user_xai_key(uid)
+    return {
+        "updated": True,
+        "xai_key_set": True,
+        "xai_key_masked": mask_xai_key(stored),
+    }
 
 
 # ── Email Change ──────────────────────────────────────────────────────────────

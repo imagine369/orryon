@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS xai_api_key_enc TEXT DEFAULT '';

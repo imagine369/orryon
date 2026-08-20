@@ -12,6 +12,7 @@ import { HealthPanel } from "@/components/health-panel";
 import { JournalPanel } from "@/components/journal-panel";
 import { ResetAnchorPanel } from "@/components/reset-anchor-panel";
 import { TrialBanner } from "@/components/trial-banner";
+import { GrokKeyGate } from "@/components/grok-key-gate";
 import { LifeInterestsOnboarding } from "@/components/life-interests-onboarding";
 import { useSubscription } from "@/lib/use-subscription";
 import { SubscriptionProvider } from "@/lib/subscription-service";
@@ -83,7 +84,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
         style={{ transformOrigin: "center center", willChange: "transform" }}
       >
         <NavBar />
-        {sub && <TrialBanner sub={sub} onSubscriptionUpdated={refreshSub} />}
+        {sub?.billing_enabled && (
+          <TrialBanner sub={sub} onSubscriptionUpdated={refreshSub} />
+        )}
+        <GrokKeyGate />
         <main className="flex-1 min-h-0">{children}</main>
       </motion.div>
 

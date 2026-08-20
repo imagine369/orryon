@@ -10,7 +10,15 @@ export function Footer() {
         siteChromePaddingX,
       )}
     >
-      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
+        <a
+          href="https://github.com/imagine369/orryon"
+          className="text-[0.65rem] text-white/25 hover:text-white/50 transition"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
+        </a>
         <Link href="/privacy" className="text-[0.65rem] text-white/25 hover:text-white/50 transition">
           Privacy Policy
         </Link>

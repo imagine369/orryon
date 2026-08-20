@@ -2,7 +2,7 @@
 
 import type { SettingsPanel } from "../panel-types";
 
-import { User, CreditCard, Accessibility, Bell, Download, Shield, Lock, HelpCircle, DollarSign, Brain, Sunrise, Activity, MapPin, Sparkles } from "lucide-react";
+import { User, CreditCard, Accessibility, Bell, Download, Shield, Lock, HelpCircle, DollarSign, Brain, Sunrise, Activity, MapPin, Sparkles, KeyRound } from "lucide-react";
 import { NavItem } from "../ui";
 
 
@@ -30,7 +30,17 @@ export function MainMenuView({ panel }: { panel: SettingsPanel }) {
         description="Name, contact details, and profile"
         onClick={() => setView("account")}
       />
-      {sub && (
+      <NavItem
+        icon={<KeyRound className="h-5 w-5" strokeWidth={1.5} />}
+        title="Grok (xAI)"
+        description={
+          settings?.xai_key_set
+            ? `Key saved${settings.xai_key_masked ? ` · ${settings.xai_key_masked}` : ""}`
+            : "Paste your API key to chat"
+        }
+        onClick={() => setView("grok")}
+      />
+      {sub && settings?.billing_enabled && (
         <NavItem
           icon={<CreditCard className="h-5 w-5" strokeWidth={1.5} />}
           title="Plan & Usage"

@@ -43,8 +43,8 @@ from backend.deps import (
     resolve_plan_for_user,
 )
 from backend.signing import require_signed_request
-from config import XAI_API_KEY, ELEVENLABS_API_KEY
-from core.xai_client import has_api_keys, next_api_key
+from config import ELEVENLABS_API_KEY, ELEVENLABS_ORB_VOICE_ID
+from core.user_xai import resolve_api_key
 from db.usage import (
     get_voice_seconds_used,
     get_voice_topup_minutes,
@@ -63,7 +63,6 @@ _STT_URL = f"{_XAI_BASE}/stt"
 _TTS_URL = f"{_XAI_BASE}/tts"
 
 _EL_BASE = "https://api.elevenlabs.io/v1"
-_EL_ORB_VOICE_ID = os.getenv("ELEVENLABS_ORB_VOICE_ID", "DKfKzHbGIi7qsCsZWN8G")
 _EL_MODEL = "eleven_multilingual_v2"
 
 _DEFAULT_LANGUAGE = os.getenv("XAI_TTS_LANGUAGE", "en")
@@ -92,13 +91,18 @@ class OrbTTSReq(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _require_key() -> None:
-    if not has_api_keys():
-        raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+def _require_key(user_id: str) -> str:
+    key = resolve_api_key(user_id)
+    if not key:
+        raise HTTPException(
+            status_code=503,
+            detail="Add your Grok API key in Settings → Grok to use voice.",
+        )
+    return key
 
 
-def _xai_auth_headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {next_api_key()}"}
+def _xai_auth_headers(user_id: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {_require_key(user_id)}"}
 
 
 def _stt_multipart(filename: str, contents: bytes, mime: str) -> list[tuple]:
@@ -202,8 +206,8 @@ async def speech_to_text(
     Body: multipart/form-data with field `file`.
     Returns: {"text": "transcribed words"}
     """
-    _require_key()
     uid = user["user_id"]
+    _require_key(uid)
     await _enforce_voice_quota(uid, "stt")
 
     mime = (file.content_type or "audio/webm").lower()
@@ -224,7 +228,7 @@ async def speech_to_text(
         )
 
     multipart = _stt_multipart(file.filename or "audio.webm", contents, mime)
-    headers = _xai_auth_headers()
+    headers = _xai_auth_headers(uid)
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -278,8 +282,8 @@ async def text_to_speech(
     Body: {"text": "hello"}
     Returns: audio/mpeg (MP3 bytes)
     """
-    _require_key()
     uid = user["user_id"]
+    _require_key(uid)
     await _enforce_voice_quota(uid, "tts")
 
     text = body.text.strip()
@@ -292,7 +296,7 @@ async def text_to_speech(
         "language": _DEFAULT_LANGUAGE,
     }
     headers = {
-        **_xai_auth_headers(),
+        **_xai_auth_headers(uid),
         "Content-Type": "application/json",
     }
 
@@ -372,7 +376,7 @@ async def get_voice_usage(user: dict = Depends(get_current_user)) -> dict:
     }
 
 
-# ── Orb TTS (ElevenLabs — Erin, Meditation Guide) ────────────────────────────
+# ── Orb TTS (optional ElevenLabs; otherwise xAI TTS) ─────────────────────────
 
 @router.post("/api/voice/orb-tts")
 async def orb_text_to_speech(
@@ -381,9 +385,10 @@ async def orb_text_to_speech(
     _signed: dict = Depends(require_signed_request),
 ) -> Response:
     """
-    Synthesize orb / breathing cues using ElevenLabs Erin (Meditation Guide).
+    Synthesize orb / breathing cues.
 
-    Falls back to xAI TTS (eve voice) if ELEVENLABS_API_KEY is not configured.
+    Uses ElevenLabs when ELEVENLABS_API_KEY and ELEVENLABS_ORB_VOICE_ID are set;
+    otherwise falls back to xAI TTS (eve voice).
     Orb TTS is NOT counted against voice-minute caps — it's part of the
     wellness experience, not the chat assistant.
 
@@ -398,8 +403,8 @@ async def orb_text_to_speech(
         raise HTTPException(status_code=400, detail="Empty text.")
 
     # ── ElevenLabs path ───────────────────────────────────────────────────────
-    if ELEVENLABS_API_KEY:
-        url = f"{_EL_BASE}/text-to-speech/{_EL_ORB_VOICE_ID}?output_format=mp3_44100_128"
+    if ELEVENLABS_API_KEY and ELEVENLABS_ORB_VOICE_ID:
+        url = f"{_EL_BASE}/text-to-speech/{ELEVENLABS_ORB_VOICE_ID}?output_format=mp3_44100_128"
         payload = {
             "text": text,
             "model_id": _EL_MODEL,
@@ -437,8 +442,8 @@ async def orb_text_to_speech(
         return Response(content=resp.content, media_type=audio_type)
 
     # ── xAI fallback (no ElevenLabs key configured) ───────────────────────────
-    if not XAI_API_KEY:
-        raise HTTPException(status_code=503, detail="Voice service is not configured on the server.")
+    if not resolve_api_key(uid):
+        raise HTTPException(status_code=503, detail="Add your Grok API key in Settings → Grok to use voice.")
 
     payload_xai = {
         "text": text,
@@ -446,7 +451,7 @@ async def orb_text_to_speech(
         "language": _DEFAULT_LANGUAGE,
     }
     headers_xai = {
-        **_xai_auth_headers(),
+        **_xai_auth_headers(uid),
         "Content-Type": "application/json",
     }
     try:

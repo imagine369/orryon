@@ -30,4 +30,4 @@ npm run publish:mac          # uploads to Vercel Blob, prints env var to set
 cd ../frontend && npm run verify:download:production
 ```
 
-**Public Mac releases (like Cursor):** follow **[MAC_SIGNING.md](./MAC_SIGNING.md)** — Apple Developer Program, sign, notarize, then host the `.dmg`. No App Store required; repo can stay private.
+**Public Mac releases (like Cursor):** follow **[MAC_SIGNING.md](./MAC_SIGNING.md)** — Apple Developer Program, sign, notarize, then host the `.dmg`. After install, users add a Grok API key in Settings.

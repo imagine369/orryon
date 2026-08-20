@@ -15,7 +15,7 @@ export const LIFE_OS_TOUR_LABEL = "See it in action.";
 
 /** Trust / privacy line under the tour and in the footer reveal. */
 export const LIFE_OS_PRIVACY_LINE =
-  "Private by design. We make money from memberships, not from your data.";
+  "Private by design. Orryon is free and open source. Chat uses your Grok API key.";
 
 /** Shown on Pro tier — upgrade path to Premium voice */
 export const PRO_TEXT_ONLY_HINT =

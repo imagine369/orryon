@@ -1,6 +1,6 @@
 # Contributing to Orryon
 
-Thank you for helping improve Orryon. This guide covers the constraints every PR must respect.
+Thank you for helping improve Orryon. The project is MIT-licensed. This guide covers the constraints every PR must respect.
 
 ## Before you open a PR
 

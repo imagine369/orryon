@@ -15,6 +15,7 @@ export interface Subscription {
   usage_resets_label?: string;
   reset_date?: string;
   is_trial_period?: boolean;
+  billing_enabled?: boolean;
 }
 
 export function useSubscription() {

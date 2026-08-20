@@ -79,7 +79,7 @@ spctl -a -vvv -t install dist/mac-arm64/Orryon.app
    - `DESKTOP_DOWNLOAD_MAC_URL` = Blob URL
 4. Redeploy
 
-Users download from **orryon.com**; your **GitHub repo stays private**.
+Users download from **orryon.com**. The GitHub repository is public.
 
 ## 7. Optional: CI signing (GitHub Actions)
 

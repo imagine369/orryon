@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     birth_date  TEXT DEFAULT '',
     gender  TEXT DEFAULT '',
     billing_period_start  TEXT DEFAULT '',
-    billing_period_end  TEXT DEFAULT ''
+    billing_period_end  TEXT DEFAULT '',
+    xai_api_key_enc TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS verification_codes (

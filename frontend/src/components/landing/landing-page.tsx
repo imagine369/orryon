@@ -5,7 +5,7 @@ import { hasToken } from "@/lib/api";
 import { AnimatedHeroAvatar } from "@/components/animated-hero-avatar";
 import { FadeIn } from "@/components/motion";
 import { PillLink } from "@/components/pill-cta";
-import { GetAppInstallCta, GetAppNavLink, SignInNavLink, SiteNav } from "@/components/site-nav";
+import { GetAppInstallCta, GetAppNavLink, GitHubNavLink, SignInNavLink, SiteNav } from "@/components/site-nav";
 import { AppTourDemo } from "@/components/landing/app-tour-demo";
 import { FeatureSection } from "@/components/landing/feature-section";
 import { FooterRevealSection } from "@/components/landing/footer-reveal-section";
@@ -26,6 +26,7 @@ export default function LandingPage() {
     <PillLink href="/home" variant="primary" size="sm">Go to app</PillLink>
   ) : (
     <>
+      <GitHubNavLink />
       <SignInNavLink />
       <GetAppNavLink />
     </>
@@ -34,7 +35,12 @@ export default function LandingPage() {
   const heroCta = loggedIn ? (
     <PillLink href="/home" size="sm">Go to app</PillLink>
   ) : (
-    <GetAppInstallCta size="sm" />
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <PillLink href="https://github.com/imagine369/orryon" size="sm">
+        GitHub
+      </PillLink>
+      <GetAppInstallCta size="sm" />
+    </div>
   );
 
   return (
@@ -64,7 +70,7 @@ export default function LandingPage() {
           >
             Your trusted personal concierge.
             <br />
-            Ask me and I&rsquo;ll do the work for you.
+            Open source and free. Download the app, then add your own Grok (xAI) API key.
           </p>
 
           {/* See it in action — app tour */}

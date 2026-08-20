@@ -186,7 +186,9 @@ ATTACHMENTS_DIR: str = os.getenv("ATTACHMENTS_DIR", "attachments")
 
 # ── ElevenLabs (orb / breathing voice) ───────────────────────────────────────
 # Optional. Used for breathing orb / Reset Anchor when xAI TTS is not used.
+# Voice ID must come from env — never hardcode a provider account voice.
 ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_ORB_VOICE_ID: str = os.getenv("ELEVENLABS_ORB_VOICE_ID", "")
 
 # ── Stripe (billing) ──────────────────────────────────────────────────────────
 # Set up at https://dashboard.stripe.com
@@ -243,6 +245,10 @@ def get_trial_days(price_id: str) -> int:
     return 0 if price_id in ANNUAL_PRICE_IDS else TRIAL_DAYS
 
 STRIPE_ENABLED: bool = bool(STRIPE_SECRET_KEY)
+
+# Paid checkout / plan gates. Off by default — Orryon is free; users bring a Grok key.
+# Set BILLING_ENABLED=1 only if you intentionally run Stripe subscriptions.
+BILLING_ENABLED: bool = os.getenv("BILLING_ENABLED", "").lower() in ("1", "true", "yes")
 
 # ── Ensure directories exist ──────────────────────────────────────────────────
 os.makedirs(NOTES_DIR, exist_ok=True)

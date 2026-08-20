@@ -2,7 +2,9 @@
 
 Your **Life OS** — ask almost anything in chat; when it's about your life here, Orryon actually does something.
 
-> **Local dev** uses SQLite on disk. **Production** can use Postgres + Redis on Railway; OTP sign-in is required outside demo mode.
+**Free and open source** ([MIT](LICENSE)). Hosted use and the desktop app are free; **you supply a Grok (xAI) API key**. Source: [github.com/imagine369/orryon](https://github.com/imagine369/orryon).
+
+> **Local / self-host** uses SQLite on disk (or Postgres). Chat needs `XAI_API_KEY` in `.env` **or** a key in Settings → Grok. Desktop downloaders paste the key in the app — do not edit installer files.
 
 ---
 
@@ -45,7 +47,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 - **CSV Import** — upload bank CSVs with auto-detected column mapping (Chase, Amex, generic)
 - **Data Export** — download all your data as a ZIP (SQLite DB + JSON)
 - **Share Links** — generate read-only dashboard links
-- **Stripe Billing** — optional subscription management with trial support
+- **Grok BYOK** — paste your xAI API key in Settings (or `XAI_API_KEY` when self-hosting)
 
 ---
 
@@ -59,7 +61,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 ### 1. Install
 
 ```bash
-git clone <repo-url> && cd orryon
+git clone https://github.com/imagine369/orryon.git && cd orryon
 
 # Backend
 python -m venv .venv
@@ -74,7 +76,7 @@ cd frontend && npm install && cd ..
 
 ```bash
 cp .env.example .env
-# Edit .env → set XAI_API_KEY (everything else is optional)
+# Edit .env → set XAI_API_KEY from https://console.x.ai (or add it later in Settings → Grok)
 ```
 
 ### 3. Run (two terminals)
@@ -140,7 +142,8 @@ docker run -p 8000:8000 --env-file .env orryon-backend
 
 | Variable | Required | Description |
 |---|---|---|
-| `XAI_API_KEY` | **Yes** | AI API key — enables the AI chat |
+| `XAI_API_KEY` | For self-host | Server-wide Grok key. Desktop/web users can instead paste a key in Settings → Grok |
+| `BILLING_ENABLED` | No | Set `1` only if you run Stripe subscriptions (off by default) |
 | `JWT_SECRET` | Prod | Secret for JWT signing (auto-generated in dev) |
 | `GROK_MODEL` | No | xAI model (default: `grok-4.3`) |
 | `SMTP_HOST` | No | SMTP server for OTP emails and reminders |
@@ -274,8 +277,12 @@ See [PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for the full policies (Eff
 
 - **Local-first** — all data stays in a single SQLite file on your device.
 - **AI chat** sends your messages + a context summary to third-party AI providers. No full database is shared.
-- **Stripe** handles payments — we never store card details.
+- **BYOK** — chat uses your Grok key (Settings or `.env`). We do not charge for the app.
 - **Full data export** (ZIP) and **account deletion** are always available.
+
+## License
+
+Released under the [MIT License](LICENSE). The name and logo “Orryon” remain a trademark of the project; forks should not present themselves as the official hosted app without permission.
 
 ---
 

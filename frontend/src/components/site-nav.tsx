@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PillLink } from "@/components/pill-cta";
 import { GetAppInstallCta, GetAppNavLink } from "@/components/get-app-nav-link";
-import { siteChromePaddingX } from "@/lib/site-chrome";
+import { GITHUB_REPO_URL } from "@/lib/github";
 import { cn } from "@/lib/utils";
 
 export { GetAppInstallCta, GetAppNavLink };
@@ -70,6 +70,19 @@ export function NavBackLink({ href = "/", label = "Back" }: { href?: string; lab
     <Link href={href} className={navPillClass}>
       &larr; {label}
     </Link>
+  );
+}
+
+export function GitHubNavLink() {
+  return (
+    <a
+      href={GITHUB_REPO_URL}
+      target="_blank"
+      rel="noreferrer"
+      className={navPillClass}
+    >
+      GitHub
+    </a>
   );
 }
 

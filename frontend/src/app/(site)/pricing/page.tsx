@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SiteNav, SignInNavLink } from "@/components/site-nav";
 import { PricingTierCard } from "@/components/pricing-tier-card";
-import { PRICING_TIERS, UPGRADE_PATH } from "@/lib/pricing-tiers";
+import { PRICING_TIERS } from "@/lib/pricing-tiers";
 import { useAuth } from "@/lib/auth-context";
 
 export default function PricingPage() {
@@ -15,7 +15,7 @@ export default function PricingPage() {
   // Hybrid: signed-in users upgrade in-app, not on the marketing page
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace(UPGRADE_PATH);
+      router.replace("/home");
     }
   }, [authLoading, user, router]);
 
@@ -36,13 +36,32 @@ export default function PricingPage() {
       <main className="flex-1 max-w-6xl mx-auto px-4 pb-24 w-full">
         <div className="text-center pt-16 pb-12">
           <h1 className="text-[1.6rem] sm:text-2xl lg:text-4xl font-bold text-white/85 mb-4 font-[family-name:var(--font-playfair)] leading-[1.25]">
-            Pricing
+            Free, forever
           </h1>
-          <p className="text-white/45 text-sm max-w-md mx-auto">
-            Sign in to subscribe. Already have an account?{" "}
-            <Link href={UPGRADE_PATH} className="underline underline-offset-2 hover:text-white/70">
-              Upgrade in the app
+          <p className="text-white/45 text-sm max-w-lg mx-auto">
+            Orryon does not charge. Self-host or{" "}
+            <Link href="/download" className="underline underline-offset-2 hover:text-white/70">
+              download the app
             </Link>
+            , then paste your own Grok key from{" "}
+            <a
+              href="https://console.x.ai"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-white/70"
+            >
+              console.x.ai
+            </a>
+            . Source is on{" "}
+            <a
+              href="https://github.com/imagine369/orryon"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-white/70"
+            >
+              GitHub
+            </a>
+            .
           </p>
         </div>
 

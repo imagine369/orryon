@@ -58,9 +58,10 @@ export default function HomePage() {
     chat.replaceMessages,
   );
 
-  const voiceInputOn = planAllowsVoiceInput(sub?.plan);
-  const voiceOverlayOn = planAllowsVoiceOutput(sub?.plan, prefs.voice_overlay_enabled);
-  const showSpeakToggle = planShowsSpeakResponsesToggle(sub?.plan);
+  const billingOn = Boolean(sub?.billing_enabled);
+  const voiceInputOn = planAllowsVoiceInput(sub?.plan, billingOn);
+  const voiceOverlayOn = planAllowsVoiceOutput(sub?.plan, prefs.voice_overlay_enabled, billingOn);
+  const showSpeakToggle = planShowsSpeakResponsesToggle(sub?.plan, billingOn);
   const orryonAliveState = deriveOrryonAliveState(voice.status, chat.streaming, chat.thinking);
 
   const ambient = useAmbientOrryon({

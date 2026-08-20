@@ -27,7 +27,8 @@ from core.orryon_brand import user_likely_addressing_orryon
 from core.system_prompt import get_system_prompt
 from core.tools import TOOL_SCHEMAS
 from core.user_locale import get_user_locale
-from core.xai_client import close_http_client, get_http_client, has_api_keys, next_api_key
+from core.user_xai import has_chat_api_key, resolve_api_key
+from core.xai_client import close_http_client, get_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,11 @@ async def run_orryon(
     session_id: str = "",
 ) -> dict:
     """Non-streaming entrypoint — collects the full response from the async stream."""
-    if not has_api_keys():
+    if not has_chat_api_key(user_id):
         return {
             "message": (
-                "AI API key not set. Add `XAI_API_KEY=your_key` to `.env`."
+                "Add your Grok (xAI) API key in Settings → Grok to chat. "
+                "Get a key at https://console.x.ai"
             ),
             "actions_taken": [],
             "tabs_to_refresh": [],
@@ -108,8 +110,14 @@ async def run_orryon_stream(
         {"type": "done",   "message": "...", "actions": [...], "tabs": [...]}
         {"type": "error",  "message": "..."}
     """
-    if not has_api_keys():
-        yield {"type": "error", "message": "Orryon's AI is not configured. Please try again later."}
+    if not has_chat_api_key(user_id):
+        yield {
+            "type": "error",
+            "message": (
+                "Add your Grok (xAI) API key in Settings → Grok to chat. "
+                "Get a key at https://console.x.ai"
+            ),
+        }
         return
 
     from core.xai_responses import (
@@ -157,7 +165,7 @@ async def run_orryon_stream(
         messages=messages,
         session_id=session_id,
         chat_history=chat_history or [],
-        api_key=next_api_key(),
+        api_key=resolve_api_key(user_id),
         reprompt_note=REPROMPT_SYSTEM_NOTE,
         max_rounds=MAX_TOOL_ROUNDS,
     )
@@ -195,7 +203,10 @@ async def run_orryon_stream(
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
         if status == 401:
-            msg = "Invalid API key. Check `XAI_API_KEY` in your `.env` file."
+            msg = (
+                "Invalid Grok API key. Open Settings → Grok and paste a key from "
+                "https://console.x.ai"
+            )
         elif status == 429:
             msg = "I'm getting a lot of requests right now. Give me a sec and try again."
         elif status >= 500:

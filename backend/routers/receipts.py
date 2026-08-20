@@ -12,7 +12,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from backend.cache import check_rate_limit_async
 from backend.deps import check_monthly_api_quota, require_active_plan, resolve_plan_for_user
-from config import GROK_MODEL, XAI_API_KEY
+from config import GROK_MODEL
+from core.user_xai import resolve_api_key
 from db.usage import record_token_spend
 
 logger = logging.getLogger(__name__)
@@ -90,8 +91,14 @@ async def scan_receipt(file: UploadFile = File(...), user: dict = Depends(requir
         "temperature": 0,
     }
 
+    api_key = resolve_api_key(uid)
+    if not api_key:
+        raise HTTPException(
+            503,
+            "Add your Grok API key in Settings → Grok to scan receipts.",
+        )
     headers = {
-        "Authorization": f"Bearer {XAI_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 

@@ -198,4 +198,5 @@ export const VIEW_TITLES: Record<string, string> = {
   briefing: "Daily Briefing",
   accessibility: "Accessibility",
   ambient: "Ambient Pickup",
+  grok: "Grok (xAI)",
 };

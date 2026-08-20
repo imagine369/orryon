@@ -6,18 +6,18 @@ import { CHAT_CONTAINER } from "@/lib/chat-helpers";
 
 const ERROR_COPY: Record<string, string> = {
   token_exchange:
-    "Google connect failed while saving access. Check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Railway match the Orryon (Jun 10) Web client, then try Connect again.",
+    "Google connect failed while saving access. Check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server match your Google Cloud OAuth web client, then try Connect again.",
   store_failed: "Google approved access, but Orryon couldn't save it. Try Connect again in a moment.",
   invalid_state: "Google connect expired or was interrupted. Open Settings and click Connect again.",
 };
 
 const REASON_COPY: Record<string, string> = {
   invalid_client:
-    "Google rejected the app credentials (invalid_client). On Railway, GOOGLE_CLIENT_ID must be copied from the Orryon Jun 10 Web client Client ID field — not a service-account email with .apps.googleusercontent.com added. Secret must be from that same client.",
+    "Google rejected the app credentials (invalid_client). GOOGLE_CLIENT_ID must be the Web client Client ID from Google Cloud — not a service-account email with .apps.googleusercontent.com added. Secret must be from that same client.",
   redirect_uri:
-    "Google rejected the redirect URI. GOOGLE_OAUTH_REDIRECT_URI must exactly match an Authorized redirect URI on the Orryon Jun 10 client.",
+    "Google rejected the redirect URI. GOOGLE_OAUTH_REDIRECT_URI must exactly match an Authorized redirect URI on that OAuth web client.",
   invalid_grant:
-    "Google rejected the OAuth code after Allow. Most often GOOGLE_CLIENT_SECRET on Railway does not match the Orryon (Jun 10) Client ID — reset the secret in Google Cloud, paste the new GOCSPX value into Railway, redeploy, then Connect once.",
+    "Google rejected the OAuth code after Allow. Most often GOOGLE_CLIENT_SECRET on the server does not match the Client ID — reset the secret in Google Cloud, update the env var, redeploy, then Connect once.",
   scope: "Google returned different permissions than expected. Try Connect again.",
   unknown: "Google token exchange failed for an unknown reason. Check Railway backend logs for details.",
 };

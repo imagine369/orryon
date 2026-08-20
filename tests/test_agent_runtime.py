@@ -21,13 +21,13 @@ async def test_run_orryon_stream_uses_degraded_tools_on_agent_unavailable():
         yield {"type": "done", "message": "ok", "actions": [], "tabs": []}
 
     with (
-        patch("core.grok_agent.has_api_keys", return_value=True),
+        patch("core.grok_agent.has_chat_api_key", return_value=True),
         patch("core.grok_agent.build_messages", return_value=[]),
         patch("core.grok_agent.get_user_memories", return_value=[]),
         patch("core.grok_agent.get_context_snapshot_text", new_callable=AsyncMock, return_value=""),
         patch("core.grok_agent.get_system_prompt", return_value="sys"),
         patch("core.grok_agent.filter_schemas_for_grok", return_value=[]),
-        patch("core.grok_agent.next_api_key", return_value="test-key"),
+        patch("core.grok_agent.resolve_api_key", return_value="test-key"),
         patch("core.xai_responses.run_orryon_stream_agent", side_effect=agent_side_effect),
     ):
         collected = []

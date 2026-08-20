@@ -22,6 +22,10 @@ export interface Settings {
   smtp_enabled: boolean;
   ai_connected: boolean;
   grok_model: string;
+  xai_key_set?: boolean;
+  xai_key_masked?: string;
+  server_ai_configured?: boolean;
+  billing_enabled?: boolean;
 }
 
 export interface AuthSession {
@@ -51,7 +55,8 @@ export type View =
   | "location"
   | "briefing"
   | "accessibility"
-  | "ambient";
+  | "ambient"
+  | "grok";
 
 
 export type EmailStep = "idle" | "input" | "code";

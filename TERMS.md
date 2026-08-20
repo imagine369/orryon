@@ -1,8 +1,10 @@
 # Terms of Service
 
-**Effective Date: May 12, 2026 | Version 3.0**
+**Effective Date: August 20, 2026 | Version 3.1**
 
-**IMPORTANT NOTICE:** PLEASE READ THESE TERMS OF SERVICE CAREFULLY. BY ACCESSING, USING, REGISTERING FOR, OR CONTINUING TO USE ORRYON (THE "SERVICE"), YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE LEGALLY BOUND BY THESE TERMS OF SERVICE, INCLUDING ALL DISCLAIMERS, LIMITATIONS OF LIABILITY, INDEMNIFICATION OBLIGATIONS, BINDING ARBITRATION AGREEMENT, AND CLASS ACTION WAIVER. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT ACCESS, USE, REGISTER FOR, OR CONTINUE USING THE SERVICE.
+**IMPORTANT NOTICE:** PLEASE READ THESE TERMS OF SERVICE CAREFULLY. THESE TERMS APPLY TO THE HOSTED SERVICE AT ORRYON.COM AND RELATED OFFICIAL APPS. THE SOURCE CODE IS AVAILABLE UNDER THE MIT LICENSE IN THIS REPOSITORY AND IS NOT LICENSED SOLELY BY THESE TERMS.
+
+BY ACCESSING, USING, REGISTERING FOR, OR CONTINUING TO USE THE HOSTED SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE LEGALLY BOUND BY THESE TERMS OF SERVICE, INCLUDING ALL DISCLAIMERS, LIMITATIONS OF LIABILITY, INDEMNIFICATION OBLIGATIONS, BINDING ARBITRATION AGREEMENT, AND CLASS ACTION WAIVER. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT ACCESS, USE, REGISTER FOR, OR CONTINUE USING THE SERVICE.
 
 ## 1. Definitions
 
@@ -46,17 +48,21 @@ Orryon is a Life OS platform — personal finance, organization, AI concierge, a
 
 The AI assistant uses third-party large language models (including xAI) and may produce inaccurate, incomplete, biased, hallucinated, outdated, inconsistent, or otherwise unreliable outputs. AI responses do not reflect the views of Orryon and are not verified, endorsed, or warranted by Orryon. **NOTWITHSTANDING ANY OTHER PROVISION OF THESE TERMS, YOU AGREE NOT TO RELY ON ANY AI OUTPUT FOR ANY PURPOSE, ESPECIALLY ANY DECISION WITH MATERIAL FINANCIAL, LEGAL, HEALTH, SAFETY, OR OTHER CONSEQUENCES. ORRYON MAKES NO WARRANTY, REPRESENTATION, OR GUARANTEE REGARDING THE ACCURACY, COMPLETENESS, OR SUITABILITY OF ANY AI OUTPUT. YOU ASSUME ALL RISK ASSOCIATED WITH THE USE OF AI FEATURES.** We reserve the right, at any time and without notice or liability, to modify, limit, suspend, or remove any AI feature or functionality.
 
-## 6. Subscription, Billing, Cancellation, and Refunds
+## 6. Hosted Service; API Keys; Optional Billing
 
-New users on monthly plans receive a fourteen (14) day free trial of paid features (annual plans are charged immediately upon signup). After the trial period, continued access requires a paid subscription. Subscriptions automatically renew at the then-current rate unless cancelled in accordance with these Terms. All payments are processed securely by Stripe, Inc.; we do not store full payment card details. Current pricing is displayed at signup and in Settings and is subject to change. To cancel, use the Stripe billing portal via Settings → Manage Billing. Cancellation takes effect at the end of the current billing period. **NOTWITHSTANDING ANY OTHER PROVISION OF THESE TERMS, YOU WILL NOT RECEIVE ANY REFUND, CREDIT, OR PRO-RATA REIMBURSEMENT FOR PARTIAL PERIODS, UNUSED TIME, OR ANNUAL SUBSCRIPTIONS. ANNUAL SUBSCRIPTIONS ARE NON-REFUNDABLE. WE MAY, IN OUR SOLE DISCRETION, OFFER REFUNDS OR CREDITS ON A CASE-BY-CASE BASIS; ANY SUCH OFFER DOES NOT CREATE A RIGHT TO FUTURE REFUNDS OR CONSTITUTE A WAIVER OF THESE TERMS.** If you cancel, your data remains accessible until you delete your account or the account is terminated.
+The official apps and website are provided **without a subscription fee**. Chat and related AI features require an xAI (Grok) API key that you create at console.x.ai and paste in Settings, or that you set as `XAI_API_KEY` when you self-host. You are responsible for xAI usage charges on that key. If billing features are enabled on a given deployment (`BILLING_ENABLED`), paid plans and Stripe processing may apply as described in the product UI; otherwise those sections do not apply.
 
 ## 7. Intellectual Property Rights
 
-The Service and all Content (excluding User Content) are owned by Orryon, its Affiliates, or their respective licensors and are protected by United States and international Intellectual Property Rights laws. Subject to these Terms, Orryon grants you a limited, non-exclusive, non-transferable, revocable, non-sublicensable license to access and use the Service solely for your personal, non-commercial use. **NOTWITHSTANDING ANY OTHER PROVISION, YOU MAY NOT COPY, MODIFY, DISTRIBUTE, SELL, RENT, LEASE, SUBLICENSE, REVERSE ENGINEER, DECOMPILE, DISASSEMBLE, CREATE DERIVATIVE WORKS FROM, OR OTHERWISE EXPLOIT THE SERVICE OR ANY CONTENT WITHOUT OUR PRIOR WRITTEN CONSENT.** All rights not expressly granted are reserved by Orryon and its licensors.
+The **source code** of Orryon is licensed under the MIT License included in the public repository. These Terms do not restrict rights granted by that license.
+
+The **hosted Service**, trademarks (including “Orryon”), logos, and branding remain owned by Orryon. You may not present a fork or competing host as the official Orryon service. User Content is addressed in section 9.
+
+Use of the hosted Service is a personal license to access the running application, not a transfer of trademark rights.
 
 ## 8. Acceptable Use Policy
 
-You agree not to, and not to permit any third party to: (a) use the Service for any illegal, harmful, fraudulent, abusive, or unauthorized purpose; (b) scrape, crawl, spider, harvest, or otherwise collect data or Content; (c) reverse engineer, decompile, disassemble, or attempt to derive source code; (d) upload, transmit, or store any virus, malware, or harmful code; (e) interfere with or disrupt the Service or servers; (f) attempt to gain unauthorized access; (g) use the AI to generate content that is illegal, abusive, hateful, defamatory, infringing, or violates third-party rights; (h) resell, sublicense, or provide the Service to third parties; (i) use the Service to train or improve any AI model without prior written permission; or (j) violate any applicable law or third-party right. We may suspend or terminate your account for any violation, in our sole discretion, without notice or refund.
+You agree not to, and not to permit any third party to: (a) use the Service for any illegal, harmful, fraudulent, abusive, or unauthorized purpose; (b) scrape, crawl, spider, harvest, or otherwise collect data or Content; (c) reverse engineer, decompile, disassemble, or attempt to derive source code except as permitted by the MIT License for the public repository; (d) upload, transmit, or store any virus, malware, or harmful code; (e) interfere with or disrupt the Service or servers; (f) attempt to gain unauthorized access; (g) use the AI to generate content that is illegal, abusive, hateful, defamatory, infringing, or violates third-party rights; (h) resell, sublicense, or provide the hosted Service to third parties as if it were your own paid product; (i) use the Service to train or improve any AI model without prior written permission; or (j) violate any applicable law or third-party right. We may suspend or terminate your account for any violation, in our sole discretion, without notice or refund.
 
 ## 9. User Content and License Grant
 
