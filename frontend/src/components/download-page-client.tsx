@@ -160,7 +160,7 @@ export function DownloadPageClient() {
 
         <p className="text-white/45 text-base sm:text-lg mb-10 max-w-md leading-relaxed">
           {selected === "ios"
-            ? "Install Orryon as a web app — same as using Cursor on iPhone and iPad."
+            ? "Install Orryon as a web app on iPhone and iPad."
             : isDesktopTab(selected)
               ? "Free to use. After install, add your Grok (xAI) API key in Settings."
               : "Install Orryon on your home screen, then sign in and add your Grok key."}

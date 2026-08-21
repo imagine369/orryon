@@ -47,7 +47,7 @@ Policy for product, Help, and the AI system prompt (`core/system_prompt.py` v10)
 | **Grocery vs errands** | **List** (“add milk”, shopping list) → `add_grocery_items` / `delete_grocery_items`. **Instacart checkout** (“order groceries”) → `create_fulfillment_handoff` (Quick Access → Errands). Call tools; never prose-only claims. |
 | **Health logs** | Vitals, medications, appointments (stored in Orryon) |
 | **Weather** | `get_weather` — live conditions for a city/place |
-| **News & web** | xAI `web_search` + `x_search` (Grok-style); RSS `search_web` fallback if Agent Tools unavailable |
+| **News & web** | xAI `web_search` + `x_search`; RSS `search_web` fallback if Agent Tools unavailable |
 | **Search** | Cross-feature search across their data |
 | **Errands** | `create_fulfillment_handoff` — deeplink to Uber, DoorDash, Instacart, OpenTable, pharmacy (user completes in partner app) |
 

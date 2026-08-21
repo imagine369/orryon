@@ -1,6 +1,6 @@
 # Orryon Desktop
 
-Native Mac / Windows / Linux app using the **Orryon avatar** as the dock/taskbar icon. Loads your deployed web app in an Electron shell (same pattern as Cursor).
+Native Mac / Windows / Linux app using the **Orryon avatar** as the dock/taskbar icon. Loads your deployed web app in an Electron shell.
 
 ## Develop
 
@@ -30,4 +30,4 @@ npm run publish:mac          # uploads to Vercel Blob, prints env var to set
 cd ../frontend && npm run verify:download:production
 ```
 
-**Public Mac releases (like Cursor):** follow **[MAC_SIGNING.md](./MAC_SIGNING.md)** — Apple Developer Program, sign, notarize, then host the `.dmg`. After install, users add a Grok API key in Settings.
+**Public Mac releases:** follow **[MAC_SIGNING.md](./MAC_SIGNING.md)** — Apple Developer Program, sign, notarize, then host the `.dmg`. After install, users add a Grok API key in Settings.

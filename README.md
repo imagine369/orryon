@@ -40,7 +40,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full folder map, data flow, and m
 - **Schedule** — calendar events, tasks, and grocery list
 - **Goals** — savings goals with progress tracking
 - **Notes** — personal notes and journal
-- **Lists** — multi-list system (Todoist-style custom lists)
+- **Lists** — multi-list system for custom lists
 - **OTP Auth** — email-based sign-in (no passwords); demo mode for local development
 - **PWA** — installable as a mobile app (manifest + service worker)
 - **Receipt Scanner** — snap a photo to auto-extract expense data (AI vision)

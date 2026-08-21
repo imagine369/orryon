@@ -78,7 +78,7 @@ function createWindow() {
     return { action: "deny" };
   });
 
-  // Cursor-style: open the installed app, then sign in (not the marketing download page).
+  // Open the installed app, then sign in (not the marketing download page).
   win.loadURL(`${APP_URL}/login?step=email`);
 
   win.on("closed", () => {

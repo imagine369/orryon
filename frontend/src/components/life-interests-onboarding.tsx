@@ -21,7 +21,7 @@ function markDismissedLocally(): void {
 }
 
 /**
- * One-screen interest onboarding (X-style): pick up to 3 focus areas.
+ * One-screen interest onboarding: pick up to 3 focus areas.
  * Shown once per account until skipped or saved.
  */
 export function LifeInterestsOnboarding() {

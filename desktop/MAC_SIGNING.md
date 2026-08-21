@@ -1,6 +1,6 @@
-# Mac distribution like Cursor (sign + notarize)
+# Mac distribution (sign + notarize)
 
-Cursor is **not** on the App Store. They ship a **signed + notarized** `.dmg` from their website. Orryon can do the same.
+Orryon ships a **signed + notarized** `.dmg` from the website, not the App Store.
 
 ## 1. Apple Developer Program
 
