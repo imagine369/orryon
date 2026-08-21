@@ -1,5 +1,12 @@
 desktop/dist/
 desktop/node_modules/
+**/*.dmg
+**/*.exe
+**/*.AppImage
+frontend/ios
+frontend/android
+frontend/node_modules
+frontend/.next
 frontend/public/downloads/*.dmg
 frontend/public/downloads/*.exe
 frontend/public/downloads/*.AppImage

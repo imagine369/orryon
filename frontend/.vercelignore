@@ -1,3 +1,11 @@
+.next
+node_modules
+**/*.dmg
+**/*.exe
+**/*.AppImage
+ios
+android
 public/downloads/*.dmg
 public/downloads/*.exe
 public/downloads/*.AppImage
+public/downloads/Orryon-mac.dmg
